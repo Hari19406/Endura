@@ -12,3 +12,8 @@ This is the user-facing app for Endura.
 - Real-time adaptive coaching
 - Voice guidance during runs
 - Integration with wearables
+
+## Current Progress
+- Initial system architecture defined
+- Fatigue model prototype implemented
+- Workout generation logic in design phase
