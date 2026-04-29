@@ -18,6 +18,7 @@ import '../services/coach_message_builder.dart' as message;
 import '../widgets/target_pace_indicator.dart';
 import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
 
@@ -505,6 +506,14 @@ bool get _hasCooldown =>
     }
 
     AudioCueService.instance.announceRunStart();
+    await Posthog().capture(
+      eventName: 'workout_started',
+      properties: {
+        'workout_type': widget.activeCoachMessage != null
+            ? _resolveWorkoutType(widget.activeCoachMessage!.workoutIntent)
+            : 'free',
+      },
+    );
     _startGPSMonitoring();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -728,6 +737,14 @@ bool get _hasCooldown =>
         );
         await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then((r) => debugPrint('Sync: $r'));
+        await Posthog().capture(
+          eventName: 'workout_completed',
+          properties: {
+            'duration': _capturedMainSeconds,
+            'distance': double.parse(
+                (_capturedMainDistanceM / 1000).toStringAsFixed(2)),
+          },
+        );
         await _showCSCalibrationPromptIfNeeded();
       } catch (e) {
         debugPrint('Error saving run: $e');

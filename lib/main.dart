@@ -14,6 +14,7 @@ import 'screens/reset_password_screen.dart';
 import 'dart:async';
 import 'utils/refreshable.dart';
 import 'services/coach_message_builder.dart' as message;
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
   try {
@@ -55,6 +56,27 @@ void main() async {
     debugPrint('[Startup] Supabase.initialize() failed: $e');
     runApp(_StartupErrorApp(message: 'Supabase init failed:\n$e'));
     return;
+  }
+
+  const posthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  const posthogHost = String.fromEnvironment('POSTHOG_HOST');
+
+  if (posthogApiKey.isNotEmpty && posthogHost.isNotEmpty) {
+    await Posthog().setup(
+      PostHogConfig(posthogApiKey)
+        ..host = posthogHost
+        ..debug = false
+        ..captureApplicationLifecycleEvents = true,
+    );
+    debugPrint('[Startup] PostHog initialized');
+  } else {
+    debugPrint('[Startup] PostHog skipped — missing credentials');
+  }
+
+  if (posthogApiKey.isNotEmpty && posthogHost.isNotEmpty) {
+    await Posthog().capture(
+      eventName: 'app_opened',
+    );
   }
 
   runApp(const MyApp());

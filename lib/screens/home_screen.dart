@@ -22,6 +22,7 @@ import '../services/profile_service.dart';
 import '../services/engine_state_sync_service.dart';
 import '../engines/config/workout_template_library.dart';
 import '../screens/pre_run_check.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 enum WorkoutCategory { easy, tempo, interval, long, recovery, rest }
 
@@ -518,6 +519,14 @@ class _HomeScreenState extends State<HomeScreen>
         await EngineMemoryService().saveActivePlan(newPlan);
         _engineMemory = memory.copyWith(activePlan: newPlan);
         _activePlan = newPlan;
+        final prefs = await SharedPreferences.getInstance();
+        await Posthog().capture(
+          eventName: 'plan_created',
+          properties: {
+            'goal': prefs.getString('goal_race') ?? 'unknown',
+            'level': prefs.getString('experience_level') ?? 'unknown',
+          },
+        );
       } else {
         _activePlan = memory.activePlan;
       }
