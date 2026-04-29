@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "564529835415",
+    "project_id": "coach-f41f1",
+    "storage_bucket": "coach-f41f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564529835415:android:800d367dbe0b092bda28d2",
+        "android_client_info": {
+          "package_name": "com.endura.runapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiKveOf0azc7mv8m6RUdc4_k6ZRkT_XAo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564529835415:android:b4a634c02e8fc368da28d2",
+        "android_client_info": {
+          "package_name": "com.example.run_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiKveOf0azc7mv8m6RUdc4_k6ZRkT_XAo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
