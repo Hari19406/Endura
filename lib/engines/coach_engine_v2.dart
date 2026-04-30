@@ -42,6 +42,7 @@ class HistoricalTrainingData {
   });
 }
 
+// coach_engine_v2.dart — UserMetrics class
 class UserMetrics {
   final int avgEasyPace;
   final int tempoCapabilityPace;
@@ -52,6 +53,7 @@ class UserMetrics {
   final int runsPerWeek;
   final String goalRace;
   final String experienceLevel;
+  final String goalIntent;          // NEW
   final double? avgRpe;
   final selector.RecentRpeTrend recentRpeTrend;
   final bool lastEasyRunTooHard;
@@ -70,6 +72,7 @@ class UserMetrics {
     this.runsPerWeek = 4,
     required this.goalRace,
     this.experienceLevel = 'beginner',
+    this.goalIntent = 'improve',    // NEW
     this.avgRpe,
     this.recentRpeTrend = selector.RecentRpeTrend.unknown,
     this.lastEasyRunTooHard = false,
