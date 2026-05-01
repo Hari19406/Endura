@@ -4,6 +4,7 @@ import '../../models/weekly_plan.dart';
 import '../../models/race_plan.dart';
 import '../config/workout_template_library.dart';
 import '../core/vdot_calculator.dart';
+import '../coach_engine_v2.dart' show ProgressionDecision;
 
 EngineMemory defaultSafeMemory() => const EngineMemory();
 
@@ -71,6 +72,8 @@ class EngineMemory {
   final WorkoutIntent? lastCompletedWorkoutIntent;
   final String? plannedIntentPreviewLabel;
   final List<String> recentTemplateIds;
+  final ProgressionDecision? weeklyProgressionDecision;
+  final DateTime? lastProgressionEvaluationDate;
 
   String get lastWorkoutType => lastCompletedType.name;
 
@@ -93,6 +96,8 @@ class EngineMemory {
     this.lastCompletedWorkoutIntent,
     this.plannedIntentPreviewLabel,
     this.recentTemplateIds = const [],
+    this.weeklyProgressionDecision,
+    this.lastProgressionEvaluationDate,
   });
 
   bool get hasRacePlan => racePlan != null;
@@ -154,6 +159,9 @@ class EngineMemory {
         'lastCompletedWorkoutIntent': lastCompletedWorkoutIntent?.name,
         'plannedIntentPreviewLabel': plannedIntentPreviewLabel,
         'recentTemplateIds': recentTemplateIds,
+        'weeklyProgressionDecision': weeklyProgressionDecision?.name,
+        'lastProgressionEvaluationDate':
+            lastProgressionEvaluationDate?.toIso8601String(),
       };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
@@ -198,6 +206,18 @@ class EngineMemory {
         }
       }
 
+      ProgressionDecision? parseProgressionDecision(dynamic raw) {
+        if (raw is! String) return null;
+        try {
+          return ProgressionDecision.values.firstWhere(
+            (e) => e.name == raw,
+            orElse: () => ProgressionDecision.hold,
+          );
+        } catch (_) {
+          return null;
+        }
+      }
+
       // ── Schema migration: criticalSpeed → vdotScore ──────────────────────
       int parsedVdot;
       bool parsedProvisional;
@@ -218,7 +238,6 @@ class EngineMemory {
       final firstRunDate = DateTime.tryParse('${json['firstRunDate'] ?? ''}');
       final lastRunDate = DateTime.tryParse('${json['lastRunDate'] ?? ''}');
 
-      // Use calendar-based week if firstRunDate is available, otherwise fall back.
       final currentWeek = firstRunDate != null
           ? PhaseEngine.weekNumberFromDate(firstRunDate)
           : PhaseEngine.weekNumber(totalRuns);
@@ -248,6 +267,10 @@ class EngineMemory {
         plannedIntentPreviewLabel:
             json['plannedIntentPreviewLabel'] as String?,
         recentTemplateIds: parseStringList(json['recentTemplateIds']),
+        weeklyProgressionDecision:
+            parseProgressionDecision(json['weeklyProgressionDecision']),
+        lastProgressionEvaluationDate: DateTime.tryParse(
+            '${json['lastProgressionEvaluationDate'] ?? ''}'),
       );
     } catch (_) {
       return defaultSafeMemory();
@@ -280,11 +303,13 @@ class EngineMemory {
     String? plannedIntentPreviewLabel,
     bool clearPlannedIntentPreviewLabel = false,
     List<String>? recentTemplateIds,
+    ProgressionDecision? weeklyProgressionDecision,
+    bool clearWeeklyProgressionDecision = false,
+    DateTime? lastProgressionEvaluationDate,
   }) {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
 
-    // Calendar-based if firstRunDate exists, otherwise fall back to run count.
     final newCurrentWeek = currentWeek ??
         (newFirstRunDate != null
             ? PhaseEngine.weekNumberFromDate(newFirstRunDate)
@@ -319,6 +344,11 @@ class EngineMemory {
           ? null
           : (plannedIntentPreviewLabel ?? this.plannedIntentPreviewLabel),
       recentTemplateIds: recentTemplateIds ?? this.recentTemplateIds,
+      weeklyProgressionDecision: clearWeeklyProgressionDecision
+          ? null
+          : (weeklyProgressionDecision ?? this.weeklyProgressionDecision),
+      lastProgressionEvaluationDate:
+          lastProgressionEvaluationDate ?? this.lastProgressionEvaluationDate,
     );
   }
 }

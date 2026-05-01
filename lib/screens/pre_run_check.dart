@@ -43,7 +43,7 @@ Future<void> showPreRunCheck({
 // SHEET
 // ============================================================================
 
-enum _Step { feeling, sleep, pain, restChoice, chestWarning }
+enum _Step { sleep, pain, restChoice, chestWarning }
 
 class _PreRunCheckSheet extends StatefulWidget {
   final message.CoachMessage coachMessage;
@@ -61,30 +61,15 @@ class _PreRunCheckSheet extends StatefulWidget {
 }
 
 class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
-  _Step _step = _Step.feeling;
-  PreRunFeeling? _feeling;
+  _Step _step = _Step.sleep;
   PreRunSleep? _sleep;
 
   // ── Step handlers ────────────────────────────────────────────────────────
 
-  void _onFeelingSelected(PreRunFeeling feeling) {
-    _feeling = feeling;
-    if (feeling == PreRunFeeling.great || feeling == PreRunFeeling.normal) {
-      setState(() => _step = _Step.sleep);
-    } else {
-      // tired → still ask sleep + pain
-      setState(() => _step = _Step.sleep);
-    }
-  }
-
-  void _onNeedRest() {
-    setState(() => _step = _Step.restChoice);
-  }
-
   void _onSleepSelected(PreRunSleep sleep) {
-    _sleep = sleep;
-    setState(() => _step = _Step.pain);
-  }
+  _sleep = sleep;
+  setState(() => _step = _Step.pain);
+}
 
   void _onPainSelected(PainLocation pain) {
     if (pain == PainLocation.chest) {
@@ -95,18 +80,17 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   }
 
   void _finalize(PainLocation pain) {
-    final inputs = PreRunInputs(
-      feeling: _feeling ?? PreRunFeeling.great,
-      sleep: _sleep ?? PreRunSleep.good,
-      pain: pain,
-    );
-
-    final scaler = const PreRunScaler();
-    final result = scaler.scale(widget.coachMessage.resolvedWorkout, inputs);
-    final scaled = _rebuildMessage(result.workout, result.coachNote);
-    Navigator.pop(context);
-    widget.onProceed(scaled);
-  }
+  final inputs = PreRunInputs(
+    feeling: PreRunFeeling.normal,
+    sleep: _sleep ?? PreRunSleep.good,
+    pain: pain,
+  );
+  final scaler = const PreRunScaler();
+  final result = scaler.scale(widget.coachMessage.resolvedWorkout, inputs);
+  final scaled = _rebuildMessage(result.workout, result.coachNote);
+  Navigator.pop(context);
+  widget.onProceed(scaled);
+}
 
   void _onTakeFullRest() {
     Navigator.pop(context);
@@ -157,53 +141,29 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   }
 
   Widget _buildStep() {
-    return switch (_step) {
-      _Step.feeling     => _FeelingStep(onFeeling: _onFeelingSelected, onNeedRest: _onNeedRest),
-      _Step.sleep       => _SleepStep(onSleep: _onSleepSelected, onBack: () => setState(() => _step = _Step.feeling)),
-      _Step.pain        => _PainStep(onPain: _onPainSelected, onBack: () => setState(() => _step = _Step.sleep)),
-      _Step.restChoice  => _RestChoiceStep(onFullRest: _onTakeFullRest, onRecoveryRun: _onTakeRecoveryRun, onBack: () => setState(() => _step = _Step.feeling)),
-      _Step.chestWarning => _ChestWarningStep(onDismiss: () { Navigator.pop(context); widget.onSkip(); }),
-    };
-  }
+  return switch (_step) {
+    _Step.sleep        => _SleepStep(onSleep: _onSleepSelected),
+    _Step.pain         => _PainStep(onPain: _onPainSelected, onBack: () => setState(() => _step = _Step.sleep)),
+    _Step.restChoice   => _RestChoiceStep(onFullRest: _onTakeFullRest, onRecoveryRun: _onTakeRecoveryRun, onBack: () => setState(() => _step = _Step.sleep)),
+    _Step.chestWarning => _ChestWarningStep(onDismiss: () { Navigator.pop(context); widget.onSkip(); }),
+  };
+}
 }
 
 // ============================================================================
 // STEP WIDGETS
 // ============================================================================
 
-class _FeelingStep extends StatelessWidget {
-  final void Function(PreRunFeeling) onFeeling;
-  final VoidCallback onNeedRest;
-
-  const _FeelingStep({required this.onFeeling, required this.onNeedRest});
-
-  @override
-  Widget build(BuildContext context) {
-    return _StepShell(
-      title: 'How are you feeling?',
-      subtitle: 'Max will adjust today\'s session if needed.',
-      children: [
-        _OptionCard(emoji: '⚡', label: 'Feeling great', subtitle: 'Ready to go', onTap: () => onFeeling(PreRunFeeling.great)),
-        _OptionCard(emoji: '👟', label: 'Feeling normal', subtitle: 'All good', onTap: () => onFeeling(PreRunFeeling.normal)),
-        _OptionCard(emoji: '😴', label: 'Feeling tired', subtitle: 'Dose will be adjusted', onTap: () => onFeeling(PreRunFeeling.tired)),
-        _OptionCard(emoji: '🛑', label: 'Need rest', subtitle: 'Choose how to handle today', onTap: onNeedRest),
-      ],
-    );
-  }
-}
-
 class _SleepStep extends StatelessWidget {
   final void Function(PreRunSleep) onSleep;
-  final VoidCallback onBack;
 
-  const _SleepStep({required this.onSleep, required this.onBack});
+  const _SleepStep({required this.onSleep});
 
   @override
   Widget build(BuildContext context) {
     return _StepShell(
       title: 'How was your sleep?',
       subtitle: 'Poor sleep affects recovery and performance.',
-      onBack: onBack,
       children: [
         _OptionCard(emoji: '😴', label: 'Slept well', subtitle: '7+ hours, felt rested', onTap: () => onSleep(PreRunSleep.good)),
         _OptionCard(emoji: '🥱', label: 'Poor sleep', subtitle: 'Broken or under 6 hours', onTap: () => onSleep(PreRunSleep.poor)),

@@ -270,7 +270,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       ),
       _RpeOption(
         emoji: '👌',
-        label: 'Just right',
+        label: 'Fine',
         sublabel: 'Controlled, felt as expected',
         rpeValue: 5,
         color: Color(0xFF388E3C),
@@ -284,7 +284,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       ),
       _RpeOption(
         emoji: '😮‍💨',
-        label: 'Very hard',
+        label: 'Too hard',
         sublabel: 'Near limit, tough to finish',
         rpeValue: 9,
         color: Color(0xFFD32F2F),

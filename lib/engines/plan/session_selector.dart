@@ -51,6 +51,7 @@ class SelectionContext {
   final int qualitySessionsDoneThisWeek;
   final bool longRunDoneThisWeek;
   final String experienceLevel;
+  final String goalIntent; 
 
    const SelectionContext({
     required this.raceDistance,
@@ -71,6 +72,7 @@ class SelectionContext {
     this.qualitySessionsDoneThisWeek = 0,
     this.longRunDoneThisWeek = false,
     this.experienceLevel = 'intermediate',
+    this.goalIntent = 'improve', 
   });
 }
 
@@ -340,10 +342,12 @@ class SessionSelector {
         if (context.phase == TrainingPhase.base) {
           return WorkoutIntent.threshold;
         }
-        // Beginners do threshold in week 1 of build before graduating to VO2
+        // finish intent never gets VO2 max work
+        if (context.goalIntent == 'finish') return WorkoutIntent.threshold;
+
         final isBeginnerEarlyBuild = context.phase == TrainingPhase.build &&
             context.weekNumber == 1 &&
-            context.experienceLevel == 'beginner';
+           context.experienceLevel == 'beginner';
         if (isBeginnerEarlyBuild) return WorkoutIntent.threshold;
         return switch (context.raceDistance) {
           RaceDistance.fiveK        => WorkoutIntent.vo2max,

@@ -591,6 +591,8 @@ class _HomeScreenState extends State<HomeScreen>
             ? 5.0
             : runs.map((r) => r.distance).reduce((a, b) => a > b ? a : b);
 
+        final goalIntent = prefs.getString('goal_intent') ?? 'improve'; // NEW — read from prefs
+
         _userMetrics = UserMetrics(
           avgEasyPace: avgEasyPace,
           tempoCapabilityPace: (avgEasyPace * 0.85).round(),
@@ -603,6 +605,7 @@ class _HomeScreenState extends State<HomeScreen>
           runsPerWeek: runsPerWeek,
           goalRace: goalRace,
           experienceLevel: experienceLevel,
+          goalIntent: goalIntent,           // NEW
           avgRpe: _averageRecentRpe(runs),
           recentRpeTrend: _deriveRecentRpeTrend(runs),
           lastEasyRunTooHard: _lastEasyRunTooHard(runs),

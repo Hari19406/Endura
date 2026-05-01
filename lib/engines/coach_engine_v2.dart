@@ -204,10 +204,11 @@ class CoachEngine {
       phase = memory.currentPhase;
     }
 
-    final progression = _progressionProfile(
+    final progression = _resolveProgression(
       runAnalysis: runAnalysis,
       historicalTrainingData: historicalTrainingData,
       memory: memory,
+      now: now,
     );
 
     final baseWeeklyTargetKm = WeeklyGenerator.targetFor(
@@ -280,6 +281,7 @@ class CoachEngine {
       qualitySessionsDoneThisWeek: budget.qualityDone,
       longRunDoneThisWeek: budget.longRunDone,
       experienceLevel: userMetrics.experienceLevel,
+      goalIntent: userMetrics.goalIntent,
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
@@ -607,6 +609,59 @@ class CoachEngine {
   }
 
   double _roundHalf(double value) => (value * 2).round() / 2;
+
+  ProgressionProfile _resolveProgression({
+  required selector.RunAnalysis runAnalysis,
+  required HistoricalTrainingData historicalTrainingData,
+  required EngineMemory memory,
+  required DateTime now,
+}) {
+  final isMonday = now.weekday == DateTime.monday;
+  final lastEval = memory.lastProgressionEvaluationDate;
+  final alreadyEvaluatedThisWeek = lastEval != null &&
+      now.difference(lastEval).inDays < 7 &&
+      !isMonday;
+
+  if (alreadyEvaluatedThisWeek &&
+      memory.weeklyProgressionDecision != null) {
+    return _decisionToProfile(memory.weeklyProgressionDecision!);
+  }
+
+  return _progressionProfile(
+    runAnalysis: runAnalysis,
+    historicalTrainingData: historicalTrainingData,
+    memory: memory,
+  );
+}
+
+ProgressionProfile _decisionToProfile(ProgressionDecision decision) {
+  return switch (decision) {
+    ProgressionDecision.progress => const ProgressionProfile(
+        decision: ProgressionDecision.progress,
+        weeklyVolumeMultiplier: 1.07,
+        longRunMultiplier: 1.06,
+        sessionVolumeMultiplier: 1.04,
+        sessionIntensityMultiplier: 0.99,
+        allowProgression: true,
+      ),
+    ProgressionDecision.hold => const ProgressionProfile(
+        decision: ProgressionDecision.hold,
+        weeklyVolumeMultiplier: 1.0,
+        longRunMultiplier: 1.0,
+        sessionVolumeMultiplier: 1.0,
+        sessionIntensityMultiplier: 1.0,
+        allowProgression: false,
+      ),
+    ProgressionDecision.regress => const ProgressionProfile(
+        decision: ProgressionDecision.regress,
+        weeklyVolumeMultiplier: 0.92,
+        longRunMultiplier: 0.90,
+        sessionVolumeMultiplier: 0.94,
+        sessionIntensityMultiplier: 1.02,
+        allowProgression: false,
+      ),
+  };
+}
 
   // ── Type mappers ──────────────────────────────────────────────────────────
 
