@@ -62,10 +62,24 @@ class EngineRuntime {
       }
 
       // ── Monday: save progression evaluation date ──────────────────────
-      if (runDate.weekday == DateTime.monday) {
-        await _memoryService.save(updated.copyWith(
+      if (_shouldEvaluateProgression(updated, runDate)) {
+        final pendingNudge = updated.pendingVdotNudge;
+        final appliedNudge = pendingNudge.clamp(-1, 1);
+        final newVdot = (updated.vdotScore + appliedNudge).clamp(30, 85);
+
+        updated = updated.copyWith(
           lastProgressionEvaluationDate: runDate,
-        ));
+          vdotScore: newVdot,
+          vdotIsProvisional: false,
+          pendingVdotNudge: 0,
+        );
+
+        debugPrint(
+          '[EngineRuntime] Weekly vDOT apply: ${updated.vdotScore - appliedNudge} → $newVdot '
+          '(pending=$pendingNudge applied=$appliedNudge)',
+        );
+
+        await _memoryService.save(updated);
       }
 
       debugPrint(
@@ -117,19 +131,25 @@ class EngineRuntime {
 
     if (nudge == 0) return null;
 
-    final newVdot = (current.vdotScore + nudge).clamp(30, 85);
-    if (newVdot == current.vdotScore) return null;
+    final banked = (current.pendingVdotNudge + nudge).clamp(-3, 3);
 
     debugPrint(
-      '[EngineRuntime] vDOT calibration: ${current.vdotScore} → $newVdot '
+      '[EngineRuntime] vDOT signal banked: nudge=$nudge '
+      'pending=${current.pendingVdotNudge} → $banked '
       '(actualPace=${actualPace.round()} expectedPace=${expectedPace.round()} '
-      'rpe=$rpe nudge=$nudge)',
+      'rpe=$rpe)',
     );
 
-    return current.copyWith(
-      vdotScore: newVdot,
-      vdotIsProvisional: false,
-    );
+    return current.copyWith(pendingVdotNudge: banked);
+  }
+
+  static bool _shouldEvaluateProgression(EngineMemory memory, DateTime today) {
+    if (memory.lastProgressionEvaluationDate == null) {
+      return memory.totalRunsCompleted >= 3;
+    }
+    final daysSinceLast =
+        today.difference(memory.lastProgressionEvaluationDate!).inDays;
+    return daysSinceLast >= 7;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

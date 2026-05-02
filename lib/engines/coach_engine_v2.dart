@@ -209,6 +209,7 @@ class CoachEngine {
       historicalTrainingData: historicalTrainingData,
       memory: memory,
       now: now,
+      trainingDayIndices: effectiveTrainingDays,
     );
 
     final baseWeeklyTargetKm = WeeklyGenerator.targetFor(
@@ -478,6 +479,7 @@ class CoachEngine {
     required selector.RunAnalysis runAnalysis,
     required HistoricalTrainingData historicalTrainingData,
     required EngineMemory memory,
+    required int splitSize,
   }) {
     final avgRpe = runAnalysis.avgRpe ?? memory.averageRecentRpe(3) ?? 5.5;
     final hasSufficientRpeTrendData =
@@ -490,6 +492,7 @@ class CoachEngine {
     final completedSuccessfully = _completedSuccessfully(
       historicalTrainingData,
       memory.activePlan,
+      splitSize,
     );
     final afterRecoveryDay = memory.lastCompletedType == WorkoutType.recovery;
     final repeatedDowngrades = _repeatedDowngradePressure(
@@ -555,33 +558,56 @@ class CoachEngine {
   }
 
   bool _completedSuccessfully(
-    HistoricalTrainingData historicalTrainingData,
-    WeeklyPlan? activePlan,
-  ) {
-    final recentRuns = historicalTrainingData.recentRuns.take(3).toList();
-    if (recentRuns.isEmpty) return true;
+  HistoricalTrainingData historicalTrainingData,
+  WeeklyPlan? activePlan,
+  int splitSize,
+) {
+  final recentRuns = historicalTrainingData.recentRuns.take(3).toList();
+  if (recentRuns.isEmpty) return true;
 
-    final rpeSum = recentRuns
-        .where((r) => r.rpe != null)
-        .fold<double>(0.0, (sum, r) => sum + r.rpe!);
-    final rpeCount = recentRuns.where((r) => r.rpe != null).length;
-    final rpeOk = rpeCount == 0 || (rpeSum / rpeCount) <= 6.5;
+  final rpeSum = recentRuns
+      .where((r) => r.rpe != null)
+      .fold<double>(0.0, (sum, r) => sum + r.rpe!);
+  final rpeCount = recentRuns.where((r) => r.rpe != null).length;
+  final rpeOk = rpeCount == 0 || (rpeSum / rpeCount) <= 6.5;
 
-    if (activePlan == null) return rpeOk;
+  if (activePlan == null) return rpeOk;
 
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
-    final plannedDaysSoFar = activePlan.days.where((d) {
-      if (d.isRestDay) return false;
-      final plannedDate = DateTime(d.date.year, d.date.month, d.date.day);
-      return !plannedDate.isAfter(todayDate);
-    }).toList();
-    final completionRate = plannedDaysSoFar.isEmpty
-        ? 1.0
-        : plannedDaysSoFar.where((d) => d.isCompleted).length /
-            plannedDaysSoFar.length;
-    return rpeOk && completionRate >= 0.6;
-  }
+  final today = DateTime.now();
+  final todayDate = DateTime(today.year, today.month, today.day);
+  final plannedDaysSoFar = activePlan.days.where((d) {
+    if (d.isRestDay) return false;
+    final plannedDate = DateTime(d.date.year, d.date.month, d.date.day);
+    return !plannedDate.isAfter(todayDate);
+  }).toList();
+
+  final completed = plannedDaysSoFar.where((d) => d.isCompleted).length;
+  final planned = plannedDaysSoFar.length;
+  final completionRate = planned == 0 ? 1.0 : completed / planned;
+
+  final progressThreshold = _progressThreshold(splitSize);
+  final holdThreshold = _holdThreshold(splitSize);
+
+  if (completionRate >= progressThreshold) return true;
+  if (completionRate >= holdThreshold) return rpeOk;
+  return false;
+}
+
+double _progressThreshold(int splitSize) => switch (splitSize) {
+  3 => 1.0,
+  4 => 0.75,
+  5 => 0.80,
+  6 => 0.83,
+  _ => 0.80,
+};
+
+double _holdThreshold(int splitSize) => switch (splitSize) {
+  3 => 0.67,
+  4 => 0.50,
+  5 => 0.60,
+  6 => 0.50,
+  _ => 0.60,
+};
 
   bool _repeatedDowngradePressure(List<SavedRun> recentRuns) {
     final recent = recentRuns.take(3).toList();
@@ -615,15 +641,20 @@ class CoachEngine {
   required HistoricalTrainingData historicalTrainingData,
   required EngineMemory memory,
   required DateTime now,
+  required List<int> trainingDayIndices,
 }) {
-  final isMonday = now.weekday == DateTime.monday;
   final lastEval = memory.lastProgressionEvaluationDate;
-  final alreadyEvaluatedThisWeek = lastEval != null &&
-      now.difference(lastEval).inDays < 7 &&
-      !isMonday;
+  final hasEnoughData = memory.totalRunsCompleted >= 3;
+  final daysSinceLast = lastEval != null
+     ? now.difference(lastEval).inDays
+     : 999;
+  final alreadyEvaluated = lastEval != null && daysSinceLast < 7;
 
-  if (alreadyEvaluatedThisWeek &&
-      memory.weeklyProgressionDecision != null) {
+  if (!hasEnoughData) {
+    return _decisionToProfile(ProgressionDecision.hold);
+  }
+
+  if (alreadyEvaluated && memory.weeklyProgressionDecision != null) {
     return _decisionToProfile(memory.weeklyProgressionDecision!);
   }
 
@@ -631,6 +662,7 @@ class CoachEngine {
     runAnalysis: runAnalysis,
     historicalTrainingData: historicalTrainingData,
     memory: memory,
+    splitSize: trainingDayIndices.length,
   );
 }
 

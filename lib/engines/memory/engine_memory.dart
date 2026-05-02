@@ -74,6 +74,7 @@ class EngineMemory {
   final List<String> recentTemplateIds;
   final ProgressionDecision? weeklyProgressionDecision;
   final DateTime? lastProgressionEvaluationDate;
+  final int pendingVdotNudge;
 
   String get lastWorkoutType => lastCompletedType.name;
 
@@ -98,6 +99,7 @@ class EngineMemory {
     this.recentTemplateIds = const [],
     this.weeklyProgressionDecision,
     this.lastProgressionEvaluationDate,
+    this.pendingVdotNudge = 0,
   });
 
   bool get hasRacePlan => racePlan != null;
@@ -162,6 +164,7 @@ class EngineMemory {
         'weeklyProgressionDecision': weeklyProgressionDecision?.name,
         'lastProgressionEvaluationDate':
             lastProgressionEvaluationDate?.toIso8601String(),
+        'pendingVdotNudge': pendingVdotNudge,
       };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
@@ -271,6 +274,7 @@ class EngineMemory {
             parseProgressionDecision(json['weeklyProgressionDecision']),
         lastProgressionEvaluationDate: DateTime.tryParse(
             '${json['lastProgressionEvaluationDate'] ?? ''}'),
+        pendingVdotNudge: (json['pendingVdotNudge'] as num?)?.toInt() ?? 0,
       );
     } catch (_) {
       return defaultSafeMemory();
@@ -306,6 +310,7 @@ class EngineMemory {
     ProgressionDecision? weeklyProgressionDecision,
     bool clearWeeklyProgressionDecision = false,
     DateTime? lastProgressionEvaluationDate,
+    int? pendingVdotNudge,
   }) {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
@@ -349,6 +354,7 @@ class EngineMemory {
           : (weeklyProgressionDecision ?? this.weeklyProgressionDecision),
       lastProgressionEvaluationDate:
           lastProgressionEvaluationDate ?? this.lastProgressionEvaluationDate,
+      pendingVdotNudge: pendingVdotNudge ?? this.pendingVdotNudge,
     );
   }
 }
