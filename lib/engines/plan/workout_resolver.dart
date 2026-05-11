@@ -113,6 +113,7 @@ class WorkoutResolver {
       variant: selection.variant,
       longestRecentRunKm: longestRecentRunKm,
       experienceLevel: selectionContext.experienceLevel,
+      weekPercentageSum: selectionContext.weekPercentageSum,
     );
 
     // ── Step 3: Resolve blocks with real paces and distances ─────────────

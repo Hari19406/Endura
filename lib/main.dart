@@ -15,6 +15,7 @@ import 'dart:async';
 import 'utils/refreshable.dart';
 import 'services/coach_message_builder.dart' as message;
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'services/revenue_cat_service.dart';
 
 Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
   try {
@@ -196,6 +197,13 @@ class _AppInitializerState extends State<AppInitializer> {
     try {
       final service = await FirstRunService.create();
       await DatabaseService.instance.migrateFromSharedPreferences();
+
+      // RevenueCat init — only if user is already logged in at startup
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await RevenueCatService.init(user.id);
+        debugPrint('[Startup] RevenueCat initialized');
+      }
       if (mounted) {
         setState(() {
           _firstRunService = service;
@@ -211,7 +219,7 @@ class _AppInitializerState extends State<AppInitializer> {
   void _listenAuthEvents() {
     _authSubscription =
         Supabase.instance.client.auth.onAuthStateChange.listen(
-      (data) {
+      (data) async {
         final event = data.event;
         debugPrint('[Auth] Event: $event');
 
@@ -224,6 +232,11 @@ class _AppInitializerState extends State<AppInitializer> {
           return;
         }
 
+        // AFTER
+        if (event == AuthChangeEvent.signedIn) {
+          final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) await RevenueCatService.init(user.id);
+        }
         if (mounted) setState(() {});
       },
       onError: (e) => debugPrint('[Auth] Stream error: $e'),

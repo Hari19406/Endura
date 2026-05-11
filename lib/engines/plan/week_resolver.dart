@@ -82,12 +82,14 @@ class WeekResolution {
   final int weekNumber;
   final TrainingPhase phase;
   final double targetKm;
+  final double weekPercentageSum;
 
   const WeekResolution({
     required this.days,
     required this.weekNumber,
     required this.phase,
     required this.targetKm,
+    this.weekPercentageSum = 1.0,
   });
 
   DaySlot? slotFor(int weekday) {
@@ -151,6 +153,7 @@ class WeekResolver {
         weekNumber: weekTarget.week,
         phase: phase,
         targetKm: weekTarget.targetKm,
+        weekPercentageSum: 1.0,
       );
     }
 
@@ -208,11 +211,17 @@ class WeekResolver {
           '${s.dayName}: ${s.intent?.name} [${s.templateId}]').join(', '),
     });
 
+    final weekPercentageSum = slots
+        .where((s) => s.isTraining && s.templateId != null)
+        .map((s) => WorkoutLibrary.byId(s.templateId!)?.recommendedPercentage ?? 0.0)
+        .fold(0.0, (sum, p) => sum + p);
+
     return WeekResolution(
       days: slots,
       weekNumber: weekTarget.week,
       phase: phase,
       targetKm: weekTarget.targetKm,
+      weekPercentageSum: weekPercentageSum > 0 ? weekPercentageSum : 1.0, 
     );
   }
 

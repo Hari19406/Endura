@@ -53,9 +53,15 @@ class VolumeCalculator {
     PhaseVariant? variant,
     double? longestRecentRunKm,
     String experienceLevel = 'intermediate',
+    double weekPercentageSum = 1.0,
   }) {
-    // Step 1: Template percentage × weekly target = raw distance.
-    var distance = weeklyTargetKm * template.recommendedPercentage;
+    // Step 1: Normalize this session's share of the weekly target.
+    // weekPercentageSum = sum of all selected templates' recommendedPercentage
+    // this week. Dividing gives the true proportional slice of the pie.
+    final normalizedPct = weekPercentageSum > 0
+        ? template.recommendedPercentage / weekPercentageSum
+        : template.recommendedPercentage;
+    var distance = weeklyTargetKm * normalizedPct;
 
     // Step 2: Apply phase variant volume multiplier.
     if (variant != null) {

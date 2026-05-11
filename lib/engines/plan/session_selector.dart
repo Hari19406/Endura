@@ -51,7 +51,8 @@ class SelectionContext {
   final int qualitySessionsDoneThisWeek;
   final bool longRunDoneThisWeek;
   final String experienceLevel;
-  final String goalIntent; 
+  final String goalIntent;
+  final double weekPercentageSum; 
 
    const SelectionContext({
     required this.raceDistance,
@@ -72,7 +73,8 @@ class SelectionContext {
     this.qualitySessionsDoneThisWeek = 0,
     this.longRunDoneThisWeek = false,
     this.experienceLevel = 'intermediate',
-    this.goalIntent = 'improve', 
+    this.goalIntent = 'improve',
+    this.weekPercentageSum = 1.0, 
   });
 }
 

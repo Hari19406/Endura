@@ -283,6 +283,7 @@ class CoachEngine {
       longRunDoneThisWeek: budget.longRunDone,
       experienceLevel: userMetrics.experienceLevel,
       goalIntent: userMetrics.goalIntent,
+      weekPercentageSum: weekResolution.weekPercentageSum,
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
