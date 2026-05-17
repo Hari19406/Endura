@@ -87,10 +87,22 @@ WorkoutDisplayStyle _workoutDisplayStyle(WorkoutIntent intent) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKOUT DISPLAY MODEL  (replace the existing WorkoutDisplayModel class)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class WorkoutDisplayModel {
   final WorkoutCategory category;
   final String title;
+
+  /// What the athlete's training state looks like right now.
+  /// Shown as the subtitle on the home card.
   final String coachingReason;
+
+  /// Why the engine picked *this* workout today.
+  /// Shown as a second, smaller line on the home card beneath coachingReason.
+  final String coachingWhy;
+
   final String? duration;
   final String? paceRange;
   final String? distance;
@@ -104,6 +116,7 @@ class WorkoutDisplayModel {
     required this.category,
     required this.title,
     required this.coachingReason,
+    this.coachingWhy = '',
     this.duration,
     this.paceRange,
     this.distance,
@@ -136,8 +149,8 @@ class WorkoutDisplayModel {
             .map((b) => b.paceMaxSecondsPerKm)
             .reduce((a, b) => a > b ? a : b);
         if ((msg.workoutIntent == WorkoutIntent.aerobicBase ||
-            msg.workoutIntent == WorkoutIntent.recovery ||
-            msg.workoutIntent == WorkoutIntent.endurance) &&
+                msg.workoutIntent == WorkoutIntent.recovery ||
+                msg.workoutIntent == WorkoutIntent.endurance) &&
             (slowest - fastest) >= 30) {
           final ceiling = (fastest / 5).round() * 5;
           paceRange = "Don't run faster than ${_fmtPace(ceiling)}/km";
@@ -147,27 +160,27 @@ class WorkoutDisplayModel {
           paceRange = lo == hi
               ? '${_fmtPace(lo)}/km'
               : '${_fmtPace(lo)}–${_fmtPace(hi)}/km';
-        } 
+        }
       }
     }
 
-    List<String> steps = List<String>.from(msg.workoutSteps);
+    final steps = List<String>.from(msg.workoutSteps);
 
-    if (steps.isEmpty &&
-        displayStyle.category == WorkoutCategory.recovery) {
-      steps = [
+    if (steps.isEmpty && displayStyle.category == WorkoutCategory.recovery) {
+      steps.addAll([
         'Run at a very easy, conversational pace for 20–30 min — '
             'you should be able to hold a full conversation throughout.',
         'Keep effort low (RPE 3–4 out of 10). '
             'The goal is active recovery, not fitness gains.',
         'Focus on relaxed form, light footfall, and easy breathing.',
-      ];
+      ]);
     }
 
     return WorkoutDisplayModel(
       category: displayStyle.category,
       title: msg.workoutTitle,
       coachingReason: msg.reflectionText,
+      coachingWhy: msg.acknowledgementText,
       duration: duration,
       paceRange: paceRange,
       distance: distance,
@@ -184,8 +197,8 @@ class WorkoutDisplayModel {
       category: WorkoutCategory.rest,
       title: 'Log a run to unlock',
       coachingReason:
-          'Your personalised workout will appear here after a couple of runs. '
-          'Head to the Run tab to get started.',
+          'Your personalised workout will appear here after a couple of runs.',
+      coachingWhy: 'Head to the Run tab to get started.',
       steps: [],
     );
   }
@@ -198,7 +211,7 @@ class WorkoutDisplayModel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WORKOUT CARD
+// WORKOUT CARD 
 // ─────────────────────────────────────────────────────────────────────────────
 
 class WorkoutCard extends StatelessWidget {
@@ -273,97 +286,123 @@ class WorkoutCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFEEEEEE)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Badge ─────────────────────────────────────────────────────
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _accent.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(_icon, size: 13, color: _accent),
-                          const SizedBox(width: 6),
-                          Text(
-                            _badge,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: _accent,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  workout.title,
-                  style: const TextStyle(
-                    fontSize: 32, fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0A0A0A), letterSpacing: -0.8, height: 1.1,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _accent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  workout.coachingReason,
-                  style: TextStyle(
-                    fontSize: 13, color: const Color(0xFF999999),
-                    height: 1.5,
-                  ),
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    if (workout.distance != null)
-                      _chipWidget(Icons.straighten, workout.distance!),
-                    const Spacer(),
-                    if (!_isEmpty && onTap != null)
-                      GestureDetector(
-                        onTap: onTap,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF333333),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'View Workout',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(width: 5),
-                              Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
-                            ],
-                          ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_icon, size: 13, color: _accent),
+                      const SizedBox(width: 6),
+                      Text(
+                        _badge,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _accent,
+                          letterSpacing: 1.0,
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 18),
+
+            // ── Title ─────────────────────────────────────────────────────
+            Text(
+              workout.title,
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A0A0A),
+                letterSpacing: -0.8,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // ── Reflection line — training state ──────────────────────────
+            Text(
+              workout.coachingReason,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF666666),
+                height: 1.5,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            // ── Why line — engine decision (only when non-empty) ──────────
+            if (workout.coachingWhy.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                workout.coachingWhy,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF999999),
+                  height: 1.45,
+                  fontStyle: FontStyle.italic,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // ── Distance chip + CTA ───────────────────────────────────────
+            Row(
+              children: [
+                if (workout.distance != null)
+                  _chipWidget(Icons.straighten, workout.distance!),
+                const Spacer(),
+                if (!_isEmpty && onTap != null)
+                  GestureDetector(
+                    onTap: onTap,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF333333),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'View Workout',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 5),
+                          Icon(Icons.arrow_forward_rounded,
+                              size: 13, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -380,9 +419,14 @@ class WorkoutCard extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: const Color(0xFF999999)),
           const SizedBox(width: 5),
-          Text(label, style: const TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0A0A0A),
-          )),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0A0A0A),
+            ),
+          ),
         ],
       ),
     );

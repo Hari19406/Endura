@@ -1,7 +1,7 @@
 import '../engines/config/workout_template_library.dart';
 import '../models/training_phase.dart';
 
-// ── Enums (kept for engine use) ───────────────────────────────────────────────
+// ── Enums ─────────────────────────────────────────────────────────────────────
 
 enum ProgressionSignal { progressing, holding, steppingBack }
 
@@ -17,18 +17,18 @@ class PaceRange {
   });
 }
 
-// ── Flat input — only real signals ────────────────────────────────────────────
+// ── Coach context — only real signals ─────────────────────────────────────────
 
 class CoachContext {
   final int totalRunsCompleted;
   final int daysSinceLastRun;
   final double? avgRpe;
-  final bool highRpeRecently;       // memory.hasHighRpe()
+  final bool highRpeRecently;
   final bool easyRunFeltTooHard;
   final ProgressionSignal progression;
   final bool wasDowngraded;
   final List<String> scalingAdjustments;
-  final bool paceTrending;          // from PaceTrendCalculator
+  final bool paceTrending;
   final bool paceInsufficientData;
 
   const CoachContext({
@@ -62,7 +62,20 @@ class CoachMessage {
   final String phaseLabel;
   final int weekNumber;
   final WorkoutIntent workoutIntent;
+
+  /// Retained for pre_run_briefing_screen.dart and pre_run_check.dart.
+  /// The engine never sets this — it is always null at runtime.
+  /// Safe to remove in a future cleanup once those screens no longer
+  /// reference it.
   final String? movedFromDay;
+
+  /// What the engine has planned for the next training session.
+  /// Null when today is the last training day of the week.
+  final WorkoutIntent? nextPlannedIntent;
+
+  /// Human-readable label for the next session.
+  /// e.g. "Tomorrow · Threshold Run" or "Thursday · Long Run"
+  final String? nextPlannedLabel;
 
   String get phaseWeekLabel =>
       weekNumber > 0 ? '$phaseLabel · Week $weekNumber' : phaseLabel;
@@ -88,6 +101,8 @@ class CoachMessage {
     this.phaseLabel = '',
     this.weekNumber = 1,
     this.movedFromDay,
+    this.nextPlannedIntent,
+    this.nextPlannedLabel,
   });
 }
 
@@ -99,6 +114,8 @@ class CoachMessageBuilder {
     required ResolvedWorkout resolvedWorkout,
     TrainingPhase phase = TrainingPhase.base,
     int weekNumber = 1,
+    WorkoutIntent? nextPlannedIntent,
+    String? nextPlannedLabel,
   }) {
     final intent = resolvedWorkout.intent;
     return CoachMessage(
@@ -112,28 +129,28 @@ class CoachMessageBuilder {
       feelText: _buildFeelText(intent),
       phaseLabel: _phaseDisplayName(phase),
       weekNumber: weekNumber,
+      movedFromDay: null, // never set by the engine
+      nextPlannedIntent: nextPlannedIntent,
+      nextPlannedLabel: nextPlannedLabel,
     );
   }
 
-  // ── Reflection — what's the honest state of training ──────────────────────
+  // ── Reflection — honest state of training ────────────────────────────────
 
   String _buildReflectionText(CoachContext ctx) {
     if (ctx.isNewUser) {
-      return "You're just getting started — the coach will learn your "
-          'rhythm as you log runs.';
+      return "First session — the coach will learn your rhythm as you log runs.";
     }
 
     if (ctx.hasBeenAway) {
       final days = ctx.daysSinceLastRun;
       if (days >= 14) {
-        return "It's been a couple of weeks off — your body has had a "
-            'good rest.';
+        return "It's been a couple of weeks off — your body has had a good rest.";
       }
       if (days >= 7) {
-        return "It's been about a week since your last run — "
-            'your body has had a good rest.';
+        return "It's been about a week since your last run — your body has had a good rest.";
       }
-      return 'You had a few days off since your last run.';
+      return 'A few days off since your last run.';
     }
 
     if (ctx.easyRunFeltTooHard) {
@@ -142,8 +159,8 @@ class CoachMessageBuilder {
     }
 
     if (ctx.highRpeRecently) {
-      return 'Your recent runs have been feeling tough. '
-          "That's okay — it means you've been working hard.";
+      return 'Recent runs have been feeling tough — '
+          "that means you've been working hard.";
     }
 
     if (!ctx.paceInsufficientData && ctx.paceTrending) {
@@ -152,13 +169,13 @@ class CoachMessageBuilder {
 
     if (ctx.paceInsufficientData) {
       return 'The coach is still building a picture of your training — '
-          'keep logging and it will get sharper.';
+          'keep logging runs and it will get sharper.';
     }
 
-    return 'Your training has been consistent — the work is adding up.';
+    return 'Training has been consistent — the work is adding up.';
   }
 
-  // ── Acknowledgement — what the engine decided and why ─────────────────────
+  // ── Acknowledgement — why the engine picked this workout ─────────────────
 
   String _buildAcknowledgementText(CoachContext ctx, WorkoutIntent intent) {
     if (ctx.isNewUser) {
@@ -171,7 +188,7 @@ class CoachMessageBuilder {
         return "Easing back in carefully — no rush to pick up where you left off.";
       }
       if (days >= 7) {
-        return "Welcome back. Today is adjusted to ease you back into rhythm.";
+        return "Today is adjusted to ease you back into rhythm.";
       }
       return "Picking up right where you left off — no adjustment needed.";
     }
@@ -183,8 +200,8 @@ class CoachMessageBuilder {
     }
 
     return switch (ctx.progression) {
-      ProgressionSignal.progressing => _progressOpener(intent),
-      ProgressionSignal.holding     => _holdOpener(intent),
+      ProgressionSignal.progressing  => _progressOpener(intent),
+      ProgressionSignal.holding      => _holdOpener(intent),
       ProgressionSignal.steppingBack => "Easing back slightly — "
           "a lighter day now sets you up for a stronger one next.",
     };
@@ -192,25 +209,18 @@ class CoachMessageBuilder {
 
   String _progressOpener(WorkoutIntent intent) {
     return switch (intent) {
-      WorkoutIntent.endurance  => "You're ready for a bit more — "
-          "nudging the long run forward.",
-      WorkoutIntent.threshold  => "The base is solid — "
-          "pushing the quality work a touch further today.",
-      WorkoutIntent.vo2max     => "Good form lately — "
-          "adding a little more to the interval set.",
-      _                        => "Things are coming together — "
-          "building on the progress.",
+      WorkoutIntent.endurance  => "Ready for a bit more — nudging the long run forward.",
+      WorkoutIntent.threshold  => "Base is solid — pushing the quality work a touch further today.",
+      WorkoutIntent.vo2max     => "Good form lately — adding a little more to the interval set.",
+      _                        => "Things are coming together — building on the progress.",
     };
   }
 
   String _holdOpener(WorkoutIntent intent) {
     return switch (intent) {
-      WorkoutIntent.recovery   => "Active recovery today — "
-          "keeping the legs moving without adding stress.",
-      WorkoutIntent.aerobicBase => "Steady aerobic work — "
-          "consistent easy running is the engine of progress.",
-      _                        => "Holding steady — "
-          "today is about absorbing the work already done.",
+      WorkoutIntent.recovery    => "Active recovery today — keeping the legs moving without adding stress.",
+      WorkoutIntent.aerobicBase => "Steady aerobic work — consistent easy running is the engine of progress.",
+      _                         => "Holding steady — today is about absorbing the work already done.",
     };
   }
 

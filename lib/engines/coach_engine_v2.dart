@@ -42,7 +42,6 @@ class HistoricalTrainingData {
   });
 }
 
-// coach_engine_v2.dart — UserMetrics class
 class UserMetrics {
   final int avgEasyPace;
   final int tempoCapabilityPace;
@@ -53,7 +52,7 @@ class UserMetrics {
   final int runsPerWeek;
   final String goalRace;
   final String experienceLevel;
-  final String goalIntent;          // NEW
+  final String goalIntent;
   final double? avgRpe;
   final selector.RecentRpeTrend recentRpeTrend;
   final bool lastEasyRunTooHard;
@@ -72,7 +71,7 @@ class UserMetrics {
     this.runsPerWeek = 4,
     required this.goalRace,
     this.experienceLevel = 'beginner',
-    this.goalIntent = 'improve',    // NEW
+    this.goalIntent = 'improve',
     this.avgRpe,
     this.recentRpeTrend = selector.RecentRpeTrend.unknown,
     this.lastEasyRunTooHard = false,
@@ -126,10 +125,8 @@ class CoachEngine {
   // ── vDOT / pace table ─────────────────────────────────────────────────────
 
   PaceTable _buildPaceTable(UserMetrics userMetrics, EngineMemory memory) {
-    // Prefer the stored vDOT score.
     int vdot = memory.vdotScore;
 
-    // If stored score is the default and there is PR data, recompute.
     if (memory.vdotIsProvisional &&
         userMetrics.prTimeSeconds != null &&
         userMetrics.prDistance != null) {
@@ -142,17 +139,16 @@ class CoachEngine {
         prDistanceKm: distKm,
         confidence: confidence,
       );
-    } else if (memory.vdotIsProvisional &&
-        userMetrics.avgEasyPace > 0) {
+    } else if (memory.vdotIsProvisional && userMetrics.avgEasyPace > 0) {
       vdot = vdotFromEasyPace(userMetrics.avgEasyPace.toDouble());
     }
 
-    debugPrint('[PaceTable] vdot=$vdot, provisional=${memory.vdotIsProvisional}, stored=${memory.vdotScore}, prTime=${userMetrics.prTimeSeconds}, prDist=${userMetrics.prDistance}');
+    debugPrint('[PaceTable] vdot=$vdot, provisional=${memory.vdotIsProvisional}');
     return PaceTable(vdot.clamp(30, 85));
-
   }
 
-  ResolverContext _buildResolverContext(UserMetrics userMetrics, EngineMemory memory) {
+  ResolverContext _buildResolverContext(
+      UserMetrics userMetrics, EngineMemory memory) {
     return ResolverContext(
       paceTable: _buildPaceTable(userMetrics, memory),
       goalRaceDistance: _goalRaceToPRDistance(_mapGoalRace(userMetrics.goalRace)),
@@ -169,6 +165,7 @@ class CoachEngine {
     required selector.WorkoutId? lastWorkoutType,
     required EngineMemory memory,
     List<int> trainingDayIndices = const [],
+    session.SelectorReadiness? preRunReadiness,
   }) {
     final now = DateTime.now();
     final resolvedRunsPerWeek = userMetrics.runsPerWeek > 0
@@ -218,7 +215,8 @@ class CoachEngine {
       absence: absence,
     );
     final adjustedTargetKm = baseWeeklyTargetKm *
-        progression.weeklyVolumeMultiplier.clamp(0.90, _maxSafeProgressionMultiplier);
+        progression.weeklyVolumeMultiplier
+            .clamp(0.90, _maxSafeProgressionMultiplier);
     final finalWeeklyTargetKm = _capFinalProgressionValue(
       baseValue: fourWeekAvgKm,
       finalValue: _roundHalf(adjustedTargetKm),
@@ -232,7 +230,8 @@ class CoachEngine {
         _clampLongRunTarget(
           current: weekTarget.longRunKm,
           adapted: weekTarget.longRunKm *
-              progression.longRunMultiplier.clamp(0.90, _maxSafeProgressionMultiplier),
+              progression.longRunMultiplier
+                  .clamp(0.90, _maxSafeProgressionMultiplier),
         ),
       ),
     );
@@ -265,7 +264,7 @@ class CoachEngine {
     final selectionContext = session.SelectionContext(
       raceDistance: _mapGoalRace(userMetrics.goalRace),
       phase: _mapTrainingPhase(phase),
-      readiness: session.SelectorReadiness.green,
+      readiness: preRunReadiness ?? session.SelectorReadiness.green,
       daysPerWeek: resolvedRunsPerWeek,
       trainingDayIndices: effectiveTrainingDays,
       todayDayIndex: now.weekday - 1,
@@ -316,7 +315,7 @@ class CoachEngine {
       return true;
     }());
 
-    // ── Build coach context from real signals only ─────────────────────────
+    // ── Build coach context from real signals ─────────────────────────────
     final paces = historicalTrainingData.recentRuns
         .map((r) => paceStringToSeconds(r.averagePace))
         .where((p) => p > 0)
@@ -338,12 +337,65 @@ class CoachEngine {
       paceInsufficientData: insufficientPaceData,
     );
 
+    // ── Derive next planned session from WeekResolution ───────────────────
+    final nextInfo = _resolveNextPlannedSession(
+      weekResolution: weekResolution,
+      now: now,
+      trainingDayIndices: effectiveTrainingDays,
+    );
+
     return _coachMessageBuilder.buildMessage(
       context: coachContext,
       resolvedWorkout: result.workout!,
       phase: phase,
       weekNumber: weekNum,
+      nextPlannedIntent: nextInfo.$1,
+      nextPlannedLabel: nextInfo.$2,
     );
+  }
+
+  // ── Next planned session derivation ──────────────────────────────────────
+  //
+  // Walks WeekResolution forward from today using the existing slotFor()
+  // method. Returns (intent, label) e.g. (threshold, "Tomorrow · Threshold Run").
+
+  (WorkoutIntent?, String?) _resolveNextPlannedSession({
+    required WeekResolution weekResolution,
+    required DateTime now,
+    required List<int> trainingDayIndices,
+  }) {
+    final todayIndex = now.weekday - 1; // Mon=0 … Sun=6
+
+    for (int dayIdx = todayIndex + 1; dayIdx <= 6; dayIdx++) {
+      if (!trainingDayIndices.contains(dayIdx)) continue;
+
+      final slot = weekResolution.slotFor(dayIdx);
+      if (slot == null || slot.isRest || slot.intent == null) continue;
+
+      final intent = slot.intent!;
+      final daysAhead = dayIdx - todayIndex;
+      final dayLabel = daysAhead == 1 ? 'Tomorrow' : _weekdayName(dayIdx);
+      return (intent, '$dayLabel · ${_intentDisplayName(intent)}');
+    }
+
+    return (null, null);
+  }
+
+  String _weekdayName(int dayIndex) {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return names[dayIndex.clamp(0, 6)];
+  }
+
+  String _intentDisplayName(WorkoutIntent intent) {
+    return switch (intent) {
+      WorkoutIntent.aerobicBase  => 'Easy Run',
+      WorkoutIntent.endurance    => 'Long Run',
+      WorkoutIntent.threshold    => 'Threshold Run',
+      WorkoutIntent.vo2max       => 'Interval Session',
+      WorkoutIntent.speed        => 'Speed Session',
+      WorkoutIntent.raceSpecific => 'Race Pace Run',
+      WorkoutIntent.recovery     => 'Recovery Run',
+    };
   }
 
   // ── Week resolution for home screen plan card ─────────────────────────────
@@ -499,7 +551,8 @@ class CoachEngine {
     final repeatedDowngrades = _repeatedDowngradePressure(
       historicalTrainingData.recentRuns,
     );
-    final consistentlyHighRpe = avgRpe >= 7.0 || memory.hasHighRpe(n: 3, threshold: 7);
+    final consistentlyHighRpe =
+        avgRpe >= 7.0 || memory.hasHighRpe(n: 3, threshold: 7);
 
     if (consistentlyHighRpe || repeatedDowngrades) {
       return const ProgressionProfile(
@@ -559,68 +612,70 @@ class CoachEngine {
   }
 
   bool _completedSuccessfully(
-  HistoricalTrainingData historicalTrainingData,
-  WeeklyPlan? activePlan,
-  int splitSize,
-) {
-  final recentRuns = historicalTrainingData.recentRuns.take(3).toList();
-  if (recentRuns.isEmpty) return true;
+    HistoricalTrainingData historicalTrainingData,
+    WeeklyPlan? activePlan,
+    int splitSize,
+  ) {
+    final recentRuns = historicalTrainingData.recentRuns.take(3).toList();
+    if (recentRuns.isEmpty) return true;
 
-  final rpeSum = recentRuns
-      .where((r) => r.rpe != null)
-      .fold<double>(0.0, (sum, r) => sum + r.rpe!);
-  final rpeCount = recentRuns.where((r) => r.rpe != null).length;
-  final rpeOk = rpeCount == 0 || (rpeSum / rpeCount) <= 6.5;
+    final rpeSum = recentRuns
+        .where((r) => r.rpe != null)
+        .fold<double>(0.0, (sum, r) => sum + r.rpe!);
+    final rpeCount = recentRuns.where((r) => r.rpe != null).length;
+    final rpeOk = rpeCount == 0 || (rpeSum / rpeCount) <= 6.5;
 
-  if (activePlan == null) return rpeOk;
+    if (activePlan == null) return rpeOk;
 
-  final today = DateTime.now();
-  final todayDate = DateTime(today.year, today.month, today.day);
-  final plannedDaysSoFar = activePlan.days.where((d) {
-    if (d.isRestDay) return false;
-    final plannedDate = DateTime(d.date.year, d.date.month, d.date.day);
-    return !plannedDate.isAfter(todayDate);
-  }).toList();
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final plannedDaysSoFar = activePlan.days.where((d) {
+      if (d.isRestDay) return false;
+      final plannedDate = DateTime(d.date.year, d.date.month, d.date.day);
+      return !plannedDate.isAfter(todayDate);
+    }).toList();
 
-  final completed = plannedDaysSoFar.where((d) => d.isCompleted).length;
-  final planned = plannedDaysSoFar.length;
-  final completionRate = planned == 0 ? 1.0 : completed / planned;
+    final completed = plannedDaysSoFar.where((d) => d.isCompleted).length;
+    final planned = plannedDaysSoFar.length;
+    final completionRate = planned == 0 ? 1.0 : completed / planned;
 
-  final progressThreshold = _progressThreshold(splitSize);
-  final holdThreshold = _holdThreshold(splitSize);
+    final progressThreshold = _progressThreshold(splitSize);
+    final holdThreshold = _holdThreshold(splitSize);
 
-  if (completionRate >= progressThreshold) return true;
-  if (completionRate >= holdThreshold) return rpeOk;
-  return false;
-}
+    if (completionRate >= progressThreshold) return true;
+    if (completionRate >= holdThreshold) return rpeOk;
+    return false;
+  }
 
-double _progressThreshold(int splitSize) => switch (splitSize) {
-  3 => 1.0,
-  4 => 0.75,
-  5 => 0.80,
-  6 => 0.83,
-  _ => 0.80,
-};
+  double _progressThreshold(int splitSize) => switch (splitSize) {
+        3 => 1.0,
+        4 => 0.75,
+        5 => 0.80,
+        6 => 0.83,
+        _ => 0.80,
+      };
 
-double _holdThreshold(int splitSize) => switch (splitSize) {
-  3 => 0.67,
-  4 => 0.50,
-  5 => 0.60,
-  6 => 0.50,
-  _ => 0.60,
-};
+  double _holdThreshold(int splitSize) => switch (splitSize) {
+        3 => 0.67,
+        4 => 0.50,
+        5 => 0.60,
+        6 => 0.50,
+        _ => 0.60,
+      };
 
   bool _repeatedDowngradePressure(List<SavedRun> recentRuns) {
     final recent = recentRuns.take(3).toList();
     if (recent.length < 2) return false;
     final pressured = recent.where((r) {
-      final isEasyLike = r.workoutType == 'easy' || r.workoutType == 'recovery';
+      final isEasyLike =
+          r.workoutType == 'easy' || r.workoutType == 'recovery';
       return isEasyLike && (r.rpe ?? 0) >= 7;
     }).length;
     return pressured >= 2;
   }
 
-  double _clampLongRunTarget({required double current, required double adapted}) {
+  double _clampLongRunTarget(
+      {required double current, required double adapted}) {
     if (current <= 0) return adapted;
     return adapted.clamp(current * 0.90, current * 1.10);
   }
@@ -638,91 +693,90 @@ double _holdThreshold(int splitSize) => switch (splitSize) {
   double _roundHalf(double value) => (value * 2).round() / 2;
 
   ProgressionProfile _resolveProgression({
-  required selector.RunAnalysis runAnalysis,
-  required HistoricalTrainingData historicalTrainingData,
-  required EngineMemory memory,
-  required DateTime now,
-  required List<int> trainingDayIndices,
-}) {
-  final lastEval = memory.lastProgressionEvaluationDate;
-  final hasEnoughData = memory.totalRunsCompleted >= 3;
-  final daysSinceLast = lastEval != null
-     ? now.difference(lastEval).inDays
-     : 999;
-  final alreadyEvaluated = lastEval != null && daysSinceLast < 7;
+    required selector.RunAnalysis runAnalysis,
+    required HistoricalTrainingData historicalTrainingData,
+    required EngineMemory memory,
+    required DateTime now,
+    required List<int> trainingDayIndices,
+  }) {
+    final lastEval = memory.lastProgressionEvaluationDate;
+    final hasEnoughData = memory.totalRunsCompleted >= 3;
+    final daysSinceLast =
+        lastEval != null ? now.difference(lastEval).inDays : 999;
+    final alreadyEvaluated = lastEval != null && daysSinceLast < 7;
 
-  if (!hasEnoughData) {
-    return _decisionToProfile(ProgressionDecision.hold);
+    if (!hasEnoughData) {
+      return _decisionToProfile(ProgressionDecision.hold);
+    }
+
+    if (alreadyEvaluated && memory.weeklyProgressionDecision != null) {
+      return _decisionToProfile(memory.weeklyProgressionDecision!);
+    }
+
+    return _progressionProfile(
+      runAnalysis: runAnalysis,
+      historicalTrainingData: historicalTrainingData,
+      memory: memory,
+      splitSize: trainingDayIndices.length,
+    );
   }
 
-  if (alreadyEvaluated && memory.weeklyProgressionDecision != null) {
-    return _decisionToProfile(memory.weeklyProgressionDecision!);
+  ProgressionProfile _decisionToProfile(ProgressionDecision decision) {
+    return switch (decision) {
+      ProgressionDecision.progress => const ProgressionProfile(
+          decision: ProgressionDecision.progress,
+          weeklyVolumeMultiplier: 1.07,
+          longRunMultiplier: 1.06,
+          sessionVolumeMultiplier: 1.04,
+          sessionIntensityMultiplier: 0.99,
+          allowProgression: true,
+        ),
+      ProgressionDecision.hold => const ProgressionProfile(
+          decision: ProgressionDecision.hold,
+          weeklyVolumeMultiplier: 1.0,
+          longRunMultiplier: 1.0,
+          sessionVolumeMultiplier: 1.0,
+          sessionIntensityMultiplier: 1.0,
+          allowProgression: false,
+        ),
+      ProgressionDecision.regress => const ProgressionProfile(
+          decision: ProgressionDecision.regress,
+          weeklyVolumeMultiplier: 0.92,
+          longRunMultiplier: 0.90,
+          sessionVolumeMultiplier: 0.94,
+          sessionIntensityMultiplier: 1.02,
+          allowProgression: false,
+        ),
+    };
   }
-
-  return _progressionProfile(
-    runAnalysis: runAnalysis,
-    historicalTrainingData: historicalTrainingData,
-    memory: memory,
-    splitSize: trainingDayIndices.length,
-  );
-}
-
-ProgressionProfile _decisionToProfile(ProgressionDecision decision) {
-  return switch (decision) {
-    ProgressionDecision.progress => const ProgressionProfile(
-        decision: ProgressionDecision.progress,
-        weeklyVolumeMultiplier: 1.07,
-        longRunMultiplier: 1.06,
-        sessionVolumeMultiplier: 1.04,
-        sessionIntensityMultiplier: 0.99,
-        allowProgression: true,
-      ),
-    ProgressionDecision.hold => const ProgressionProfile(
-        decision: ProgressionDecision.hold,
-        weeklyVolumeMultiplier: 1.0,
-        longRunMultiplier: 1.0,
-        sessionVolumeMultiplier: 1.0,
-        sessionIntensityMultiplier: 1.0,
-        allowProgression: false,
-      ),
-    ProgressionDecision.regress => const ProgressionProfile(
-        decision: ProgressionDecision.regress,
-        weeklyVolumeMultiplier: 0.92,
-        longRunMultiplier: 0.90,
-        sessionVolumeMultiplier: 0.94,
-        sessionIntensityMultiplier: 1.02,
-        allowProgression: false,
-      ),
-  };
-}
 
   // ── Type mappers ──────────────────────────────────────────────────────────
 
   RaceDistance _mapGoalRace(String goalRace) => switch (goalRace) {
-    '5k'            => RaceDistance.fiveK,
-    '10k'           => RaceDistance.tenK,
-    'half_marathon' => RaceDistance.halfMarathon,
-    'marathon'      => RaceDistance.marathon,
-    _               => RaceDistance.fiveK,
-  };
+        '5k'            => RaceDistance.fiveK,
+        '10k'           => RaceDistance.tenK,
+        'half_marathon' => RaceDistance.halfMarathon,
+        'marathon'      => RaceDistance.marathon,
+        _               => RaceDistance.fiveK,
+      };
 
   TrainingPhase _mapTrainingPhase(TrainingPhase phase) => phase;
 
   double _prDistanceToKm(String distance) => switch (distance) {
-    '5k'            => 5.0,
-    '10k'           => 10.0,
-    'half'          => 21.0975,
-    'half_marathon' => 21.0975,
-    'marathon'      => 42.195,
-    _               => 5.0,
-  };
+        '5k'            => 5.0,
+        '10k'           => 10.0,
+        'half'          => 21.0975,
+        'half_marathon' => 21.0975,
+        'marathon'      => 42.195,
+        _               => 5.0,
+      };
 
   PRDistance? _goalRaceToPRDistance(RaceDistance race) => switch (race) {
-    RaceDistance.fiveK        => PRDistance.fiveK,
-    RaceDistance.tenK         => PRDistance.tenK,
-    RaceDistance.halfMarathon => PRDistance.halfMarathon,
-    RaceDistance.marathon     => PRDistance.marathon,
-  };
+        RaceDistance.fiveK        => PRDistance.fiveK,
+        RaceDistance.tenK         => PRDistance.tenK,
+        RaceDistance.halfMarathon => PRDistance.halfMarathon,
+        RaceDistance.marathon     => PRDistance.marathon,
+      };
 
   WorkoutIntent? _lastWorkoutToIntent(selector.WorkoutId? id) {
     if (id == null) return null;
@@ -738,10 +792,10 @@ ProgressionProfile _decisionToProfile(ProgressionDecision decision) {
   }
 
   message.ProgressionSignal _toMessageProgressionSignal(
-    ProgressionDecision decision,
-  ) => switch (decision) {
-    ProgressionDecision.progress => message.ProgressionSignal.progressing,
-    ProgressionDecision.hold     => message.ProgressionSignal.holding,
-    ProgressionDecision.regress  => message.ProgressionSignal.steppingBack,
-  };
+          ProgressionDecision decision) =>
+      switch (decision) {
+        ProgressionDecision.progress => message.ProgressionSignal.progressing,
+        ProgressionDecision.hold     => message.ProgressionSignal.holding,
+        ProgressionDecision.regress  => message.ProgressionSignal.steppingBack,
+      };
 }
