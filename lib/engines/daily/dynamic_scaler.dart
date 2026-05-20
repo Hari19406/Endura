@@ -130,19 +130,9 @@ class DynamicScaler {
         ? _roundSmart(block.distanceKm * factors.volumeScale)
         : block.distanceKm;
 
-    ResolvedBlock? newRecovery;
-    if (block.recovery != null && factors.recoveryExtension > 1.0) {
-      final extendedKm =
-          _roundSmart(block.recovery!.distanceKm * factors.recoveryExtension);
-      newRecovery = ResolvedBlock(
-        type: block.recovery!.type,
-        distanceKm: extendedKm,
-        paceMinSecondsPerKm: block.recovery!.paceMinSecondsPerKm,
-        paceMaxSecondsPerKm: block.recovery!.paceMaxSecondsPerKm,
-      );
-    } else {
-      newRecovery = block.recovery;
-    }
+    final int? scaledRecoverySeconds = (block.recoverySeconds != null && factors.recoveryExtension > 1.0)
+    ? (block.recoverySeconds! * factors.recoveryExtension).round()
+    : block.recoverySeconds;
 
     return ResolvedBlock(
       type: block.type,
@@ -151,7 +141,8 @@ class DynamicScaler {
       paceMaxSecondsPerKm: block.paceMaxSecondsPerKm,
       isRpeOnly: block.isRpeOnly,
       reps: newReps,
-      recovery: newRecovery,
+      recoverySeconds: scaledRecoverySeconds,
+      recoveryMeters: block.recoveryMeters,
       label: block.label,
     );
   }

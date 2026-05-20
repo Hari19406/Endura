@@ -124,6 +124,7 @@ class WorkoutResolver {
       resolverContext: resolverContext,
       phase: selectionContext.phase,
       intent: selection.intent,
+      experienceLevel: selectionContext.experienceLevel,
     );
 
     // ── Step 4: Scale for readiness/RPE ──────────────────────────────────
@@ -154,6 +155,7 @@ class WorkoutResolver {
     required ResolverContext resolverContext,
     required TrainingPhase phase,
     required WorkoutIntent intent,
+    String experienceLevel = 'intermediate',
   }) {
     final fixedDistanceKm = _calculateFixedDistance(template.blocks, variant);
     final flexibleBudgetKm =
@@ -172,6 +174,7 @@ class WorkoutResolver {
         flexibleBudgetKm: flexibleBudgetKm,
         percentSum: percentSum,
         resolverContext: resolverContext,
+        experienceLevel: experienceLevel,
       ));
     }
 
@@ -191,10 +194,7 @@ class WorkoutResolver {
   // PACE RESOLUTION
   // ========================================================================
 
-  /// Resolve a PaceZone to a ResolvedPace, handling the special
-  /// goal-pace zones that need target race time.
-  ResolvedPace _resolvePaceZone(
-      PaceZone zone, ResolverContext context) {
+  ResolvedPace _resolvePaceZone(PaceZone zone, ResolverContext context) {
     if (_isGoalPaceZone(zone)) {
       if (context.hasGoalPace) {
         return context.paceTable.resolveGoalPace(
@@ -202,7 +202,6 @@ class WorkoutResolver {
           targetTimeSeconds: context.goalRaceTimeSeconds!,
         );
       }
-      // Fallback: if no goal time set, use tempo pace.
       return context.paceTable.resolve(PaceZone.tempo);
     }
     return context.paceTable.resolve(zone);
@@ -251,7 +250,8 @@ class WorkoutResolver {
         paceMaxSecondsPerKm: b.paceMaxSecondsPerKm,
         isRpeOnly: b.isRpeOnly,
         reps: b.reps,
-        recovery: b.recovery,
+        recoverySeconds: b.recoverySeconds,
+        recoveryMeters: b.recoveryMeters,
         label: b.label,
       );
     }
@@ -296,13 +296,9 @@ class WorkoutResolver {
       final reps = (block.reps != null) ? (variant?.reps ?? block.reps!) : 1;
       total += blockKm * reps;
 
-      if (block.recoveryBlock != null && reps > 1) {
-        double recoveryKm;
-        if (variant?.recoveryDistanceMeters != null) {
-          recoveryKm = variant!.recoveryDistanceMeters! / 1000.0;
-        } else {
-          recoveryKm = block.recoveryBlock!.value;
-        }
+      if (block.recoveryMeters != null && reps > 1) {
+        final recoveryKm =
+            (variant?.recoveryMeters ?? block.recoveryMeters!) / 1000.0;
         total += recoveryKm * (reps - 1);
       }
     }
@@ -320,6 +316,7 @@ class WorkoutResolver {
     required double flexibleBudgetKm,
     required double percentSum,
     required ResolverContext resolverContext,
+    required String experienceLevel,
   }) {
     // ── Distance ─────────────────────────────────────────────────────────
     double distanceKm;
@@ -342,35 +339,20 @@ class WorkoutResolver {
     }
 
     // ── Pace ─────────────────────────────────────────────────────────────
-    final resolvedPace =
-        _resolvePaceZone(block.paceZone, resolverContext);
+    final resolvedPace = _resolvePaceZone(block.paceZone, resolverContext);
 
     // ── Reps ─────────────────────────────────────────────────────────────
     int? reps;
     if (block.reps != null) {
-      reps = variant?.reps ?? block.reps;
+      final raw = variant?.reps ?? block.reps!;
+      reps = _clampRepsForExperience(raw, experienceLevel);
     }
 
     // ── Recovery ─────────────────────────────────────────────────────────
-    ResolvedBlock? resolvedRecovery;
-    if (block.recoveryBlock != null) {
-      double recoveryKm;
-      if (variant?.recoveryDistanceMeters != null) {
-        recoveryKm = variant!.recoveryDistanceMeters! / 1000.0;
-      } else {
-        recoveryKm = block.recoveryBlock!.value;
-      }
-
-      final recoveryPace =
-          _resolvePaceZone(block.recoveryBlock!.paceZone, resolverContext);
-
-      resolvedRecovery = ResolvedBlock(
-        type: BlockType.recovery,
-        distanceKm: _roundSmart(recoveryKm),
-        paceMinSecondsPerKm: recoveryPace.minSecondsPerKm,
-        paceMaxSecondsPerKm: recoveryPace.maxSecondsPerKm,
-      );
-    }
+    final int? resolvedRecoverySeconds =
+        variant?.recoverySeconds ?? block.recoverySeconds;
+    final double? resolvedRecoveryMeters =
+        variant?.recoveryMeters ?? block.recoveryMeters;
 
     return ResolvedBlock(
       type: block.type,
@@ -379,13 +361,14 @@ class WorkoutResolver {
       paceMaxSecondsPerKm: resolvedPace.maxSecondsPerKm,
       isRpeOnly: resolvedPace.isRpeOnly,
       reps: reps,
-      recovery: resolvedRecovery,
+      recoverySeconds: resolvedRecoverySeconds,
+      recoveryMeters: resolvedRecoveryMeters,
       label: block.label,
     );
   }
 
   // ========================================================================
-  // ROUNDING
+  // HELPERS
   // ========================================================================
 
   double _roundSmart(double v) {
@@ -396,4 +379,13 @@ class WorkoutResolver {
     }
     return (v * 2).round() / 2;
   }
+
+  int _clampRepsForExperience(int reps, String level) {
+    return switch (level) {
+      'beginner' => (reps * 0.65).round().clamp(2, reps).toInt(),
+      'intermediate' => (reps * 0.85).round().clamp(2, reps).toInt(),
+      'advanced' => reps,
+      _ => (reps * 0.85).round().clamp(2, reps).toInt(),
+    };
+  } 
 }

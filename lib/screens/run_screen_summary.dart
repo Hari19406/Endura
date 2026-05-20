@@ -8,6 +8,15 @@ import '../services/coach_message_builder.dart' as message;
 import '../widgets/post_run_feedback.dart';
 import '../services/cloud_sync_service.dart';
 import '../engines/config/workout_template_library.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../engines/memory/engine_memory_service.dart';
+import '../engines/plan/week_projection_service.dart';
+import '../engines/plan/workout_resolver.dart';
+import '../engines/core/pace_table.dart';
+import '../engines/core/vdot_calculator.dart';
+import '../services/training_days_service.dart';
+import '../utils/stats.dart' show loadSavedRuns, RunHistory;
+import '../engines/daily/dynamic_scaler.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -394,51 +403,132 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   // ── Data builder ──────────────────────────────────────────────────────────
 
   Future<_SummaryData> _buildSummaryData() async {
-    final recentRuns = await DatabaseService.instance.getRecentRuns(limit: 10);
-    final paceTrend = PaceTrendCalculator.calculate(
-      recentRuns.map((r) => _paceToSeconds(r.averagePace)).toList(),
+  final recentRuns = await DatabaseService.instance.getRecentRuns(limit: 10);
+ 
+  final paceTrend = PaceTrendCalculator.calculate(
+    recentRuns.map((r) => _paceToSeconds(r.averagePace)).toList(),
+  );
+  final weeklyDistance = _calcWeeklyDistance(recentRuns);
+ 
+  // ── Try to pull the real next session from the projection service ─────────
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final memory = await EngineMemoryService().load();
+    final trainingDayIndices = await TrainingDaysService.loadOrDefault(4);
+ 
+    final goalRace = prefs.getString('goal_race') ?? '5k';
+    final runsPerWeek = trainingDayIndices.isNotEmpty
+        ? trainingDayIndices.length
+        : (prefs.getInt('runs_per_week') ?? 4);
+ 
+    // Build a minimal pace table from stored vDOT.
+    final paceTable = PaceTable(memory.vdotScore.clamp(30, 85));
+    final raceDistance = _goalRaceToDistance(goalRace);
+ 
+    final resolverContext = ResolverContext(
+      paceTable: paceTable,
+      goalRaceDistance: _raceDistanceToPR(raceDistance),
+      goalRaceTimeSeconds: null,
     );
-    final weeklyDistance = _calcWeeklyDistance(recentRuns);
-    final daysSinceQuality = _calcDaysSince(recentRuns, {'tempo', 'interval'});
-    final daysSinceLong = _calcDaysSince(recentRuns, {'long'});
-    final nextWorkout = _suggestNext(
-      daysSinceLastQuality: daysSinceQuality,
-      daysSinceLastLong: daysSinceLong,
+ 
+    // Load run history for completed-day data.
+    final runHistory = await loadSavedRuns();
+    final runHistoryTyped = runHistory
+        .map((r) => RunHistory(
+              distance: r.distance,
+              averagePace: r.averagePace,
+              date: r.date,
+              gpsPoints: r.gpsPoints,
+              rpe: r.rpe,
+              workoutType: r.workoutType,
+            ))
+        .toList();
+ 
+    final weekNum = memory.hasRacePlan
+        ? memory.racePlan!.currentWeekNumber(DateTime.now())
+        : memory.currentWeek;
+ 
+    final phase = memory.hasRacePlan
+        ? (memory.racePlan!.currentWeek(DateTime.now())?.phase ??
+            memory.currentPhase)
+        : memory.currentPhase;
+ 
+    // Estimate weekly target from recent volume.
+    final recentAvg = runHistory.isEmpty
+        ? 5.0
+        : runHistory.take(5).fold(0.0, (s, r) => s + r.distance) /
+            runHistory.take(5).length;
+    final weeklyTargetKm = recentAvg * runsPerWeek;
+ 
+    final service = WeekProjectionService();
+    final projection = service.projectWeek(
+      weekNumber: weekNum,
+      phase: phase,
+      trainingDayIndices: trainingDayIndices,
+      resolverContext: resolverContext,
+      scalingSignals: const ScalingSignals(),
+      raceDistance: raceDistance,
+      weeklyTargetKm: weeklyTargetKm,
+      completedRuns: runHistoryTyped,
+      lastCompletedIntent: memory.lastCompletedWorkoutIntent,
+      lastCompletedTemplateId: memory.lastCompletedTemplateId,
+      avgRpe: memory.averageRecentRpe(3),
     );
-    return _SummaryData(
-      paceTrend: paceTrend,
-      weeklyDistance: weeklyDistance,
-      nextWorkout: nextWorkout,
-    );
+ 
+    // Find the next upcoming session (projected or rest of week).
+    final now = DateTime.now();
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+ 
+    ProjectedDay? nextDay;
+    for (final day in projection.days) {
+      final dayMidnight =
+          DateTime(day.date.year, day.date.month, day.date.day);
+      if (dayMidnight.isAfter(todayMidnight) &&
+          (day.status == DayStatus.projected) &&
+          day.intent != null) {
+        nextDay = day;
+        break;
+      }
+    }
+ 
+    if (nextDay != null) {
+      final intent = nextDay.intent!;
+      final daysAhead =
+          nextDay.date.difference(todayMidnight).inDays;
+      final dayLabel = daysAhead == 1 ? 'Tomorrow' : _weekdayName(nextDay.weekday);
+      final distStr = nextDay.distanceKm > 0
+          ? ' · ${nextDay.distanceKm.toStringAsFixed(1)} km'
+          : '';
+      final label = '$dayLabel · ${_intentName(intent)}$distStr';
+      final subtext = _intentSubtext(intent);
+ 
+      return _SummaryData(
+        paceTrend: paceTrend,
+        weeklyDistance: weeklyDistance,
+        nextIntent: intent,
+        nextWorkoutLabel: label,
+        nextWorkoutSubtext: subtext,
+      );
+    }
+  } catch (e) {
+    debugPrint('[RunSummaryScreen] next session projection failed: $e');
   }
+ 
+  // Fallback — couldn't project.
+  return _SummaryData(
+    paceTrend: paceTrend,
+    weeklyDistance: weeklyDistance,
+    nextIntent: null,
+    nextWorkoutLabel: 'Easy run — keep building your base.',
+    nextWorkoutSubtext: '',
+  );
+ }
 
   double _calcWeeklyDistance(List<RunRecord> runs) {
     final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
     return runs
         .where((r) => r.date.isAfter(sevenDaysAgo))
         .fold(0.0, (sum, r) => sum + r.distanceKm);
-  }
-
-  int _calcDaysSince(List<RunRecord> runs, Set<String> types) {
-    for (final run in runs) {
-      if (types.contains(run.workoutType)) {
-        return DateTime.now().difference(run.date).inDays;
-      }
-    }
-    return 999;
-  }
-
-  String _suggestNext({
-    required int daysSinceLastQuality,
-    required int daysSinceLastLong,
-  }) {
-    if (daysSinceLastLong >= 7) {
-      return 'Long easy run — it\'s been a week since your last long run.';
-    }
-    if (daysSinceLastQuality >= 3) {
-      return 'Tempo or interval session — time for a quality workout.';
-    }
-    return 'Easy run — keep building your base.';
   }
 
   int _paceToSeconds(String pace) {
@@ -618,13 +708,21 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   Widget _buildNextWorkoutSection(_SummaryData data) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('NEXT UP',
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF999999),
-              letterSpacing: 1.2)),
+  final accentColor = _intentAccentColor(data.nextIntent);
+  final icon = _intentIcon(data.nextIntent);
+ 
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'NEXT UP',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF999999),
+          letterSpacing: 1.2,
+        ),
+      ),
       const SizedBox(height: 12),
       Container(
         padding: const EdgeInsets.all(16),
@@ -633,26 +731,52 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
         ),
-        child: Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accentColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
             ),
-            child: const Icon(Icons.directions_run,
-                color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(data.nextWorkout,
-                style: const TextStyle(
-                    fontSize: 14, color: Colors.black87, height: 1.4)),
-          ),
-        ]),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.nextWorkoutLabel,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (data.nextWorkoutSubtext.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      data.nextWorkoutSubtext,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ]);
-  }
+    ],
+  );
+ }
 
   String _formatDistance(double km) =>
       km >= 10 ? km.toStringAsFixed(1) : km.toStringAsFixed(2);
@@ -681,6 +805,73 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       _                    => '→ Stable',
     };
   }
+  
+  String _intentName(WorkoutIntent intent) => switch (intent) {
+      WorkoutIntent.aerobicBase  => 'Easy Run',
+      WorkoutIntent.endurance    => 'Long Run',
+      WorkoutIntent.threshold    => 'Threshold Run',
+      WorkoutIntent.vo2max       => 'Interval Session',
+      WorkoutIntent.speed        => 'Speed Session',
+      WorkoutIntent.raceSpecific => 'Race Pace Run',
+      WorkoutIntent.recovery     => 'Recovery Run',
+    };
+ 
+String _intentSubtext(WorkoutIntent intent) => switch (intent) {
+      WorkoutIntent.aerobicBase  =>
+        'Easy effort — conversational pace, keep it comfortable.',
+      WorkoutIntent.endurance    =>
+        'Long run — building your endurance base.',
+      WorkoutIntent.threshold    =>
+        'Comfortably hard — raises your lactate threshold.',
+      WorkoutIntent.vo2max       =>
+        'High-intensity intervals — develops raw speed and VO₂ max.',
+      WorkoutIntent.speed        =>
+        'Short, fast reps — improves running economy and turnover.',
+      WorkoutIntent.raceSpecific =>
+        'Race pace work — confidence and rhythm at goal pace.',
+      WorkoutIntent.recovery     =>
+        'Very easy — flushing fatigue, no fitness pressure.',
+    };
+ 
+Color _intentAccentColor(WorkoutIntent? intent) => switch (intent) {
+      WorkoutIntent.threshold    => const Color(0xFFBF360C),
+      WorkoutIntent.vo2max       => const Color(0xFF0D47A1),
+      WorkoutIntent.speed        => const Color(0xFF0D47A1),
+      WorkoutIntent.endurance    => const Color(0xFF1B5E20),
+      WorkoutIntent.recovery     => const Color(0xFF4A148C),
+      WorkoutIntent.raceSpecific => const Color(0xFFBF360C),
+      _                          => Colors.black,
+    };
+ 
+IconData _intentIcon(WorkoutIntent? intent) => switch (intent) {
+      WorkoutIntent.threshold    => Icons.bolt,
+      WorkoutIntent.vo2max       => Icons.repeat_rounded,
+      WorkoutIntent.speed        => Icons.flash_on,
+      WorkoutIntent.endurance    => Icons.landscape_outlined,
+      WorkoutIntent.recovery     => Icons.self_improvement,
+      WorkoutIntent.raceSpecific => Icons.flag_outlined,
+      _                          => Icons.directions_run,
+    };
+ 
+String _weekdayName(int dayIndex) {
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return names[dayIndex.clamp(0, 6)];
+}
+ 
+RaceDistance _goalRaceToDistance(String goalRace) => switch (goalRace) {
+      '5k'            => RaceDistance.fiveK,
+      '10k'           => RaceDistance.tenK,
+      'half_marathon' => RaceDistance.halfMarathon,
+      'marathon'      => RaceDistance.marathon,
+      _               => RaceDistance.fiveK,
+    };
+ 
+PRDistance? _raceDistanceToPR(RaceDistance race) => switch (race) {
+      RaceDistance.fiveK        => PRDistance.fiveK,
+      RaceDistance.tenK         => PRDistance.tenK,
+      RaceDistance.halfMarathon => PRDistance.halfMarathon,
+      RaceDistance.marathon     => PRDistance.marathon,
+    };
 }
 
 // ── Data model ────────────────────────────────────────────────────────────────
@@ -688,18 +879,30 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 class _SummaryData {
   final String paceTrend;
   final double weeklyDistance;
-  final String nextWorkout;
-
+ 
+  /// Real intent from WeekProjectionService. Null = end of week / no data.
+  final WorkoutIntent? nextIntent;
+ 
+  /// Human-readable label, e.g. "Tomorrow · Threshold Run · 8.0 km"
+  final String nextWorkoutLabel;
+ 
+  /// Short supporting line, e.g. "Raises your lactate threshold …"
+  final String nextWorkoutSubtext;
+ 
   const _SummaryData({
     required this.paceTrend,
     required this.weeklyDistance,
-    required this.nextWorkout,
+    this.nextIntent,
+    required this.nextWorkoutLabel,
+    required this.nextWorkoutSubtext,
   });
-
+ 
   factory _SummaryData.empty() => const _SummaryData(
         paceTrend: 'neutral',
         weeklyDistance: 0.0,
-        nextWorkout: 'Easy run — keep building your base.',
+        nextIntent: null,
+        nextWorkoutLabel: 'Easy run — keep building your base.',
+        nextWorkoutSubtext: '',
       );
 }
 

@@ -136,7 +136,8 @@ class PreRunScaler {
         paceMaxSecondsPerKm: block.paceMaxSecondsPerKm,
         isRpeOnly: block.isRpeOnly,
         reps: newReps,
-        recovery: block.recovery,
+        recoverySeconds: block.recoverySeconds,
+        recoveryMeters: block.recoveryMeters,
         label: block.label,
       );
     }
@@ -150,7 +151,8 @@ class PreRunScaler {
       paceMaxSecondsPerKm: block.paceMaxSecondsPerKm,
       isRpeOnly: block.isRpeOnly,
       reps: block.reps,
-      recovery: block.recovery,
+      recoverySeconds: block.recoverySeconds,
+      recoveryMeters: block.recoveryMeters,   
       label: block.label,
     );
   }

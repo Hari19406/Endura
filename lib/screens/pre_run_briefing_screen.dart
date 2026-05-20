@@ -495,8 +495,15 @@ class _WorkoutBlockCard extends StatelessWidget {
       buf.write(': $distStr');
     }
     buf.write(' @ ${block.formattedPaceForIntent(workoutIntent)}');
-    if (block.recovery != null && block.reps != null && block.reps! > 1) {
-      buf.write(' (${_smartDistance(block.recovery!.distanceKm)} jog)');
+    if (block.reps != null && block.reps! > 1) {
+      if (block.recoverySeconds != null) {
+        final m = block.recoverySeconds! ~/ 60;
+        final s = block.recoverySeconds! % 60;
+        final label = m > 0 ? '$m:${s.toString().padLeft(2,'0')} recovery' : '${block.recoverySeconds}s recovery';
+        buf.write(' ($label)');
+      } else if (block.recoveryMeters != null) {
+        buf.write(' (${_smartDistance(block.recoveryMeters! / 1000)} jog)');
+      }
     }
 
     final icon = block.type == BlockType.recovery

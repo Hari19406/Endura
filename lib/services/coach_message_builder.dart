@@ -301,8 +301,15 @@ class CoachMessageBuilder {
 
     buf.write(' at ${block.formattedPace}');
 
-    if (block.recovery != null && block.reps != null && block.reps! > 1) {
-      buf.write(' (${block.recovery!.formattedDistance} jog recovery)');
+    if (block.reps != null && block.reps! > 1) {
+      if (block.recoverySeconds != null) {
+        final m = block.recoverySeconds! ~/ 60;
+        final s = block.recoverySeconds! % 60;
+        final label = m > 0 ? '$m:${s.toString().padLeft(2,'0')} recovery' : '${block.recoverySeconds}s recovery';
+        buf.write(' ($label)');
+      } else if (block.recoveryMeters != null) {
+        buf.write(' (${_fmtMeters(block.recoveryMeters!)} jog recovery)');
+      }
     }
 
     return buf.toString();
@@ -363,4 +370,10 @@ class CoachMessageBuilder {
         ],
     };
   }
+
+  //HELPER FUNCTIONS
+  String _fmtMeters(double meters) {
+  if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)} km';
+  return '${meters.round()}m';
+}
 }
