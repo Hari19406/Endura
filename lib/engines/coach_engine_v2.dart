@@ -52,6 +52,8 @@ class UserMetrics {
   final int runsPerWeek;
   final String goalRace;
   final String experienceLevel;
+  // goalIntent keys: 'steady' | 'structured' | 'performance'
+  // Maps to onboarding labels: Finish comfortably | Improve steadily | Peak performance
   final String goalIntent;
   final double? avgRpe;
   final selector.RecentRpeTrend recentRpeTrend;
@@ -71,7 +73,7 @@ class UserMetrics {
     this.runsPerWeek = 4,
     required this.goalRace,
     this.experienceLevel = 'beginner',
-    this.goalIntent = 'improve',
+    this.goalIntent = 'structured',  // updated default: was 'improve'
     this.avgRpe,
     this.recentRpeTrend = selector.RecentRpeTrend.unknown,
     this.lastEasyRunTooHard = false,
@@ -337,7 +339,7 @@ class CoachEngine {
       paceInsufficientData: insufficientPaceData,
     );
 
-    // ── Derive next planned session from WeekResolution ───────────────────
+    // ── Derive next planned session ───────────────────────────────────────
     final nextInfo = _resolveNextPlannedSession(
       weekResolution: weekResolution,
       now: now,
@@ -355,16 +357,13 @@ class CoachEngine {
   }
 
   // ── Next planned session derivation ──────────────────────────────────────
-  //
-  // Walks WeekResolution forward from today using the existing slotFor()
-  // method. Returns (intent, label) e.g. (threshold, "Tomorrow · Threshold Run").
 
   (WorkoutIntent?, String?) _resolveNextPlannedSession({
     required WeekResolution weekResolution,
     required DateTime now,
     required List<int> trainingDayIndices,
   }) {
-    final todayIndex = now.weekday - 1; // Mon=0 … Sun=6
+    final todayIndex = now.weekday - 1;
 
     for (int dayIdx = todayIndex + 1; dayIdx <= 6; dayIdx++) {
       if (!trainingDayIndices.contains(dayIdx)) continue;
@@ -398,7 +397,7 @@ class CoachEngine {
     };
   }
 
-  // ── Week resolution for home screen plan card ─────────────────────────────
+  // ── Week resolution for home screen ──────────────────────────────────────
 
   WeekResolution resolveCurrentWeek({
     required UserMetrics userMetrics,
@@ -481,7 +480,8 @@ class CoachEngine {
           .where((p) => p > 0)
           .toList();
       if (paces.isNotEmpty) {
-        avgEasyPace = (paces.reduce((a, b) => a + b) / paces.length).round();
+        avgEasyPace =
+            (paces.reduce((a, b) => a + b) / paces.length).round();
       }
     }
 

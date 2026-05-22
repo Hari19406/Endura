@@ -75,6 +75,7 @@ class EngineMemory {
   final ProgressionDecision? weeklyProgressionDecision;
   final DateTime? lastProgressionEvaluationDate;
   final int pendingVdotNudge;
+  final int? longRunDayIndex;
 
   String get lastWorkoutType => lastCompletedType.name;
 
@@ -100,6 +101,7 @@ class EngineMemory {
     this.weeklyProgressionDecision,
     this.lastProgressionEvaluationDate,
     this.pendingVdotNudge = 0,
+    this.longRunDayIndex,
   });
 
   bool get hasRacePlan => racePlan != null;
@@ -162,9 +164,9 @@ class EngineMemory {
         'plannedIntentPreviewLabel': plannedIntentPreviewLabel,
         'recentTemplateIds': recentTemplateIds,
         'weeklyProgressionDecision': weeklyProgressionDecision?.name,
-        'lastProgressionEvaluationDate':
-            lastProgressionEvaluationDate?.toIso8601String(),
+        'lastProgressionEvaluationDate': lastProgressionEvaluationDate?.toIso8601String(),
         'pendingVdotNudge': pendingVdotNudge,
+        'longRunDayIndex': longRunDayIndex,
       };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
@@ -275,6 +277,7 @@ class EngineMemory {
         lastProgressionEvaluationDate: DateTime.tryParse(
             '${json['lastProgressionEvaluationDate'] ?? ''}'),
         pendingVdotNudge: (json['pendingVdotNudge'] as num?)?.toInt() ?? 0,
+        longRunDayIndex: (json['longRunDayIndex'] as num?)?.toInt(),
       );
     } catch (_) {
       return defaultSafeMemory();
@@ -311,6 +314,7 @@ class EngineMemory {
     bool clearWeeklyProgressionDecision = false,
     DateTime? lastProgressionEvaluationDate,
     int? pendingVdotNudge,
+    int? longRunDayIndex,
   }) {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
@@ -355,6 +359,7 @@ class EngineMemory {
       lastProgressionEvaluationDate:
           lastProgressionEvaluationDate ?? this.lastProgressionEvaluationDate,
       pendingVdotNudge: pendingVdotNudge ?? this.pendingVdotNudge,
+      longRunDayIndex: longRunDayIndex ?? this.longRunDayIndex,
     );
   }
 }

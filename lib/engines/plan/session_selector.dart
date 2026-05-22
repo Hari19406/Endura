@@ -52,9 +52,9 @@ class SelectionContext {
   final bool longRunDoneThisWeek;
   final String experienceLevel;
   final String goalIntent;
-  final double weekPercentageSum; 
+  final double weekPercentageSum;
 
-   const SelectionContext({
+  const SelectionContext({
     required this.raceDistance,
     required this.phase,
     required this.readiness,
@@ -73,8 +73,8 @@ class SelectionContext {
     this.qualitySessionsDoneThisWeek = 0,
     this.longRunDoneThisWeek = false,
     this.experienceLevel = 'intermediate',
-    this.goalIntent = 'improve',
-    this.weekPercentageSum = 1.0, 
+    this.goalIntent = 'structured',  // updated default: was 'improve'
+    this.weekPercentageSum = 1.0,
   });
 }
 
@@ -125,13 +125,6 @@ class SessionSelector {
     final dayRole = _determineDayRole(context);
 
     // ── Step 3: Resolve intent — plannedIntent is PRIMARY ────────────────
-    //
-    // Priority chain:
-    //   1. plannedIntent (from intent layer — post-workout decision)
-    //   2. _roleToIntent  (structural fallback — no intent stored yet)
-    //
-    // When plannedIntent exists, DayRole becomes informational only.
-    // The intent layer has already decided what to train.
     final intentSource = context.plannedIntent != null
         ? 'plannedIntent'
         : 'roleToIntent (fallback)';
@@ -146,35 +139,17 @@ class SessionSelector {
       'readiness': context.readiness.name,
     });
 
-    // ── Step 4: Apply readiness gating (EXECUTION adjustment only) ───────
-    //
-    // KEY PRINCIPLE: Readiness does NOT change the training direction.
-    // It only adjusts intensity WITHIN the intent boundary.
-    //
-    // GREEN  → run as planned
-    // YELLOW → downgrade intensity within the intent family:
-    //          vo2max/speed/raceSpecific → threshold (lighter quality)
-    //          threshold stays threshold (already manageable)
-    //          aerobicBase stays aerobicBase
-    //          endurance stays endurance (just run slower)
-    // RED    → override to recovery (safety override — only exception)
-    //
-    // IMPORTANT: aerobicBase + GREEN readiness → still aerobicBase.
-    //            The intent layer said "easy day" and green readiness
-    //            does NOT promote it to quality. That would break the
-    //            contract between what the UI previewed and what runs.
+    // ── Step 4: Apply readiness gating ───────────────────────────────────
     var wasDowngraded = false;
     final originalIntent = intent;
 
     if (context.readiness == SelectorReadiness.red) {
-      // RED = safety override. Body isn't ready for anything.
       intent = WorkoutIntent.recovery;
       wasDowngraded = true;
       _log('READINESS GATE: RED → recovery override', {
         'originalIntent': originalIntent.name,
       });
     } else if (context.readiness == SelectorReadiness.yellow) {
-      // YELLOW = reduce intensity, stay in the intent family.
       if (intent == WorkoutIntent.vo2max ||
           intent == WorkoutIntent.speed ||
           intent == WorkoutIntent.raceSpecific) {
@@ -184,10 +159,9 @@ class SessionSelector {
           'originalIntent': originalIntent.name,
         });
       }
-      // threshold, aerobicBase, endurance, recovery → no change on yellow
     }
 
-    // ── Step 5: Query library for templates (STRICT intent boundaries) ───
+    // ── Step 5: Query library ─────────────────────────────────────────────
     final candidates = WorkoutLibrary.forSlot(
       intent: intent,
       raceDistance: context.raceDistance,
@@ -203,7 +177,6 @@ class SessionSelector {
     });
 
     if (candidates.isEmpty) {
-      // Fallback: try aerobic base (always has templates for every context).
       final fallback = WorkoutLibrary.forSlot(
         intent: WorkoutIntent.aerobicBase,
         raceDistance: context.raceDistance,
@@ -233,10 +206,9 @@ class SessionSelector {
       );
     }
 
-    // ── Step 6: Pick the best template (variety + phase fit) ─────────────
+    // ── Step 6: Pick best template ────────────────────────────────────────
     final template = _pickBestTemplate(candidates, context);
     final variant = WorkoutLibrary.getVariant(template, context.phase);
-
     final reason = _buildReason(dayRole, intent, context, intentSource);
 
     _log('SELECTION COMPLETE', {
@@ -273,13 +245,13 @@ class SessionSelector {
     final isLastDay = todayPosition == totalDays - 1;
     final isSecondToLast = todayPosition == totalDays - 2;
 
-    final qualityBudget = _qualityBudgetForWeek(totalDays, context.phase, context.experienceLevel);
+    final qualityBudget = _qualityBudgetForWeek(
+        totalDays, context.phase, context.experienceLevel);
     final qualityDone = context.qualitySessionsDoneThisWeek;
     final qualityRemaining = (qualityBudget - qualityDone).clamp(0, 2);
 
     final daysRemaining = totalDays - todayPosition;
 
-    // ── Long run: last training day, unless already done ────────────────
     if (isLastDay && !context.longRunDoneThisWeek) {
       if (context.daysSinceLastLongRun < 3 &&
           context.daysSinceLastQuality > 4 &&
@@ -293,12 +265,10 @@ class SessionSelector {
       return DayRole.easyRun;
     }
 
-    // ── Recovery day: second to last in 6+ day weeks ────────────────────
     if (totalDays >= 6 && isSecondToLast) {
       return DayRole.recovery;
     }
 
-    // ── Quality assignment: urgency-aware ────────────────────────────────
     if (qualityRemaining > 0 && context.daysSinceLastQuality >= 2) {
       final nonLongDaysRemaining =
           daysRemaining - (context.longRunDoneThisWeek ? 0 : 1);
@@ -321,18 +291,19 @@ class SessionSelector {
     return DayRole.easyRun;
   }
 
-  int _qualityBudgetForWeek(int daysPerWeek, TrainingPhase phase, String experienceLevel) {
-  final isBeginner = experienceLevel == 'beginner';
-  return switch (phase) {
-    TrainingPhase.base  => daysPerWeek >= 4 ? 1 : (isBeginner ? 0 : 1),
-    TrainingPhase.taper => 1,
-    TrainingPhase.build => daysPerWeek >= 5 ? 2 : 1,
-    TrainingPhase.peak  => daysPerWeek >= 4 ? 2 : 1,
-  };
-}
+  int _qualityBudgetForWeek(
+      int daysPerWeek, TrainingPhase phase, String experienceLevel) {
+    final isBeginner = experienceLevel == 'beginner';
+    return switch (phase) {
+      TrainingPhase.base  => daysPerWeek >= 4 ? 1 : (isBeginner ? 0 : 1),
+      TrainingPhase.taper => 1,
+      TrainingPhase.build => daysPerWeek >= 5 ? 2 : 1,
+      TrainingPhase.peak  => daysPerWeek >= 4 ? 2 : 1,
+    };
+  }
 
   // ========================================================================
-  // INTENT MAPPING (fallback only — used when no plannedIntent exists)
+  // INTENT MAPPING (fallback only)
   // ========================================================================
 
   WorkoutIntent _roleToIntent(DayRole role, SelectionContext context) {
@@ -344,13 +315,14 @@ class SessionSelector {
         if (context.phase == TrainingPhase.base) {
           return WorkoutIntent.threshold;
         }
-        // finish intent never gets VO2 max work
-        if (context.goalIntent == 'finish') return WorkoutIntent.threshold;
+        // 'steady' = finish comfortably — never push into VO2 work
+        if (context.goalIntent == 'steady') return WorkoutIntent.threshold;
 
         final isBeginnerEarlyBuild = context.phase == TrainingPhase.build &&
             context.weekNumber == 1 &&
-           context.experienceLevel == 'beginner';
+            context.experienceLevel == 'beginner';
         if (isBeginnerEarlyBuild) return WorkoutIntent.threshold;
+
         return switch (context.raceDistance) {
           RaceDistance.fiveK        => WorkoutIntent.vo2max,
           RaceDistance.tenK         => WorkoutIntent.vo2max,
@@ -427,13 +399,10 @@ class SessionSelector {
         'via $intentSource';
   }
 
-  /// Debug log — prints to console in debug mode.
-  /// In production, this becomes a no-op or feeds into analytics.
   void _log(String tag, Map<String, dynamic> data) {
     assert(() {
-      final entries = data.entries
-          .map((e) => '  ${e.key}: ${e.value}')
-          .join('\n');
+      final entries =
+          data.entries.map((e) => '  ${e.key}: ${e.value}').join('\n');
       // ignore: avoid_print
       print('[SessionSelector] $tag\n$entries');
       return true;

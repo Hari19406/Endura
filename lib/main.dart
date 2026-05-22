@@ -3,7 +3,7 @@ import 'screens/home_screen.dart';
 import 'screens/run_screen.dart';
 import 'screens/you_screen.dart';
 import 'services/first_run_service.dart';
-import 'screens/onboarding_screen.dart';
+import 'onboarding/onboarding_screen.dart';
 import 'utils/database_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/auth_screen.dart';
