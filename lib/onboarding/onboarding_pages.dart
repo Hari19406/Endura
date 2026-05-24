@@ -2042,12 +2042,14 @@ class _RingPainter extends CustomPainter {
 
 class OPageWeeklyMileage extends StatefulWidget {
   final double weeklyKm;
+  final String? goalRace;
   final ValueChanged<double> onChanged;
 
   const OPageWeeklyMileage({
     super.key,
     required this.weeklyKm,
     required this.onChanged,
+    this.goalRace,
   });
 
   @override
@@ -2060,6 +2062,14 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
   static const double _min = 5;
   static const double _max = 150;
   static const double _step = 5;
+
+  // Min viable km per goal race (mirrors WeeklyVolumeResolver._ranges)
+  static const _minViable = {
+    '5k':           15.0,
+    '10k':          20.0,
+    'half_marathon': 30.0,
+    'marathon':     40.0,
+  };
 
   @override
   void initState() {
@@ -2076,14 +2086,12 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
   }
 
   void _increment() {
-    final current = widget.weeklyKm;
-    final next = (current + _step).clamp(_min, _max);
+    final next = (widget.weeklyKm + _step).clamp(_min, _max);
     _update(next);
   }
 
   void _decrement() {
-    final current = widget.weeklyKm;
-    final next = (current - _step).clamp(_min, _max);
+    final next = (widget.weeklyKm - _step).clamp(_min, _max);
     _update(next);
   }
 
@@ -2101,18 +2109,35 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
     }
   }
 
+  // Goal-aware hint — warns if below min viable for selected race.
   String _hint(double km) {
-    if (km <= 15) return 'Just getting started — Max will build you up gradually';
-    if (km <= 30) return 'Building a base — good foundation to work from';
-    if (km <= 50) return 'Solid volume — Max can push with real structure';
-    if (km <= 80) return 'High mileage — Max will train you seriously';
+    final minKm = _minViable[widget.goalRace] ?? 15.0;
+    if (km < minKm) {
+      final raceName = switch (widget.goalRace) {
+        '10k'           => '10K',
+        'half_marathon' => 'half marathon',
+        'marathon'      => 'marathon',
+        _               => '5K',
+      };
+      return 'Below the recommended base for a $raceName — Max will build you up first';
+    }
+    if (km <= 25) return 'Just getting started — Max will build you up gradually';
+    if (km <= 40) return 'Building a base — good foundation to work from';
+    if (km <= 60) return 'Solid volume — Max can push with real structure';
+    if (km <= 90) return 'High mileage — Max will train you seriously';
     return 'Elite volume — Max will manage load very carefully';
+  }
+
+  bool get _isBelowViable {
+    final minKm = _minViable[widget.goalRace] ?? 15.0;
+    return widget.weeklyKm > 0 && widget.weeklyKm < minKm;
   }
 
   @override
   Widget build(BuildContext context) {
     final km = widget.weeklyKm;
     final hasValue = km > 0;
+    final belowViable = _isBelowViable;
 
     return Padding(
       padding: ET.pagePad,
@@ -2130,14 +2155,12 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
           // ── Input row ─────────────────────────────────────────────────
           Row(
             children: [
-              // Decrement button
               _StepButton(
                 icon: Icons.remove_rounded,
                 onTap: km > _min ? _decrement : null,
               ),
               const SizedBox(width: 16),
 
-              // Number input
               Expanded(
                 child: Container(
                   height: 80,
@@ -2145,7 +2168,11 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
                     color: EC.surface,
                     borderRadius: BorderRadius.circular(ET.cardRadius),
                     border: Border.all(
-                      color: hasValue ? EC.teal : EC.border,
+                      color: belowViable
+                          ? EC.amber
+                          : hasValue
+                              ? EC.teal
+                              : EC.border,
                       width: hasValue ? 1.5 : ET.borderWidth,
                     ),
                   ),
@@ -2201,7 +2228,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
 
               const SizedBox(width: 16),
 
-              // Increment button
               _StepButton(
                 icon: Icons.add_rounded,
                 onTap: km < _max ? _increment : null,
@@ -2211,7 +2237,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
 
           const SizedBox(height: 8),
 
-          // ── Per week label ─────────────────────────────────────────────
           Center(
             child: Text(
               'per week',
@@ -2231,24 +2256,34 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
-                      color: EC.teal.withOpacity(0.07),
+                      color: belowViable
+                          ? EC.amber.withOpacity(0.07)
+                          : EC.teal.withOpacity(0.07),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: EC.teal.withOpacity(0.2),
-                          width: ET.borderWidth),
+                        color: belowViable
+                            ? EC.amber.withOpacity(0.3)
+                            : EC.teal.withOpacity(0.2),
+                        width: ET.borderWidth,
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.bolt_rounded,
-                            size: 16, color: EC.teal),
+                        Icon(
+                          belowViable
+                              ? Icons.warning_amber_rounded
+                              : Icons.bolt_rounded,
+                          size: 16,
+                          color: belowViable ? EC.amber : EC.teal,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             _hint(km),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: EC.teal,
+                              color: belowViable ? EC.amber : EC.teal,
                               height: 1.5,
                               fontWeight: FontWeight.w500,
                             ),
@@ -2265,7 +2300,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
   }
 }
 
-/// Reusable stepper button used by OPageWeeklyMileage
 class _StepButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;

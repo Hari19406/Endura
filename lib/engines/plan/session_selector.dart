@@ -295,10 +295,11 @@ class SessionSelector {
       int daysPerWeek, TrainingPhase phase, String experienceLevel) {
     final isBeginner = experienceLevel == 'beginner';
     return switch (phase) {
-      TrainingPhase.base  => daysPerWeek >= 4 ? 1 : (isBeginner ? 0 : 1),
-      TrainingPhase.taper => 1,
-      TrainingPhase.build => daysPerWeek >= 5 ? 2 : 1,
-      TrainingPhase.peak  => daysPerWeek >= 4 ? 2 : 1,
+      TrainingPhase.base        => daysPerWeek >= 4 ? 1 : (isBeginner ? 0 : 1),
+      TrainingPhase.taper       => 1,
+      TrainingPhase.build       => daysPerWeek >= 5 ? 2 : 1,
+      TrainingPhase.peak        => daysPerWeek >= 4 ? 2 : 1,
+      TrainingPhase.maintenance => 1,
     };
   }
 

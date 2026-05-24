@@ -19,6 +19,7 @@ class UserProfile {
   final int? paceSeconds;
   final DateTime? raceDate;
   final bool useMetric;
+  final double? baselineWeeklyKm;
 
   const UserProfile({
     this.displayName,
@@ -32,6 +33,7 @@ class UserProfile {
     this.paceSeconds,
     this.raceDate,
     this.useMetric = true,
+    this.baselineWeeklyKm,
   });
 
   Map<String, dynamic> toMap(String userId) => {
@@ -45,15 +47,19 @@ class UserProfile {
         if (paceDistance != null) 'pace_distance': paceDistance,
         if (paceMinutes != null) 'pace_minutes': paceMinutes,
         if (paceSeconds != null) 'pace_seconds': paceSeconds,
-        if (raceDate != null) 'race_date': raceDate!.toIso8601String().substring(0, 10),
+        if (raceDate != null)
+          'race_date': raceDate!.toIso8601String().substring(0, 10),
         'use_metric': useMetric,
+        if (baselineWeeklyKm != null) 'baseline_weekly_km': baselineWeeklyKm,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
   factory UserProfile.fromMap(Map<String, dynamic> map) => UserProfile(
         displayName: map['display_name'] as String?,
         gender: map['gender'] as String?,
-        dob: map['dob'] != null ? DateTime.tryParse(map['dob'] as String) : null,
+        dob: map['dob'] != null
+            ? DateTime.tryParse(map['dob'] as String)
+            : null,
         goal: map['goal'] as String?,
         runsPerWeek: map['runs_per_week'] as int?,
         trainingDays: (map['training_days'] as List<dynamic>? ?? [])
@@ -66,6 +72,8 @@ class UserProfile {
             ? DateTime.tryParse(map['race_date'] as String)
             : null,
         useMetric: map['use_metric'] as bool? ?? true,
+        baselineWeeklyKm:
+            (map['baseline_weekly_km'] as num?)?.toDouble(),
       );
 
   UserProfile copyWith({
@@ -80,6 +88,7 @@ class UserProfile {
     int? paceSeconds,
     DateTime? raceDate,
     bool? useMetric,
+    double? baselineWeeklyKm,
   }) =>
       UserProfile(
         displayName: displayName ?? this.displayName,
@@ -93,6 +102,7 @@ class UserProfile {
         paceSeconds: paceSeconds ?? this.paceSeconds,
         raceDate: raceDate ?? this.raceDate,
         useMetric: useMetric ?? this.useMetric,
+        baselineWeeklyKm: baselineWeeklyKm ?? this.baselineWeeklyKm,
       );
 }
 
@@ -112,9 +122,7 @@ class ProfileService {
   Future<bool> saveProfile(UserProfile profile) async {
     if (_userId == null) return false;
     try {
-      await _client
-          .from('profiles')
-          .upsert(profile.toMap(_userId!));
+      await _client.from('profiles').upsert(profile.toMap(_userId!));
       debugPrint('[ProfileService] profile saved');
       return true;
     } catch (e) {

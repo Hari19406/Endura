@@ -154,10 +154,11 @@ class RacePlanBuilder {
       TrainingPhase phase, String level, bool isDeload) {
     if (isDeload) return phase == TrainingPhase.build ? 1 : 0;
     return switch (phase) {
-      TrainingPhase.base => level == 'advanced' ? 1 : 0,
-      TrainingPhase.build => level == 'beginner' ? 1 : 2,
-      TrainingPhase.peak => 2,
-      TrainingPhase.taper => 1,
+      TrainingPhase.base        => level == 'advanced' ? 1 : 0,
+      TrainingPhase.build       => level == 'beginner' ? 1 : 2,
+      TrainingPhase.peak        => 2,
+      TrainingPhase.taper       => 1,
+      TrainingPhase.maintenance => 1,
     };
   }
 
@@ -172,17 +173,18 @@ class RacePlanBuilder {
 
   static String _keySession(TrainingPhase phase, String goalRace) {
     return switch (phase) {
-      TrainingPhase.base => 'easy',
-      TrainingPhase.build => switch (goalRace) {
+      TrainingPhase.base        => 'easy',
+      TrainingPhase.build       => switch (goalRace) {
           '5k' || '10k' => 'intervals',
           _ => 'tempo',
         },
-      TrainingPhase.peak => switch (goalRace) {
+      TrainingPhase.peak        => switch (goalRace) {
           '5k' => 'intervals',
           '10k' => 'tempo',
           _ => 'race_pace',
         },
-      TrainingPhase.taper => 'easy',
+      TrainingPhase.taper       => 'easy',
+      TrainingPhase.maintenance => 'easy',
     };
   }
 

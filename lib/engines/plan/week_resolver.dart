@@ -7,8 +7,8 @@
 ///   6 days: E – Q – E – Q – E – L
 ///   7 days: E – Q – E – Q – E – L – E
 ///
-/// These slots are mapped onto the runner's chosen training days
-/// (e.g., Mon/Tue/Thu/Fri/Sat for a 5-day runner).
+/// Maintenance phase uses the same structural pattern but Q slots are
+/// always threshold (one quality, one long, rest easy) regardless of count.
 ///
 /// Quality sessions are always split:
 ///   1 quality slot  → threshold OR vo2max (race-distance dependent)
@@ -221,7 +221,7 @@ class WeekResolver {
       weekNumber: weekTarget.week,
       phase: phase,
       targetKm: weekTarget.targetKm,
-      weekPercentageSum: weekPercentageSum > 0 ? weekPercentageSum : 1.0, 
+      weekPercentageSum: weekPercentageSum > 0 ? weekPercentageSum : 1.0,
     );
   }
 
@@ -236,6 +236,9 @@ class WeekResolver {
   /// 5 days: E – Q1 – E – Q2 – L
   /// 6 days: E – Q1 – E – Q2 – E – L
   /// 7 days: E – Q1 – E – Q2 – E – L – E
+  ///
+  /// Maintenance: always E – Q1 – E – L (4-day base, clipped to actual count).
+  ///   With fewer than 3 days — all easy.
   ///
   /// Cutback: Q2 becomes E (drop to 1 quality).
   List<SlotType> _weekPattern(int dayCount, {bool isCutbackWeek = false}) {
@@ -272,6 +275,8 @@ class WeekResolver {
 
   /// Determines which intent each quality slot gets.
   ///
+  /// Maintenance: always threshold (single light quality session).
+  ///
   /// Always split: Q1 and Q2 are from different categories.
   ///   5K / 10K:  Q1 = vo2max,    Q2 = threshold
   ///   HM / FM:   Q1 = threshold, Q2 = vo2max
@@ -282,6 +287,11 @@ class WeekResolver {
     required RaceDistance raceDistance,
     required TrainingPhase phase,
   }) {
+    // Maintenance: single light threshold session only.
+    if (phase == TrainingPhase.maintenance) {
+      return (q1: WorkoutIntent.threshold, q2: WorkoutIntent.aerobicBase);
+    }
+
     if (phase == TrainingPhase.base) {
       return (q1: WorkoutIntent.threshold, q2: WorkoutIntent.threshold);
     }
@@ -342,9 +352,10 @@ class WeekResolver {
   ///
   /// Strategy:
   ///   1. Get all templates matching the intent + race + phase
-  ///   2. Exclude any template used in last 2 weeks (recentTemplateIds)
-  ///   3. If all excluded, pick the least recently used one
-  ///   4. Use weekNumber + slotType as seed for deterministic variety
+  ///   2. For maintenance phase, fall back to base phase if no maintenance templates exist
+  ///   3. Exclude any template used in last 2 weeks (recentTemplateIds)
+  ///   4. If all excluded, pick the least recently used one
+  ///   5. Use weekNumber + slotType as seed for deterministic variety
   String? _pickTemplate({
     required WorkoutIntent intent,
     required SlotType slotType,
@@ -353,11 +364,20 @@ class WeekResolver {
     required int weekNumber,
     required List<String> recentTemplateIds,
   }) {
-    final candidates = WorkoutLibrary.forSlot(
+    var candidates = WorkoutLibrary.forSlot(
       intent: intent,
       raceDistance: raceDistance,
       phase: phase,
     );
+
+    // Maintenance fallback: use base phase templates when no maintenance-specific ones exist.
+    if (candidates.isEmpty && phase == TrainingPhase.maintenance) {
+      candidates = WorkoutLibrary.forSlot(
+        intent: intent,
+        raceDistance: raceDistance,
+        phase: TrainingPhase.base,
+      );
+    }
 
     if (candidates.isEmpty) return null;
     if (candidates.length == 1) return candidates.first.id;
@@ -375,7 +395,6 @@ class WeekResolver {
     }
 
     // All templates used recently — pick the one used longest ago.
-    // Earlier in recentTemplateIds = used longer ago.
     final ranked = List<WorkoutTemplate>.from(candidates);
     ranked.sort((a, b) {
       final idxA = recentTemplateIds.indexOf(a.id);

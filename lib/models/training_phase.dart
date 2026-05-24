@@ -1,42 +1,47 @@
-enum TrainingPhase { base, build, peak, taper }
+enum TrainingPhase { base, build, peak, taper, maintenance }
 
 extension TrainingPhaseX on TrainingPhase {
   bool get allowsQualitySessions =>
       this == TrainingPhase.build || this == TrainingPhase.peak;
 
   double get intensityMultiplier => switch (this) {
-        TrainingPhase.base => 1.05,
-        TrainingPhase.build => 1.0,
-        TrainingPhase.peak => 0.95,
-        TrainingPhase.taper => 1.08,
+        TrainingPhase.base        => 1.05,
+        TrainingPhase.build       => 1.0,
+        TrainingPhase.peak        => 0.95,
+        TrainingPhase.taper       => 1.08,
+        TrainingPhase.maintenance => 1.02,
       };
 
   int get maxQualityPerWeek => switch (this) {
-        TrainingPhase.base => 0,
-        TrainingPhase.build => 2,
-        TrainingPhase.peak => 2,
-        TrainingPhase.taper => 1,
+        TrainingPhase.base        => 0,
+        TrainingPhase.build       => 2,
+        TrainingPhase.peak        => 2,
+        TrainingPhase.taper       => 1,
+        TrainingPhase.maintenance => 1,
       };
 
   double get easyToQualityRatio => switch (this) {
-        TrainingPhase.base => 1.0,
-        TrainingPhase.build => 0.80,
-        TrainingPhase.peak => 0.75,
-        TrainingPhase.taper => 0.85,
+        TrainingPhase.base        => 1.0,
+        TrainingPhase.build       => 0.80,
+        TrainingPhase.peak        => 0.75,
+        TrainingPhase.taper       => 0.85,
+        TrainingPhase.maintenance => 0.85,
       };
 
   String get displayName => switch (this) {
-        TrainingPhase.base => 'Base',
-        TrainingPhase.build => 'Build',
-        TrainingPhase.peak => 'Peak',
-        TrainingPhase.taper => 'Taper',
+        TrainingPhase.base        => 'Base',
+        TrainingPhase.build       => 'Build',
+        TrainingPhase.peak        => 'Peak',
+        TrainingPhase.taper       => 'Taper',
+        TrainingPhase.maintenance => 'Maintenance',
       };
 
   String get description => switch (this) {
-        TrainingPhase.base => 'Building aerobic foundation',
-        TrainingPhase.build => 'Adding quality and volume',
-        TrainingPhase.peak => 'Race-specific sharpening',
-        TrainingPhase.taper => 'Reducing load before race',
+        TrainingPhase.base        => 'Building aerobic foundation',
+        TrainingPhase.build       => 'Adding quality and volume',
+        TrainingPhase.peak        => 'Race-specific sharpening',
+        TrainingPhase.taper       => 'Reducing load before race',
+        TrainingPhase.maintenance => 'Keeping fitness between plans',
       };
 }
 

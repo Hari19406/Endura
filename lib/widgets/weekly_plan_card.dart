@@ -143,6 +143,7 @@ class _PlanArc extends StatelessWidget {
     TrainingPhase.build => 'Build',
     TrainingPhase.peak  => 'Peak',
     TrainingPhase.taper => 'Taper',
+    TrainingPhase.maintenance => 'Maintenance',
   };
 }
 

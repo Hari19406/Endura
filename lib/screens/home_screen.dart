@@ -9,6 +9,7 @@ import '../engines/memory/engine_memory_service.dart';
 import '../engines/memory/engine_memory.dart';
 import '../utils/database_service.dart';
 import '../models/weekly_plan.dart';
+import '../models/training_phase.dart';
 import '../screens/pre_run_briefing_screen.dart';
 import '../services/consistency_service.dart';
 import '../utils/refreshable.dart';
@@ -22,7 +23,11 @@ import '../services/profile_service.dart';
 import '../services/engine_state_sync_service.dart';
 import '../engines/config/workout_template_library.dart';
 import '../screens/pre_run_check.dart';
+import '../screens/plan_complete_screen.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+
+// Import the shortened onboarding for post-plan re-onboarding.
+import '../onboarding/onboarding_screen.dart' show OnboardingScreen;
 
 enum WorkoutCategory { easy, tempo, interval, long, recovery, rest }
 
@@ -88,21 +93,14 @@ WorkoutDisplayStyle _workoutDisplayStyle(WorkoutIntent intent) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WORKOUT DISPLAY MODEL  (replace the existing WorkoutDisplayModel class)
+// WORKOUT DISPLAY MODEL
 // ─────────────────────────────────────────────────────────────────────────────
 
 class WorkoutDisplayModel {
   final WorkoutCategory category;
   final String title;
-
-  /// What the athlete's training state looks like right now.
-  /// Shown as the subtitle on the home card.
   final String coachingReason;
-
-  /// Why the engine picked *this* workout today.
-  /// Shown as a second, smaller line on the home card beneath coachingReason.
   final String coachingWhy;
-
   final String? duration;
   final String? paceRange;
   final String? distance;
@@ -211,7 +209,7 @@ class WorkoutDisplayModel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WORKOUT CARD 
+// WORKOUT CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
 class WorkoutCard extends StatelessWidget {
@@ -291,7 +289,6 @@ class WorkoutCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Badge ─────────────────────────────────────────────────────
             Row(
               children: [
                 Container(
@@ -321,8 +318,6 @@ class WorkoutCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-
-            // ── Title ─────────────────────────────────────────────────────
             Text(
               workout.title,
               style: const TextStyle(
@@ -334,8 +329,6 @@ class WorkoutCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-
-            // ── Reflection line — training state ──────────────────────────
             Text(
               workout.coachingReason,
               style: const TextStyle(
@@ -346,8 +339,6 @@ class WorkoutCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-
-            // ── Why line — engine decision (only when non-empty) ──────────
             if (workout.coachingWhy.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
@@ -362,10 +353,7 @@ class WorkoutCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
-
             const SizedBox(height: 20),
-
-            // ── Distance chip + CTA ───────────────────────────────────────
             Row(
               children: [
                 if (workout.distance != null)
@@ -473,6 +461,19 @@ class _HomeScreenState extends State<HomeScreen>
   ConsistencyData? _consistencyData;
   EngineMemory? _engineMemory;
 
+  // ── Post-plan flow state ───────────────────────────────────────────────────
+  /// True when plan is complete and the celebration card should show.
+  bool _showPlanComplete = false;
+
+  /// vDOT before the plan started — stored in prefs during re-onboarding kick-off.
+  int _vdotBeforePlan = 40;
+
+  /// Total km run during the completed plan (approximated from run history).
+  double _planTotalKm = 0.0;
+
+  /// Display label for the completed race.
+  String _completedRaceLabel = 'your';
+
   @override
   bool get wantKeepAlive => true;
 
@@ -545,11 +546,37 @@ class _HomeScreenState extends State<HomeScreen>
       final List<RunHistory> runs = await loadSavedRuns();
       if (!mounted) return;
 
-      final memory = await EngineMemoryService().load();
+      var memory = await EngineMemoryService().load();
+
+      // ── Post-plan state check (before anything else) ─────────────────────
+      final postPlanResult = _coachEngine.checkAndApplyPostPlanState(memory);
+      if (postPlanResult.justCompleted || postPlanResult.justEnteredMaintenance) {
+        await EngineMemoryService().save(postPlanResult.memory);
+        memory = postPlanResult.memory;
+      }
+
       _engineMemory = memory;
       _lastRun = runs.isNotEmpty ? runs.first : null;
       _runHistory = runs;
 
+      // ── Populate post-plan display fields ────────────────────────────────
+      final prefs = await SharedPreferences.getInstance();
+      _vdotBeforePlan = prefs.getInt('vdot_before_plan') ?? memory.vdotScore;
+      _completedRaceLabel = _raceLabel(prefs.getString('goal_race') ?? '5k');
+      _planTotalKm = runs.fold(0.0, (sum, r) => sum + r.distance);
+
+      if (memory.isPlanComplete && !memory.isInMaintenance) {
+        // Show celebration card instead of workout card.
+        setState(() {
+          _showPlanComplete = true;
+          _isLoading = false;
+        });
+        _isFetching = false;
+        return;
+      }
+      _showPlanComplete = false;
+
+      // ── Normal plan flow ─────────────────────────────────────────────────
       if (memory.activePlan == null ||
           !_planCoversThisWeek(memory.activePlan!)) {
         final newPlan = WeeklyGenerator.generate(
@@ -563,7 +590,6 @@ class _HomeScreenState extends State<HomeScreen>
         await EngineMemoryService().saveActivePlan(newPlan);
         _engineMemory = memory.copyWith(activePlan: newPlan);
         _activePlan = newPlan;
-        final prefs = await SharedPreferences.getInstance();
         await Posthog().capture(
           eventName: 'plan_created',
           properties: {
@@ -589,7 +615,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       try {
-        final prefs = await SharedPreferences.getInstance();
         final experienceLevel =
             prefs.getString('experience_level') ?? 'beginner';
         final goalRace = prefs.getString('goal_race') ?? '5k';
@@ -635,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen>
             ? 5.0
             : runs.map((r) => r.distance).reduce((a, b) => a > b ? a : b);
 
-        final goalIntent = prefs.getString('goal_intent') ?? 'improve'; // NEW — read from prefs
+        final goalIntent = prefs.getString('goal_intent') ?? 'improve';
 
         _userMetrics = UserMetrics(
           avgEasyPace: avgEasyPace,
@@ -649,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen>
           runsPerWeek: runsPerWeek,
           goalRace: goalRace,
           experienceLevel: experienceLevel,
-          goalIntent: goalIntent,           // NEW
+          goalIntent: goalIntent,
           avgRpe: _averageRecentRpe(runs),
           recentRpeTrend: _deriveRecentRpeTrend(runs),
           lastEasyRunTooHard: _lastEasyRunTooHard(runs),
@@ -710,6 +735,65 @@ class _HomeScreenState extends State<HomeScreen>
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  // ── Post-plan actions ──────────────────────────────────────────────────────
+
+  /// User tapped "Start your next plan" — save vDOT snapshot, launch shortened onboarding.
+  Future<void> _onStartNextPlan() async {
+    final memory = _engineMemory;
+    if (memory == null) return;
+
+    // Snapshot current vDOT so celebration card can show before→after next time.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('vdot_before_plan', memory.vdotScore);
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OnboardingScreen(
+          shortenedMode: true,
+          onComplete: () {
+            Navigator.of(context).pop();
+            // Clear plan-complete state and reload.
+            _engineMemory = _engineMemory?.copyWith(
+              clearPlanCompletedAt: true,
+              isInMaintenance: false,
+            );
+            loadData();
+          },
+        ),
+      ),
+    );
+  }
+
+  /// User tapped "Just keep me running" — immediately enter maintenance.
+  Future<void> _onEnterMaintenanceManually() async {
+    final memory = _engineMemory;
+    if (memory == null) return;
+
+    final maintenanceKm =
+        (memory.previousWeekTargetKm ?? memory.baselineWeeklyKm ?? 20.0) * 0.85;
+
+    final updated = memory.copyWith(
+      isInMaintenance: true,
+      currentPhase: TrainingPhase.maintenance,
+      baselineWeeklyKm: maintenanceKm,
+      previousWeekTargetKm: maintenanceKm,
+    );
+    await EngineMemoryService().save(updated);
+    _engineMemory = updated;
+    setState(() => _showPlanComplete = false);
+    await loadData();
+  }
+
+  String _raceLabel(String goalRace) => switch (goalRace) {
+        '10k'           => '10K',
+        'half_marathon' => 'Half Marathon',
+        'marathon'      => 'Marathon',
+        _               => '5K',
+      };
+
+  // ── Cloud / profile helpers (unchanged) ───────────────────────────────────
 
   Future<void> _restoreCloudCoachingState() async {
     final cloudState = await EngineStateSyncService.instance.fetchCloudCoachingState();
@@ -789,10 +873,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (!prefs.containsKey('weekly_mileage_km')) {
       final fallbackWeeklyKm = switch (profile.runsPerWeek ?? 4) {
         <= 2 => 12.0,
-        3 => 20.0,
-        4 => 28.0,
-        5 => 40.0,
-        _ => 50.0,
+        3    => 20.0,
+        4    => 28.0,
+        5    => 40.0,
+        _    => 50.0,
       };
       await prefs.setDouble('weekly_mileage_km', fallbackWeeklyKm);
     }
@@ -874,16 +958,15 @@ class _HomeScreenState extends State<HomeScreen>
       await EngineMemoryService().saveActivePlan(result.plan);
       if (!mounted) return;
       setState(() {
-         _activePlan = result.plan;
-         _coachMessage = null;
-         _workoutModel = const WorkoutDisplayModel(
-            category: WorkoutCategory.rest,
-            title: 'Rest Day',
-            coachingReason: 'Skipped for today. Rest up and come back stronger.',
-            steps: [],
-          );
-        });
-
+        _activePlan = result.plan;
+        _coachMessage = null;
+        _workoutModel = const WorkoutDisplayModel(
+          category: WorkoutCategory.rest,
+          title: 'Rest Day',
+          coachingReason: 'Skipped for today. Rest up and come back stronger.',
+          steps: [],
+        );
+      });
     });
   }
 
@@ -1049,30 +1132,49 @@ class _HomeScreenState extends State<HomeScreen>
             children: [
               _buildSectionLabel("TODAY'S WORKOUT"),
               const SizedBox(height: 10),
-              WorkoutCard(
-                workout: _workoutModel ?? const WorkoutDisplayModel(
-                  category: WorkoutCategory.rest,
-                  title: 'Rest Day',
-                  coachingReason: 'Rest up today. Your next workout is already lined up.',
-                  steps: [],
-                ),
-                onTap: _coachMessage != null
-                    ? () => showPreRunCheck(
-                          context: context,
-                          coachMessage: _coachMessage!,
-                          onProceed: (scaled) => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PreRunBriefingScreen(
-                                coachMessage: scaled,
-                                onGoToRun: () => widget.onNavigateToRun?.call(),
+
+              // ── Maintenance badge (shown above workout card) ──────────────
+              if (_engineMemory?.isInMaintenance == true) ...[
+                MaintenanceBadge(onStartNewPlan: _onStartNextPlan),
+                const SizedBox(height: 10),
+              ],
+
+              // ── Plan complete card OR normal workout card ────────────────
+              if (_showPlanComplete && _engineMemory != null)
+                PlanCompleteCard(
+                  memory: _engineMemory!,
+                  completedRaceLabel: _completedRaceLabel,
+                  totalKmCompleted: _planTotalKm,
+                  vdotBefore: _vdotBeforePlan,
+                  onStartNextPlan: _onStartNextPlan,
+                  onEnterMaintenance: _onEnterMaintenanceManually,
+                )
+              else
+                WorkoutCard(
+                  workout: _workoutModel ?? const WorkoutDisplayModel(
+                    category: WorkoutCategory.rest,
+                    title: 'Rest Day',
+                    coachingReason: 'Rest up today. Your next workout is already lined up.',
+                    steps: [],
+                  ),
+                  onTap: _coachMessage != null
+                      ? () => showPreRunCheck(
+                            context: context,
+                            coachMessage: _coachMessage!,
+                            onProceed: (scaled) => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PreRunBriefingScreen(
+                                  coachMessage: scaled,
+                                  onGoToRun: () => widget.onNavigateToRun?.call(),
+                                ),
                               ),
                             ),
-                          ),
-                          onSkip: _handleSkip,
-                        )
-                    : null,
-              ),
+                            onSkip: _handleSkip,
+                          )
+                      : null,
+                ),
+
               const SizedBox(height: 16),
               if (_lastRun == null && _workoutModel?.category != WorkoutCategory.rest) ...[
                 _buildWelcomeHeroCard(),
@@ -1094,7 +1196,6 @@ class _HomeScreenState extends State<HomeScreen>
       color: Color(0xFF999999), letterSpacing: 1.2,
     ));
   }
-
 
   Widget _buildBottomCarousel() {
     final cardWidth = MediaQuery.of(context).size.width - 60;
@@ -1118,108 +1219,108 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _carouselShell({required Widget child, required double width}) {
-  return Container(
-    width: width, height: 190,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFEEEEEE)),
-    ),
-    padding: const EdgeInsets.all(18),
-    child: child,
-  );
-}
+    return Container(
+      width: width, height: 190,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: child,
+    );
+  }
 
   Widget _buildWeeklyCarouselCard(double width) {
-  final now = DateTime.now();
-  final todayIndex = now.weekday - 1;
-  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  final weekMonday = DateTime(now.year, now.month, now.day)
-      .subtract(Duration(days: now.weekday - 1));
+    final now = DateTime.now();
+    final todayIndex = now.weekday - 1;
+    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final weekMonday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
 
-  final runsThisWeek = _consistencyData?.runsThisWeek ??
-      _runHistory.where((r) {
-        final diff = now.difference(r.date).inDays;
-        return diff < 7;
-      }).length;
-  final weeklyTarget = _trainingDayIndices.length;
-  final ratio = weeklyTarget > 0
-      ? (runsThisWeek / weeklyTarget).clamp(0.0, 1.0)
-      : 0.0;
+    final runsThisWeek = _consistencyData?.runsThisWeek ??
+        _runHistory.where((r) {
+          final diff = now.difference(r.date).inDays;
+          return diff < 7;
+        }).length;
+    final weeklyTarget = _trainingDayIndices.length;
+    final ratio = weeklyTarget > 0
+        ? (runsThisWeek / weeklyTarget).clamp(0.0, 1.0)
+        : 0.0;
 
-  return _carouselShell(
-    width: width,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text('THIS WEEK', style: TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w600,
-          color: Color(0xFF999999), letterSpacing: 1.2,
-        )),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(7, (i) {
-            final isToday = i == todayIndex;
-            final dayDate = weekMonday.add(Duration(days: i));
-            final hasRun = _dayHasRun(dayDate);
-            return Column(
-              children: [
-                Text(dayLabels[i], style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                  color: isToday ? const Color(0xFF0A0A0A) : const Color(0xFF999999),
-                )),
-                const SizedBox(height: 8),
-                Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: hasRun ? const Color(0xFF0A0A0A) : Colors.transparent,
-                    border: Border.all(
-                      color: hasRun
-                          ? Colors.transparent
-                          : const Color(0xFFDDDDDD),
-                      width: 1.5,
+    return _carouselShell(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('THIS WEEK', style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600,
+            color: Color(0xFF999999), letterSpacing: 1.2,
+          )),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) {
+              final isToday = i == todayIndex;
+              final dayDate = weekMonday.add(Duration(days: i));
+              final hasRun = _dayHasRun(dayDate);
+              return Column(
+                children: [
+                  Text(dayLabels[i], style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                    color: isToday ? const Color(0xFF0A0A0A) : const Color(0xFF999999),
+                  )),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: hasRun ? const Color(0xFF0A0A0A) : Colors.transparent,
+                      border: Border.all(
+                        color: hasRun
+                            ? Colors.transparent
+                            : const Color(0xFFDDDDDD),
+                        width: 1.5,
+                      ),
                     ),
+                    child: hasRun
+                        ? const Icon(Icons.check, size: 15, color: Colors.white)
+                        : null,
                   ),
-                  child: hasRun
-                      ? const Icon(Icons.check, size: 15, color: Colors.white)
-                      : null,
-                ),
-              ],
-            );
-          }),
-        ),
-        const Spacer(),
-        RichText(
-          text: TextSpan(children: [
-            TextSpan(
-              text: '$runsThisWeek',
-              style: const TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0A0A0A),
-              ),
-            ),
-            TextSpan(
-              text: ' / $weeklyTarget runs',
-              style: const TextStyle(fontSize: 14, color: Color(0xFF999999)),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(
-            value: ratio, minHeight: 3,
-            backgroundColor: const Color(0xFFEEEEEE),
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0A0A0A)),
+                ],
+              );
+            }),
           ),
-        ),
-      ],
-    ),
-  );
-}
+          const Spacer(),
+          RichText(
+            text: TextSpan(children: [
+              TextSpan(
+                text: '$runsThisWeek',
+                style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0A0A0A),
+                ),
+              ),
+              TextSpan(
+                text: ' / $weeklyTarget runs',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF999999)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: ratio, minHeight: 3,
+              backgroundColor: const Color(0xFFEEEEEE),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0A0A0A)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   bool _dayHasRun(DateTime day) {
     for (final RunHistory r in _runHistory) {
@@ -1231,104 +1332,103 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildLastRunCarouselCard(double width) {
-  return _carouselShell(
-    width: width,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('LAST RUN', style: TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w600,
-          color: Color(0xFF999999), letterSpacing: 1.2,
-        )),
-        const SizedBox(height: 2),
-        Text(_formatDate(_lastRun!.date), style: const TextStyle(
-          fontSize: 11, color: Color(0xFF999999),
-        )),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('DIST', style: TextStyle(
-                    fontSize: 9, fontWeight: FontWeight.w600,
-                    color: Color(0xFF999999), letterSpacing: 0.8,
-                  )),
-                  const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _convertDistance(_lastRun!.distance).toStringAsFixed(1),
-                        style: const TextStyle(
+    return _carouselShell(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('LAST RUN', style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600,
+            color: Color(0xFF999999), letterSpacing: 1.2,
+          )),
+          const SizedBox(height: 2),
+          Text(_formatDate(_lastRun!.date), style: const TextStyle(
+            fontSize: 11, color: Color(0xFF999999),
+          )),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('DIST', style: TextStyle(
+                      fontSize: 9, fontWeight: FontWeight.w600,
+                      color: Color(0xFF999999), letterSpacing: 0.8,
+                    )),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          _convertDistance(_lastRun!.distance).toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 28, fontWeight: FontWeight.w600,
+                            color: Color(0xFF0A0A0A), letterSpacing: -0.5,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4, left: 3),
+                          child: Text(_distanceLabel, style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF999999),
+                            fontWeight: FontWeight.w500,
+                          )),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('PACE', style: TextStyle(
+                      fontSize: 9, fontWeight: FontWeight.w600,
+                      color: Color(0xFF999999), letterSpacing: 0.8,
+                    )),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(_lastRun!.averagePace, style: const TextStyle(
                           fontSize: 28, fontWeight: FontWeight.w600,
                           color: Color(0xFF0A0A0A), letterSpacing: -0.5,
                           fontFeatures: [FontFeature.tabularFigures()],
+                        )),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 4, left: 3),
+                          child: Text('/km', style: TextStyle(
+                            fontSize: 12, color: Color(0xFF999999),
+                            fontWeight: FontWeight.w500,
+                          )),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4, left: 3),
-                        child: Text(_distanceLabel, style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF999999),
-                          fontWeight: FontWeight.w500,
-                        )),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('PACE', style: TextStyle(
-                    fontSize: 9, fontWeight: FontWeight.w600,
-                    color: Color(0xFF999999), letterSpacing: 0.8,
-                  )),
-                  const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(_lastRun!.averagePace, style: const TextStyle(
-                        fontSize: 28, fontWeight: FontWeight.w600,
-                        color: Color(0xFF0A0A0A), letterSpacing: -0.5,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      )),
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 4, left: 3),
-                        child: Text('/km', style: TextStyle(
-                          fontSize: 12, color: Color(0xFF999999),
-                          fontWeight: FontWeight.w500,
-                        )),
-                      ),
-                    ],
-                  ),
-                ],
+            ],
+          ),
+          if (_lastRun!.rpe != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFEEEEEE)),
               ),
+              child: Text('RPE ${_lastRun!.rpe}/10', style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0A0A0A),
+              )),
             ),
           ],
-        ),
-        if (_lastRun!.rpe != null) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFEEEEEE)),
-            ),
-            child: Text('RPE ${_lastRun!.rpe}/10', style: const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0A0A0A),
-            )),
-          ),
         ],
-      ],
-    ),
-  );
-}
-
+      ),
+    );
+  }
 
   Widget _buildFirstRunPromptCard(double width) {
     return _carouselShell(
@@ -1370,40 +1470,40 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildWelcomeHeroCard() {
-  return Container(
-    width: double.infinity,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: const BorderRadius.all(Radius.circular(16)),
-      border: Border.all(color: const Color(0xFFEEEEEE)),
-    ),
-    padding: const EdgeInsets.all(28),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFDDDDDD)),
-            borderRadius: BorderRadius.circular(4),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFDDDDDD)),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text('WELCOME', style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w700,
+              color: Color(0xFF999999), letterSpacing: 2,
+            )),
           ),
-          child: const Text('WELCOME', style: TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w700,
-            color: Color(0xFF999999), letterSpacing: 2,
+          const SizedBox(height: 20),
+          const Text('Ready to\ntrain?', style: TextStyle(
+            fontSize: 48, fontWeight: FontWeight.w800,
+            color: Color(0xFF0A0A0A), height: 1.05, letterSpacing: -1.5,
           )),
-        ),
-        const SizedBox(height: 20),
-        const Text('Ready to\ntrain?', style: TextStyle(
-          fontSize: 48, fontWeight: FontWeight.w800,
-          color: Color(0xFF0A0A0A), height: 1.05, letterSpacing: -1.5,
-        )),
-        const SizedBox(height: 12),
-        const Text(
-          'Complete your first run to unlock\nyour adaptive plan.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF999999), height: 1.6),
-        ),
-      ],
-    ),
-  );
-}
+          const SizedBox(height: 12),
+          const Text(
+            'Complete your first run to unlock\nyour adaptive plan.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF999999), height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
 }

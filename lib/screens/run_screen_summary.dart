@@ -107,6 +107,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       rpe: rpe,
       templateId: completedTemplateId,
       completedIntent: completedIntent,
+
     );
   }
 

@@ -323,11 +323,12 @@ class CoachMessageBuilder {
   };
 
   String _phaseDisplayName(TrainingPhase phase) => switch (phase) {
-    TrainingPhase.base  => 'Base Phase',
-    TrainingPhase.build => 'Build Phase',
-    TrainingPhase.peak  => 'Peak Phase',
-    TrainingPhase.taper => 'Taper Phase',
-  };
+      TrainingPhase.base        => 'Base Phase',
+      TrainingPhase.build       => 'Build Phase',
+      TrainingPhase.peak        => 'Peak Phase',
+      TrainingPhase.taper       => 'Taper Phase',
+      TrainingPhase.maintenance => 'Maintenance',
+    };
 
   // ── Fallback steps ────────────────────────────────────────────────────────
 

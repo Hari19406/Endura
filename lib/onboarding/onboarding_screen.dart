@@ -8,6 +8,7 @@ import '../../engines/memory/engine_memory_service.dart';
 import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
 import 'onboarding_pages.dart';
+import '../../models/training_phase.dart';
 
 class EC {
   static const bg       = Color(0xFF0D0D0D);
@@ -46,7 +47,7 @@ enum OPage {
   daysCount,
   dayPicker,
   longRunDay,
-  weeklyMileage,   // ← NEW — after long run day
+  weeklyMileage,
   intensity,
   planTimeline,
   dob,
@@ -63,7 +64,16 @@ enum OPage {
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
-  const OnboardingScreen({super.key, required this.onComplete});
+
+  /// When true, skips intro, experience, bestTime, dob, gender, name.
+  /// Used for post-plan re-onboarding. Carries over existing profile data.
+  final bool shortenedMode;
+
+  const OnboardingScreen({
+    super.key,
+    required this.onComplete,
+    this.shortenedMode = false,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -73,12 +83,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with TickerProviderStateMixin {
   final _ctrl = PageController();
   int _current = 0;
+  bool _prefilledFromMemory = false;
 
   // ── Collected data ───────────────────────────────────────────────────────
   String?   _goal;
   String?   _experience;
 
-  // Best time
+  // Best time (carried over in shortened mode)
   String    _paceDistance = '5k';
   int       _paceHours    = 0;
   int       _paceMinutes  = 25;
@@ -90,10 +101,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   List<int>  _selectedDays     = TrainingDaysService.defaultsFor(4);
   int?       _longRunDayIndex;
 
-  // Weekly mileage — NEW
+  // Weekly mileage
   double     _weeklyKm         = 0;
 
-  // Intensity / goal intent
+  // Intensity / goal intent (carried over)
   String?   _intensity;
 
   // Plan timeline
@@ -101,7 +112,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int?      _planWeeks;
   DateTime? _raceDate;
 
-  // Personal
+  // Personal (carried over in shortened mode)
   DateTime? _dob;
   String?   _gender;
   String    _firstName = '';
@@ -125,6 +136,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     final now = DateTime.now();
     _startDate = DateTime(now.year, now.month, now.day + 1);
+
+    if (widget.shortenedMode) {
+      _prefillFromExistingProfile();
+    }
   }
 
   @override
@@ -134,9 +149,81 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.dispose();
   }
 
+  /// Load carried-over values from prefs + EngineMemory for shortened mode.
+  Future<void> _prefillFromExistingProfile() async {
+    if (_prefilledFromMemory) return;
+    _prefilledFromMemory = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final memory = await EngineMemoryService().load();
+
+      // Carry over experience + personal info
+      _experience = prefs.getString('experience_level') ?? 'intermediate';
+      _intensity  = prefs.getString('goal_intent');
+      _gender     = prefs.getString('gender');
+      _firstName  = prefs.getString('first_name') ?? '';
+      _lastName   = prefs.getString('last_name') ?? '';
+      final dobRaw = prefs.getString('dob');
+      if (dobRaw != null) _dob = DateTime.tryParse(dobRaw);
+
+      // Carry over best time (vDOT used instead of re-entering time)
+      final paceMin = prefs.getInt('pace_minutes');
+      final paceSec = prefs.getInt('pace_seconds') ?? 0;
+      if (paceMin != null) {
+        _paceMinutes = paceMin;
+        _paceSeconds = paceSec;
+        _paceDistance = prefs.getString('pace_distance') ?? '5k';
+        _knowsTime = true;
+      } else {
+        _knowsTime = false;
+      }
+      _vdot = memory.vdotScore;
+      _vdotProvisional = memory.vdotIsProvisional;
+
+      // Pre-fill training days from last plan
+      final storedDays = await TrainingDaysService.load();
+      if (storedDays != null && storedDays.isNotEmpty) {
+        _selectedDays = storedDays;
+        _runsPerWeek  = storedDays.length;
+      }
+      _longRunDayIndex = prefs.getInt('long_run_day_index') ??
+          (memory.longRunDayIndex);
+
+      // Pre-fill weekly mileage from last plan's final week volume
+      final lastWeekKm = memory.previousWeekTargetKm ??
+          memory.baselineWeeklyKm;
+      if (lastWeekKm != null && lastWeekKm > 0) {
+        _weeklyKm = lastWeekKm;
+      }
+
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[Onboarding] Prefill error: $e');
+    }
+  }
+
   // ── Navigation ───────────────────────────────────────────────────────────
 
-  List<OPage> get _sequence => OPage.values;
+  /// Full sequence (first-time onboarding).
+  static const _fullSequence = OPage.values;
+
+  /// Shortened sequence (post-plan re-onboarding).
+  /// Skips: intro, experience, bestTime, dob, gender, name.
+  static const _shortSequence = [
+    OPage.goal,
+    OPage.planTimeline,
+    OPage.daysCount,
+    OPage.dayPicker,
+    OPage.weeklyMileage,
+    OPage.generatePlan,
+    OPage.buildPlan,
+    OPage.welcome,
+  ];
+
+  List<OPage> get _sequence =>
+      widget.shortenedMode ? _shortSequence : _fullSequence;
+
   int get _total => _sequence.length;
   OPage get _currentPage => _sequence[_current];
 
@@ -187,7 +274,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       case OPage.daysCount:      return true;
       case OPage.dayPicker:      return _selectedDays.length == _runsPerWeek;
       case OPage.longRunDay:     return _longRunDayIndex != null;
-      case OPage.weeklyMileage:  return _weeklyKm >= 5;   // ← NEW
+      case OPage.weeklyMileage:  return _weeklyKm >= 5;
       case OPage.intensity:      return _intensity != null;
       case OPage.planTimeline:   return _planWeeks != null || _raceDate != null;
       case OPage.dob:            return _dob != null;
@@ -202,6 +289,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // ── vDOT computation ─────────────────────────────────────────────────────
 
   (int, bool) _computeVdot() {
+    // In shortened mode use existing vDOT directly — don't re-derive from time.
+    if (widget.shortenedMode && !_vdotProvisional) {
+      return (_vdot, false);
+    }
+
     if (_knowsTime) {
       final totalSec =
           _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
@@ -220,7 +312,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         return (vdot, false);
       }
     }
-    return (40, true);
+    return (_vdot, _vdotProvisional);
   }
 
   // ── Helpers for welcome page ─────────────────────────────────────────────
@@ -250,9 +342,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _vdot = vdot;
     _vdotProvisional = provisional;
 
+    final double effectiveBaselineKm =
+        _weeklyKm > 0 ? _weeklyKm : _runsPerWeek * 8.0;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final exp   = _experience ?? 'intermediate';
+      final exp = _experience ?? 'intermediate';
 
       await prefs.setString('goal_race', _goal ?? '5k');
       await prefs.setString('experience_level', exp);
@@ -272,41 +367,48 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         await prefs.setInt('plan_weeks', _planWeeks!);
       }
       await prefs.setString('plan_start_date', _startDate.toIso8601String());
-      if (_dob != null) {
-        await prefs.setString('dob', _dob!.toIso8601String());
+
+      // Personal fields — only persist in full mode (shortened carries existing values).
+      if (!widget.shortenedMode) {
+        if (_dob != null) {
+          await prefs.setString('dob', _dob!.toIso8601String());
+        }
+        if (_gender != null) await prefs.setString('gender', _gender!);
+        await prefs.setString('first_name', _firstName.trim());
+        await prefs.setString('last_name', _lastName.trim());
+        if (_knowsTime) {
+          await prefs.setString('pace_distance', _paceDistance);
+          await prefs.setInt('pace_hours', _paceHours);
+          await prefs.setInt('pace_minutes', _paceMinutes);
+          await prefs.setInt('pace_seconds', _paceSeconds);
+        }
       }
-      if (_gender != null) await prefs.setString('gender', _gender!);
-      await prefs.setString('first_name', _firstName.trim());
-      await prefs.setString('last_name', _lastName.trim());
 
-      if (_knowsTime) {
-        await prefs.setString('pace_distance', _paceDistance);
-        await prefs.setInt('pace_hours', _paceHours);
-        await prefs.setInt('pace_minutes', _paceMinutes);
-        await prefs.setInt('pace_seconds', _paceSeconds);
-      }
-
-      // ── Weekly mileage — NEW ───────────────────────────────────────────
-      await prefs.setDouble('weekly_km', _weeklyKm);
-
+      await prefs.setDouble('weekly_km', effectiveBaselineKm);
       await prefs.setInt('vdot_score', _vdot);
       await prefs.setBool('vdot_is_provisional', _vdotProvisional);
 
-      // ── Engine memory ──────────────────────────────────────────────────
+      // ── Engine memory — clear post-plan state, seed new plan ───────────
       final memService = EngineMemoryService();
-      final mem        = await memService.load();
+      final mem = await memService.load();
       await memService.save(mem.copyWith(
-        vdotScore:         _vdot,
-        vdotIsProvisional: _vdotProvisional,
-        longRunDayIndex:   _longRunDayIndex,
+        vdotScore:            _vdot,
+        vdotIsProvisional:    _vdotProvisional,
+        longRunDayIndex:      _longRunDayIndex,
+        baselineWeeklyKm:     effectiveBaselineKm,
+        previousWeekTargetKm: effectiveBaselineKm,
+        // Clear post-plan flags so normal flow resumes.
+        clearPlanCompletedAt: true,
+        isInMaintenance:      false,
+        currentPhase:         TrainingPhase.base,
       ));
 
-      // ── Race plan — uses real weekly km now ────────────────────────────
+      // ── Race plan ──────────────────────────────────────────────────────
       final effectiveRaceDate = _raceDate ??
           _startDate.add(Duration(days: (_planWeeks ?? 12) * 7));
       try {
         final plan = RacePlanBuilder.build(
-          currentWeeklyKm: _weeklyKm > 0 ? _weeklyKm : _runsPerWeek * 8.0,
+          currentWeeklyKm: effectiveBaselineKm,
           goalRace:        _goal ?? '5k',
           raceDate:        effectiveRaceDate,
           experienceLevel: exp,
@@ -320,17 +422,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final displayName =
           '${_firstName.trim()} ${_lastName.trim()}'.trim();
       await ProfileService.instance.saveProfile(UserProfile(
-        gender:       _gender,
-        dob:          _dob,
-        goal:         _goal,
-        runsPerWeek:  _runsPerWeek,
-        trainingDays: _selectedDays,
-        paceDistance: _knowsTime ? _paceDistance : null,
-        paceMinutes:  _knowsTime ? _paceMinutes : null,
-        paceSeconds:  _knowsTime ? _paceSeconds : null,
-        raceDate:     _raceDate,
-        useMetric:    true,
-        displayName:  displayName,
+        gender:           _gender,
+        dob:              _dob,
+        goal:             _goal,
+        runsPerWeek:      _runsPerWeek,
+        trainingDays:     _selectedDays,
+        paceDistance:     _knowsTime ? _paceDistance : null,
+        paceMinutes:      _knowsTime ? _paceMinutes : null,
+        paceSeconds:      _knowsTime ? _paceSeconds : null,
+        raceDate:         _raceDate,
+        useMetric:        true,
+        displayName:      displayName.isNotEmpty ? displayName : null,
+        baselineWeeklyKm: effectiveBaselineKm,
       ));
     } catch (e) {
       debugPrint('[Onboarding] Save error: $e');
@@ -428,146 +531,136 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   List<Widget> _buildPages() {
     final previewVdot = _computeVdot();
 
-    return [
-      // 1. Intro
-      OPageIntro(loopCtrl: _loopCtrl),
+    // Build a widget for every page in the active sequence.
+    return _sequence.map((page) => _buildPage(page, previewVdot)).toList();
+  }
 
-      // 2. Goal
-      OPageGoal(
-        selected: _goal,
-        onSelect: (v) => setState(() => _goal = v),
-      ),
+  Widget _buildPage(OPage page, (int, bool) previewVdot) {
+    return switch (page) {
+      OPage.intro => OPageIntro(loopCtrl: _loopCtrl),
 
-      // 3. Experience
-      OPageExperience(
-        selected: _experience,
-        onSelect: (v) => setState(() => _experience = v),
-      ),
+      OPage.goal => OPageGoal(
+          selected: _goal,
+          onSelect: (v) => setState(() => _goal = v),
+        ),
 
-      // 4. Best Time
-      OPageBestTime(
-        knowsTime:      _knowsTime,
-        distance:       _paceDistance,
-        hours:          _paceHours,
-        minutes:        _paceMinutes,
-        seconds:        _paceSeconds,
-        onToggleKnows:  (v) => setState(() => _knowsTime = v),
-        onDistChanged:  (v) => setState(() => _paceDistance = v),
-        onHoursChanged: (v) => setState(() => _paceHours = v),
-        onMinsChanged:  (v) => setState(() => _paceMinutes = v),
-        onSecsChanged:  (v) => setState(() => _paceSeconds = v),
-      ),
+      OPage.experience => OPageExperience(
+          selected: _experience,
+          onSelect: (v) => setState(() => _experience = v),
+        ),
 
-      // 5. Days count
-      OPageDaysCount(
-        runsPerWeek: _runsPerWeek,
-        onChanged: (n) => setState(() {
-          _runsPerWeek     = n;
-          _selectedDays    = TrainingDaysService.defaultsFor(n);
-          _longRunDayIndex = null;
-        }),
-      ),
+      OPage.bestTime => OPageBestTime(
+          knowsTime:      _knowsTime,
+          distance:       _paceDistance,
+          hours:          _paceHours,
+          minutes:        _paceMinutes,
+          seconds:        _paceSeconds,
+          onToggleKnows:  (v) => setState(() => _knowsTime = v),
+          onDistChanged:  (v) => setState(() => _paceDistance = v),
+          onHoursChanged: (v) => setState(() => _paceHours = v),
+          onMinsChanged:  (v) => setState(() => _paceMinutes = v),
+          onSecsChanged:  (v) => setState(() => _paceSeconds = v),
+        ),
 
-      // 6. Day picker
-      OPageDayPicker(
-        runsPerWeek:  _runsPerWeek,
-        selectedDays: _selectedDays,
-        onChanged: (days) => setState(() {
-          _selectedDays    = days;
-          _longRunDayIndex = null;
-        }),
-      ),
+      OPage.daysCount => OPageDaysCount(
+          runsPerWeek: _runsPerWeek,
+          onChanged: (n) => setState(() {
+            _runsPerWeek     = n;
+            _selectedDays    = TrainingDaysService.defaultsFor(n);
+            _longRunDayIndex = null;
+          }),
+        ),
 
-      // 7. Long run day
-      OPageLongRunDay(
-        availableDays:    _selectedDays,
-        selectedDayIndex: _longRunDayIndex,
-        onSelect: (i) => setState(() => _longRunDayIndex = i),
-      ),
+      OPage.dayPicker => OPageDayPicker(
+          runsPerWeek:  _runsPerWeek,
+          selectedDays: _selectedDays,
+          onChanged: (days) => setState(() {
+            _selectedDays    = days;
+            _longRunDayIndex = null;
+          }),
+        ),
 
-      // 8. Weekly mileage — NEW
-      OPageWeeklyMileage(
-        weeklyKm:  _weeklyKm,
-        onChanged: (v) => setState(() => _weeklyKm = v),
-      ),
+      OPage.longRunDay => OPageLongRunDay(
+          availableDays:    _selectedDays,
+          selectedDayIndex: _longRunDayIndex,
+          onSelect: (i) => setState(() => _longRunDayIndex = i),
+        ),
 
-      // 9. Intensity
-      OPageIntensity(
-        selected: _intensity,
-        onSelect: (v) => setState(() => _intensity = v),
-      ),
+      OPage.weeklyMileage => OPageWeeklyMileage(
+          weeklyKm:  _weeklyKm,
+          goalRace:  _goal,
+          onChanged: (v) => setState(() => _weeklyKm = v),
+        ),
 
-      // 10. Plan timeline
-      OPagePlanTimeline(
-        startDate:      _startDate,
-        planWeeks:      _planWeeks,
-        raceDate:       _raceDate,
-        onStartChanged: (d) => setState(() => _startDate = d),
-        onWeeksChanged: (w) => setState(() {
-          _planWeeks = w;
-          _raceDate  = null;
-        }),
-        onRaceDate: (d) => setState(() {
-          _raceDate  = d;
-          _planWeeks = null;
-        }),
-      ),
+      OPage.intensity => OPageIntensity(
+          selected: _intensity,
+          onSelect: (v) => setState(() => _intensity = v),
+        ),
 
-      // 11. DOB
-      OPageDob(
-        dob:       _dob,
-        onChanged: (d) => setState(() => _dob = d),
-      ),
+      OPage.planTimeline => OPagePlanTimeline(
+          startDate:      _startDate,
+          planWeeks:      _planWeeks,
+          raceDate:       _raceDate,
+          onStartChanged: (d) => setState(() => _startDate = d),
+          onWeeksChanged: (w) => setState(() {
+            _planWeeks = w;
+            _raceDate  = null;
+          }),
+          onRaceDate: (d) => setState(() {
+            _raceDate  = d;
+            _planWeeks = null;
+          }),
+        ),
 
-      // 12. Gender
-      OPageGender(
-        selected: _gender,
-        onSelect: (v) => setState(() => _gender = v),
-      ),
+      OPage.dob => OPageDob(
+          dob:       _dob,
+          onChanged: (d) => setState(() => _dob = d),
+        ),
 
-      // 13. Name
-      OPageName(
-        firstName:      _firstName,
-        lastName:       _lastName,
-        onFirstChanged: (v) => setState(() => _firstName = v),
-        onLastChanged:  (v) => setState(() => _lastName = v),
-      ),
+      OPage.gender => OPageGender(
+          selected: _gender,
+          onSelect: (v) => setState(() => _gender = v),
+        ),
 
-      // 14. Generate plan
-      OPageGeneratePlan(
-        firstName:    _firstName.trim().isNotEmpty ? _firstName.trim() : 'you',
-        goal:         _goal ?? '5k',
-        startDate:    _startDate,
-        planWeeks:    _planWeeks,
-        raceDate:     _raceDate,
-        runsPerWeek:  _runsPerWeek,
-        selectedDays: _selectedDays,
-        intensity:    _intensity,
-        vdotScore:    previewVdot.$1,
-        onGenerate:   _next,
-      ),
+      OPage.name => OPageName(
+          firstName:      _firstName,
+          lastName:       _lastName,
+          onFirstChanged: (v) => setState(() => _firstName = v),
+          onLastChanged:  (v) => setState(() => _lastName = v),
+        ),
 
-      // 15. Build plan (saving fires here)
-      OPageBuildPlan(
-        firstName:  _firstName.trim().isNotEmpty ? _firstName.trim() : 'you',
-        goal:       _goal ?? '5k',
-        onComplete: () async {
-          await _saveAll();
-          if (mounted) _next();
-        },
-      ),
+      OPage.generatePlan => OPageGeneratePlan(
+          firstName:    _firstName.trim().isNotEmpty ? _firstName.trim() : 'you',
+          goal:         _goal ?? '5k',
+          startDate:    _startDate,
+          planWeeks:    _planWeeks,
+          raceDate:     _raceDate,
+          runsPerWeek:  _runsPerWeek,
+          selectedDays: _selectedDays,
+          intensity:    _intensity,
+          vdotScore:    previewVdot.$1,
+          onGenerate:   _next,
+        ),
 
-      // 16. Welcome — full projection card
-      OPageWelcome(
-        firstName:       _firstName.trim().isNotEmpty ? _firstName.trim() : 'Runner',
-        goal:            _goal ?? '5k',
-        vdot:            previewVdot.$1,
-        planWeeks:       _effectivePlanWeeks,
-        experienceLevel: _experience ?? 'intermediate',
-        currentTimeSec:  _currentTimeSec,
-        paceDistanceKm:  _paceDistanceKm,
-        onContinue:      widget.onComplete,
-      ),
-    ];
+      OPage.buildPlan => OPageBuildPlan(
+          firstName:  _firstName.trim().isNotEmpty ? _firstName.trim() : 'you',
+          goal:       _goal ?? '5k',
+          onComplete: () async {
+            await _saveAll();
+            if (mounted) _next();
+          },
+        ),
+
+      OPage.welcome => OPageWelcome(
+          firstName:       _firstName.trim().isNotEmpty ? _firstName.trim() : 'Runner',
+          goal:            _goal ?? '5k',
+          vdot:            previewVdot.$1,
+          planWeeks:       _effectivePlanWeeks,
+          experienceLevel: _experience ?? 'intermediate',
+          currentTimeSec:  _currentTimeSec,
+          paceDistanceKm:  _paceDistanceKm,
+          onContinue:      widget.onComplete,
+        ),
+    };
   }
 }
