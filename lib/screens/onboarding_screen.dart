@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/training_days_service.dart';
 import '../engines/planner/race_plan_builder.dart';
 import '../engines/memory/engine_memory_service.dart';
-import '../engines/memory/engine_memory.dart';
 import '../engines/core/vdot_calculator.dart';
 import '../services/profile_service.dart';
 

@@ -175,6 +175,7 @@ class WorkoutResolver {
         percentSum: percentSum,
         resolverContext: resolverContext,
         experienceLevel: experienceLevel,
+        intent: intent,
       ));
     }
 
@@ -194,18 +195,22 @@ class WorkoutResolver {
   // PACE RESOLUTION
   // ========================================================================
 
-  ResolvedPace _resolvePaceZone(PaceZone zone, ResolverContext context) {
-    if (_isGoalPaceZone(zone)) {
-      if (context.hasGoalPace) {
-        return context.paceTable.resolveGoalPace(
-          raceDistance: context.goalRaceDistance!,
-          targetTimeSeconds: context.goalRaceTimeSeconds!,
-        );
-      }
-      return context.paceTable.resolve(PaceZone.tempo);
+  ResolvedPace _resolvePaceZone(PaceZone zone, ResolverContext context, WorkoutIntent intent) {
+  if (_isGoalPaceZone(zone)) {
+    if (context.hasGoalPace) {
+      return context.paceTable.resolveGoalPace(
+        raceDistance: context.goalRaceDistance!,
+        targetTimeSeconds: context.goalRaceTimeSeconds!,
+      );
     }
-    return context.paceTable.resolve(zone);
+    // Long run goal pace blocks fall back to marathon pace, not tempo
+    if (intent == WorkoutIntent.endurance) {
+      return context.paceTable.resolve(PaceZone.marathonPace);
+    }
+    return context.paceTable.resolve(PaceZone.tempo);
   }
+  return context.paceTable.resolve(zone);
+}
 
   bool _isGoalPaceZone(PaceZone zone) {
     return zone == PaceZone.goalPace ||
@@ -317,6 +322,7 @@ class WorkoutResolver {
     required double percentSum,
     required ResolverContext resolverContext,
     required String experienceLevel,
+    required WorkoutIntent intent,
   }) {
     // ── Distance ─────────────────────────────────────────────────────────
     double distanceKm;
@@ -339,7 +345,7 @@ class WorkoutResolver {
     }
 
     // ── Pace ─────────────────────────────────────────────────────────────
-    final resolvedPace = _resolvePaceZone(block.paceZone, resolverContext);
+    final resolvedPace = _resolvePaceZone(block.paceZone, resolverContext, intent);
 
     // ── Reps ─────────────────────────────────────────────────────────────
     int? reps;

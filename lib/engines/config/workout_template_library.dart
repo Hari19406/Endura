@@ -7,7 +7,7 @@
 ///       cruise_intervals_400  → intro threshold (8–12 × 400m, 60s)
 ///       cruise_intervals_800  → standard threshold (5–8 × 800m, 75s)
 ///       cruise_intervals_mile → advanced threshold (3–5 × 1600m, 60s)
-///       tempo_continuous      → continuous tempo (build/peak only)
+///       tempo_continuous      → continuous tempo (build/peak/taper)
 ///       threshold_progression → progressive blocks (build/peak only)
 ///   - Goal pace intervals restructured to be genuinely different from cruise intervals:
 ///       race_gp_intervals now uses 2–4 × 2–3km blocks with longer recovery (race rehearsal)
@@ -16,6 +16,13 @@
 ///       vo2_1000 added (5–6 × 1000m — Daniels I-pace classic)
 ///   - RecoveryType enum added to BlockTemplate (fixedSeconds | fixedMeters)
 ///   - DurationType.percentage blocks retain meters-based recovery where appropriate
+///
+/// Audit v3 fixes applied:
+///   - Fix A: easy_strides — added taper to applicablePhases
+///   - Fix B: tempo_continuous — added taper to applicablePhases + taper PhaseVariant (0.65×)
+///   - Fix C: recommendedPercentage — easy_steady 0.20→0.15, easy_progressive/easy_strides 0.18→0.13
+///   - Fix D: race_gp_intervals FM cap 24→16km, race_simulation FM cap 24→18km,
+///            race_dress_rehearsal HM cap 16→10km, FM cap 24→12km
 library;
 
 import '../core/pace_table.dart';
@@ -382,7 +389,7 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
-      recommendedPercentage: 0.20,
+      recommendedPercentage: 0.15, // Fix C: was 0.20
       description:
           'Steady conversational pace. Build aerobic base and aid recovery.',
       blocks: [
@@ -414,7 +421,7 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
-      recommendedPercentage: 0.18,
+      recommendedPercentage: 0.13, // Fix C: was 0.18
       description:
           'Start easy, finish at steady effort. Teaches pace awareness.',
       blocks: [
@@ -439,6 +446,7 @@ class WorkoutLibrary {
         TrainingPhase.base,
         TrainingPhase.build,
         TrainingPhase.peak,
+        TrainingPhase.taper, // Fix A: added taper
       },
       applicableRaceDistances: {
         RaceDistance.fiveK,
@@ -452,7 +460,7 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
-      recommendedPercentage: 0.18,
+      recommendedPercentage: 0.13, // Fix C: was 0.18
       description:
           'Easy run with strides at the end for turnover and form work.',
       blocks: [
@@ -488,6 +496,12 @@ class WorkoutLibrary {
           repDistanceMeters: 100,
           recoveryMeters: 100,
           note: 'Maintain 8 strides',
+        ),
+        TrainingPhase.taper: PhaseVariant(
+          reps: 4,
+          repDistanceMeters: 100,
+          recoveryMeters: 100,
+          note: 'Light strides — stay sharp before race',
         ),
       },
     ),
@@ -728,7 +742,7 @@ class WorkoutLibrary {
     //   cruise_intervals_400  (base intro — short reps, incomplete rest)
     //   cruise_intervals_800  (standard — Jack Daniels T-intervals)
     //   cruise_intervals_mile (advanced — longer sustained blocks)
-    //   tempo_continuous      (build/peak — continuous threshold run)
+    //   tempo_continuous      (build/peak/taper — continuous threshold run)
     //   threshold_progression (build/peak — ascending intensity blocks)
     // ════════════════════════════════════════════════════════════════════════
 
@@ -927,6 +941,7 @@ class WorkoutLibrary {
       applicablePhases: {
         TrainingPhase.build,
         TrainingPhase.peak,
+        TrainingPhase.taper, // Fix B: added taper
       },
       applicableRaceDistances: {
         RaceDistance.fiveK,
@@ -969,6 +984,10 @@ class WorkoutLibrary {
         TrainingPhase.peak: PhaseVariant(
           volumeMultiplier: 1.0,
           note: 'Full tempo volume at peak',
+        ),
+        TrainingPhase.taper: PhaseVariant(
+          volumeMultiplier: 0.65,
+          note: 'Short taper tempo — sharpening only',
         ),
       },
     ),
@@ -1552,7 +1571,7 @@ class WorkoutLibrary {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 16),
-        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 24),
+        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 16), // Fix D: was 24
       },
       recommendedPercentage: 0.15,
       description:
@@ -1611,7 +1630,7 @@ class WorkoutLibrary {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 16),
-        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 24),
+        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18), // Fix D: was 24
       },
       recommendedPercentage: 0.18,
       description:
@@ -1651,8 +1670,8 @@ class WorkoutLibrary {
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 12),
-        RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 16),
-        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 24),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 6, maxKm: 10), // Fix D: was 16
+        RaceDistance.marathon: DistanceRange(minKm: 8, maxKm: 12),    // Fix D: was 24
       },
       recommendedPercentage: 0.12,
       description:
