@@ -1,42 +1,11 @@
 /// WeekResolver — assigns a WorkoutIntent and template to every day of the week.
-///
-/// The week structure is FIXED based on how many days the runner trains:
-///   3 days: E – Q – L
-///   4 days: E – Q – E – L
-///   5 days: E – Q – E – Q – L
-///   6 days: E – Q – E – Q – E – L
-///   7 days: E – Q – E – Q – E – L – E
-///
-/// Maintenance phase uses the same structural pattern but Q slots are
-/// always threshold (one quality, one long, rest easy) regardless of count.
-///
-/// Quality sessions are always split:
-///   1 quality slot  → threshold OR vo2max (race-distance dependent)
-///   2 quality slots → one threshold + one vo2max (always)
-///
-/// Rotation: tracks recently used template IDs per category.
-/// A template won't repeat within 2 weeks unless all templates
-/// in that category have been used.
-///
-/// Cutback weeks:
-///   - Drop from 2 quality to 1 quality (lighter)
-///   - Freed quality slot becomes easy
-///   - Volume drops to ~70% of build week (handled by progression layer)
 library;
 
 import '../config/workout_template_library.dart';
 import '../../models/training_phase.dart';
 import '../../models/race_plan.dart';
 
-// ============================================================================
-// SLOT TYPE — the structural role of each day
-// ============================================================================
-
 enum SlotType { easy, quality1, quality2, longRun, rest }
-
-// ============================================================================
-// DAY SLOT — one day in the resolved week
-// ============================================================================
 
 class DaySlot {
   final int weekday;
@@ -72,10 +41,6 @@ class DaySlot {
       ? '$dayName: REST'
       : '$dayName: ${intent?.name ?? "??"} [${templateId ?? "??"}] ($label)';
 }
-
-// ============================================================================
-// WEEK RESOLUTION RESULT
-// ============================================================================
 
 class WeekResolution {
   final List<DaySlot> days;
@@ -117,27 +82,15 @@ class WeekResolution {
       days.where((d) => d.templateId != null).map((d) => d.templateId!).toList();
 }
 
-// ============================================================================
-// WEEK RESOLVER
-// ============================================================================
-
 class WeekResolver {
   const WeekResolver();
 
-  /// Resolve a full week of workout slots.
-  ///
-  /// [weekTarget] — volume/phase/quality info from RacePlanBuilder
-  /// [trainingDayIndices] — which days the runner trains (0=Mon..6=Sun)
-  /// [raceDistance] — goal race for quality intent selection
-  /// [phase] — current training phase
-  /// [weekNumber] — current week in training cycle
-  /// [recentTemplateIds] — template IDs used in the last 2 weeks (for rotation)
-  /// [isCutbackWeek] — if true, drop to 1 quality + reduce structure
   WeekResolution resolve({
     required WeekTarget weekTarget,
     required List<int> trainingDayIndices,
     required RaceDistance raceDistance,
     required TrainingPhase phase,
+    int? longRunDayIndex,
     int weekNumber = 1,
     List<String> recentTemplateIds = const [],
     bool isCutbackWeek = false,
@@ -147,9 +100,10 @@ class WeekResolver {
 
     if (n == 0) {
       return WeekResolution(
-        days: List.generate(7, (i) => DaySlot(
-          weekday: i, slotType: SlotType.rest, isRest: true, label: 'rest',
-        )),
+        days: List.generate(
+          7,
+          (i) => DaySlot(weekday: i, slotType: SlotType.rest, isRest: true, label: 'rest'),
+        ),
         weekNumber: weekTarget.week,
         phase: phase,
         targetKm: weekTarget.targetKm,
@@ -157,30 +111,22 @@ class WeekResolver {
       );
     }
 
-    // ── 1. Get the structural pattern for this day count ─────────────────
-    final pattern = _weekPattern(n, isCutbackWeek: isCutbackWeek);
+    final lrDay = (longRunDayIndex != null && sorted.contains(longRunDayIndex))
+        ? longRunDayIndex
+        : sorted.last;
 
-    // ── 2. Determine quality intents ─────────────────────────────────────
-    final qualityIntents = _qualityIntents(
-      raceDistance: raceDistance,
-      phase: phase,
-    );
+    final qualityIntents = _qualityIntents(raceDistance: raceDistance, phase: phase);
+    final slotMap = _anchoredPattern(sorted: sorted, lrDay: lrDay, isCutbackWeek: isCutbackWeek);
 
-    // ── 3. Map pattern onto training days, pick templates ────────────────
     final slots = <DaySlot>[];
-    int patternIdx = 0;
 
     for (int weekday = 0; weekday < 7; weekday++) {
-      if (!sorted.contains(weekday)) {
-        slots.add(DaySlot(
-          weekday: weekday, slotType: SlotType.rest,
-          isRest: true, label: 'rest',
-        ));
+      final slotType = slotMap[weekday] ?? SlotType.rest;
+
+      if (slotType == SlotType.rest) {
+        slots.add(DaySlot(weekday: weekday, slotType: SlotType.rest, isRest: true, label: 'rest'));
         continue;
       }
-
-      final slotType = pattern[patternIdx];
-      patternIdx++;
 
       final intent = _intentForSlot(slotType, qualityIntents);
       final templateId = _pickTemplate(
@@ -205,10 +151,12 @@ class WeekResolver {
       'weekNumber': weekNumber,
       'phase': phase.name,
       'dayCount': n,
+      'lrDay': lrDay,
       'isCutback': isCutbackWeek,
-      'pattern': pattern.map((s) => s.name).join(' – '),
-      'slots': slots.where((s) => s.isTraining).map((s) =>
-          '${s.dayName}: ${s.intent?.name} [${s.templateId}]').join(', '),
+      'slots': slots
+          .where((s) => s.isTraining)
+          .map((s) => '${s.dayName}: ${s.intent?.name} [${s.templateId}]')
+          .join(', '),
     });
 
     final weekPercentageSum = slots
@@ -225,99 +173,62 @@ class WeekResolver {
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // WEEK PATTERNS
-  // ════════════════════════════════════════════════════════════════════════════
+  Map<int, SlotType> _anchoredPattern({
+    required List<int> sorted,
+    required int lrDay,
+    required bool isCutbackWeek,
+  }) {
+    final result = <int, SlotType>{};
+    result[lrDay] = SlotType.longRun;
 
-  /// Fixed structural pattern based on training day count.
-  ///
-  /// 3 days: E – Q1 – L
-  /// 4 days: E – Q1 – E – L
-  /// 5 days: E – Q1 – E – Q2 – L
-  /// 6 days: E – Q1 – E – Q2 – E – L
-  /// 7 days: E – Q1 – E – Q2 – E – L – E
-  ///
-  /// Maintenance: always E – Q1 – E – L (4-day base, clipped to actual count).
-  ///   With fewer than 3 days — all easy.
-  ///
-  /// Cutback: Q2 becomes E (drop to 1 quality).
-  List<SlotType> _weekPattern(int dayCount, {bool isCutbackWeek = false}) {
-    final pattern = switch (dayCount) {
-      3 => [SlotType.easy, SlotType.quality1, SlotType.longRun],
-      4 => [SlotType.easy, SlotType.quality1, SlotType.easy, SlotType.longRun],
-      5 => [
-          SlotType.easy, SlotType.quality1, SlotType.easy,
-          SlotType.quality2, SlotType.longRun,
-        ],
-      6 => [
-          SlotType.easy, SlotType.quality1, SlotType.easy,
-          SlotType.quality2, SlotType.easy, SlotType.longRun,
-        ],
-      7 => [
-          SlotType.easy, SlotType.quality1, SlotType.easy,
-          SlotType.quality2, SlotType.easy, SlotType.longRun,
-          SlotType.easy,
-        ],
-      _ => dayCount < 3
-          ? List.filled(dayCount, SlotType.easy)
-          : [SlotType.easy, SlotType.quality1, SlotType.longRun],
-    };
+    final before = sorted.where((d) => d < lrDay).toList().reversed.toList();
+    final after  = sorted.where((d) => d > lrDay).toList();
 
-    if (!isCutbackWeek) return pattern;
+    final queue = <int>[];
+    final maxLen = before.length > after.length ? before.length : after.length;
+    for (int i = 0; i < maxLen; i++) {
+      if (i < after.length)  queue.add(after[i]);
+      if (i < before.length) queue.add(before[i]);
+    }
 
-    // Cutback: replace quality2 with easy, keep quality1.
-    return pattern.map((s) => s == SlotType.quality2 ? SlotType.easy : s).toList();
+    for (int pos = 0; pos < queue.length; pos++) {
+      final day = queue[pos];
+      SlotType slot;
+      if (pos == 0 || pos == 1) {
+        slot = SlotType.easy;
+      } else if (pos == 2) {
+        slot = SlotType.quality1;
+      } else if (pos == 3) {
+        slot = SlotType.easy;
+      } else if (pos == 4) {
+        slot = isCutbackWeek ? SlotType.easy : SlotType.quality2;
+      } else {
+        slot = SlotType.easy;
+      }
+      result[day] = slot;
+    }
+
+    return result;
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // QUALITY INTENT MAPPING
-  // ════════════════════════════════════════════════════════════════════════════
-
-  /// Determines which intent each quality slot gets.
-  ///
-  /// Maintenance: always threshold (single light quality session).
-  ///
-  /// Always split: Q1 and Q2 are from different categories.
-  ///   5K / 10K:  Q1 = vo2max,    Q2 = threshold
-  ///   HM / FM:   Q1 = threshold, Q2 = vo2max
-  ///
-  /// Base phase: both quality slots use threshold (lighter).
-  /// Taper phase: single quality uses threshold.
   ({WorkoutIntent q1, WorkoutIntent q2}) _qualityIntents({
     required RaceDistance raceDistance,
     required TrainingPhase phase,
   }) {
-    // Maintenance: single light threshold session only.
     if (phase == TrainingPhase.maintenance) {
       return (q1: WorkoutIntent.threshold, q2: WorkoutIntent.aerobicBase);
     }
-
     if (phase == TrainingPhase.base) {
       return (q1: WorkoutIntent.threshold, q2: WorkoutIntent.threshold);
     }
-
     if (phase == TrainingPhase.taper) {
       return (q1: WorkoutIntent.threshold, q2: WorkoutIntent.threshold);
     }
-
-    // Build / Peak: race-specific split.
     return switch (raceDistance) {
-      RaceDistance.fiveK => (
-          q1: WorkoutIntent.vo2max,
-          q2: WorkoutIntent.threshold,
-        ),
-      RaceDistance.tenK => (
-          q1: WorkoutIntent.vo2max,
-          q2: WorkoutIntent.threshold,
-        ),
-      RaceDistance.halfMarathon => (
-          q1: WorkoutIntent.threshold,
-          q2: WorkoutIntent.vo2max,
-        ),
-      RaceDistance.marathon => (
-          q1: WorkoutIntent.threshold,
-          q2: WorkoutIntent.vo2max,
-        ),
+      RaceDistance.fiveK        => (q1: WorkoutIntent.vo2max,     q2: WorkoutIntent.threshold),
+      RaceDistance.tenK         => (q1: WorkoutIntent.vo2max,     q2: WorkoutIntent.threshold),
+      RaceDistance.halfMarathon => (q1: WorkoutIntent.threshold,  q2: WorkoutIntent.vo2max),
+      RaceDistance.marathon     => (q1: WorkoutIntent.threshold,  q2: WorkoutIntent.vo2max),
     };
   }
 
@@ -344,18 +255,6 @@ class WeekResolver {
     };
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // TEMPLATE ROTATION
-  // ════════════════════════════════════════════════════════════════════════════
-
-  /// Pick a template for this slot, avoiding recently used ones.
-  ///
-  /// Strategy:
-  ///   1. Get all templates matching the intent + race + phase
-  ///   2. For maintenance phase, fall back to base phase if no maintenance templates exist
-  ///   3. Exclude any template used in last 2 weeks (recentTemplateIds)
-  ///   4. If all excluded, pick the least recently used one
-  ///   5. Use weekNumber + slotType as seed for deterministic variety
   String? _pickTemplate({
     required WorkoutIntent intent,
     required SlotType slotType,
@@ -370,7 +269,6 @@ class WeekResolver {
       phase: phase,
     );
 
-    // Maintenance fallback: use base phase templates when no maintenance-specific ones exist.
     if (candidates.isEmpty && phase == TrainingPhase.maintenance) {
       candidates = WorkoutLibrary.forSlot(
         intent: intent,
@@ -382,16 +280,35 @@ class WeekResolver {
     if (candidates.isEmpty) return null;
     if (candidates.length == 1) return candidates.first.id;
 
-    // Filter out recently used templates.
-    final fresh = candidates
-        .where((t) => !recentTemplateIds.contains(t.id))
-        .toList();
+    final fresh = candidates.where((t) => !recentTemplateIds.contains(t.id)).toList();
+
+    // ── DEBUG: log pool details for quality slots ─────────────────────────
+    assert(() {
+      if (intent != WorkoutIntent.aerobicBase && intent != WorkoutIntent.recovery) {
+        // ignore: avoid_print
+        print('[WeekResolver] TEMPLATE_POOL'
+            '\n  week: $weekNumber'
+            '\n  intent: ${intent.name}'
+            '\n  phase: ${phase.name}'
+            '\n  race: ${raceDistance.name}'
+            '\n  pool(${candidates.length}): ${candidates.map((t) => t.id).join(', ')}'
+            '\n  recent: ${recentTemplateIds.take(6).join(', ')}'
+            '\n  fresh(${fresh.length}): ${fresh.map((t) => t.id).join(', ')}');
+      }
+      return true;
+    }());
 
     if (fresh.isNotEmpty) {
-      // Deterministic pick: weekNumber ensures different picks each week,
-      // slotType.index ensures Q1 and Q2 don't collide.
       final seed = weekNumber * 7 + slotType.index;
-      return fresh[seed % fresh.length].id;
+      final picked = fresh[seed % fresh.length].id;
+      assert(() {
+        if (intent != WorkoutIntent.aerobicBase && intent != WorkoutIntent.recovery) {
+          // ignore: avoid_print
+          print('[WeekResolver]   → picked: $picked (seed=$seed, idx=${seed % fresh.length})');
+        }
+        return true;
+      }());
+      return picked;
     }
 
     // All templates used recently — pick the one used longest ago.
@@ -404,18 +321,20 @@ class WeekResolver {
       return idxA.compareTo(idxB);
     });
 
+    assert(() {
+      if (intent != WorkoutIntent.aerobicBase && intent != WorkoutIntent.recovery) {
+        // ignore: avoid_print
+        print('[WeekResolver]   → ALL EXHAUSTED — picking least recent: ${ranked.first.id}');
+      }
+      return true;
+    }());
+
     return ranked.first.id;
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // DEBUG LOGGING
-  // ════════════════════════════════════════════════════════════════════════════
-
   void _log(String tag, Map<String, dynamic> data) {
     assert(() {
-      final entries = data.entries
-          .map((e) => '  ${e.key}: ${e.value}')
-          .join('\n');
+      final entries = data.entries.map((e) => '  ${e.key}: ${e.value}').join('\n');
       // ignore: avoid_print
       print('[WeekResolver] $tag\n$entries');
       return true;

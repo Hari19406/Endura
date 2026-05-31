@@ -97,6 +97,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     final speed = widget.durationSeconds > 0
         ? (widget.distanceKm * 1000 / widget.durationSeconds)
         : 0.0;
+ 
+    final memory = await EngineMemoryService().load();
 
     await EngineRuntime.processRun(
       durationMinutes: widget.durationSeconds / 60.0,
@@ -106,6 +108,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       rpe: rpe,
       templateId: completedTemplateId,
       completedIntent: completedIntent,
+      weeklyProgressionDecision: memory.weeklyProgressionDecision,
     );
   }
 

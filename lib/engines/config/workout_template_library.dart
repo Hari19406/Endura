@@ -23,6 +23,12 @@
 ///   - Fix C: recommendedPercentage — easy_steady 0.20→0.15, easy_progressive/easy_strides 0.18→0.13
 ///   - Fix D: race_gp_intervals FM cap 24→16km, race_simulation FM cap 24→18km,
 ///            race_dress_rehearsal HM cap 16→10km, FM cap 24→12km
+///
+/// Pool fixes (v3.1):
+///   - Fix E: vo2_600 — added marathon to applicableRaceDistances (FM VO2 pool was only 2)
+///   - Fix F: vo2_ladder — added marathon to applicableRaceDistances (FM VO2 pool was only 2)
+///   - Fix G: cruise_intervals_mile — added base to applicablePhases for marathon
+///            (FM base threshold pool was only 2, exhausted from W2 onwards)
 library;
 
 import '../core/pace_table.dart';
@@ -88,7 +94,6 @@ class BlockTemplate {
   final PaceZone paceZone;
   final int? reps;
 
-  // Recovery — one of these will be set, not both
   final int? recoverySeconds;
   final double? recoveryMeters;
 
@@ -104,8 +109,6 @@ class BlockTemplate {
     this.recoveryMeters,
     this.label,
   });
-
-  // ── convenience constructors ──────────────────────────────────────────
 
   const BlockTemplate.main({
     required double km,
@@ -230,7 +233,6 @@ class ResolvedBlock {
   final bool isRpeOnly;
   final int? reps;
 
-  // Recovery — rendered differently on run screen
   final int? recoverySeconds;
   final double? recoveryMeters;
 
@@ -254,7 +256,6 @@ class ResolvedBlock {
   double get totalDistanceKm {
     final repCount = reps ?? 1;
     final workDist = distanceKm * repCount;
-    // Recovery distance only counted when meters-based
     final recDist = (recoveryMeters != null)
         ? (recoveryMeters! / 1000) * (repCount > 1 ? repCount - 1 : 0)
         : 0.0;
@@ -332,14 +333,11 @@ class ResolvedWorkout {
     for (final block in blocks) {
       final repCount = block.reps ?? 1;
       totalSeconds += block.distanceKm * block.targetPace * repCount;
-      // Add seconds-based recovery to duration estimate
       if (block.recoverySeconds != null && repCount > 1) {
         totalSeconds += block.recoverySeconds! * (repCount - 1);
       }
-      // Add meters-based recovery to duration estimate (assume easy jog ~7:00/km)
       if (block.recoveryMeters != null && repCount > 1) {
-        totalSeconds +=
-            (block.recoveryMeters! / 1000) * 420 * (repCount - 1);
+        totalSeconds += (block.recoveryMeters! / 1000) * 420 * (repCount - 1);
       }
     }
     return Duration(seconds: totalSeconds.round());
@@ -389,9 +387,8 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
-      recommendedPercentage: 0.15, // Fix C: was 0.20
-      description:
-          'Steady conversational pace. Build aerobic base and aid recovery.',
+      recommendedPercentage: 0.15,
+      description: 'Steady conversational pace. Build aerobic base and aid recovery.',
       blocks: [
         BlockTemplate.percent(
           type: BlockType.main,
@@ -421,9 +418,8 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
-      recommendedPercentage: 0.13, // Fix C: was 0.18
-      description:
-          'Start easy, finish at steady effort. Teaches pace awareness.',
+      recommendedPercentage: 0.13,
+      description: 'Start easy, finish at steady effort. Teaches pace awareness.',
       blocks: [
         BlockTemplate.percent(
           type: BlockType.main,
@@ -446,7 +442,7 @@ class WorkoutLibrary {
         TrainingPhase.base,
         TrainingPhase.build,
         TrainingPhase.peak,
-        TrainingPhase.taper, // Fix A: added taper
+        TrainingPhase.taper,
       },
       applicableRaceDistances: {
         RaceDistance.fiveK,
@@ -460,16 +456,14 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
-      recommendedPercentage: 0.13, // Fix C: was 0.18
-      description:
-          'Easy run with strides at the end for turnover and form work.',
+      recommendedPercentage: 0.13,
+      description: 'Easy run with strides at the end for turnover and form work.',
       blocks: [
         BlockTemplate.percent(
           type: BlockType.main,
           fraction: 0.85,
           zone: PaceZone.aerobicEasy,
         ),
-        // Strides: distance is the stimulus — meters-based recovery is correct here
         BlockTemplate.mainMeters(
           meters: 100,
           zone: PaceZone.strides,
@@ -480,27 +474,19 @@ class WorkoutLibrary {
       ],
       phaseVariants: {
         TrainingPhase.base: PhaseVariant(
-          reps: 4,
-          repDistanceMeters: 100,
-          recoveryMeters: 100,
+          reps: 4, repDistanceMeters: 100, recoveryMeters: 100,
           note: 'Start with 4 strides',
         ),
         TrainingPhase.build: PhaseVariant(
-          reps: 6,
-          repDistanceMeters: 100,
-          recoveryMeters: 100,
+          reps: 6, repDistanceMeters: 100, recoveryMeters: 100,
           note: 'Progress to 6 strides',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 8,
-          repDistanceMeters: 100,
-          recoveryMeters: 100,
+          reps: 8, repDistanceMeters: 100, recoveryMeters: 100,
           note: 'Maintain 8 strides',
         ),
         TrainingPhase.taper: PhaseVariant(
-          reps: 4,
-          repDistanceMeters: 100,
-          recoveryMeters: 100,
+          reps: 4, repDistanceMeters: 100, recoveryMeters: 100,
           note: 'Light strides — stay sharp before race',
         ),
       },
@@ -542,22 +528,10 @@ class WorkoutLibrary {
         ),
       ],
       phaseVariants: {
-        TrainingPhase.base: PhaseVariant(
-          volumeMultiplier: 0.85,
-          note: 'Conservative long run distance',
-        ),
-        TrainingPhase.build: PhaseVariant(
-          volumeMultiplier: 1.0,
-          note: 'Full long run distance',
-        ),
-        TrainingPhase.peak: PhaseVariant(
-          volumeMultiplier: 1.10,
-          note: 'Peak long run — longest of the plan',
-        ),
-        TrainingPhase.taper: PhaseVariant(
-          volumeMultiplier: 0.65,
-          note: 'Reduced taper long run',
-        ),
+        TrainingPhase.base: PhaseVariant(volumeMultiplier: 0.85, note: 'Conservative long run distance'),
+        TrainingPhase.build: PhaseVariant(volumeMultiplier: 1.0, note: 'Full long run distance'),
+        TrainingPhase.peak: PhaseVariant(volumeMultiplier: 1.10, note: 'Peak long run — longest of the plan'),
+        TrainingPhase.taper: PhaseVariant(volumeMultiplier: 0.65, note: 'Reduced taper long run'),
       },
     ),
 
@@ -580,19 +554,10 @@ class WorkoutLibrary {
         RaceDistance.marathon: DistanceRange(minKm: 16, maxKm: 32),
       },
       recommendedPercentage: 0.30,
-      description:
-          'Long run starting easy, finishing at steady. Teaches negative splitting.',
+      description: 'Long run starting easy, finishing at steady. Teaches negative splitting.',
       blocks: [
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.70,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.30,
-          zone: PaceZone.progressiveEnd,
-        ),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.70, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.30, zone: PaceZone.progressiveEnd),
       ],
     ),
 
@@ -613,34 +578,15 @@ class WorkoutLibrary {
         RaceDistance.marathon: DistanceRange(minKm: 16, maxKm: 32),
       },
       recommendedPercentage: 0.30,
-      description:
-          'Long run with final 20–25% at race goal pace. Simulates race fatigue.',
+      description: 'Long run with final 20–25% at race goal pace. Simulates race fatigue.',
       blocks: [
-        BlockTemplate.percent(
-          type: BlockType.warmup,
-          fraction: 0.15,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.60,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.25,
-          zone: PaceZone.goalPace,
-        ),
+        BlockTemplate.percent(type: BlockType.warmup, fraction: 0.15, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.60, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.25, zone: PaceZone.goalPace),
       ],
       phaseVariants: {
-        TrainingPhase.build: PhaseVariant(
-          volumeMultiplier: 1.0,
-          note: 'Goal pace block = 20–25% of long run',
-        ),
-        TrainingPhase.peak: PhaseVariant(
-          volumeMultiplier: 1.10,
-          note: 'Longer goal pace block at peak',
-        ),
+        TrainingPhase.build: PhaseVariant(volumeMultiplier: 1.0, note: 'Goal pace block = 20–25% of long run'),
+        TrainingPhase.peak: PhaseVariant(volumeMultiplier: 1.10, note: 'Longer goal pace block at peak'),
       },
     ),
 
@@ -657,34 +603,13 @@ class WorkoutLibrary {
         RaceDistance.marathon: DistanceRange(minKm: 16, maxKm: 32),
       },
       recommendedPercentage: 0.30,
-      description:
-          'Long run with sustained goal-pace block in the middle. Marathon-specific.',
+      description: 'Long run with sustained goal-pace block in the middle. Marathon-specific.',
       blocks: [
-        BlockTemplate.percent(
-          type: BlockType.warmup,
-          fraction: 0.20,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.20,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.30,
-          zone: PaceZone.goalPace,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.20,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.cooldown,
-          fraction: 0.10,
-          zone: PaceZone.aerobicEasy,
-        ),
+        BlockTemplate.percent(type: BlockType.warmup, fraction: 0.20, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.20, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.30, zone: PaceZone.goalPace),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.20, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.cooldown, fraction: 0.10, zone: PaceZone.aerobicEasy),
       ],
     ),
 
@@ -710,40 +635,19 @@ class WorkoutLibrary {
         RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18),
       },
       recommendedPercentage: 0.20,
-      description:
-          'Midweek longer easy effort. Bridges easy runs and the long run.',
+      description: 'Midweek longer easy effort. Bridges easy runs and the long run.',
       blocks: [
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 1.0,
-          zone: PaceZone.aerobicEasy,
-        ),
+        BlockTemplate.percent(type: BlockType.main, fraction: 1.0, zone: PaceZone.aerobicEasy),
       ],
       phaseVariants: {
-        TrainingPhase.base: PhaseVariant(
-          volumeMultiplier: 0.85,
-          note: 'Conservative medium long',
-        ),
-        TrainingPhase.build: PhaseVariant(
-          volumeMultiplier: 1.0,
-          note: 'Standard medium long',
-        ),
-        TrainingPhase.peak: PhaseVariant(
-          volumeMultiplier: 1.05,
-          note: 'Slight bump at peak',
-        ),
+        TrainingPhase.base: PhaseVariant(volumeMultiplier: 0.85, note: 'Conservative medium long'),
+        TrainingPhase.build: PhaseVariant(volumeMultiplier: 1.0, note: 'Standard medium long'),
+        TrainingPhase.peak: PhaseVariant(volumeMultiplier: 1.05, note: 'Slight bump at peak'),
       },
     ),
 
     // ════════════════════════════════════════════════════════════════════════
     // THRESHOLD
-    //
-    // Ladder from introductory → advanced:
-    //   cruise_intervals_400  (base intro — short reps, incomplete rest)
-    //   cruise_intervals_800  (standard — Jack Daniels T-intervals)
-    //   cruise_intervals_mile (advanced — longer sustained blocks)
-    //   tempo_continuous      (build/peak/taper — continuous threshold run)
-    //   threshold_progression (build/peak — ascending intensity blocks)
     // ════════════════════════════════════════════════════════════════════════
 
     WorkoutTemplate(
@@ -772,36 +676,25 @@ class WorkoutLibrary {
           'Accumulates threshold stimulus without sustained discomfort.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 400,
-          zone: PaceZone.cruiseIntervals,
-          reps: 8,
-          recoverySeconds: 60,
-          label: 'T-rep',
+          meters: 400, zone: PaceZone.cruiseIntervals,
+          reps: 8, recoverySeconds: 60, label: 'T-rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.base: PhaseVariant(
-          reps: 8,
-          repDistanceMeters: 400,
-          recoverySeconds: 60,
+          reps: 8, repDistanceMeters: 400, recoverySeconds: 60,
           note: 'Intro: 8 × 400m, 60s recovery',
         ),
         TrainingPhase.build: PhaseVariant(
-          reps: 12,
-          repDistanceMeters: 400,
-          recoverySeconds: 60,
+          reps: 12, repDistanceMeters: 400, recoverySeconds: 60,
           note: 'Progress to 12 × 400m',
         ),
       },
@@ -834,42 +727,29 @@ class WorkoutLibrary {
           'core of Jack Daniels\' threshold prescription.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 800,
-          zone: PaceZone.cruiseIntervals,
-          reps: 5,
-          recoverySeconds: 75,
-          label: 'T-rep',
+          meters: 800, zone: PaceZone.cruiseIntervals,
+          reps: 5, recoverySeconds: 75, label: 'T-rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.base: PhaseVariant(
-          reps: 4,
-          repDistanceMeters: 800,
-          recoverySeconds: 90,
+          reps: 4, repDistanceMeters: 800, recoverySeconds: 90,
           note: 'Intro: 4 × 800m, 90s recovery',
         ),
         TrainingPhase.build: PhaseVariant(
-          reps: 5,
-          repDistanceMeters: 800,
-          recoverySeconds: 75,
+          reps: 5, repDistanceMeters: 800, recoverySeconds: 75,
           note: 'Standard: 5 × 800m, 75s recovery',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 6,
-          repDistanceMeters: 800,
-          recoverySeconds: 60,
+          reps: 6, repDistanceMeters: 800, recoverySeconds: 60,
           note: 'Peak: 6 × 800m, 60s recovery (tighter rest)',
         ),
       },
@@ -880,6 +760,7 @@ class WorkoutLibrary {
       name: 'Cruise Intervals — Mile',
       intent: WorkoutIntent.threshold,
       applicablePhases: {
+        TrainingPhase.base, // Fix G: added base for marathon (pool was only 2 in base)
         TrainingPhase.build,
         TrainingPhase.peak,
       },
@@ -899,36 +780,29 @@ class WorkoutLibrary {
           'approaches continuous tempo in total stress.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 1600,
-          zone: PaceZone.cruiseIntervals,
-          reps: 3,
-          recoverySeconds: 60,
-          label: 'T-rep',
+          meters: 1600, zone: PaceZone.cruiseIntervals,
+          reps: 3, recoverySeconds: 60, label: 'T-rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
+        TrainingPhase.base: PhaseVariant(
+          reps: 2, repDistanceMeters: 1600, recoverySeconds: 90,
+          note: 'Base intro: 2 × 1600m, 90s recovery — aerobic threshold only',
+        ),
         TrainingPhase.build: PhaseVariant(
-          reps: 3,
-          repDistanceMeters: 1600,
-          recoverySeconds: 60,
+          reps: 3, repDistanceMeters: 1600, recoverySeconds: 60,
           note: '3 × 1600m, 60s recovery',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 4,
-          repDistanceMeters: 1600,
-          recoverySeconds: 60,
+          reps: 4, repDistanceMeters: 1600, recoverySeconds: 60,
           note: '4 × 1600m, 60s recovery',
         ),
       },
@@ -941,7 +815,7 @@ class WorkoutLibrary {
       applicablePhases: {
         TrainingPhase.build,
         TrainingPhase.peak,
-        TrainingPhase.taper, // Fix B: added taper
+        TrainingPhase.taper,
       },
       applicableRaceDistances: {
         RaceDistance.fiveK,
@@ -960,35 +834,14 @@ class WorkoutLibrary {
           'Continuous run at threshold pace. No breaks. '
           'Builds lactate clearance and mental toughness at T-pace.',
       blocks: [
-        BlockTemplate.percent(
-          type: BlockType.warmup,
-          fraction: 0.20,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.60,
-          zone: PaceZone.tempo,
-        ),
-        BlockTemplate.percent(
-          type: BlockType.cooldown,
-          fraction: 0.20,
-          zone: PaceZone.aerobicEasy,
-        ),
+        BlockTemplate.percent(type: BlockType.warmup, fraction: 0.20, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.60, zone: PaceZone.tempo),
+        BlockTemplate.percent(type: BlockType.cooldown, fraction: 0.20, zone: PaceZone.aerobicEasy),
       ],
       phaseVariants: {
-        TrainingPhase.build: PhaseVariant(
-          volumeMultiplier: 0.90,
-          note: 'Moderate tempo volume in build',
-        ),
-        TrainingPhase.peak: PhaseVariant(
-          volumeMultiplier: 1.0,
-          note: 'Full tempo volume at peak',
-        ),
-        TrainingPhase.taper: PhaseVariant(
-          volumeMultiplier: 0.65,
-          note: 'Short taper tempo — sharpening only',
-        ),
+        TrainingPhase.build: PhaseVariant(volumeMultiplier: 0.90, note: 'Moderate tempo volume in build'),
+        TrainingPhase.peak: PhaseVariant(volumeMultiplier: 1.0, note: 'Full tempo volume at peak'),
+        TrainingPhase.taper: PhaseVariant(volumeMultiplier: 0.65, note: 'Short taper tempo — sharpening only'),
       },
     ),
 
@@ -1016,47 +869,23 @@ class WorkoutLibrary {
           'Each block faster than the last — teaches threshold management.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
-        BlockTemplate.main(
-          km: 2.0,
-          zone: PaceZone.thresholdProgStart,
-          label: 'Block 1 — Steady',
-        ),
+        BlockTemplate.main(km: 2.0, zone: PaceZone.thresholdProgStart, label: 'Block 1 — Steady'),
         BlockTemplate.recoveryJog(km: 0.4),
-        BlockTemplate.main(
-          km: 2.0,
-          zone: PaceZone.tempo,
-          label: 'Block 2 — Threshold',
-        ),
+        BlockTemplate.main(km: 2.0, zone: PaceZone.tempo, label: 'Block 2 — Threshold'),
         BlockTemplate.recoveryJog(km: 0.4),
-        BlockTemplate.main(
-          km: 1.0,
-          zone: PaceZone.thresholdProgEnd,
-          label: 'Block 3 — Hard',
-        ),
+        BlockTemplate.main(km: 1.0, zone: PaceZone.thresholdProgEnd, label: 'Block 3 — Hard'),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
     ),
 
     // ════════════════════════════════════════════════════════════════════════
     // VO₂MAX
-    //
-    // Ladder from accessible → demanding:
-    //   vo2_600        (600m — most common real-world prescription)
-    //   vo2_classic    (800m–1000m — Daniels I-pace standard)
-    //   vo2_1000       (1000m — longer I-pace reps)
-    //   vo2_short_short (200m alternating — high VO2 time, lower strain)
-    //   vo2_ladder     (ascending 200→1000m)
-    //   vo2_pyramid    (peak-phase only — full pyramid)
     // ════════════════════════════════════════════════════════════════════════
 
     WorkoutTemplate(
@@ -1071,11 +900,13 @@ class WorkoutLibrary {
         RaceDistance.fiveK,
         RaceDistance.tenK,
         RaceDistance.halfMarathon,
+        RaceDistance.marathon, // Fix E: added marathon (FM VO2 pool was only 2)
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 10),
         RaceDistance.halfMarathon: DistanceRange(minKm: 7, maxKm: 11),
+        RaceDistance.marathon: DistanceRange(minKm: 8, maxKm: 12),
       },
       recommendedPercentage: 0.15,
       description:
@@ -1083,36 +914,25 @@ class WorkoutLibrary {
           'Most accessible VO₂ session — high quality time without blowing up.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 600,
-          zone: PaceZone.vo2Intervals,
-          reps: 6,
-          recoverySeconds: 180,
-          label: 'I-rep',
+          meters: 600, zone: PaceZone.vo2Intervals,
+          reps: 6, recoverySeconds: 180, label: 'I-rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(
-          reps: 6,
-          repDistanceMeters: 600,
-          recoverySeconds: 180,
+          reps: 6, repDistanceMeters: 600, recoverySeconds: 180,
           note: '6 × 600m, 3 min recovery',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 8,
-          repDistanceMeters: 600,
-          recoverySeconds: 180,
+          reps: 8, repDistanceMeters: 600, recoverySeconds: 180,
           note: '8 × 600m, 3 min recovery',
         ),
       },
@@ -1144,36 +964,25 @@ class WorkoutLibrary {
           'quality is maintained every rep.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 800,
-          zone: PaceZone.vo2Intervals,
-          reps: 5,
-          recoverySeconds: 210,
-          label: 'I-rep',
+          meters: 800, zone: PaceZone.vo2Intervals,
+          reps: 5, recoverySeconds: 210, label: 'I-rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(
-          reps: 4,
-          repDistanceMeters: 800,
-          recoverySeconds: 240,
+          reps: 4, repDistanceMeters: 800, recoverySeconds: 240,
           note: '4 × 800m, 4 min recovery — build into VO₂',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 5,
-          repDistanceMeters: 800,
-          recoverySeconds: 210,
+          reps: 5, repDistanceMeters: 800, recoverySeconds: 210,
           note: '5 × 800m, 3:30 recovery — full VO₂ dose',
         ),
       },
@@ -1205,36 +1014,25 @@ class WorkoutLibrary {
           'Demands more mental control than 800s.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.main(
-          km: 1.0,
-          zone: PaceZone.vo2Intervals,
-          reps: 5,
-          recoverySeconds: 240,
-          label: 'I-rep',
+          km: 1.0, zone: PaceZone.vo2Intervals,
+          reps: 5, recoverySeconds: 240, label: 'I-rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(
-          reps: 4,
-          repDistanceKm: 1.0,
-          recoverySeconds: 270,
+          reps: 4, repDistanceKm: 1.0, recoverySeconds: 270,
           note: '4 × 1000m, 4:30 recovery',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 5,
-          repDistanceKm: 1.0,
-          recoverySeconds: 240,
+          reps: 5, repDistanceKm: 1.0, recoverySeconds: 240,
           note: '5 × 1000m, 4 min recovery',
         ),
       },
@@ -1262,37 +1060,25 @@ class WorkoutLibrary {
           'less perceived strain than longer reps.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 200,
-          zone: PaceZone.shortShort,
-          reps: 12,
-          // Float 200m recovery — meters is appropriate here (it's a running float)
-          recoveryMeters: 200,
-          label: 'Fast',
+          meters: 200, zone: PaceZone.shortShort,
+          reps: 12, recoveryMeters: 200, label: 'Fast',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(
-          reps: 10,
-          repDistanceMeters: 200,
-          recoveryMeters: 200,
+          reps: 10, repDistanceMeters: 200, recoveryMeters: 200,
           note: '10 × 200m/200m float',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 14,
-          repDistanceMeters: 200,
-          recoveryMeters: 200,
+          reps: 14, repDistanceMeters: 200, recoveryMeters: 200,
           note: '14 × 200m/200m float',
         ),
       },
@@ -1310,51 +1096,28 @@ class WorkoutLibrary {
         RaceDistance.fiveK,
         RaceDistance.tenK,
         RaceDistance.halfMarathon,
+        RaceDistance.marathon, // Fix F: added marathon (FM VO2 pool was only 2)
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 10),
         RaceDistance.halfMarathon: DistanceRange(minKm: 7, maxKm: 11),
+        RaceDistance.marathon: DistanceRange(minKm: 8, maxKm: 13),
       },
       recommendedPercentage: 0.15,
-      description:
-          'Ascending ladder: 400–600–800–1000m. Recovery scales with rep distance.',
+      description: 'Ascending ladder: 400–600–800–1000m. Recovery scales with rep distance.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
-        BlockTemplate.mainMeters(
-          meters: 400,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 120,
-          label: '400m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 600,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 150,
-          label: '600m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 800,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 180,
-          label: '800m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 1000,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 240,
-          label: '1000m',
-        ),
+        BlockTemplate.mainMeters(meters: 400, zone: PaceZone.ladderPyramid, recoverySeconds: 120, label: '400m'),
+        BlockTemplate.mainMeters(meters: 600, zone: PaceZone.ladderPyramid, recoverySeconds: 150, label: '600m'),
+        BlockTemplate.mainMeters(meters: 800, zone: PaceZone.ladderPyramid, recoverySeconds: 180, label: '800m'),
+        BlockTemplate.mainMeters(meters: 1000, zone: PaceZone.ladderPyramid, recoverySeconds: 240, label: '1000m'),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
     ),
@@ -1373,50 +1136,20 @@ class WorkoutLibrary {
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 10),
       },
       recommendedPercentage: 0.15,
-      description:
-          'Full pyramid: 400–600–800–600–400m. Peak-phase variety session.',
+      description: 'Full pyramid: 400–600–800–600–400m. Peak-phase variety session.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
-        BlockTemplate.mainMeters(
-          meters: 400,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 120,
-          label: '400m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 600,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 150,
-          label: '600m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 800,
-          zone: PaceZone.vo2Intervals,
-          recoverySeconds: 210,
-          label: '800m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 600,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 150,
-          label: '600m',
-        ),
-        BlockTemplate.mainMeters(
-          meters: 400,
-          zone: PaceZone.ladderPyramid,
-          recoverySeconds: 120,
-          label: '400m',
-        ),
+        BlockTemplate.mainMeters(meters: 400, zone: PaceZone.ladderPyramid, recoverySeconds: 120, label: '400m'),
+        BlockTemplate.mainMeters(meters: 600, zone: PaceZone.ladderPyramid, recoverySeconds: 150, label: '600m'),
+        BlockTemplate.mainMeters(meters: 800, zone: PaceZone.vo2Intervals, recoverySeconds: 210, label: '800m'),
+        BlockTemplate.mainMeters(meters: 600, zone: PaceZone.ladderPyramid, recoverySeconds: 150, label: '600m'),
+        BlockTemplate.mainMeters(meters: 400, zone: PaceZone.ladderPyramid, recoverySeconds: 120, label: '400m'),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
     ),
@@ -1447,36 +1180,25 @@ class WorkoutLibrary {
           'Builds power and running economy — not a fitness session.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 80,
-          zone: PaceZone.hillSprints,
-          reps: 8,
-          recoverySeconds: 120,
-          label: 'Hill Sprint',
+          meters: 80, zone: PaceZone.hillSprints,
+          reps: 8, recoverySeconds: 120, label: 'Hill Sprint',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.base: PhaseVariant(
-          reps: 6,
-          repDistanceMeters: 80,
-          recoverySeconds: 120,
+          reps: 6, repDistanceMeters: 80, recoverySeconds: 120,
           note: 'Start with 6 hills, full 2 min recovery',
         ),
         TrainingPhase.build: PhaseVariant(
-          reps: 10,
-          repDistanceMeters: 80,
-          recoverySeconds: 120,
+          reps: 10, repDistanceMeters: 80, recoverySeconds: 120,
           note: 'Progress to 10 hills',
         ),
       },
@@ -1508,36 +1230,25 @@ class WorkoutLibrary {
           'Full recovery — quality over quantity.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.mainMeters(
-          meters: 200,
-          zone: PaceZone.speedReps,
-          reps: 6,
-          recoverySeconds: 120,
-          label: 'Speed Rep',
+          meters: 200, zone: PaceZone.speedReps,
+          reps: 6, recoverySeconds: 120, label: 'Speed Rep',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(
-          reps: 5,
-          repDistanceMeters: 200,
-          recoverySeconds: 120,
+          reps: 5, repDistanceMeters: 200, recoverySeconds: 120,
           note: '5 × 200m, 2 min recovery',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 6,
-          repDistanceMeters: 400,
-          recoverySeconds: 150,
+          reps: 6, repDistanceMeters: 400, recoverySeconds: 150,
           note: '6 × 400m, 2:30 recovery',
         ),
       },
@@ -1545,12 +1256,6 @@ class WorkoutLibrary {
 
     // ════════════════════════════════════════════════════════════════════════
     // RACE SPECIFIC
-    //
-    // race_gp_intervals: long sustained blocks at goal pace (2–3km each)
-    //                    genuinely different from cruise_intervals in both
-    //                    zone and structure — race rehearsal, not T-work
-    // race_simulation:   extended race-pace effort, peak only
-    // race_dress_rehearsal: taper confidence builder
     // ════════════════════════════════════════════════════════════════════════
 
     WorkoutTemplate(
@@ -1571,45 +1276,33 @@ class WorkoutLibrary {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 16),
-        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 16), // Fix D: was 24
+        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 16),
       },
       recommendedPercentage: 0.15,
       description:
           'Long sustained blocks at goal race pace with generous recovery. '
-          'Purpose is rhythm and race feel — not lactate stress. '
-          'Structurally distinct from cruise intervals: longer reps, longer rest.',
+          'Purpose is rhythm and race feel — not lactate stress.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
         BlockTemplate.main(
-          km: 2.0,
-          zone: PaceZone.goalPace,
-          reps: 3,
-          recoverySeconds: 180,
-          label: 'Goal Pace',
+          km: 2.0, zone: PaceZone.goalPace,
+          reps: 3, recoverySeconds: 180, label: 'Goal Pace',
         ),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(
-          reps: 3,
-          repDistanceKm: 2.0,
-          recoverySeconds: 180,
+          reps: 3, repDistanceKm: 2.0, recoverySeconds: 180,
           note: '3 × 2km @ goal pace, 3 min recovery — finding the rhythm',
         ),
         TrainingPhase.peak: PhaseVariant(
-          reps: 3,
-          repDistanceKm: 3.0,
-          recoverySeconds: 180,
+          reps: 3, repDistanceKm: 3.0, recoverySeconds: 180,
           note: '3 × 3km @ goal pace, 3 min recovery — race simulation',
         ),
       },
@@ -1630,28 +1323,19 @@ class WorkoutLibrary {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 16),
-        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18), // Fix D: was 24
+        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18),
       },
       recommendedPercentage: 0.18,
-      description:
-          'Extended continuous race-pace effort. Mental and physical dress rehearsal.',
+      description: 'Extended continuous race-pace effort. Mental and physical dress rehearsal.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.60,
-          zone: PaceZone.raceSimulation,
-        ),
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.60, zone: PaceZone.raceSimulation),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
       ],
     ),
@@ -1670,29 +1354,20 @@ class WorkoutLibrary {
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
         RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 12),
-        RaceDistance.halfMarathon: DistanceRange(minKm: 6, maxKm: 10), // Fix D: was 16
-        RaceDistance.marathon: DistanceRange(minKm: 8, maxKm: 12),    // Fix D: was 24
+        RaceDistance.halfMarathon: DistanceRange(minKm: 6, maxKm: 10),
+        RaceDistance.marathon: DistanceRange(minKm: 8, maxKm: 12),
       },
       recommendedPercentage: 0.12,
-      description:
-          'Short race-pace effort in taper week. Low volume, confidence-building.',
+      description: 'Short race-pace effort in taper week. Low volume, confidence-building.',
       blocks: [
         BlockTemplate(
-          type: BlockType.warmup,
-          durationType: DurationType.fixedKm,
-          value: 2.0,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.warmup, durationType: DurationType.fixedKm,
+          value: 2.0, paceZone: PaceZone.aerobicEasy,
         ),
-        BlockTemplate.main(
-          km: 2.0,
-          zone: PaceZone.dressRehearsal,
-          label: 'Race Pace',
-        ),
+        BlockTemplate.main(km: 2.0, zone: PaceZone.dressRehearsal, label: 'Race Pace'),
         BlockTemplate(
-          type: BlockType.cooldown,
-          durationType: DurationType.fixedKm,
-          value: 1.5,
-          paceZone: PaceZone.aerobicEasy,
+          type: BlockType.cooldown, durationType: DurationType.fixedKm,
+          value: 1.5, paceZone: PaceZone.aerobicEasy,
         ),
       ],
     ),
@@ -1706,16 +1381,12 @@ class WorkoutLibrary {
       name: 'Shake-Out Run',
       intent: WorkoutIntent.recovery,
       applicablePhases: {
-        TrainingPhase.base,
-        TrainingPhase.build,
-        TrainingPhase.peak,
-        TrainingPhase.taper,
+        TrainingPhase.base, TrainingPhase.build,
+        TrainingPhase.peak, TrainingPhase.taper,
       },
       applicableRaceDistances: {
-        RaceDistance.fiveK,
-        RaceDistance.tenK,
-        RaceDistance.halfMarathon,
-        RaceDistance.marathon,
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 3, maxKm: 5),
@@ -1727,10 +1398,8 @@ class WorkoutLibrary {
       description: 'Short easy jog to flush legs after hard sessions.',
       blocks: [
         BlockTemplate(
-          type: BlockType.main,
-          durationType: DurationType.fixedKm,
-          value: 3.0,
-          paceZone: PaceZone.shakeout,
+          type: BlockType.main, durationType: DurationType.fixedKm,
+          value: 3.0, paceZone: PaceZone.shakeout,
         ),
       ],
     ),
@@ -1740,16 +1409,12 @@ class WorkoutLibrary {
       name: 'Walk/Jog',
       intent: WorkoutIntent.recovery,
       applicablePhases: {
-        TrainingPhase.base,
-        TrainingPhase.build,
-        TrainingPhase.peak,
-        TrainingPhase.taper,
+        TrainingPhase.base, TrainingPhase.build,
+        TrainingPhase.peak, TrainingPhase.taper,
       },
       applicableRaceDistances: {
-        RaceDistance.fiveK,
-        RaceDistance.tenK,
-        RaceDistance.halfMarathon,
-        RaceDistance.marathon,
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 3, maxKm: 5),
@@ -1758,16 +1423,11 @@ class WorkoutLibrary {
         RaceDistance.marathon: DistanceRange(minKm: 3, maxKm: 8),
       },
       recommendedPercentage: 0.08,
-      description:
-          'Alternating jog and walk. For return from illness/injury or very high fatigue.',
+      description: 'Alternating jog and walk. For return from illness/injury or very high fatigue.',
       blocks: [
         BlockTemplate.mainMeters(
-          meters: 400,
-          zone: PaceZone.easyRecovery,
-          reps: 6,
-          // Walk recovery — meters is correct here
-          recoveryMeters: 200,
-          label: 'Jog',
+          meters: 400, zone: PaceZone.easyRecovery,
+          reps: 6, recoveryMeters: 200, label: 'Jog',
         ),
       ],
     ),
@@ -1777,16 +1437,12 @@ class WorkoutLibrary {
       name: 'Rest Day',
       intent: WorkoutIntent.recovery,
       applicablePhases: {
-        TrainingPhase.base,
-        TrainingPhase.build,
-        TrainingPhase.peak,
-        TrainingPhase.taper,
+        TrainingPhase.base, TrainingPhase.build,
+        TrainingPhase.peak, TrainingPhase.taper,
       },
       applicableRaceDistances: {
-        RaceDistance.fiveK,
-        RaceDistance.tenK,
-        RaceDistance.halfMarathon,
-        RaceDistance.marathon,
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 0, maxKm: 0),
@@ -1804,33 +1460,30 @@ class WorkoutLibrary {
   // QUERY METHODS
   // ════════════════════════════════════════════════════════════════════════
 
-  static List<WorkoutTemplate> byIntent(WorkoutIntent intent) {
-    return templates.where((t) => t.intent == intent).toList();
-  }
+  static List<WorkoutTemplate> byIntent(WorkoutIntent intent) =>
+      templates.where((t) => t.intent == intent).toList();
 
   static List<WorkoutTemplate> forContext({
     required RaceDistance distance,
     required TrainingPhase phase,
-  }) {
-    return templates
-        .where((t) =>
-            t.applicableRaceDistances.contains(distance) &&
-            t.applicablePhases.contains(phase))
-        .toList();
-  }
+  }) =>
+      templates
+          .where((t) =>
+              t.applicableRaceDistances.contains(distance) &&
+              t.applicablePhases.contains(phase))
+          .toList();
 
   static List<WorkoutTemplate> forSlot({
     required WorkoutIntent intent,
     required RaceDistance raceDistance,
     required TrainingPhase phase,
-  }) {
-    return templates
-        .where((t) =>
-            t.intent == intent &&
-            t.applicableRaceDistances.contains(raceDistance) &&
-            t.applicablePhases.contains(phase))
-        .toList();
-  }
+  }) =>
+      templates
+          .where((t) =>
+              t.intent == intent &&
+              t.applicableRaceDistances.contains(raceDistance) &&
+              t.applicablePhases.contains(phase))
+          .toList();
 
   static WorkoutTemplate? byId(String id) {
     try {
@@ -1840,10 +1493,8 @@ class WorkoutLibrary {
     }
   }
 
-  static PhaseVariant? getVariant(
-      WorkoutTemplate template, TrainingPhase phase) {
-    return template.phaseVariants[phase];
-  }
+  static PhaseVariant? getVariant(WorkoutTemplate template, TrainingPhase phase) =>
+      template.phaseVariants[phase];
 
   static Map<WorkoutIntent, int> get templateCountByIntent {
     final counts = <WorkoutIntent, int>{};

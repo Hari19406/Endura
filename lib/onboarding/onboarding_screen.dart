@@ -89,12 +89,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   String?   _goal;
   String?   _experience;
 
-  // Best time (carried over in shortened mode)
+  // Best time
   String    _paceDistance = '5k';
   int       _paceHours    = 0;
   int       _paceMinutes  = 25;
   int       _paceSeconds  = 0;
-  bool      _knowsTime    = true;
 
   // Training days
   int        _runsPerWeek      = 4;
@@ -167,16 +166,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final dobRaw = prefs.getString('dob');
       if (dobRaw != null) _dob = DateTime.tryParse(dobRaw);
 
-      // Carry over best time (vDOT used instead of re-entering time)
+      // Carry over best time
       final paceMin = prefs.getInt('pace_minutes');
       final paceSec = prefs.getInt('pace_seconds') ?? 0;
       if (paceMin != null) {
         _paceMinutes = paceMin;
         _paceSeconds = paceSec;
         _paceDistance = prefs.getString('pace_distance') ?? '5k';
-        _knowsTime = true;
-      } else {
-        _knowsTime = false;
       }
       _vdot = memory.vdotScore;
       _vdotProvisional = memory.vdotIsProvisional;
@@ -270,7 +266,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       case OPage.intro:          return true;
       case OPage.goal:           return _goal != null;
       case OPage.experience:     return _experience != null;
-      case OPage.bestTime:       return !_knowsTime || _paceMinutes > 0;
+      case OPage.bestTime:       return _paceMinutes > 0 || _paceHours > 0;
       case OPage.daysCount:      return true;
       case OPage.dayPicker:      return _selectedDays.length == _runsPerWeek;
       case OPage.longRunDay:     return _longRunDayIndex != null;
@@ -294,24 +290,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return (_vdot, false);
     }
 
-    if (_knowsTime) {
-      final totalSec =
-          _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
-      if (totalSec > 0) {
-        final distKm = switch (_paceDistance) {
-          '10k'      => 10.0,
-          'half'     => 21.0975,
-          'marathon' => 42.195,
-          _          => 5.0,
-        };
-        final vdot = vdotFromPr(
-          prTimeSeconds: totalSec,
-          prDistanceKm: distKm,
-          confidence: PrConfidence.high,
-        );
-        return (vdot, false);
-      }
+    final totalSec = _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
+    if (totalSec > 0) {
+      final distKm = switch (_paceDistance) {
+        '10k'      => 10.0,
+        'half'     => 21.0975,
+        'marathon' => 42.195,
+        _          => 5.0,
+      };
+      final vdot = vdotFromPr(
+        prTimeSeconds: totalSec,
+        prDistanceKm: distKm,
+        confidence: PrConfidence.high,
+      );
+      return (vdot, false);
     }
+
     return (_vdot, _vdotProvisional);
   }
 
@@ -376,12 +370,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         if (_gender != null) await prefs.setString('gender', _gender!);
         await prefs.setString('first_name', _firstName.trim());
         await prefs.setString('last_name', _lastName.trim());
-        if (_knowsTime) {
-          await prefs.setString('pace_distance', _paceDistance);
-          await prefs.setInt('pace_hours', _paceHours);
-          await prefs.setInt('pace_minutes', _paceMinutes);
-          await prefs.setInt('pace_seconds', _paceSeconds);
-        }
+        await prefs.setString('pace_distance', _paceDistance);
+        await prefs.setInt('pace_hours', _paceHours);
+        await prefs.setInt('pace_minutes', _paceMinutes);
+        await prefs.setInt('pace_seconds', _paceSeconds);
       }
 
       await prefs.setDouble('weekly_km', effectiveBaselineKm);
@@ -427,9 +419,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         goal:             _goal,
         runsPerWeek:      _runsPerWeek,
         trainingDays:     _selectedDays,
-        paceDistance:     _knowsTime ? _paceDistance : null,
-        paceMinutes:      _knowsTime ? _paceMinutes : null,
-        paceSeconds:      _knowsTime ? _paceSeconds : null,
+        paceDistance:     _paceDistance,
+        paceMinutes:      _paceMinutes,
+        paceSeconds:      _paceSeconds,
         raceDate:         _raceDate,
         useMetric:        true,
         displayName:      displayName.isNotEmpty ? displayName : null,
@@ -530,8 +522,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   List<Widget> _buildPages() {
     final previewVdot = _computeVdot();
-
-    // Build a widget for every page in the active sequence.
     return _sequence.map((page) => _buildPage(page, previewVdot)).toList();
   }
 
@@ -550,12 +540,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         ),
 
       OPage.bestTime => OPageBestTime(
-          knowsTime:      _knowsTime,
           distance:       _paceDistance,
           hours:          _paceHours,
           minutes:        _paceMinutes,
           seconds:        _paceSeconds,
-          onToggleKnows:  (v) => setState(() => _knowsTime = v),
           onDistChanged:  (v) => setState(() => _paceDistance = v),
           onHoursChanged: (v) => setState(() => _paceHours = v),
           onMinsChanged:  (v) => setState(() => _paceMinutes = v),

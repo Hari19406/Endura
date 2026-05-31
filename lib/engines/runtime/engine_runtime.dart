@@ -4,6 +4,7 @@ import '../memory/engine_memory.dart';
 import '../config/workout_template_library.dart';
 import '../../models/workout_type.dart';
 import '../../utils/database_service.dart';
+import '../coach_engine_v2.dart' show ProgressionDecision;
 
 /// Called once after every completed run to keep all coaching state current.
 ///
@@ -29,6 +30,7 @@ class EngineRuntime {
     WorkoutIntent? completedIntent,
     double? actualPaceSecondsPerKm,
     double? expectedPaceSecondsPerKm,
+    ProgressionDecision? weeklyProgressionDecision,
   }) async {
     try {
       final totalRuns = await _getTotalRunCount();
@@ -67,9 +69,13 @@ class EngineRuntime {
         final appliedNudge = pendingNudge.clamp(-1, 1);
         final newVdot = (updated.vdotScore + appliedNudge).clamp(30, 85);
 
+        // Compute from memory signals when caller didn't supply a decision.
+        final resolvedDecision = weeklyProgressionDecision ?? _computeDecisionFromMemory(updated);
+
         updated = updated.copyWith(
           lastProgressionEvaluationDate: runDate,
           vdotScore: newVdot,
+          weeklyProgressionDecision: resolvedDecision,
           vdotIsProvisional: false,
           pendingVdotNudge: 0,
         );
@@ -153,6 +159,17 @@ class EngineRuntime {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  static ProgressionDecision _computeDecisionFromMemory(EngineMemory memory) {
+    final avgRpe = memory.averageRecentRpe(3) ?? 5.0;
+    final highRpe = avgRpe >= 7.0 || memory.hasHighRpe(n: 3, threshold: 7);
+    final afterRecovery = memory.lastCompletedType == WorkoutType.recovery;
+    if (highRpe) return ProgressionDecision.regress;
+    if (!afterRecovery && avgRpe <= 5.0 && memory.recentRpeEntries.length >= 3) {
+      return ProgressionDecision.progress;
+    }
+    return ProgressionDecision.hold;
+  }
 
   static Future<int> _getTotalRunCount() async {
     try {

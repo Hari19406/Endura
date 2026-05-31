@@ -1,9 +1,9 @@
 /// DynamicScaler — adjusts resolved workouts based on RPE signals.
 ///
-/// RPE thresholds (rolling avg of last 3 runs, values 3/5/7/9):
-///   - avgRpe >= 7.0 → scale back
+/// RPE thresholds (rolling avg of last 3 runs, values 1–10):
+///   - avgRpe >= 7.0 → scale back meaningfully
 ///   - avgRpe >= 6.5 → mild caution
-///   "Just right" (5) stays fully below both thresholds — no false caution.
+///   Comfortable effort (≤5) stays below both thresholds — no false caution.
 library;
 
 import '../config/workout_template_library.dart';
@@ -85,17 +85,17 @@ class DynamicScaler {
     var recoveryExtension = 1.0;
 
     // ── RPE history overlay ──────────────────────────────────────────────
-    // avgRpe uses values 3/5/7/9 from the 4-card RPE picker.
-    // "Just right" = 5, safely below both thresholds.
+    // avgRpe uses 1–10 scale from the RPE bar picker.
+    // Comfortable effort (≤5) stays below both thresholds.
     if (signals.avgRpe != null) {
       if (signals.avgRpe! >= 7.0) {
         // Consistently hard — scale back meaningfully.
-        repReduction = repReduction.clamp(2, 3);
+        repReduction = 2;
         volumeScale = (volumeScale * 0.90).clamp(0.70, 1.0);
         recoveryExtension *= 1.10;
       } else if (signals.avgRpe! >= 6.5) {
         // Trending hard — mild caution.
-        repReduction = repReduction.clamp(1, 3);
+        repReduction = 1;
         volumeScale = (volumeScale * 0.95).clamp(0.75, 1.0);
       }
     }
@@ -130,9 +130,10 @@ class DynamicScaler {
         ? _roundSmart(block.distanceKm * factors.volumeScale)
         : block.distanceKm;
 
-    final int? scaledRecoverySeconds = (block.recoverySeconds != null && factors.recoveryExtension > 1.0)
-    ? (block.recoverySeconds! * factors.recoveryExtension).round()
-    : block.recoverySeconds;
+    final int? scaledRecoverySeconds =
+        (block.recoverySeconds != null && factors.recoveryExtension > 1.0)
+            ? (block.recoverySeconds! * factors.recoveryExtension).round()
+            : block.recoverySeconds;
 
     return ResolvedBlock(
       type: block.type,

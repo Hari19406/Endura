@@ -57,16 +57,12 @@ class EngineMemoryService {
       lastNonRecovery = workoutType;
     }
 
-    final newPhase = PhaseEngine.fromRunCount(totalRunCount);
-    final newWeek = PhaseEngine.weekNumber(totalRunCount);
-
     final updated = current.copyWith(
       lastCompletedType: workoutType,
       lastNonRecoveryType: lastNonRecovery,
       recentRpeEntries: updatedRpe,
       totalRunsCompleted: totalRunCount,
-      currentPhase: newPhase,
-      currentWeek: newWeek,
+      currentPhase: PhaseEngine.fromRunCount(totalRunCount),
       firstRunDate: current.firstRunDate ?? runDate,
       lastRunDate: runDate,
       lastCompletedTemplateId: templateId,

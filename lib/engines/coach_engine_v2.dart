@@ -25,10 +25,6 @@ import 'daily/dynamic_scaler.dart';
 
 typedef CoachMessage = message.CoachMessage;
 
-// ============================================================================
-// DATA CLASSES
-// ============================================================================
-
 class HistoricalTrainingData {
   final int daysSinceLastQuality;
   final int daysSinceLastLongRun;
@@ -103,19 +99,9 @@ class ProgressionProfile {
   });
 }
 
-// ============================================================================
-// POST-PLAN STATE
-// ============================================================================
-
-/// Result of evaluating whether the plan has ended and what state to apply.
 class PostPlanState {
-  /// The memory to persist (may be identical to input if nothing changed).
   final EngineMemory memory;
-
-  /// True if the race plan's total weeks have now elapsed.
   final bool justCompleted;
-
-  /// True if maintenance mode was auto-entered this evaluation.
   final bool justEnteredMaintenance;
 
   const PostPlanState({
@@ -124,10 +110,6 @@ class PostPlanState {
     this.justEnteredMaintenance = false,
   });
 }
-
-// ============================================================================
-// ENGINE
-// ============================================================================
 
 class CoachEngine {
   static const double _maxSafeProgressionMultiplier = 1.0825;
@@ -148,40 +130,28 @@ class CoachEngine {
         _weekResolver = weekResolver ?? const WeekResolver(),
         _volumeResolver = volumeResolver ?? WeeklyVolumeResolver();
 
-  // ── Post-plan state evaluation ────────────────────────────────────────────
-
-  /// Call this once per home-screen load, before getNextCoachMessage.
-  ///
-  /// Detects plan completion, sets planCompletedAt, and auto-enters maintenance
-  /// after 7 days. Returns the (possibly updated) memory for the caller to
-  /// persist if [PostPlanState.justCompleted] or
-  /// [PostPlanState.justEnteredMaintenance] is true.
   PostPlanState checkAndApplyPostPlanState(EngineMemory memory) {
     final now = DateTime.now();
 
-    // ── Already in maintenance — nothing to re-detect ────────────────────
     if (memory.isInMaintenance) {
       return PostPlanState(memory: memory);
     }
 
-    // ── Check if plan just completed ──────────────────────────────────────
     if (memory.hasRacePlan && memory.planCompletedAt == null) {
       final planWeek = memory.racePlan!.currentWeekNumber(now);
       final totalWeeks = memory.racePlan!.totalWeeks;
 
       if (planWeek > totalWeeks) {
-        // Plan has ended — stamp completion date, clear race plan.
         final updated = memory.copyWith(
           planCompletedAt: now,
           clearRacePlan: true,
-          currentPhase: TrainingPhase.base, // neutral phase until new plan
+          currentPhase: TrainingPhase.base,
         );
         debugPrint('[CoachEngine] Plan complete detected — week $planWeek > $totalWeeks');
         return PostPlanState(memory: updated, justCompleted: true);
       }
     }
 
-    // ── Auto-enter maintenance after 7 days of inaction ───────────────────
     if (memory.shouldAutoEnterMaintenance) {
       final maintenanceKm = (memory.previousWeekTargetKm ??
               memory.baselineWeeklyKm ??
@@ -200,8 +170,6 @@ class CoachEngine {
 
     return PostPlanState(memory: memory);
   }
-
-  // ── vDOT / pace table ─────────────────────────────────────────────────────
 
   PaceTable _buildPaceTable(UserMetrics userMetrics, EngineMemory memory) {
     int vdot = memory.vdotScore;
@@ -235,8 +203,6 @@ class CoachEngine {
     );
   }
 
-  // ── Primary entry point ───────────────────────────────────────────────────
-
   CoachMessage? getNextCoachMessage({
     required UserMetrics userMetrics,
     required selector.RunAnalysis runAnalysis,
@@ -246,7 +212,6 @@ class CoachEngine {
     List<int> trainingDayIndices = const [],
     session.SelectorReadiness? preRunReadiness,
   }) {
-    // ── Guard: maintenance mode uses a simplified path ────────────────────
     if (memory.isInMaintenance) {
       return _getMaintenanceCoachMessage(
         userMetrics: userMetrics,
@@ -268,7 +233,6 @@ class CoachEngine {
         ? trainingDayIndices
         : List.generate(resolvedRunsPerWeek, (i) => i);
 
-    // ── Layer 1: Macro plan ───────────────────────────────────────────────
     final absence = AbsenceDetector.assess(lastRunDate: memory.lastRunDate);
 
     WeekTarget weekTarget;
@@ -304,7 +268,6 @@ class CoachEngine {
 
     final is3to1Cutback = weekNum % 4 == 0;
 
-    // ── Weekly target km: mileage-system path vs legacy path ─────────────
     final double finalWeeklyTargetKm;
 
     if (memory.baselineWeeklyKm != null) {
@@ -330,7 +293,6 @@ class CoachEngine {
       );
     }
 
-    // ── Layer 2: Weekly budget ────────────────────────────────────────────
     final thisWeekRuns = _filterThisWeek(historicalTrainingData.recentRuns, now);
     final adaptedLongRunKm = _capFinalProgressionValue(
       baseValue: weekTarget.longRunKm,
@@ -352,7 +314,6 @@ class CoachEngine {
       weekTarget: adaptedWeekTarget,
     );
 
-    // ── Layer 3: Week resolution ──────────────────────────────────────────
     final weekResolution = _weekResolver.resolve(
       weekTarget: adaptedWeekTarget,
       trainingDayIndices: effectiveTrainingDays,
@@ -361,6 +322,7 @@ class CoachEngine {
       weekNumber: weekNum,
       recentTemplateIds: memory.recentTemplateIds,
       isCutbackWeek: is3to1Cutback,
+      longRunDayIndex: memory.longRunDayIndex,
     );
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
@@ -421,7 +383,6 @@ class CoachEngine {
       return true;
     }());
 
-    // ── Build coach context from real signals ─────────────────────────────
     final paces = historicalTrainingData.recentRuns
         .map((r) => paceStringToSeconds(r.averagePace))
         .where((p) => p > 0)
@@ -443,7 +404,6 @@ class CoachEngine {
       paceInsufficientData: insufficientPaceData,
     );
 
-    // ── Derive next planned session ───────────────────────────────────────
     final nextInfo = _resolveNextPlannedSession(
       weekResolution: weekResolution,
       now: now,
@@ -460,8 +420,6 @@ class CoachEngine {
     );
   }
 
-  // ── Maintenance mode coach message ────────────────────────────────────────
-
   CoachMessage? _getMaintenanceCoachMessage({
     required UserMetrics userMetrics,
     required EngineMemory memory,
@@ -477,7 +435,6 @@ class CoachEngine {
         : List.generate(resolvedRunsPerWeek, (i) => i);
     final maintenanceKm = memory.baselineWeeklyKm ?? 20.0;
 
-    // Build a synthetic WeekTarget for maintenance.
     final weekTarget = WeekTarget(
       week: memory.currentWeek,
       phase: TrainingPhase.maintenance,
@@ -496,6 +453,7 @@ class CoachEngine {
       weekNumber: memory.currentWeek,
       recentTemplateIds: memory.recentTemplateIds,
       isCutbackWeek: false,
+      longRunDayIndex: memory.longRunDayIndex,
     );
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
@@ -564,8 +522,6 @@ class CoachEngine {
     );
   }
 
-  // ── Next planned session derivation ──────────────────────────────────────
-
   (WorkoutIntent?, String?) _resolveNextPlannedSession({
     required WeekResolution weekResolution,
     required DateTime now,
@@ -605,8 +561,6 @@ class CoachEngine {
     };
   }
 
-  // ── Week resolution for home screen ──────────────────────────────────────
-
   WeekResolution resolveCurrentWeek({
     required UserMetrics userMetrics,
     required EngineMemory memory,
@@ -624,7 +578,6 @@ class CoachEngine {
     WeekTarget weekTarget;
     TrainingPhase phase;
 
-    // Maintenance: synthetic target
     if (memory.isInMaintenance) {
       final maintenanceKm = memory.baselineWeeklyKm ?? 20.0;
       weekTarget = WeekTarget(
@@ -668,10 +621,9 @@ class CoachEngine {
       phase: phase,
       weekNumber: weekNum,
       recentTemplateIds: memory.recentTemplateIds,
+      longRunDayIndex: memory.longRunDayIndex,
     );
   }
-
-  // ── User metrics factory ──────────────────────────────────────────────────
 
   UserMetrics createUserMetrics({
     required List<SavedRun> runHistory,
@@ -726,8 +678,6 @@ class CoachEngine {
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
   List<RunSummary> _filterThisWeek(List<SavedRun> runs, DateTime now) {
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final mondayStart = DateTime(monday.year, monday.month, monday.day);
@@ -755,7 +705,7 @@ class CoachEngine {
     required EngineMemory memory,
     required int splitSize,
   }) {
-    final avgRpe = runAnalysis.avgRpe ?? memory.averageRecentRpe(3) ?? 5.5;
+    final avgRpe = runAnalysis.avgRpe ?? memory.averageRecentRpe(3) ?? 5.0;
     final hasSufficientRpeTrendData =
         runAnalysis.recentRpeTrend != selector.RecentRpeTrend.unknown;
     final rpeStableOrLower =
@@ -810,7 +760,7 @@ class CoachEngine {
 
     if (hasSufficientRpeTrendData &&
         rpeStableOrLower &&
-        avgRpe <= 5.5 &&
+        avgRpe <= 5.0 &&
         completedSuccessfully) {
       return const ProgressionProfile(
         decision: ProgressionDecision.progress,
@@ -970,8 +920,6 @@ class CoachEngine {
         ),
     };
   }
-
-  // ── Type mappers ──────────────────────────────────────────────────────────
 
   RaceDistance _mapGoalRace(String goalRace) => switch (goalRace) {
         '5k'            => RaceDistance.fiveK,

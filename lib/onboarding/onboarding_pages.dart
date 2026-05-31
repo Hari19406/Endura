@@ -241,10 +241,10 @@ class OPageGoal extends StatelessWidget {
                     const Color(0xFF1E1040), EC.violet),
                 const SizedBox(height: 10),
                 _g('half_marathon', 'Half Marathon', "The runner's milestone",
-                    const Color(0xFF3D1A00), EC.orange),
+                    const Color(0xFF3D1A00), EC.orange, boxText: '21.1K'),
                 const SizedBox(height: 10),
                 _g('marathon', 'Marathon', 'The ultimate test',
-                    const Color(0xFF3D0000), EC.red),
+                    const Color(0xFF3D0000), EC.red, boxText: '42.2K'),
               ],
             ),
           ),
@@ -253,7 +253,8 @@ class OPageGoal extends StatelessWidget {
     );
   }
 
-  Widget _g(String key, String label, String sub, Color bg, Color fg) =>
+  Widget _g(String key, String label, String sub, Color bg, Color fg,
+      {String? boxText}) =>
       _Row(
         leading: Container(
           width: 44,
@@ -261,9 +262,9 @@ class OPageGoal extends StatelessWidget {
           decoration: BoxDecoration(
               color: bg, borderRadius: BorderRadius.circular(10)),
           child: Center(
-            child: Text(label,
+            child: Text(boxText ?? label,
                 style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: fg,
                     letterSpacing: 0.3)),
@@ -374,10 +375,8 @@ class OPageExperience extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class OPageBestTime extends StatelessWidget {
-  final bool knowsTime;
   final String distance;
   final int hours, minutes, seconds;
-  final ValueChanged<bool> onToggleKnows;
   final ValueChanged<String> onDistChanged;
   final ValueChanged<int> onHoursChanged;
   final ValueChanged<int> onMinsChanged;
@@ -385,12 +384,10 @@ class OPageBestTime extends StatelessWidget {
 
   const OPageBestTime({
     super.key,
-    required this.knowsTime,
     required this.distance,
     required this.hours,
     required this.minutes,
     required this.seconds,
-    required this.onToggleKnows,
     required this.onDistChanged,
     required this.onHoursChanged,
     required this.onMinsChanged,
@@ -422,181 +419,109 @@ class OPageBestTime extends StatelessWidget {
               'Use your most recent time — not your goal. Max needs your current fitness, not your dream.'),
           const SizedBox(height: 20),
 
-          // ── Toggle ─────────────────────────────────────────────────
-          Container(
-            decoration: BoxDecoration(
-              color: EC.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: EC.border, width: ET.borderWidth),
+          // ── Distance tabs ──────────────────────────────────────────
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ['5k', '10k', 'half', 'marathon'].map((d) {
+                final lbl = switch (d) {
+                  '10k' => '10K',
+                  'half' => 'Half',
+                  'marathon' => 'Marathon',
+                  _ => '5K',
+                };
+                final sel = distance == d;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => onDistChanged(d),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: sel ? EC.teal : EC.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: sel ? EC.teal : EC.border,
+                            width: ET.borderWidth),
+                      ),
+                      child: Text(lbl,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: sel ? EC.black : EC.textSecondary)),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
-            child: Row(children: [
-              _tab('I know my time', knowsTime, () => onToggleKnows(true)),
-              _tab("I'm not sure", !knowsTime, () => onToggleKnows(false)),
-            ]),
           ),
           const SizedBox(height: 20),
 
-          if (knowsTime) ...[
-            // ── Distance tabs ──────────────────────────────────────
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: ['5k', '10k', 'half', 'marathon'].map((d) {
-                  final lbl = switch (d) {
-                    '10k' => '10K',
-                    'half' => 'Half',
-                    'marathon' => 'Marathon',
-                    _ => '5K',
-                  };
-                  final sel = distance == d;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => onDistChanged(d),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: sel ? EC.teal : EC.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: sel ? EC.teal : EC.border,
-                              width: ET.borderWidth),
-                        ),
-                        child: Text(lbl,
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color:
-                                    sel ? EC.black : EC.textSecondary)),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Live display ──────────────────────────────────────
-            Center(
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                      fontSize: 14,
-                      color: EC.textSecondary,
-                      height: 1.5),
-                  children: [
-                    const TextSpan(text: 'I can currently run a '),
-                    TextSpan(
-                        text: _distLabel,
-                        style: const TextStyle(
-                            color: EC.teal,
-                            fontWeight: FontWeight.w600)),
-                    const TextSpan(text: ' in '),
-                    TextSpan(
-                        text:
-                            '${_pad(hours)}h ${_pad(minutes)}m ${_pad(seconds)}s',
-                        style: const TextStyle(
-                            color: EC.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Drum pickers ──────────────────────────────────────
-            Expanded(
-              child: Row(
+          // ── Live display ────────────────────────────────────────────
+          Center(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(
+                    fontSize: 14,
+                    color: EC.textSecondary,
+                    height: 1.5),
                 children: [
-                  Expanded(
-                      child: _drum(
-                    label: 'HH',
-                    count: 6,
-                    selected: hours,
-                    onChanged: onHoursChanged,
-                  )),
-                  _colon(),
-                  Expanded(
-                      child: _drum(
-                    label: 'MM',
-                    count: 60,
-                    selected: minutes,
-                    onChanged: onMinsChanged,
-                  )),
-                  _colon(),
-                  Expanded(
-                      child: _drum(
-                    label: 'SS',
-                    count: 60,
-                    selected: seconds,
-                    onChanged: onSecsChanged,
-                  )),
+                  const TextSpan(text: 'I can currently run a '),
+                  TextSpan(
+                      text: _distLabel,
+                      style: const TextStyle(
+                          color: EC.teal,
+                          fontWeight: FontWeight.w600)),
+                  const TextSpan(text: ' in '),
+                  TextSpan(
+                      text:
+                          '${_pad(hours)}h ${_pad(minutes)}m ${_pad(seconds)}s',
+                      style: const TextStyle(
+                          color: EC.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16)),
                 ],
               ),
             ),
-          ] else ...[
-            // ── Don't know state ───────────────────────────────────
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                          color: EC.surface,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: EC.border)),
-                      child: const Center(
-                        child: Text('?',
-                            style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                                color: EC.textPrimary)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "No problem.\nMax will calibrate your zones\nfrom your first few runs.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 15,
-                          color: EC.textSecondary,
-                          height: 1.6),
-                    ),
-                  ],
-                ),
-              ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Drum pickers ────────────────────────────────────────────
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                    child: _drum(
+                  label: 'HH',
+                  count: 6,
+                  selected: hours,
+                  onChanged: onHoursChanged,
+                )),
+                _colon(),
+                Expanded(
+                    child: _drum(
+                  label: 'MM',
+                  count: 60,
+                  selected: minutes,
+                  onChanged: onMinsChanged,
+                )),
+                _colon(),
+                Expanded(
+                    child: _drum(
+                  label: 'SS',
+                  count: 60,
+                  selected: seconds,
+                  onChanged: onSecsChanged,
+                )),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
   }
-
-  Widget _tab(String label, bool sel, VoidCallback onTap) => Expanded(
-        child: GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            decoration: BoxDecoration(
-              color: sel ? EC.teal : Colors.transparent,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: sel ? EC.black : EC.textSecondary)),
-          ),
-        ),
-      );
 
   Widget _colon() => const Padding(
         padding: EdgeInsets.only(bottom: 24),
@@ -2063,7 +1988,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
   static const double _max = 150;
   static const double _step = 5;
 
-  // Min viable km per goal race (mirrors WeeklyVolumeResolver._ranges)
   static const _minViable = {
     '5k':           15.0,
     '10k':          20.0,
@@ -2109,7 +2033,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
     }
   }
 
-  // Goal-aware hint — warns if below min viable for selected race.
   String _hint(double km) {
     final minKm = _minViable[widget.goalRace] ?? 15.0;
     if (km < minKm) {
@@ -2152,7 +2075,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
           const _Sub('Average over the last 2–4 weeks. Be honest — not your best week.'),
           const SizedBox(height: 48),
 
-          // ── Input row ─────────────────────────────────────────────────
           Row(
             children: [
               _StepButton(
@@ -2160,7 +2082,6 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
                 onTap: km > _min ? _decrement : null,
               ),
               const SizedBox(width: 16),
-
               Expanded(
                 child: Container(
                   height: 80,
@@ -2225,9 +2146,7 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 16),
-
               _StepButton(
                 icon: Icons.add_rounded,
                 onTap: km < _max ? _increment : null,
@@ -2236,17 +2155,14 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
           ),
 
           const SizedBox(height: 8),
-
           Center(
             child: Text(
               'per week',
               style: const TextStyle(fontSize: 12, color: EC.muted),
             ),
           ),
-
           const SizedBox(height: 32),
 
-          // ── Hint band ─────────────────────────────────────────────────
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: hasValue
@@ -2337,14 +2253,11 @@ class _StepButton extends StatelessWidget {
 // RACE TIME PROJECTION ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Uses Riegel formula: T2 = T1 × (D2 / D1) ^ 1.06
-/// Projects times for all 4 distances from a single anchor time,
-/// then applies a vDOT-based improvement after N weeks of training.
 class _RaceProjection {
-  final int currentTimeSec;   // user's entered time in seconds
-  final double paceDistanceKm; // distance their time is for
+  final int currentTimeSec;
+  final double paceDistanceKm;
   final int planWeeks;
-  final String experienceLevel; // 'beginner' | 'intermediate' | 'advanced'
+  final String experienceLevel;
 
   static const _distances = {
     '5k':           5.0,
@@ -2353,38 +2266,34 @@ class _RaceProjection {
     'marathon':     42.195,
   };
 
-  // vDOT improvement per 12 weeks by experience level
-  // Scales linearly for other week counts
   static const _vdotGainPer12Weeks = {
     'beginner':     3.0,
     'intermediate': 2.0,
     'advanced':     1.0,
   };
 
-  // vDOT → race pace (sec/km) lookup table
-  // Source: standard Jack Daniels vDOT tables
   static const _vdotPaceTable = {
-    30: 440.0,  // 7:20/km
+    30: 440.0,
     32: 422.0,
     34: 405.0,
     36: 390.0,
     38: 375.0,
-    40: 361.0,  // 6:01/km
+    40: 361.0,
     42: 348.0,
     44: 336.0,
     46: 325.0,
     48: 314.0,
-    50: 304.0,  // 5:04/km
+    50: 304.0,
     52: 295.0,
     54: 286.0,
     56: 278.0,
     58: 270.0,
-    60: 263.0,  // 4:23/km
+    60: 263.0,
     62: 256.0,
     64: 249.0,
     66: 243.0,
     68: 237.0,
-    70: 232.0,  // 3:52/km
+    70: 232.0,
   };
 
   const _RaceProjection({
@@ -2394,12 +2303,10 @@ class _RaceProjection {
     required this.experienceLevel,
   });
 
-  /// Riegel: project time from one distance to another
   double _riegel(double fromSec, double fromKm, double toKm) {
     return fromSec * pow(toKm / fromKm, 1.06);
   }
 
-  /// Linear interpolation on the vDOT pace table
   double _paceSec(int vdot) {
     final keys = _vdotPaceTable.keys.toList()..sort();
     if (vdot <= keys.first) return _vdotPaceTable[keys.first]!;
@@ -2415,12 +2322,9 @@ class _RaceProjection {
     return 361.0;
   }
 
-  /// Derive rough current vDOT from entered time + distance
   int get _currentVdot {
-    // Use 5K equivalent time via Riegel, then map to vDOT
     final fiveKEquivSec = _riegel(currentTimeSec.toDouble(), paceDistanceKm, 5.0);
-    final paceSec = fiveKEquivSec / 5.0; // sec/km for 5K
-    // Find closest vDOT
+    final paceSec = fiveKEquivSec / 5.0;
     final keys = _vdotPaceTable.keys.toList()..sort();
     for (int i = 0; i < keys.length - 1; i++) {
       final lo = _vdotPaceTable[keys[i]]!;
@@ -2433,31 +2337,25 @@ class _RaceProjection {
     return paceSec > _vdotPaceTable[keys.first]! ? keys.first : keys.last;
   }
 
-  /// Projected vDOT after completing the plan
   int get _projectedVdot {
-    final gainPer12 =
-        _vdotGainPer12Weeks[experienceLevel] ?? 2.0;
+    final gainPer12 = _vdotGainPer12Weeks[experienceLevel] ?? 2.0;
     final gain = (gainPer12 * planWeeks / 12).round();
     return (_currentVdot + gain).clamp(30, 85);
   }
 
-  /// Current time in seconds for a given distance key
   int currentSec(String distKey) {
     final km = _distances[distKey]!;
     return _riegel(currentTimeSec.toDouble(), paceDistanceKm, km).round();
   }
 
-  /// Projected time in seconds for a given distance key
   int projectedSec(String distKey) {
     final km = _distances[distKey]!;
-    // Compute ratio of projected pace to current pace, apply to current time
     final currentPaceSec = _paceSec(_currentVdot);
     final projectedPaceSec = _paceSec(_projectedVdot);
     final improvementRatio = projectedPaceSec / currentPaceSec;
     return (currentSec(distKey) * improvementRatio).round();
   }
 
-  /// Delta in seconds (negative = improvement = faster)
   int deltaSec(String distKey) {
     return projectedSec(distKey) - currentSec(distKey);
   }
@@ -2473,8 +2371,8 @@ class OPageWelcome extends StatelessWidget {
   final int vdot;
   final int planWeeks;
   final String experienceLevel;
-  final int currentTimeSec;     // user's entered time in seconds
-  final double paceDistanceKm;  // distance that time was for
+  final int currentTimeSec;
+  final double paceDistanceKm;
   final VoidCallback onContinue;
 
   static const _distanceKeys = ['5k', '10k', 'half_marathon', 'marathon'];
@@ -2507,7 +2405,6 @@ class OPageWelcome extends StatelessWidget {
         _ => '5k',
       };
 
-  /// Format seconds → h:mm:ss or m:ss
   String _fmt(int totalSec) {
     if (totalSec <= 0) return '--:--';
     if (totalSec >= 3600) {
@@ -2521,7 +2418,6 @@ class OPageWelcome extends StatelessWidget {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  /// Format delta seconds as -Xm Ys or -Xh Ym
   String _fmtDelta(int deltaSec) {
     final abs = deltaSec.abs();
     final sign = deltaSec < 0 ? '-' : '+';
@@ -2555,8 +2451,6 @@ class OPageWelcome extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 48),
-
-          // ── Greeting ──────────────────────────────────────────────
           RichText(
             text: TextSpan(
               style: const TextStyle(
@@ -2579,10 +2473,8 @@ class OPageWelcome extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 15, color: EC.textSecondary, height: 1.6),
           ),
-
           const SizedBox(height: 32),
 
-          // ── Goal headline card ─────────────────────────────────────
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -2618,7 +2510,6 @@ class OPageWelcome extends StatelessWidget {
                           letterSpacing: 1.1)),
                 ]),
                 const SizedBox(height: 14),
-                // Current → Projected with arrow
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -2674,7 +2565,6 @@ class OPageWelcome extends StatelessWidget {
                       ],
                     ),
                     const Spacer(),
-                    // Delta badge
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
@@ -2698,7 +2588,6 @@ class OPageWelcome extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // ── All distances table ────────────────────────────────────
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -2710,7 +2599,6 @@ class OPageWelcome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header row
                 Row(children: [
                   const SizedBox(width: 52),
                   Expanded(
@@ -2736,8 +2624,6 @@ class OPageWelcome extends StatelessWidget {
                 const SizedBox(height: 14),
                 const Divider(color: EC.border, height: 1),
                 const SizedBox(height: 14),
-
-                // Distance rows
                 ...List.generate(_distanceKeys.length, (i) {
                   final key   = _distanceKeys[i];
                   final label = _distanceLabels[i];
@@ -2751,7 +2637,6 @@ class OPageWelcome extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 14),
                     child: Row(
                       children: [
-                        // Distance badge
                         Container(
                           width: 44,
                           height: 28,
@@ -2768,8 +2653,6 @@ class OPageWelcome extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-
-                        // Current time
                         Expanded(
                           child: Text(
                             _fmt(curSec),
@@ -2782,8 +2665,6 @@ class OPageWelcome extends StatelessWidget {
                                     : EC.textSecondary),
                           ),
                         ),
-
-                        // Arrow dots
                         SizedBox(
                           width: 32,
                           child: Row(
@@ -2798,8 +2679,6 @@ class OPageWelcome extends StatelessWidget {
                             ],
                           ),
                         ),
-
-                        // Projected time + delta
                         Expanded(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -2829,11 +2708,8 @@ class OPageWelcome extends StatelessWidget {
                     ),
                   );
                 }),
-
                 const Divider(color: EC.border, height: 1),
                 const SizedBox(height: 12),
-
-                // Footnote
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2859,7 +2735,6 @@ class OPageWelcome extends StatelessWidget {
 
           const SizedBox(height: 32),
 
-          // ── CTA ────────────────────────────────────────────────────
           SizedBox(
             width: double.infinity,
             height: 56,
