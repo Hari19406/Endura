@@ -16,6 +16,7 @@ import '../coach_engine_v2.dart' show ProgressionDecision;
 ///   • Mark today's planned day as completed in the active weekly plan
 ///   • Calibrate vDOT from actual vs expected pace
 ///   • Save Monday progression evaluation date
+///   • Accumulate weeklyCompletedKm (v6)
 class EngineRuntime {
   static final EngineMemoryService _memoryService = EngineMemoryService();
 
@@ -25,6 +26,8 @@ class EngineRuntime {
     required double speed,
     required DateTime runDate,
     required String workoutType,
+    // ── v6: required for km-based completion tracking ─────────────────────
+    required double distanceKm,
     int? rpe,
     String? templateId,
     WorkoutIntent? completedIntent,
@@ -41,6 +44,7 @@ class EngineRuntime {
         rpe: rpe,
         runDate: runDate,
         totalRunCount: totalRuns,
+        distanceKm: distanceKm,
         templateId: templateId,
         completedIntent: completedIntent,
       );
@@ -63,14 +67,16 @@ class EngineRuntime {
         await _memoryService.save(calibrated);
       }
 
-      // ── Monday: save progression evaluation date ──────────────────────
+      // ── Weekly: save progression evaluation date ──────────────────────
       if (_shouldEvaluateProgression(updated, runDate)) {
         final pendingNudge = updated.pendingVdotNudge;
         final appliedNudge = pendingNudge.clamp(-1, 1);
         final newVdot = (updated.vdotScore + appliedNudge).clamp(30, 85);
 
-        // Compute from memory signals when caller didn't supply a decision.
-        final resolvedDecision = weeklyProgressionDecision ?? _computeDecisionFromMemory(updated);
+        // Use caller-supplied decision if provided, otherwise derive from
+        // the 3-signal spec stored in memory.
+        final resolvedDecision = weeklyProgressionDecision ??
+            _computeDecisionFromMemory(updated);
 
         updated = updated.copyWith(
           lastProgressionEvaluationDate: runDate,
@@ -81,18 +87,21 @@ class EngineRuntime {
         );
 
         debugPrint(
-          '[EngineRuntime] Weekly vDOT apply: ${updated.vdotScore - appliedNudge} → $newVdot '
-          '(pending=$pendingNudge applied=$appliedNudge)',
+          '[EngineRuntime] Weekly eval: vDOT ${updated.vdotScore - appliedNudge} → $newVdot '
+          '(pending=$pendingNudge applied=$appliedNudge) '
+          'progression=${resolvedDecision.name}',
         );
 
         await _memoryService.save(updated);
       }
 
       debugPrint(
-        '[EngineRuntime] type=$workoutType rpe=$rpe '
+        '[EngineRuntime] type=$workoutType rpe=$rpe distanceKm=$distanceKm '
+        'weeklyCompletedKm=${updated.weeklyCompletedKm} '
+        'completionRate=${updated.weeklyCompletionRate?.toStringAsFixed(2)} '
+        'downgrades=${updated.weeklyDowngradeCount} '
         'phase=${updated.currentPhase.name} totalRuns=$totalRuns '
-        'vdot=${updated.vdotScore} template=$templateId '
-        'rotationSize=${updated.recentTemplateIds.length}',
+        'vdot=${updated.vdotScore} template=$templateId',
       );
     } catch (e) {
       debugPrint('[EngineRuntime] processRun error: $e');
@@ -112,22 +121,15 @@ class EngineRuntime {
     if (expectedPace <= 0 || actualPace <= 0) return null;
 
     // Only calibrate on easy and threshold runs.
-    // Interval pace is too variable. Long run pace is effort-capped.
     const calibratableIntents = {
       WorkoutIntent.aerobicBase,
       WorkoutIntent.threshold,
     };
     if (intent != null && !calibratableIntents.contains(intent)) return null;
 
-    // Faster than expected = positive delta. Slower = negative.
     final paceDelta = expectedPace - actualPace;
-
-    // Ignore differences under 10 sec/km — noise.
     if (paceDelta.abs() < 10) return null;
 
-    // RPE cross-check:
-    //   nudge up only if faster AND effort was Easy(3) or Fine(5)
-    //   nudge down only if slower AND effort was Hard(7) or Too Hard(9)
     int nudge = 0;
     if (paceDelta > 10 && (rpe == null || rpe <= 5)) {
       nudge = 1;
@@ -142,8 +144,7 @@ class EngineRuntime {
     debugPrint(
       '[EngineRuntime] vDOT signal banked: nudge=$nudge '
       'pending=${current.pendingVdotNudge} → $banked '
-      '(actualPace=${actualPace.round()} expectedPace=${expectedPace.round()} '
-      'rpe=$rpe)',
+      '(actualPace=${actualPace.round()} expectedPace=${expectedPace.round()} rpe=$rpe)',
     );
 
     return current.copyWith(pendingVdotNudge: banked);
@@ -158,18 +159,55 @@ class EngineRuntime {
     return daysSinceLast >= 7;
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Progression decision from memory (V1 spec) ───────────────────────────
+  //
+  // Uses the same 3-signal logic as _progressionProfile in coach_engine_v2:
+  //   1. RPE trend   — from recentRpeEntries
+  //   2. Completion% — weeklyCompletedKm / weeklyPlannedKm
+  //   3. Downgrades  — weeklyDowngradeCount
 
   static ProgressionDecision _computeDecisionFromMemory(EngineMemory memory) {
-    final avgRpe = memory.averageRecentRpe(3) ?? 5.0;
-    final highRpe = avgRpe >= 7.0 || memory.hasHighRpe(n: 3, threshold: 7);
-    final afterRecovery = memory.lastCompletedType == WorkoutType.recovery;
-    if (highRpe) return ProgressionDecision.regress;
-    if (!afterRecovery && avgRpe <= 5.0 && memory.recentRpeEntries.length >= 3) {
+    // ── Signal 1: RPE trend ──────────────────────────────────────────────
+    final rpeIncreasing = _isRpeTrendIncreasing(memory);
+    final rpeStableOrDecreasing = !rpeIncreasing &&
+        memory.recentRpeEntries.length >= 2;
+
+    // ── Signal 2: Completion % ───────────────────────────────────────────
+    final completionRate = memory.weeklyCompletionRate ?? 1.0;
+    final completionGood = completionRate >= 0.85;
+    final completionPoor = completionRate < 0.70;
+
+    // ── Signal 3: Downgrade history ──────────────────────────────────────
+    final downgrades = memory.weeklyDowngradeCount;
+    final mostlyGreen = downgrades <= 1;
+    final manyRed = downgrades >= 3;
+
+    // ── Regress ──────────────────────────────────────────────────────────
+    if (completionPoor || (rpeIncreasing && manyRed) || downgrades >= 4) {
+      return ProgressionDecision.regress;
+    }
+
+    // ── Progress ─────────────────────────────────────────────────────────
+    if (completionGood && rpeStableOrDecreasing && mostlyGreen) {
       return ProgressionDecision.progress;
     }
+
+    // ── Hold ─────────────────────────────────────────────────────────────
     return ProgressionDecision.hold;
   }
+
+  /// Returns true if the last 3 RPE entries show an upward trend.
+  static bool _isRpeTrendIncreasing(EngineMemory memory) {
+    final entries = memory.recentRpeEntries;
+    if (entries.length < 2) return false;
+    final sorted = [...entries]..sort((a, b) => a.date.compareTo(b.date));
+    final recent = sorted.length > 3 ? sorted.sublist(sorted.length - 3) : sorted;
+    if (recent.length < 2) return false;
+    // Simple: last value strictly greater than first value in the window
+    return recent.last.value > recent.first.value;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   static Future<int> _getTotalRunCount() async {
     try {

@@ -1,21 +1,20 @@
 /// PreRunCheck — three-question pre-run gate.
 ///
 /// Questions:
-///   1. How are you feeling? (great / normal / tired / need rest)
-///   2. How was your sleep? (good / poor)  — skipped if need rest
-///   3. Any pain? (none / upper body / leg / chest)  — skipped if need rest
+///   1. How was your sleep? (good / poor)
+///   2. Any pain? (none / upper body / leg / chest) — skipped if need rest
 ///
 /// Outcomes:
-///   great/normal + good sleep + no/upper pain → run as planned
-///   tired or poor sleep or leg pain           → PreRunScaler adjusts dose
-///   chest pain                                → blocked, doctor message
-///   need rest                                 → shakeout or full rest
+///   good sleep + no/upper pain → run as planned
+///   poor sleep or leg pain     → PreRunScaler adjusts dose + downgrade recorded
+///   chest pain                 → blocked, doctor message
 library;
 
 import 'package:flutter/material.dart';
 import '../engines/daily/pre_run_scaler.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/coach_message_builder.dart' as message;
+import '../engines/memory/engine_memory_service.dart';
 
 // ============================================================================
 // ENTRY POINT
@@ -67,9 +66,9 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   // ── Step handlers ────────────────────────────────────────────────────────
 
   void _onSleepSelected(PreRunSleep sleep) {
-  _sleep = sleep;
-  setState(() => _step = _Step.pain);
-}
+    _sleep = sleep;
+    setState(() => _step = _Step.pain);
+  }
 
   void _onPainSelected(PainLocation pain) {
     if (pain == PainLocation.chest) {
@@ -80,17 +79,28 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   }
 
   void _finalize(PainLocation pain) {
-  final inputs = PreRunInputs(
-    feeling: PreRunFeeling.normal,
-    sleep: _sleep ?? PreRunSleep.good,
-    pain: pain,
-  );
-  final scaler = const PreRunScaler();
-  final result = scaler.scale(widget.coachMessage.resolvedWorkout, inputs);
-  final scaled = _rebuildMessage(result.workout, result.coachNote);
-  Navigator.pop(context);
-  widget.onProceed(scaled);
-}
+    final sleep = _sleep ?? PreRunSleep.good;
+    final inputs = PreRunInputs(
+      feeling: PreRunFeeling.normal,
+      sleep: sleep,
+      pain: pain,
+    );
+    final scaler = const PreRunScaler();
+    final result = scaler.scale(widget.coachMessage.resolvedWorkout, inputs);
+    final scaled = _rebuildMessage(result.workout, result.coachNote);
+
+    // ── Record downgrade if workout was actually reduced ──────────────────
+    // Poor sleep OR leg pain causes PreRunScaler to reduce the workout.
+    final wasDowngraded =
+        sleep == PreRunSleep.poor || pain == PainLocation.leg;
+    if (wasDowngraded) {
+      // Fire and forget — non-blocking
+      EngineMemoryService().recordPreRunDowngrade();
+    }
+
+    Navigator.pop(context);
+    widget.onProceed(scaled);
+  }
 
   void _onTakeFullRest() {
     Navigator.pop(context);
@@ -98,7 +108,6 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   }
 
   void _onTakeRecoveryRun() {
-    // Recovery run → pass through with no scaling, shakeout intent
     Navigator.pop(context);
     widget.onProceed(widget.coachMessage);
   }
@@ -141,13 +150,13 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   }
 
   Widget _buildStep() {
-  return switch (_step) {
-    _Step.sleep        => _SleepStep(onSleep: _onSleepSelected),
-    _Step.pain         => _PainStep(onPain: _onPainSelected, onBack: () => setState(() => _step = _Step.sleep)),
-    _Step.restChoice   => _RestChoiceStep(onFullRest: _onTakeFullRest, onRecoveryRun: _onTakeRecoveryRun, onBack: () => setState(() => _step = _Step.sleep)),
-    _Step.chestWarning => _ChestWarningStep(onDismiss: () { Navigator.pop(context); widget.onSkip(); }),
-  };
-}
+    return switch (_step) {
+      _Step.sleep        => _SleepStep(onSleep: _onSleepSelected),
+      _Step.pain         => _PainStep(onPain: _onPainSelected, onBack: () => setState(() => _step = _Step.sleep)),
+      _Step.restChoice   => _RestChoiceStep(onFullRest: _onTakeFullRest, onRecoveryRun: _onTakeRecoveryRun, onBack: () => setState(() => _step = _Step.sleep)),
+      _Step.chestWarning => _ChestWarningStep(onDismiss: () { Navigator.pop(context); widget.onSkip(); }),
+    };
+  }
 }
 
 // ============================================================================

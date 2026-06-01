@@ -23,6 +23,8 @@ import 'plan/week_resolver.dart';
 import 'plan/weekly_volume_resolver.dart';
 import 'daily/dynamic_scaler.dart';
 
+
+
 typedef CoachMessage = message.CoachMessage;
 
 class HistoricalTrainingData {
@@ -128,6 +130,8 @@ class CoachEngine {
         _weekResolver = weekResolver ?? const WeekResolver(),
         _volumeResolver = volumeResolver ?? WeeklyVolumeResolver();
 
+  // ── Post-plan ─────────────────────────────────────────────────────────────
+
   PostPlanState checkAndApplyPostPlanState(EngineMemory memory) {
     final now = DateTime.now();
 
@@ -145,7 +149,7 @@ class CoachEngine {
           clearRacePlan: true,
           currentPhase: TrainingPhase.base,
         );
-        debugPrint('[CoachEngine] Plan complete detected — week $planWeek > $totalWeeks');
+        debugPrint('[CoachEngine] Plan complete — week $planWeek > $totalWeeks');
         return PostPlanState(memory: updated, justCompleted: true);
       }
     }
@@ -169,6 +173,8 @@ class CoachEngine {
     return PostPlanState(memory: memory);
   }
 
+  // ── Pace / resolver helpers ───────────────────────────────────────────────
+
   PaceTable _buildPaceTable(UserMetrics userMetrics, EngineMemory memory) {
     int vdot = memory.vdotScore;
 
@@ -176,9 +182,8 @@ class CoachEngine {
         userMetrics.prTimeSeconds != null &&
         userMetrics.prDistance != null) {
       final distKm = _prDistanceToKm(userMetrics.prDistance!);
-      final confidence = userMetrics.prIsRecent
-          ? PrConfidence.high
-          : PrConfidence.low;
+      final confidence =
+          userMetrics.prIsRecent ? PrConfidence.high : PrConfidence.low;
       vdot = vdotFromPr(
         prTimeSeconds: userMetrics.prTimeSeconds!,
         prDistanceKm: distKm,
@@ -196,10 +201,13 @@ class CoachEngine {
       UserMetrics userMetrics, EngineMemory memory) {
     return ResolverContext(
       paceTable: _buildPaceTable(userMetrics, memory),
-      goalRaceDistance: _goalRaceToPRDistance(_mapGoalRace(userMetrics.goalRace)),
+      goalRaceDistance:
+          _goalRaceToPRDistance(_mapGoalRace(userMetrics.goalRace)),
       goalRaceTimeSeconds: null,
     );
   }
+
+  // ── Main entry ────────────────────────────────────────────────────────────
 
   CoachMessage? getNextCoachMessage({
     required UserMetrics userMetrics,
@@ -254,7 +262,6 @@ class CoachEngine {
 
     final progression = _resolveProgression(
       runAnalysis: runAnalysis,
-      historicalTrainingData: historicalTrainingData,
       memory: memory,
       now: now,
       trainingDayIndices: effectiveTrainingDays,
@@ -336,8 +343,8 @@ class CoachEngine {
       daysSinceLastQuality: historicalTrainingData.daysSinceLastQuality,
       daysSinceLastLongRun: historicalTrainingData.daysSinceLastLongRun,
       lastCompletedTemplateId: memory.lastCompletedTemplateId,
-      lastCompletedIntent: memory.lastCompletedWorkoutIntent
-          ?? _lastWorkoutToIntent(lastWorkoutType),
+      lastCompletedIntent: memory.lastCompletedWorkoutIntent ??
+          _lastWorkoutToIntent(lastWorkoutType),
       plannedIntent: effectivePlannedIntent,
       weekNumber: weekNum,
       avgRpe: runAnalysis.avgRpe ?? userMetrics.avgRpe,
@@ -365,6 +372,9 @@ class CoachEngine {
       print('[CoachEngine] vDOT: ${resolverContext.paceTable.vdotScore}');
       print('[CoachEngine] weeklyTargetKm: $finalWeeklyTargetKm'
           ' (mileageSystem: ${memory.baselineWeeklyKm != null})');
+      print('[CoachEngine] progression: ${progression.decision.name}');
+      print('[CoachEngine] completionRate: ${memory.weeklyCompletionRate}');
+      print('[CoachEngine] downgrades: ${memory.weeklyDowngradeCount}');
       return true;
     }());
 
@@ -418,6 +428,8 @@ class CoachEngine {
       nextPlannedLabel: nextInfo.$2,
     );
   }
+
+  // ── Maintenance path ──────────────────────────────────────────────────────
 
   CoachMessage? _getMaintenanceCoachMessage({
     required UserMetrics userMetrics,
@@ -483,7 +495,8 @@ class CoachEngine {
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
-    final scalingSignals = const ScalingSignals(avgRpe: null, lastEasyRunTooHard: false);
+    final scalingSignals =
+        const ScalingSignals(avgRpe: null, lastEasyRunTooHard: false);
 
     final result = _workoutResolver.resolve(
       selectionContext: selectionContext,
@@ -521,6 +534,8 @@ class CoachEngine {
       nextPlannedLabel: nextInfo.$2,
     );
   }
+
+  // ── Next session preview ──────────────────────────────────────────────────
 
   (WorkoutIntent?, String?) _resolveNextPlannedSession({
     required WeekResolution weekResolution,
@@ -560,6 +575,8 @@ class CoachEngine {
       WorkoutIntent.recovery     => 'Recovery Run',
     };
   }
+
+  // ── Week resolution (used by WeekProjectionService) ───────────────────────
 
   WeekResolution resolveCurrentWeek({
     required UserMetrics userMetrics,
@@ -626,6 +643,8 @@ class CoachEngine {
     );
   }
 
+  // ── UserMetrics factory ───────────────────────────────────────────────────
+
   UserMetrics createUserMetrics({
     required List<SavedRun> runHistory,
     String experienceLevel = 'beginner',
@@ -637,7 +656,8 @@ class CoachEngine {
     final recentRuns = runHistory.take(5).toList();
     final avgDistance = recentRuns.isEmpty
         ? 5.0
-        : recentRuns.fold(0.0, (sum, r) => sum + r.distance) / recentRuns.length;
+        : recentRuns.fold(0.0, (sum, r) => sum + r.distance) /
+            recentRuns.length;
 
     int avgEasyPace = experienceLevel == 'advanced'
         ? 300
@@ -675,6 +695,8 @@ class CoachEngine {
     );
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
   List<RunSummary> _filterThisWeek(List<SavedRun> runs, DateTime now) {
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final mondayStart = DateTime(monday.year, monday.month, monday.day);
@@ -696,173 +718,68 @@ class CoachEngine {
     return WorkoutType.easy;
   }
 
+  // ── Progression engine (V1 spec) ──────────────────────────────────────────
+  //
+  // Three signals only:
+  //   1. RPE trend   (decreasing / stable / increasing)
+  //   2. Completion% (completedKm / plannedKm)
+  //   3. Downgrade count (pre-run readiness reductions this week)
+  //
+  // Decision matrix:
+  //   Progress : completion ≥ 85%  AND rpe stable/decreasing  AND downgrades ≤ 1
+  //   Regress  : completion < 70%
+  //              OR (rpe increasing AND downgrades ≥ 3)
+  //              OR downgrades ≥ 4
+  //   Hold     : everything else
+
   ProgressionProfile _progressionProfile({
     required selector.RunAnalysis runAnalysis,
-    required HistoricalTrainingData historicalTrainingData,
     required EngineMemory memory,
-    required int splitSize,
   }) {
-    final avgRpe = runAnalysis.avgRpe ?? memory.averageRecentRpe(3) ?? 5.0;
-    final hasSufficientRpeTrendData =
-        runAnalysis.recentRpeTrend != selector.RecentRpeTrend.unknown;
-    final rpeStableOrLower =
-        runAnalysis.recentRpeTrend == selector.RecentRpeTrend.stable ||
-            runAnalysis.recentRpeTrend == selector.RecentRpeTrend.decreasing;
-    final risingRpe =
-        runAnalysis.recentRpeTrend == selector.RecentRpeTrend.increasing;
-    final completedSuccessfully = _completedSuccessfully(
-      historicalTrainingData,
-      memory.activePlan,
-      splitSize,
-    );
-    final afterRecoveryDay = memory.lastCompletedType == WorkoutType.recovery;
-    final repeatedDowngrades = _repeatedDowngradePressure(
-      historicalTrainingData.recentRuns,
-    );
-    final consistentlyHighRpe =
-        avgRpe >= 7.0 || memory.hasHighRpe(n: 3, threshold: 7);
+    // ── Signal 1: RPE trend ──────────────────────────────────────────────
+    final rpeTrend = runAnalysis.recentRpeTrend;
+    final rpeStableOrDecreasing =
+        rpeTrend == selector.RecentRpeTrend.stable ||
+        rpeTrend == selector.RecentRpeTrend.decreasing;
+    final rpeIncreasing = rpeTrend == selector.RecentRpeTrend.increasing;
 
-    if (consistentlyHighRpe || repeatedDowngrades) {
-      return const ProgressionProfile(
-        decision: ProgressionDecision.regress,
-        weeklyVolumeMultiplier: 0.92,
-        longRunMultiplier: 0.90,
-        sessionVolumeMultiplier: 0.94,
-        sessionIntensityMultiplier: 1.02,
-        allowProgression: false,
-      );
+    // ── Signal 2: Completion % ───────────────────────────────────────────
+    // Uses km tracked in memory (weeklyCompletedKm / weeklyPlannedKm).
+    // Falls back to 1.0 (assume full) when no planned km recorded yet.
+    final completionRate = memory.weeklyCompletionRate ?? 1.0;
+    final completionExcellentOrGood = completionRate >= 0.85; // ≥ 85%
+    final completionFair = completionRate >= 0.70 && completionRate < 0.85;
+    final completionPoor = completionRate < 0.70;
+
+    // ── Signal 3: Downgrade history ──────────────────────────────────────
+    final downgrades = memory.weeklyDowngradeCount;
+    final mostlyGreen = downgrades <= 1;   // 0–1 = positive
+    final someYellow  = downgrades == 2;   // 2   = neutral
+    final manyRed     = downgrades >= 3;   // 3+  = negative
+
+    // ── Regress ──────────────────────────────────────────────────────────
+    if (completionPoor ||
+        (rpeIncreasing && manyRed) ||
+        downgrades >= 4) {
+      return _decisionToProfile(ProgressionDecision.regress);
     }
 
-    if (afterRecoveryDay) {
-      return const ProgressionProfile(
-        decision: ProgressionDecision.hold,
-        weeklyVolumeMultiplier: 1.0,
-        longRunMultiplier: 1.0,
-        sessionVolumeMultiplier: 0.98,
-        sessionIntensityMultiplier: 1.0,
-        allowProgression: false,
-      );
+    // ── Progress ─────────────────────────────────────────────────────────
+    if (completionExcellentOrGood && rpeStableOrDecreasing && mostlyGreen) {
+      return _decisionToProfile(ProgressionDecision.progress);
     }
 
-    if (risingRpe || !completedSuccessfully) {
-      return const ProgressionProfile(
-        decision: ProgressionDecision.hold,
-        weeklyVolumeMultiplier: 1.0,
-        longRunMultiplier: 1.0,
-        sessionVolumeMultiplier: 0.98,
-        sessionIntensityMultiplier: 1.0,
-        allowProgression: false,
-      );
-    }
-
-    if (hasSufficientRpeTrendData &&
-        rpeStableOrLower &&
-        avgRpe <= 5.0 &&
-        completedSuccessfully) {
-      return const ProgressionProfile(
-        decision: ProgressionDecision.progress,
-        weeklyVolumeMultiplier: 1.07,
-        longRunMultiplier: 1.06,
-        sessionVolumeMultiplier: 1.04,
-        sessionIntensityMultiplier: 0.99,
-        allowProgression: true,
-      );
-    }
-
-    return const ProgressionProfile(
-      decision: ProgressionDecision.hold,
-      weeklyVolumeMultiplier: 1.0,
-      longRunMultiplier: 1.0,
-      sessionVolumeMultiplier: 1.0,
-      sessionIntensityMultiplier: 1.0,
-      allowProgression: false,
-    );
+    // ── Hold (everything else) ────────────────────────────────────────────
+    // Covers:
+    //   • completion 70-95% + rpe increasing
+    //   • completion 70-85% + rpe stable
+    //   • some yellow days
+    //   • unknown rpe trend (insufficient data)
+    return _decisionToProfile(ProgressionDecision.hold);
   }
-
-  bool _completedSuccessfully(
-    HistoricalTrainingData historicalTrainingData,
-    WeeklyPlan? activePlan,
-    int splitSize,
-  ) {
-    final recentRuns = historicalTrainingData.recentRuns.take(3).toList();
-    if (recentRuns.isEmpty) return true;
-
-    final rpeSum = recentRuns
-        .where((r) => r.rpe != null)
-        .fold<double>(0.0, (sum, r) => sum + r.rpe!);
-    final rpeCount = recentRuns.where((r) => r.rpe != null).length;
-    final rpeOk = rpeCount == 0 || (rpeSum / rpeCount) <= 6.5;
-
-    if (activePlan == null) return rpeOk;
-
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
-    final plannedDaysSoFar = activePlan.days.where((d) {
-      if (d.isRestDay) return false;
-      final plannedDate = DateTime(d.date.year, d.date.month, d.date.day);
-      return !plannedDate.isAfter(todayDate);
-    }).toList();
-
-    final completed = plannedDaysSoFar.where((d) => d.isCompleted).length;
-    final planned = plannedDaysSoFar.length;
-    final completionRate = planned == 0 ? 1.0 : completed / planned;
-
-    final progressThreshold = _progressThreshold(splitSize);
-    final holdThreshold = _holdThreshold(splitSize);
-
-    if (completionRate >= progressThreshold) return true;
-    if (completionRate >= holdThreshold) return rpeOk;
-    return false;
-  }
-
-  double _progressThreshold(int splitSize) => switch (splitSize) {
-        3 => 1.0,
-        4 => 0.75,
-        5 => 0.80,
-        6 => 0.83,
-        _ => 0.80,
-      };
-
-  double _holdThreshold(int splitSize) => switch (splitSize) {
-        3 => 0.67,
-        4 => 0.50,
-        5 => 0.60,
-        6 => 0.50,
-        _ => 0.60,
-      };
-
-  bool _repeatedDowngradePressure(List<SavedRun> recentRuns) {
-    final recent = recentRuns.take(3).toList();
-    if (recent.length < 2) return false;
-    final pressured = recent.where((r) {
-      final isEasyLike =
-          r.workoutType == 'easy' || r.workoutType == 'recovery';
-      return isEasyLike && (r.rpe ?? 0) >= 7;
-    }).length;
-    return pressured >= 2;
-  }
-
-  double _clampLongRunTarget(
-      {required double current, required double adapted}) {
-    if (current <= 0) return adapted;
-    return adapted.clamp(current * 0.90, current * 1.10);
-  }
-
-  double _capFinalProgressionValue({
-    required double baseValue,
-    required double finalValue,
-  }) {
-    if (baseValue <= 0) return finalValue;
-    return finalValue > baseValue * _maxSafeProgressionMultiplier
-        ? baseValue * _maxSafeProgressionMultiplier
-        : finalValue;
-  }
-
-  double _roundHalf(double value) => (value * 2).round() / 2;
 
   ProgressionProfile _resolveProgression({
     required selector.RunAnalysis runAnalysis,
-    required HistoricalTrainingData historicalTrainingData,
     required EngineMemory memory,
     required DateTime now,
     required List<int> trainingDayIndices,
@@ -883,9 +800,7 @@ class CoachEngine {
 
     return _progressionProfile(
       runAnalysis: runAnalysis,
-      historicalTrainingData: historicalTrainingData,
       memory: memory,
-      splitSize: trainingDayIndices.length,
     );
   }
 
@@ -917,6 +832,84 @@ class CoachEngine {
         ),
     };
   }
+
+  // ── Weekly reset ──────────────────────────────────────────────────────────
+
+  /// Call this at the start of each new week (Monday) to:
+  ///   1. Store this week's decision and evaluation date into memory.
+  ///   2. Carry forward previousWeekTargetKm.
+  ///   3. Reset weeklyCompletedKm, weeklyPlannedKm, weeklyDowngradeCount.
+  ///
+  /// Returns updated memory — caller must persist it.
+  EngineMemory applyWeekRollover({
+    required EngineMemory memory,
+    required selector.RunAnalysis runAnalysis,
+    required double nextWeekPlannedKm,
+    required List<int> trainingDayIndices,
+    DateTime? now,
+  }) {
+    final today = now ?? DateTime.now();
+
+    final profile = _progressionProfile(
+      runAnalysis: runAnalysis,
+      memory: memory,
+    );
+
+    return memory.copyWith(
+      weeklyProgressionDecision: profile.decision,
+      lastProgressionEvaluationDate: today,
+      previousWeekTargetKm: memory.weeklyPlannedKm > 0
+          ? memory.weeklyPlannedKm
+          : memory.previousWeekTargetKm,
+      // Reset weekly counters
+      weeklyCompletedKm: 0.0,
+      weeklyPlannedKm: nextWeekPlannedKm,
+      weeklyDowngradeCount: 0,
+    );
+  }
+
+  // ── Wiring: called after each run completes ───────────────────────────────
+
+  /// Update weekly completed km after a run is saved.
+  /// Call this from your run-save service alongside the normal memory update.
+  EngineMemory recordRunCompleted({
+    required EngineMemory memory,
+    required double distanceKm,
+  }) {
+    return memory.copyWith(
+      weeklyCompletedKm: memory.weeklyCompletedKm + distanceKm,
+    );
+  }
+
+  /// Increment downgrade count when pre-run check reduces a workout.
+  /// Call this from your pre-run check handler when readiness is yellow/red.
+  EngineMemory recordPreRunDowngrade({
+    required EngineMemory memory,
+  }) {
+    return memory.copyWith(
+      weeklyDowngradeCount: memory.weeklyDowngradeCount + 1,
+    );
+  }
+
+  // ── Mapping helpers ───────────────────────────────────────────────────────
+
+  double _clampLongRunTarget(
+      {required double current, required double adapted}) {
+    if (current <= 0) return adapted;
+    return adapted.clamp(current * 0.90, current * 1.10);
+  }
+
+  double _capFinalProgressionValue({
+    required double baseValue,
+    required double finalValue,
+  }) {
+    if (baseValue <= 0) return finalValue;
+    return finalValue > baseValue * _maxSafeProgressionMultiplier
+        ? baseValue * _maxSafeProgressionMultiplier
+        : finalValue;
+  }
+
+  double _roundHalf(double value) => (value * 2).round() / 2;
 
   RaceDistance _mapGoalRace(String goalRace) => switch (goalRace) {
         '5k'            => RaceDistance.fiveK,

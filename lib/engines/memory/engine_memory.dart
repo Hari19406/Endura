@@ -51,8 +51,8 @@ class RpeEntry {
 class EngineMemory {
   static const int maxRecentTemplateIds = 14;
 
-  /// Schema version — bumped to 5 for post-plan flow.
-  static const int _schemaVersion = 5;
+  /// Schema version — bumped to 6 for km-based completion tracking.
+  static const int _schemaVersion = 6;
 
   final int vdotScore;
   final bool vdotIsProvisional;
@@ -78,18 +78,22 @@ class EngineMemory {
   final int? longRunDayIndex;
 
   // ── Weekly mileage system (schema v4) ────────────────────────────────────
-  /// User's onboarding answer — immutable seed, never overwritten after init.
   final double? baselineWeeklyKm;
-
-  /// The resolved weekly target from the previous week — used for compounding.
   final double? previousWeekTargetKm;
 
   // ── Post-plan flow (schema v5) ────────────────────────────────────────────
-  /// Set when currentWeek > racePlan.totalWeeks. Cleared when a new plan starts.
   final DateTime? planCompletedAt;
-
-  /// True after 7 days of inaction post-plan, or if user chose maintenance explicitly.
   final bool isInMaintenance;
+
+  // ── Weekly completion tracking (schema v6) ───────────────────────────────
+  /// Total km actually logged this week (reset each Monday).
+  final double weeklyCompletedKm;
+
+  /// Total km planned for this week from WeekResolver slots (set at week start).
+  final double weeklyPlannedKm;
+
+  /// Number of pre-run readiness downgrades this week (yellow/red pre-checks).
+  final int weeklyDowngradeCount;
 
   String get lastWorkoutType => lastCompletedType.name;
 
@@ -120,25 +124,33 @@ class EngineMemory {
     this.previousWeekTargetKm,
     this.planCompletedAt,
     this.isInMaintenance = false,
+    // v6
+    this.weeklyCompletedKm = 0.0,
+    this.weeklyPlannedKm = 0.0,
+    this.weeklyDowngradeCount = 0,
   });
 
   bool get hasRacePlan => racePlan != null;
 
   bool get isExploreMode => racePlan == null;
 
-  /// True when the race plan's total weeks have elapsed.
   bool get isPlanComplete => planCompletedAt != null;
 
-  /// Days since plan was completed (null if not completed).
   int? get daysSincePlanCompletion {
     if (planCompletedAt == null) return null;
     return DateTime.now().difference(planCompletedAt!).inDays;
   }
 
-  /// Auto-maintenance triggers after 7 days of inaction post-plan.
   bool get shouldAutoEnterMaintenance {
     final days = daysSincePlanCompletion;
     return days != null && days >= 7 && !isInMaintenance;
+  }
+
+  /// Completion rate for this week: completedKm / plannedKm.
+  /// Returns null if plannedKm is 0 (no data yet).
+  double? get weeklyCompletionRate {
+    if (weeklyPlannedKm <= 0) return null;
+    return weeklyCompletedKm / weeklyPlannedKm;
   }
 
   double? averageRecentRpe([int n = 3]) {
@@ -206,6 +218,10 @@ class EngineMemory {
         // v5
         'planCompletedAt': planCompletedAt?.toIso8601String(),
         'isInMaintenance': isInMaintenance,
+        // v6
+        'weeklyCompletedKm': weeklyCompletedKm,
+        'weeklyPlannedKm': weeklyPlannedKm,
+        'weeklyDowngradeCount': weeklyDowngradeCount,
       };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
@@ -317,14 +333,19 @@ class EngineMemory {
             '${json['lastProgressionEvaluationDate'] ?? ''}'),
         pendingVdotNudge: (json['pendingVdotNudge'] as num?)?.toInt() ?? 0,
         longRunDayIndex: (json['longRunDayIndex'] as num?)?.toInt(),
-        // v4 fields — null-safe for existing users migrating from v3
         baselineWeeklyKm: (json['baselineWeeklyKm'] as num?)?.toDouble(),
         previousWeekTargetKm:
             (json['previousWeekTargetKm'] as num?)?.toDouble(),
-        // v5 fields — null-safe for existing users migrating from v4
         planCompletedAt:
             DateTime.tryParse('${json['planCompletedAt'] ?? ''}'),
         isInMaintenance: (json['isInMaintenance'] as bool?) ?? false,
+        // v6 — null-safe for users migrating from v5
+        weeklyCompletedKm:
+            (json['weeklyCompletedKm'] as num?)?.toDouble() ?? 0.0,
+        weeklyPlannedKm:
+            (json['weeklyPlannedKm'] as num?)?.toDouble() ?? 0.0,
+        weeklyDowngradeCount:
+            (json['weeklyDowngradeCount'] as num?)?.toInt() ?? 0,
       );
     } catch (_) {
       return defaultSafeMemory();
@@ -368,6 +389,10 @@ class EngineMemory {
     DateTime? planCompletedAt,
     bool clearPlanCompletedAt = false,
     bool? isInMaintenance,
+    // v6
+    double? weeklyCompletedKm,
+    double? weeklyPlannedKm,
+    int? weeklyDowngradeCount,
   }) {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
@@ -419,6 +444,10 @@ class EngineMemory {
           ? null
           : (planCompletedAt ?? this.planCompletedAt),
       isInMaintenance: isInMaintenance ?? this.isInMaintenance,
+      // v6
+      weeklyCompletedKm: weeklyCompletedKm ?? this.weeklyCompletedKm,
+      weeklyPlannedKm: weeklyPlannedKm ?? this.weeklyPlannedKm,
+      weeklyDowngradeCount: weeklyDowngradeCount ?? this.weeklyDowngradeCount,
     );
   }
 }

@@ -210,12 +210,21 @@ class WeekResolver {
   // ABSORBER SIZING
   // ========================================================================
 
-  /// Sizes every training slot so the week sums to weekTarget.targetKm:
+  /// Race-specific long run percentage bands.
+  /// Returns (minFraction, maxFraction) of weekly target.
+  ({double minFrac, double maxFrac}) _longRunBand(RaceDistance race) =>
+      switch (race) {
+        RaceDistance.fiveK        => (minFrac: 0.20, maxFrac: 0.25),
+        RaceDistance.tenK         => (minFrac: 0.25, maxFrac: 0.30),
+        RaceDistance.halfMarathon => (minFrac: 0.30, maxFrac: 0.35),
+        RaceDistance.marathon     => (minFrac: 0.35, maxFrac: 0.40),
+      };
+
+  /// Sizes every training slot:
   ///   • quality  → intrinsic (interval block sum) or distance-driven (tempo)
-  ///   • long run → anchored to weekTarget.longRunKm, clamped to template max
-  ///   • easy     → absorbs the remainder, clamped to easy max
-  /// Overflow (easy can't hold remainder) spills to the long run up to its
-  /// max; any residue is logged as an over-capacity week.
+  ///   • long run → race-specific % of weekly target, clamped to template range
+  ///   • easy     → absorbs remainder, clamped to easy max; if capped, accept
+  ///                the week total as-is (no overflow → long run)
   List<DaySlot> _sizeWeek({
     required List<DaySlot> slots,
     required WeekTarget weekTarget,
@@ -225,14 +234,12 @@ class WeekResolver {
   }) {
     final targetKm = weekTarget.targetKm;
 
-    // 1. Quality slots → read.
+    // 1. Quality slots → read their intrinsic distance.
     final qualityKm = <int, double>{};
     var qualityTotal = 0.0;
     for (final s in slots) {
       if (!s.isTraining || s.templateId == null) continue;
-      if (s.slotType != SlotType.quality1 && s.slotType != SlotType.quality2) {
-        continue;
-      }
+      if (s.slotType != SlotType.quality1 && s.slotType != SlotType.quality2) continue;
       final t = WorkoutLibrary.byId(s.templateId!);
       if (t == null) continue;
       final variant = WorkoutLibrary.getVariant(t, phase);
@@ -247,17 +254,20 @@ class WeekResolver {
       qualityTotal += km;
     }
 
-    // 2. Long run → anchored.
+    // 2. Long run → race-specific % band, clamped to template range.
     int? longWeekday;
     var longKm = 0.0;
-    double longCap = double.infinity;
     for (final s in slots) {
       if (s.slotType != SlotType.longRun || s.templateId == null) continue;
       final t = WorkoutLibrary.byId(s.templateId!);
       final range = t?.distanceByRace[raceDistance];
-      longKm = weekTarget.longRunKm;
+      final band = _longRunBand(raceDistance);
+
+      // Target the midpoint of the race-specific band.
+      final bandMid = targetKm * (band.minFrac + band.maxFrac) / 2;
+      longKm = bandMid;
+
       if (range != null) {
-        longCap = range.maxKm;
         longKm = longKm.clamp(range.minKm, range.maxKm);
       }
       longWeekday = s.weekday;
@@ -265,6 +275,8 @@ class WeekResolver {
     }
 
     // 3. Easy slots → absorb remainder.
+    //    If per-easy exceeds the cap, cap each easy run and accept the week
+    //    total as a natural undershoot (no overflow into the long run).
     final easyWeekdays = slots
         .where((s) =>
             s.isTraining &&
@@ -282,36 +294,22 @@ class WeekResolver {
       const easyMin = 3.0;
       var perEasy = remaining / easyWeekdays.length;
 
-      if (perEasy > easyMax) {
-        // Overflow: cap easy at max, spill leftover to the long run.
-        for (final wd in easyWeekdays) {
-          easyKm[wd] = easyMax;
-        }
-        var leftover = remaining - easyMax * easyWeekdays.length;
-        if (longWeekday != null && leftover > 0) {
-          final canAdd = (longCap - longKm).clamp(0.0, double.infinity);
-          final add = leftover < canAdd ? leftover : canAdd;
-          longKm += add;
-          leftover -= add;
-        }
-        if (leftover > 0.5) {
-          _log('WEEK OVER CAPACITY', {
-            'targetKm': targetKm,
-            'leftoverKm': leftover.toStringAsFixed(1),
-            'trainingDays': slots.where((s) => s.isTraining).length,
-            'hint': 'ranges cannot hold target at this day count — add a day '
-                'or raise template ceilings',
-          });
-        }
-      } else {
-        if (perEasy < easyMin) perEasy = easyMin;
-        for (final wd in easyWeekdays) {
-          easyKm[wd] = perEasy;
-        }
+      // Clamp to [min, max] and let the week total land wherever it lands.
+      // Spec §6: ±2 km tolerance is fine — don't force 50.0 when 49 or 51
+      // is what the arithmetic produces.
+      // Spec §7: no overflow into the long run.
+      perEasy = perEasy.clamp(easyMin, easyMax);
+
+      for (final wd in easyWeekdays) {
+        easyKm[wd] = perEasy;
       }
     } else if (remaining > 0 && longWeekday != null) {
-      // No easy slots (e.g. tight cutback) — spill remainder into the long run.
-      longKm = (longKm + remaining).clamp(0.0, longCap);
+      // No easy slots at all (very tight cutback with only quality + long).
+      // Still don't push into long run — log and move on.
+      _log('NO EASY SLOTS', {
+        'remainingKm': remaining.toStringAsFixed(1),
+        'note': 'week total will undershoot target — no easy days to absorb',
+      });
     }
 
     // 4. Rebuild slots with rounded distances.
@@ -395,10 +393,10 @@ class WeekResolver {
   /// Mirrors WorkoutResolver._clampRepsForExperience so sized distance matches
   /// the distance actually run. Keep the two in sync if the ratios change.
   int _clampReps(int reps, String level) => switch (level) {
-        'beginner' => (reps * 0.65).round().clamp(2, reps).toInt(),
+        'beginner'     => (reps * 0.65).round().clamp(2, reps).toInt(),
         'intermediate' => (reps * 0.85).round().clamp(2, reps).toInt(),
-        'advanced' => reps,
-        _ => (reps * 0.85).round().clamp(2, reps).toInt(),
+        'advanced'     => reps,
+        _              => (reps * 0.85).round().clamp(2, reps).toInt(),
       };
 
   /// Easy-run ceiling for the race, read from the easy_steady template range.
@@ -463,10 +461,10 @@ class WeekResolver {
       return (q1: WorkoutIntent.threshold, q2: WorkoutIntent.threshold);
     }
     return switch (raceDistance) {
-      RaceDistance.fiveK        => (q1: WorkoutIntent.vo2max,     q2: WorkoutIntent.threshold),
-      RaceDistance.tenK         => (q1: WorkoutIntent.vo2max,     q2: WorkoutIntent.threshold),
-      RaceDistance.halfMarathon => (q1: WorkoutIntent.threshold,  q2: WorkoutIntent.vo2max),
-      RaceDistance.marathon     => (q1: WorkoutIntent.threshold,  q2: WorkoutIntent.vo2max),
+      RaceDistance.fiveK        => (q1: WorkoutIntent.vo2max,    q2: WorkoutIntent.threshold),
+      RaceDistance.tenK         => (q1: WorkoutIntent.vo2max,    q2: WorkoutIntent.threshold),
+      RaceDistance.halfMarathon => (q1: WorkoutIntent.threshold, q2: WorkoutIntent.vo2max),
+      RaceDistance.marathon     => (q1: WorkoutIntent.threshold, q2: WorkoutIntent.vo2max),
     };
   }
 

@@ -105,6 +105,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       speed: speed,
       runDate: widget.runDate,
       workoutType: workoutType,
+      distanceKm: widget.distanceKm,
       rpe: rpe,
       templateId: completedTemplateId,
       completedIntent: completedIntent,
