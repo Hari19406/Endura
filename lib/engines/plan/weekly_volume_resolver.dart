@@ -5,7 +5,7 @@ import '../coach_engine_v2.dart' show ProgressionDecision;
 class WeeklyVolumeResolver {
   // ── Volume range table ───────────────────────────────────────────────────
   static const Map<RaceDistance, _VolumeRange> _ranges = {
-    RaceDistance.fiveK:        _VolumeRange(min: 15, sweetLow: 25, sweetHigh: 40, safeCap: 60),
+    RaceDistance.fiveK:        _VolumeRange(min: 15, sweetLow: 25, sweetHigh: 40, safeCap: 50),
     RaceDistance.tenK:         _VolumeRange(min: 20, sweetLow: 30, sweetHigh: 50, safeCap: 80),
     RaceDistance.halfMarathon: _VolumeRange(min: 30, sweetLow: 40, sweetHigh: 70, safeCap: 100),
     RaceDistance.marathon:     _VolumeRange(min: 40, sweetLow: 55, sweetHigh: 90, safeCap: 130),

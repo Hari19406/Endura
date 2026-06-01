@@ -7,10 +7,14 @@
 ///   1. template.recommendedPercentage × weeklyTargetKm = raw distance
 ///   2. PhaseVariant.volumeMultiplier scales the raw distance
 ///   3. Clamp to template.distanceByRace[raceDistance] (ALWAYS wins)
-///   4. Safety caps (longest recent run, absolute maximums)
+///   4. Safety cap (single-run ceiling = 40% of weekly target; long run exempt)
 ///   5. Round to nearest 0.5 km
 ///
 /// This is independent of pace — it only answers "how far", not "how fast".
+///
+/// NOTE: When the mileage system is active, WeekResolver pre-sizes each slot
+/// (absorber model) and WorkoutResolver uses that distance directly. This
+/// calculator is the fallback path (legacy / no planned distance).
 library;
 
 import '../config/workout_template_library.dart';
@@ -43,7 +47,6 @@ class VolumeCalculator {
   /// [phase]                Current training phase.
   /// [dayRole]              What kind of day this is (for safety caps only).
   /// [variant]              Phase variant to apply (may be null).
-  /// [longestRecentRunKm]   Safety cap — don't jump too far beyond recent max.
   double calculateWorkoutDistance({
     required double weeklyTargetKm,
     required WorkoutTemplate template,
@@ -51,7 +54,6 @@ class VolumeCalculator {
     required TrainingPhase phase,
     required DayRole dayRole,
     PhaseVariant? variant,
-    double? longestRecentRunKm,
     String experienceLevel = 'intermediate',
     double weekPercentageSum = 1.0,
   }) {
@@ -80,7 +82,7 @@ class VolumeCalculator {
     distance = _applySafetyCaps(
       distance: distance,
       dayRole: dayRole,
-      longestRecentRunKm: longestRecentRunKm,
+      weeklyTargetKm: weeklyTargetKm,
     );
 
     // Step 5: Apply minimums.
@@ -107,18 +109,21 @@ class VolumeCalculator {
   }
 
   /// Safety caps to prevent dangerous volume jumps.
-  ///
-  /// These are role-based absolute limits that sit on top of the template
-  /// range. They catch edge cases where template ranges are generous
-  /// (e.g., marathon long run 16–32 km) but the athlete isn't ready.
   double _applySafetyCaps({
     required double distance,
     required DayRole dayRole,
-    double? longestRecentRunKm,
+    required double weeklyTargetKm,
   }) {
-    // Don't jump more than 15% beyond longest recent run.
-    if (longestRecentRunKm != null && longestRecentRunKm > 0) {
-      final safeMax = longestRecentRunKm * 1.15;
+    // Single-run ceiling: no individual run should exceed ~40% of the week's
+    // total volume. This replaces the old "longest recent run × 1.15" brake —
+    // it needs no run history, is correct from week one (no hardcoded 5km
+    // fallback), and scales automatically as weekly volume grows.
+    //
+    // The long run is exempt: it is *meant* to be the week's biggest run, and
+    // is bounded instead by its template max and the weekly progression ramp
+    // in WeeklyVolumeResolver.
+    if (dayRole != DayRole.longRun && weeklyTargetKm > 0) {
+      final safeMax = weeklyTargetKm * 0.40;
       if (distance > safeMax) distance = safeMax;
     }
 

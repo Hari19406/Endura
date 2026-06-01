@@ -54,6 +54,11 @@ class SelectionContext {
   final String goalIntent;
   final double weekPercentageSum;
 
+  /// Pre-sized session distance from WeekResolver's absorber pass.
+  /// When set (and the session isn't readiness-downgraded), WorkoutResolver
+  /// uses this instead of recomputing via VolumeCalculator.
+  final double? plannedDistanceKm;
+
   const SelectionContext({
     required this.raceDistance,
     required this.phase,
@@ -75,6 +80,7 @@ class SelectionContext {
     this.experienceLevel = 'intermediate',
     this.goalIntent = 'structured',  // updated default: was 'improve'
     this.weekPercentageSum = 1.0,
+    this.plannedDistanceKm,
   });
 }
 

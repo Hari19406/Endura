@@ -2,7 +2,7 @@
 ///
 /// Orchestrates all four components:
 ///   1. SessionSelector  → picks the template + day role
-///   2. VolumeCalculator → sets total workout distance
+///   2. VolumeCalculator → sets total workout distance (fallback only)
 ///   3. PaceTable        → CS × multiplier = real paces
 ///   4. DynamicScaler    → adjusts for readiness/RPE
 ///
@@ -12,6 +12,11 @@
 /// CHANGE FROM v1: PaceResolver (6 generic zones) replaced by
 /// PaceTable (18 specific zones). AthletePaceProfile removed entirely —
 /// the PaceTable already has CS baked in.
+///
+/// CHANGE (Phase 3b): when SelectionContext carries a pre-sized
+/// plannedDistanceKm (from WeekResolver's absorber pass) and the session was
+/// not readiness-downgraded, that distance is used directly. VolumeCalculator
+/// is the fallback path only.
 library;
 
 import '../config/workout_template_library.dart';
@@ -95,7 +100,6 @@ class WorkoutResolver {
     required SelectionContext selectionContext,
     required ResolverContext resolverContext,
     required ScalingSignals scalingSignals,
-    double? longestRecentRunKm,
   }) {
     // ── Step 1: Select template ──────────────────────────────────────────
     final selection = _selector.select(selectionContext);
@@ -103,18 +107,24 @@ class WorkoutResolver {
       return const ResolverResult.rest();
     }
 
-    // ── Step 2: Calculate total workout distance ─────────────────────────
-    final totalDistanceKm = _volumeCalculator.calculateWorkoutDistance(
-      weeklyTargetKm: selectionContext.weeklyTargetKm,
-      template: selection.template,
-      raceDistance: selectionContext.raceDistance,
-      phase: selectionContext.phase,
-      dayRole: selection.dayRole,
-      variant: selection.variant,
-      longestRecentRunKm: longestRecentRunKm,
-      experienceLevel: selectionContext.experienceLevel,
-      weekPercentageSum: selectionContext.weekPercentageSum,
-    );
+    // ── Step 2: Total workout distance ───────────────────────────────────
+    // Prefer the pre-sized distance from WeekResolver's absorber pass. Only
+    // recompute via VolumeCalculator if there's no planned distance or the
+    // session was readiness-downgraded (the planned size no longer applies).
+    final usePlanned = !selection.wasDowngraded &&
+        selectionContext.plannedDistanceKm != null;
+    final totalDistanceKm = usePlanned
+        ? selectionContext.plannedDistanceKm!
+        : _volumeCalculator.calculateWorkoutDistance(
+            weeklyTargetKm: selectionContext.weeklyTargetKm,
+            template: selection.template,
+            raceDistance: selectionContext.raceDistance,
+            phase: selectionContext.phase,
+            dayRole: selection.dayRole,
+            variant: selection.variant,
+            experienceLevel: selectionContext.experienceLevel,
+            weekPercentageSum: selectionContext.weekPercentageSum,
+          );
 
     // ── Step 3: Resolve blocks with real paces and distances ─────────────
     final resolvedWorkout = resolveTemplate(

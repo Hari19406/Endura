@@ -656,9 +656,6 @@ class _HomeScreenState extends State<HomeScreen>
             ? 5.0
             : recentRuns.fold(0.0, (sum, r) => sum + r.distance) /
                 recentRuns.length;
-        final longestRun = runs.isEmpty
-            ? 5.0
-            : runs.map((r) => r.distance).reduce((a, b) => a > b ? a : b);
 
         final goalIntent = prefs.getString('goal_intent') ?? 'improve';
 
@@ -670,7 +667,6 @@ class _HomeScreenState extends State<HomeScreen>
           recentWeeklyVolumeKm: weeklyMileage > 0
               ? weeklyMileage
               : avgDistance * runsPerWeek,
-          longestRecentRun: longestRun,
           runsPerWeek: runsPerWeek,
           goalRace: goalRace,
           experienceLevel: experienceLevel,

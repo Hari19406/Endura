@@ -45,7 +45,6 @@ class UserMetrics {
   final int intervalCapabilityPace;
   final double recentAvgDistance;
   final double recentWeeklyVolumeKm;
-  final double longestRecentRun;
   final int runsPerWeek;
   final String goalRace;
   final String experienceLevel;
@@ -64,7 +63,6 @@ class UserMetrics {
     required this.intervalCapabilityPace,
     required this.recentAvgDistance,
     required this.recentWeeklyVolumeKm,
-    required this.longestRecentRun,
     this.runsPerWeek = 4,
     required this.goalRace,
     this.experienceLevel = 'beginner',
@@ -323,6 +321,7 @@ class CoachEngine {
       recentTemplateIds: memory.recentTemplateIds,
       isCutbackWeek: is3to1Cutback,
       longRunDayIndex: memory.longRunDayIndex,
+      experienceLevel: userMetrics.experienceLevel,
     );
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
@@ -349,6 +348,7 @@ class CoachEngine {
       experienceLevel: userMetrics.experienceLevel,
       goalIntent: userMetrics.goalIntent,
       weekPercentageSum: weekResolution.weekPercentageSum,
+      plannedDistanceKm: weekResolution.slotFor(now.weekday - 1)?.distanceKm,
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
@@ -372,7 +372,6 @@ class CoachEngine {
       selectionContext: selectionContext,
       resolverContext: resolverContext,
       scalingSignals: scalingSignals,
-      longestRecentRunKm: userMetrics.longestRecentRun,
     );
 
     if (result.isRestDay) return null;
@@ -454,6 +453,7 @@ class CoachEngine {
       recentTemplateIds: memory.recentTemplateIds,
       isCutbackWeek: false,
       longRunDayIndex: memory.longRunDayIndex,
+      experienceLevel: userMetrics.experienceLevel,
     );
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
@@ -479,6 +479,7 @@ class CoachEngine {
       experienceLevel: userMetrics.experienceLevel,
       goalIntent: 'steady',
       weekPercentageSum: weekResolution.weekPercentageSum,
+      plannedDistanceKm: weekResolution.slotFor(now.weekday - 1)?.distanceKm,
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
@@ -488,7 +489,6 @@ class CoachEngine {
       selectionContext: selectionContext,
       resolverContext: resolverContext,
       scalingSignals: scalingSignals,
-      longestRecentRunKm: userMetrics.longestRecentRun,
     );
 
     if (result.isRestDay) return null;
@@ -622,6 +622,7 @@ class CoachEngine {
       weekNumber: weekNum,
       recentTemplateIds: memory.recentTemplateIds,
       longRunDayIndex: memory.longRunDayIndex,
+      experienceLevel: userMetrics.experienceLevel,
     );
   }
 
@@ -637,9 +638,6 @@ class CoachEngine {
     final avgDistance = recentRuns.isEmpty
         ? 5.0
         : recentRuns.fold(0.0, (sum, r) => sum + r.distance) / recentRuns.length;
-    final longestRun = runHistory.isEmpty
-        ? 5.0
-        : runHistory.map((r) => r.distance).reduce((a, b) => a > b ? a : b);
 
     int avgEasyPace = experienceLevel == 'advanced'
         ? 300
@@ -666,7 +664,6 @@ class CoachEngine {
       intervalCapabilityPace: (avgEasyPace * 0.75).round(),
       recentAvgDistance: avgDistance,
       recentWeeklyVolumeKm: weeklyVolumeKm,
-      longestRecentRun: longestRun,
       runsPerWeek: runsPerWeek,
       goalRace: goalRace,
       avgRpe: null,

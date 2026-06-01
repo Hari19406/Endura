@@ -29,6 +29,14 @@
 ///   - Fix F: vo2_ladder — added marathon to applicableRaceDistances (FM VO2 pool was only 2)
 ///   - Fix G: cruise_intervals_mile — added base to applicablePhases for marathon
 ///            (FM base threshold pool was only 2, exhausted from W2 onwards)
+///
+/// Pre-launch audit (v3.2):
+///   - medium_long_run restricted to HM/marathon (was eligible for 5K/10K and
+///     could win the weekend long-run slot — a Pfitzinger medium-long has no
+///     place in a 5K/10K plan).
+///   - 10K long-run max 14→18, easy max 8→12; HM long-run max 20→24
+///     (ranges must be able to hold the weekly volume safeCap across realistic
+///     day counts).
 library;
 
 import '../core/pace_table.dart';
@@ -383,7 +391,7 @@ class WorkoutLibrary {
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 3, maxKm: 6),
-        RaceDistance.tenK: DistanceRange(minKm: 4, maxKm: 8),
+        RaceDistance.tenK: DistanceRange(minKm: 4, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
@@ -414,7 +422,7 @@ class WorkoutLibrary {
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 3, maxKm: 6),
-        RaceDistance.tenK: DistanceRange(minKm: 4, maxKm: 8),
+        RaceDistance.tenK: DistanceRange(minKm: 4, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
@@ -452,7 +460,7 @@ class WorkoutLibrary {
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 3, maxKm: 6),
-        RaceDistance.tenK: DistanceRange(minKm: 4, maxKm: 8),
+        RaceDistance.tenK: DistanceRange(minKm: 4, maxKm: 12),
         RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 10),
         RaceDistance.marathon: DistanceRange(minKm: 6, maxKm: 12),
       },
@@ -514,8 +522,8 @@ class WorkoutLibrary {
       },
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 6, maxKm: 10),
-        RaceDistance.tenK: DistanceRange(minKm: 8, maxKm: 14),
-        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 20),
+        RaceDistance.tenK: DistanceRange(minKm: 8, maxKm: 18),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 24),
         RaceDistance.marathon: DistanceRange(minKm: 16, maxKm: 32),
       },
       recommendedPercentage: 0.30,
@@ -549,8 +557,8 @@ class WorkoutLibrary {
         RaceDistance.marathon,
       },
       distanceByRace: {
-        RaceDistance.tenK: DistanceRange(minKm: 8, maxKm: 14),
-        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 20),
+        RaceDistance.tenK: DistanceRange(minKm: 8, maxKm: 18),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 24),
         RaceDistance.marathon: DistanceRange(minKm: 16, maxKm: 32),
       },
       recommendedPercentage: 0.30,
@@ -574,7 +582,7 @@ class WorkoutLibrary {
         RaceDistance.marathon,
       },
       distanceByRace: {
-        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 20),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 24),
         RaceDistance.marathon: DistanceRange(minKm: 16, maxKm: 32),
       },
       recommendedPercentage: 0.30,
@@ -623,19 +631,15 @@ class WorkoutLibrary {
         TrainingPhase.peak,
       },
       applicableRaceDistances: {
-        RaceDistance.fiveK,
-        RaceDistance.tenK,
         RaceDistance.halfMarathon,
         RaceDistance.marathon,
       },
       distanceByRace: {
-        RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
-        RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 10),
         RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 14),
         RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18),
       },
       recommendedPercentage: 0.20,
-      description: 'Midweek longer easy effort. Bridges easy runs and the long run.',
+      description: 'Midweek longer easy effort (HM/marathon only). Bridges easy runs and the long run.',
       blocks: [
         BlockTemplate.percent(type: BlockType.main, fraction: 1.0, zone: PaceZone.aerobicEasy),
       ],

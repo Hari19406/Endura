@@ -118,7 +118,6 @@ class WeekProjectionService {
     String? lastCompletedTemplateId,
     int daysSinceLastQuality = 999,
     int daysSinceLastLongRun = 999,
-    double? longestRecentRunKm,
     double? avgRpe,
     double weeklyVolumeCompletedKm = 0.0,
     DateTime? now,
@@ -241,7 +240,6 @@ class WeekProjectionService {
         phase: phase,
         dayRole: selection.dayRole,
         variant: selection.variant,
-        longestRecentRunKm: longestRecentRunKm,
       );
 
       // Resolve template → ResolvedWorkout via WorkoutResolver
