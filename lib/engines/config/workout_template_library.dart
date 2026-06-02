@@ -37,6 +37,14 @@
 ///   - 10K long-run max 14→18, easy max 8→12; HM long-run max 20→24
 ///     (ranges must be able to hold the weekly volume safeCap across realistic
 ///     day counts).
+///
+/// Scaling policy (v3.3):
+///   - supportsScaling field added to WorkoutTemplate (default true).
+///   - Four templates marked supportsScaling = false because they don't degrade
+///     cleanly under rep/distance cuts:
+///       vo2_ladder, vo2_pyramid, race_simulation, race_dress_rehearsal
+///     WorkoutResolver falls back to a simpler same-intent template for these
+///     when tier is reduced or minimum.
 library;
 
 import '../core/pace_table.dart';
@@ -215,6 +223,18 @@ class WorkoutTemplate {
   final Map<TrainingPhase, PhaseVariant> phaseVariants;
   final String description;
 
+  /// Whether this template supports Green/Yellow/Red scaling.
+  ///
+  /// true  (default) → WorkoutResolver applies rep/distance scaling based on
+  ///                    readiness tier. Covers all standard interval and
+  ///                    continuous workouts.
+  ///
+  /// false           → Template structure doesn't degrade cleanly (e.g. ladders,
+  ///                    pyramids, multi-block race simulations). When tier is
+  ///                    reduced or minimum, WorkoutResolver substitutes a simpler
+  ///                    template from the same intent pool instead of scaling.
+  final bool supportsScaling;
+
   const WorkoutTemplate({
     required this.id,
     required this.name,
@@ -226,6 +246,7 @@ class WorkoutTemplate {
     required this.blocks,
     this.phaseVariants = const {},
     this.description = '',
+    this.supportsScaling = true,  // safe default — all templates scale unless opted out
   });
 }
 
@@ -1092,6 +1113,10 @@ class WorkoutLibrary {
       id: 'vo2_ladder',
       name: 'Ladder Intervals',
       intent: WorkoutIntent.vo2max,
+      // supportsScaling = false: ascending ladder doesn't degrade cleanly —
+      // removing reps destroys the ladder structure. Resolver substitutes
+      // vo2_classic or vo2_600 when tier is reduced/minimum.
+      supportsScaling: false,
       applicablePhases: {
         TrainingPhase.build,
         TrainingPhase.peak,
@@ -1130,6 +1155,9 @@ class WorkoutLibrary {
       id: 'vo2_pyramid',
       name: 'Pyramid Intervals',
       intent: WorkoutIntent.vo2max,
+      // supportsScaling = false: pyramid structure (up + down) loses meaning
+      // when truncated. Resolver substitutes vo2_classic when tier != full.
+      supportsScaling: false,
       applicablePhases: {TrainingPhase.peak},
       applicableRaceDistances: {
         RaceDistance.fiveK,
@@ -1316,6 +1344,10 @@ class WorkoutLibrary {
       id: 'race_simulation',
       name: 'Race Simulation',
       intent: WorkoutIntent.raceSpecific,
+      // supportsScaling = false: continuous race-pace block — scaling distance
+      // by 60% removes the mental simulation value entirely. Resolver
+      // substitutes race_gp_intervals when tier is reduced/minimum.
+      supportsScaling: false,
       applicablePhases: {TrainingPhase.peak},
       applicableRaceDistances: {
         RaceDistance.fiveK,
@@ -1348,6 +1380,10 @@ class WorkoutLibrary {
       id: 'race_dress_rehearsal',
       name: 'Dress Rehearsal',
       intent: WorkoutIntent.raceSpecific,
+      // supportsScaling = false: already the minimum taper race-pace stimulus.
+      // Scaling it further removes the confidence-building purpose entirely.
+      // Resolver substitutes race_gp_intervals when tier is reduced/minimum.
+      supportsScaling: false,
       applicablePhases: {TrainingPhase.taper},
       applicableRaceDistances: {
         RaceDistance.fiveK,

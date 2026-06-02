@@ -51,8 +51,8 @@ class RpeEntry {
 class EngineMemory {
   static const int maxRecentTemplateIds = 14;
 
-  /// Schema version — bumped to 6 for km-based completion tracking.
-  static const int _schemaVersion = 6;
+  /// Schema version — bumped to 7 for ladder position tracking.
+  static const int _schemaVersion = 7;
 
   final int vdotScore;
   final bool vdotIsProvisional;
@@ -95,6 +95,12 @@ class EngineMemory {
   /// Number of pre-run readiness downgrades this week (yellow/red pre-checks).
   final int weeklyDowngradeCount;
 
+  // ── Workout ladder positions (schema v7) ─────────────────────────────────
+  /// Current rung index for each intent ladder, keyed by intent name.
+  /// e.g. {'threshold': 1, 'vo2max': 0, 'raceSpecific': 0}
+  /// Index 0 = bottom rung (easiest). Progresses/regresses with weekly signals.
+  final Map<String, int> ladderPositions;
+
   String get lastWorkoutType => lastCompletedType.name;
 
   const EngineMemory({
@@ -128,6 +134,8 @@ class EngineMemory {
     this.weeklyCompletedKm = 0.0,
     this.weeklyPlannedKm = 0.0,
     this.weeklyDowngradeCount = 0,
+    // v7
+    this.ladderPositions = const {},
   });
 
   bool get hasRacePlan => racePlan != null;
@@ -151,6 +159,26 @@ class EngineMemory {
   double? get weeklyCompletionRate {
     if (weeklyPlannedKm <= 0) return null;
     return weeklyCompletedKm / weeklyPlannedKm;
+  }
+
+  /// Returns the current ladder index for [intent], defaulting to 0.
+  int ladderIndexFor(WorkoutIntent intent) =>
+      ladderPositions[intent.name] ?? 0;
+
+  /// Returns a new [ladderPositions] map with [intent] moved up one rung,
+  /// clamped to [maxIndex].
+  Map<String, int> advanceLadder(WorkoutIntent intent, int maxIndex) {
+    final updated = Map<String, int>.from(ladderPositions);
+    updated[intent.name] = (ladderIndexFor(intent) + 1).clamp(0, maxIndex);
+    return updated;
+  }
+
+  /// Returns a new [ladderPositions] map with [intent] moved down one rung,
+  /// clamped to 0.
+  Map<String, int> regressionLadder(WorkoutIntent intent) {
+    final updated = Map<String, int>.from(ladderPositions);
+    updated[intent.name] = (ladderIndexFor(intent) - 1).clamp(0, 99);
+    return updated;
   }
 
   double? averageRecentRpe([int n = 3]) {
@@ -222,6 +250,8 @@ class EngineMemory {
         'weeklyCompletedKm': weeklyCompletedKm,
         'weeklyPlannedKm': weeklyPlannedKm,
         'weeklyDowngradeCount': weeklyDowngradeCount,
+        // v7
+        'ladderPositions': ladderPositions,
       };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
@@ -229,6 +259,14 @@ class EngineMemory {
       List<String> parseStringList(dynamic raw) {
         if (raw is! List) return [];
         return raw.whereType<String>().toList();
+      }
+
+      Map<String, int> parseLadderPositions(dynamic raw) {
+        if (raw is! Map) return {};
+        return raw.map((k, v) => MapEntry(
+              k.toString(),
+              (v as num?)?.toInt() ?? 0,
+            ));
       }
 
       TrainingPhase parsePhase(dynamic raw) {
@@ -346,6 +384,8 @@ class EngineMemory {
             (json['weeklyPlannedKm'] as num?)?.toDouble() ?? 0.0,
         weeklyDowngradeCount:
             (json['weeklyDowngradeCount'] as num?)?.toInt() ?? 0,
+        // v7 — null-safe for users migrating from v6
+        ladderPositions: parseLadderPositions(json['ladderPositions']),
       );
     } catch (_) {
       return defaultSafeMemory();
@@ -393,6 +433,8 @@ class EngineMemory {
     double? weeklyCompletedKm,
     double? weeklyPlannedKm,
     int? weeklyDowngradeCount,
+    // v7
+    Map<String, int>? ladderPositions,
   }) {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
@@ -448,6 +490,8 @@ class EngineMemory {
       weeklyCompletedKm: weeklyCompletedKm ?? this.weeklyCompletedKm,
       weeklyPlannedKm: weeklyPlannedKm ?? this.weeklyPlannedKm,
       weeklyDowngradeCount: weeklyDowngradeCount ?? this.weeklyDowngradeCount,
+      // v7
+      ladderPositions: ladderPositions ?? this.ladderPositions,
     );
   }
 }

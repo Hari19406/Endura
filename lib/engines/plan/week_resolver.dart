@@ -1,6 +1,24 @@
 /// WeekResolver — assigns a WorkoutIntent and template to every day of the week,
 /// then sizes each training slot (absorber model: quality read, long anchored,
 /// easy absorbs the remainder).
+///
+/// CHANGE (V1 Adaptation System): ladder-aware template selection.
+///   _pickTemplate now reads ladderPositions from EngineMemory to select the
+///   appropriate rung of the threshold / VO2 / raceSpecific ladder instead of
+///   pure rotation-seed picking.
+///
+/// Ladders (index 0 = easiest):
+///   threshold:    [cruise_intervals_400, cruise_intervals_800,
+///                  cruise_intervals_mile, tempo_continuous]
+///   vo2max:       [vo2_600, vo2_classic, vo2_1000]
+///   raceSpecific: [race_gp_intervals, race_simulation, race_dress_rehearsal]
+///
+/// Non-ladder intents (aerobicBase, endurance, speed, recovery) continue to
+/// use rotation-seed picking — they have no meaningful progression ordering.
+///
+/// Ladder index is clamped to the available candidates for the current
+/// race/phase context, so a high stored index never causes an out-of-bounds
+/// or picks a template that isn't applicable.
 library;
 
 import '../config/workout_template_library.dart';
@@ -100,6 +118,32 @@ class WeekResolution {
       days.where((d) => d.templateId != null).map((d) => d.templateId!).toList();
 }
 
+// ============================================================================
+// LADDER DEFINITIONS
+// ============================================================================
+
+/// Ordered template ids for each ladder, index 0 = easiest rung.
+/// Only intents with a meaningful progression order have a ladder.
+/// Other intents (aerobicBase, endurance, speed, recovery) use rotation.
+const Map<WorkoutIntent, List<String>> _ladderTemplateIds = {
+  WorkoutIntent.threshold: [
+    'cruise_intervals_400',
+    'cruise_intervals_800',
+    'cruise_intervals_mile',
+    'tempo_continuous',
+  ],
+  WorkoutIntent.vo2max: [
+    'vo2_600',
+    'vo2_classic',
+    'vo2_1000',
+  ],
+  WorkoutIntent.raceSpecific: [
+    'race_gp_intervals',
+    'race_simulation',
+    'race_dress_rehearsal',
+  ],
+};
+
 class WeekResolver {
   const WeekResolver();
 
@@ -113,6 +157,9 @@ class WeekResolver {
     List<String> recentTemplateIds = const [],
     bool isCutbackWeek = false,
     String experienceLevel = 'intermediate',
+    // Ladder positions from EngineMemory.ladderPositions.
+    // Key = WorkoutIntent.name, value = current rung index (0-based).
+    Map<String, int> ladderPositions = const {},
   }) {
     final sorted = List<int>.from(trainingDayIndices)..sort();
     final n = sorted.length;
@@ -155,6 +202,7 @@ class WeekResolver {
         phase: phase,
         weekNumber: weekNumber,
         recentTemplateIds: recentTemplateIds,
+        ladderPositions: ladderPositions,
       );
 
       slots.add(DaySlot(
@@ -220,11 +268,6 @@ class WeekResolver {
         RaceDistance.marathon     => (minFrac: 0.35, maxFrac: 0.40),
       };
 
-  /// Sizes every training slot:
-  ///   • quality  → intrinsic (interval block sum) or distance-driven (tempo)
-  ///   • long run → race-specific % of weekly target, clamped to template range
-  ///   • easy     → absorbs remainder, clamped to easy max; if capped, accept
-  ///                the week total as-is (no overflow → long run)
   List<DaySlot> _sizeWeek({
     required List<DaySlot> slots,
     required WeekTarget weekTarget,
@@ -263,7 +306,6 @@ class WeekResolver {
       final range = t?.distanceByRace[raceDistance];
       final band = _longRunBand(raceDistance);
 
-      // Target the midpoint of the race-specific band.
       final bandMid = targetKm * (band.minFrac + band.maxFrac) / 2;
       longKm = bandMid;
 
@@ -275,8 +317,6 @@ class WeekResolver {
     }
 
     // 3. Easy slots → absorb remainder.
-    //    If per-easy exceeds the cap, cap each easy run and accept the week
-    //    total as a natural undershoot (no overflow into the long run).
     final easyWeekdays = slots
         .where((s) =>
             s.isTraining &&
@@ -293,19 +333,12 @@ class WeekResolver {
       final easyMax = _easyMaxKm(raceDistance);
       const easyMin = 3.0;
       var perEasy = remaining / easyWeekdays.length;
-
-      // Clamp to [min, max] and let the week total land wherever it lands.
-      // Spec §6: ±2 km tolerance is fine — don't force 50.0 when 49 or 51
-      // is what the arithmetic produces.
-      // Spec §7: no overflow into the long run.
       perEasy = perEasy.clamp(easyMin, easyMax);
 
       for (final wd in easyWeekdays) {
         easyKm[wd] = perEasy;
       }
     } else if (remaining > 0 && longWeekday != null) {
-      // No easy slots at all (very tight cutback with only quality + long).
-      // Still don't push into long run — log and move on.
       _log('NO EASY SLOTS', {
         'remainingKm': remaining.toStringAsFixed(1),
         'note': 'week total will undershoot target — no easy days to absorb',
@@ -328,11 +361,6 @@ class WeekResolver {
     }).toList();
   }
 
-  /// Quality session distance.
-  ///   • All-fixed interval template (no percentage blocks) → intrinsic block
-  ///     sum, using experience-clamped reps (matches what WorkoutResolver runs).
-  ///   • Has percentage blocks (continuous tempo, race simulation) →
-  ///     distance-driven: recommendedPercentage × target, clamped to range.
   double _measureQualityKm({
     required WorkoutTemplate template,
     required PhaseVariant? variant,
@@ -355,8 +383,6 @@ class WeekResolver {
     return range != null ? km.clamp(range.minKm, range.maxKm) : km;
   }
 
-  /// Sum of all fixed-distance blocks (warmup + reps×repDist + jog recoveries
-  /// + cooldown), applying variant overrides and experience rep-clamping.
   double _fixedBlockDistanceKm(
     WorkoutTemplate template,
     PhaseVariant? variant,
@@ -390,8 +416,6 @@ class WeekResolver {
     return total;
   }
 
-  /// Mirrors WorkoutResolver._clampRepsForExperience so sized distance matches
-  /// the distance actually run. Keep the two in sync if the ratios change.
   int _clampReps(int reps, String level) => switch (level) {
         'beginner'     => (reps * 0.65).round().clamp(2, reps).toInt(),
         'intermediate' => (reps * 0.85).round().clamp(2, reps).toInt(),
@@ -399,7 +423,6 @@ class WeekResolver {
         _              => (reps * 0.85).round().clamp(2, reps).toInt(),
       };
 
-  /// Easy-run ceiling for the race, read from the easy_steady template range.
   double _easyMaxKm(RaceDistance race) {
     final t = WorkoutLibrary.byId('easy_steady');
     return t?.distanceByRace[race]?.maxKm ?? 10.0;
@@ -491,6 +514,10 @@ class WeekResolver {
     };
   }
 
+  // ========================================================================
+  // TEMPLATE PICKING — LADDER-AWARE
+  // ========================================================================
+
   String? _pickTemplate({
     required WorkoutIntent intent,
     required SlotType slotType,
@@ -498,6 +525,7 @@ class WeekResolver {
     required TrainingPhase phase,
     required int weekNumber,
     required List<String> recentTemplateIds,
+    required Map<String, int> ladderPositions,
   }) {
     var candidates = WorkoutLibrary.forSlot(
       intent: intent,
@@ -516,17 +544,89 @@ class WeekResolver {
     if (candidates.isEmpty) return null;
     if (candidates.length == 1) return candidates.first.id;
 
+    // ── Ladder-aware picking for intents that have a defined ladder ───────
+    final ladder = _ladderTemplateIds[intent];
+    if (ladder != null) {
+      return _pickFromLadder(
+        ladder: ladder,
+        candidates: candidates,
+        ladderPositions: ladderPositions,
+        intent: intent,
+        phase: phase,
+        raceDistance: raceDistance,
+      );
+    }
+
+    // ── Rotation-seed picking for non-ladder intents ──────────────────────
+    return _pickByRotation(
+      candidates: candidates,
+      recentTemplateIds: recentTemplateIds,
+      weekNumber: weekNumber,
+      slotType: slotType,
+      intent: intent,
+    );
+  }
+
+  /// Pick the template at the stored ladder rung, clamped to the candidates
+  /// actually available for this race/phase context.
+  ///
+  /// Example: stored index = 3 (tempo_continuous), but tempo_continuous is
+  /// not in candidates for this phase → clamp to highest available rung.
+  String _pickFromLadder({
+    required List<String> ladder,
+    required List<WorkoutTemplate> candidates,
+    required Map<String, int> ladderPositions,
+    required WorkoutIntent intent,
+    required TrainingPhase phase,
+    required RaceDistance raceDistance,
+  }) {
+    // Build an ordered list of candidate ids that appear in the ladder,
+    // preserving ladder order.
+    final candidateIds = candidates.map((t) => t.id).toSet();
+    final orderedRungs = ladder.where((id) => candidateIds.contains(id)).toList();
+
+    if (orderedRungs.isEmpty) {
+      // No ladder templates available — fall back to first candidate.
+      return candidates.first.id;
+    }
+
+    // Read stored position, clamp to available rungs.
+    final storedIndex = ladderPositions[intent.name] ?? 0;
+    final clampedIndex = storedIndex.clamp(0, orderedRungs.length - 1);
+    final picked = orderedRungs[clampedIndex];
+
+    assert(() {
+      // ignore: avoid_print
+      print('[WeekResolver] LADDER_PICK'
+          '\n  intent: ${intent.name}'
+          '\n  phase: ${phase.name}'
+          '\n  race: ${raceDistance.name}'
+          '\n  storedIndex: $storedIndex'
+          '\n  clampedIndex: $clampedIndex'
+          '\n  orderedRungs: $orderedRungs'
+          '\n  → picked: $picked');
+      return true;
+    }());
+
+    return picked;
+  }
+
+  /// Rotation-seed picking — used for non-ladder intents (aerobicBase,
+  /// endurance, speed, recovery) where there's no progression ordering.
+  String _pickByRotation({
+    required List<WorkoutTemplate> candidates,
+    required List<String> recentTemplateIds,
+    required int weekNumber,
+    required SlotType slotType,
+    required WorkoutIntent intent,
+  }) {
     final fresh = candidates.where((t) => !recentTemplateIds.contains(t.id)).toList();
 
-    // ── DEBUG: log pool details for quality slots ─────────────────────────
     assert(() {
       if (intent != WorkoutIntent.aerobicBase && intent != WorkoutIntent.recovery) {
         // ignore: avoid_print
-        print('[WeekResolver] TEMPLATE_POOL'
-            '\n  week: $weekNumber'
+        print('[WeekResolver] ROTATION_POOL'
             '\n  intent: ${intent.name}'
-            '\n  phase: ${phase.name}'
-            '\n  race: ${raceDistance.name}'
             '\n  pool(${candidates.length}): ${candidates.map((t) => t.id).join(', ')}'
             '\n  recent: ${recentTemplateIds.take(6).join(', ')}'
             '\n  fresh(${fresh.length}): ${fresh.map((t) => t.id).join(', ')}');
@@ -540,14 +640,14 @@ class WeekResolver {
       assert(() {
         if (intent != WorkoutIntent.aerobicBase && intent != WorkoutIntent.recovery) {
           // ignore: avoid_print
-          print('[WeekResolver]   → picked: $picked (seed=$seed, idx=${seed % fresh.length})');
+          print('[WeekResolver]   → picked: $picked (seed=$seed)');
         }
         return true;
       }());
       return picked;
     }
 
-    // All templates used recently — pick the one used longest ago.
+    // All used recently — pick least recently used.
     final ranked = List<WorkoutTemplate>.from(candidates);
     ranked.sort((a, b) {
       final idxA = recentTemplateIds.indexOf(a.id);

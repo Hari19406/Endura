@@ -114,6 +114,26 @@ class PostPlanState {
 class CoachEngine {
   static const double _maxSafeProgressionMultiplier = 1.0825;
 
+  // ── Ladder definitions (mirrors week_resolver.dart) ───────────────────
+  static const Map<WorkoutIntent, List<String>> _ladderTemplateIds = {
+      WorkoutIntent.threshold: [
+        'cruise_intervals_400',
+        'cruise_intervals_800',
+        'cruise_intervals_mile',
+        'tempo_continuous',
+      ],
+      WorkoutIntent.vo2max: [
+        'vo2_600',
+        'vo2_classic',
+        'vo2_1000',
+      ],
+      WorkoutIntent.raceSpecific: [
+        'race_gp_intervals',
+        'race_simulation',
+        'race_dress_rehearsal',
+      ],
+    };
+
   final message.CoachMessageBuilder _coachMessageBuilder;
   final WorkoutResolver _workoutResolver;
   final WeekResolver _weekResolver;
@@ -329,6 +349,7 @@ class CoachEngine {
       isCutbackWeek: is3to1Cutback,
       longRunDayIndex: memory.longRunDayIndex,
       experienceLevel: userMetrics.experienceLevel,
+      ladderPositions: memory.ladderPositions,      // ← wire 1: pass ladder state
     );
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
@@ -375,6 +396,7 @@ class CoachEngine {
       print('[CoachEngine] progression: ${progression.decision.name}');
       print('[CoachEngine] completionRate: ${memory.weeklyCompletionRate}');
       print('[CoachEngine] downgrades: ${memory.weeklyDowngradeCount}');
+      print('[CoachEngine] ladderPositions: ${memory.ladderPositions}');
       return true;
     }());
 
@@ -466,6 +488,7 @@ class CoachEngine {
       isCutbackWeek: false,
       longRunDayIndex: memory.longRunDayIndex,
       experienceLevel: userMetrics.experienceLevel,
+      ladderPositions: memory.ladderPositions,      // ← wire 1 (maintenance path)
     );
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
@@ -640,6 +663,7 @@ class CoachEngine {
       recentTemplateIds: memory.recentTemplateIds,
       longRunDayIndex: memory.longRunDayIndex,
       experienceLevel: userMetrics.experienceLevel,
+      ladderPositions: memory.ladderPositions,      // ← wire 1 (projection path)
     );
   }
 
@@ -718,63 +742,36 @@ class CoachEngine {
     return WorkoutType.easy;
   }
 
-  // ── Progression engine (V1 spec) ──────────────────────────────────────────
-  //
-  // Three signals only:
-  //   1. RPE trend   (decreasing / stable / increasing)
-  //   2. Completion% (completedKm / plannedKm)
-  //   3. Downgrade count (pre-run readiness reductions this week)
-  //
-  // Decision matrix:
-  //   Progress : completion ≥ 85%  AND rpe stable/decreasing  AND downgrades ≤ 1
-  //   Regress  : completion < 70%
-  //              OR (rpe increasing AND downgrades ≥ 3)
-  //              OR downgrades ≥ 4
-  //   Hold     : everything else
+  // ── Progression engine ────────────────────────────────────────────────────
 
   ProgressionProfile _progressionProfile({
     required selector.RunAnalysis runAnalysis,
     required EngineMemory memory,
   }) {
-    // ── Signal 1: RPE trend ──────────────────────────────────────────────
     final rpeTrend = runAnalysis.recentRpeTrend;
     final rpeStableOrDecreasing =
         rpeTrend == selector.RecentRpeTrend.stable ||
         rpeTrend == selector.RecentRpeTrend.decreasing;
     final rpeIncreasing = rpeTrend == selector.RecentRpeTrend.increasing;
 
-    // ── Signal 2: Completion % ───────────────────────────────────────────
-    // Uses km tracked in memory (weeklyCompletedKm / weeklyPlannedKm).
-    // Falls back to 1.0 (assume full) when no planned km recorded yet.
     final completionRate = memory.weeklyCompletionRate ?? 1.0;
-    final completionExcellentOrGood = completionRate >= 0.85; // ≥ 85%
-    final completionFair = completionRate >= 0.70 && completionRate < 0.85;
+    final completionExcellentOrGood = completionRate >= 0.85;
     final completionPoor = completionRate < 0.70;
 
-    // ── Signal 3: Downgrade history ──────────────────────────────────────
     final downgrades = memory.weeklyDowngradeCount;
-    final mostlyGreen = downgrades <= 1;   // 0–1 = positive
-    final someYellow  = downgrades == 2;   // 2   = neutral
-    final manyRed     = downgrades >= 3;   // 3+  = negative
+    final mostlyGreen = downgrades <= 1;
+    final manyRed     = downgrades >= 3;
 
-    // ── Regress ──────────────────────────────────────────────────────────
     if (completionPoor ||
         (rpeIncreasing && manyRed) ||
         downgrades >= 4) {
       return _decisionToProfile(ProgressionDecision.regress);
     }
 
-    // ── Progress ─────────────────────────────────────────────────────────
     if (completionExcellentOrGood && rpeStableOrDecreasing && mostlyGreen) {
       return _decisionToProfile(ProgressionDecision.progress);
     }
 
-    // ── Hold (everything else) ────────────────────────────────────────────
-    // Covers:
-    //   • completion 70-95% + rpe increasing
-    //   • completion 70-85% + rpe stable
-    //   • some yellow days
-    //   • unknown rpe trend (insufficient data)
     return _decisionToProfile(ProgressionDecision.hold);
   }
 
@@ -836,9 +833,10 @@ class CoachEngine {
   // ── Weekly reset ──────────────────────────────────────────────────────────
 
   /// Call this at the start of each new week (Monday) to:
-  ///   1. Store this week's decision and evaluation date into memory.
-  ///   2. Carry forward previousWeekTargetKm.
-  ///   3. Reset weeklyCompletedKm, weeklyPlannedKm, weeklyDowngradeCount.
+  ///   1. Evaluate this week's progression decision.
+  ///   2. Advance, hold, or regress ALL ladder positions by one rung.
+  ///   3. Carry forward previousWeekTargetKm.
+  ///   4. Reset weeklyCompletedKm, weeklyPlannedKm, weeklyDowngradeCount.
   ///
   /// Returns updated memory — caller must persist it.
   EngineMemory applyWeekRollover({
@@ -855,23 +853,57 @@ class CoachEngine {
       memory: memory,
     );
 
+    // ── Wire 2: advance / hold / regress all ladders ──────────────────────
+    final updatedLadderPositions = _applyLadderDecision(
+      current: memory.ladderPositions,
+      decision: profile.decision,
+    );
+
+    debugPrint('[CoachEngine] weekRollover: ${profile.decision.name} '
+        '→ ladders $updatedLadderPositions');
+
     return memory.copyWith(
       weeklyProgressionDecision: profile.decision,
       lastProgressionEvaluationDate: today,
       previousWeekTargetKm: memory.weeklyPlannedKm > 0
           ? memory.weeklyPlannedKm
           : memory.previousWeekTargetKm,
-      // Reset weekly counters
+      // Reset weekly counters.
       weeklyCompletedKm: 0.0,
       weeklyPlannedKm: nextWeekPlannedKm,
       weeklyDowngradeCount: 0,
+      // Updated ladder positions.
+      ladderPositions: updatedLadderPositions,
     );
+  }
+
+  /// Move every ladder up one rung (progress), hold, or down one rung (regress).
+  /// Each intent's index is clamped independently within [0, ladderLength - 1].
+  Map<String, int> _applyLadderDecision({
+    required Map<String, int> current,
+    required ProgressionDecision decision,
+  }) {
+    if (decision == ProgressionDecision.hold) return current;
+
+    final updated = Map<String, int>.from(current);
+
+    for (final entry in _ladderTemplateIds.entries) {
+      final intentName = entry.key.name;
+      final maxIndex = entry.value.length - 1;
+      final currentIndex = updated[intentName] ?? 0;
+
+      updated[intentName] = switch (decision) {
+        ProgressionDecision.progress => (currentIndex + 1).clamp(0, maxIndex),
+        ProgressionDecision.regress  => (currentIndex - 1).clamp(0, maxIndex),
+        ProgressionDecision.hold     => currentIndex,
+      };
+    }
+
+    return updated;
   }
 
   // ── Wiring: called after each run completes ───────────────────────────────
 
-  /// Update weekly completed km after a run is saved.
-  /// Call this from your run-save service alongside the normal memory update.
   EngineMemory recordRunCompleted({
     required EngineMemory memory,
     required double distanceKm,
@@ -881,8 +913,6 @@ class CoachEngine {
     );
   }
 
-  /// Increment downgrade count when pre-run check reduces a workout.
-  /// Call this from your pre-run check handler when readiness is yellow/red.
   EngineMemory recordPreRunDowngrade({
     required EngineMemory memory,
   }) {

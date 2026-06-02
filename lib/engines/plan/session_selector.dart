@@ -4,10 +4,9 @@
 ///   1. Is it a rest day? → return null
 ///   2. Determine day role (structural fallback only)
 ///   3. Use plannedIntent as PRIMARY driver, role as fallback
-///   4. Apply readiness gating as EXECUTION ADJUSTMENT (not replanning)
-///   5. Query library for templates WITHIN intent boundaries
-///   6. Pick best template (variety + phase fit)
-///   7. Return selection with debug log
+///   4. Query library for templates WITHIN intent boundaries
+///   5. Pick best template (variety + phase fit)
+///   6. Return selection with debug log
 ///
 /// Intent boundaries are STRICT:
 ///   aerobicBase → easy/recovery templates ONLY
@@ -16,10 +15,24 @@
 ///   vo2max      → interval templates ONLY
 ///   recovery    → recovery templates ONLY
 ///
-/// Readiness gating:
-///   GREEN  → run planned intent as-is
-///   YELLOW → downgrade within intent family (vo2max→threshold, etc.)
-///   RED    → override to recovery (only exception to intent primacy)
+/// Readiness gating (V1 Adaptation System):
+///   Readiness is NO LONGER handled here via intent swapping.
+///   WorkoutResolver reads SelectorReadiness and applies ScalingTier:
+///     green  → full volume
+///     yellow → reduced volume (~80%), same intent
+///     red    → minimum volume (~60%), same intent
+///                (or recovery override if template.supportsScaling = false
+///                 and no substitute is available)
+///
+///   The previous YELLOW → threshold downgrade and RED → recovery override
+///   have been removed. Keeping both systems active caused double-downgrading
+///   (intent swap + volume cut). WorkoutResolver is the single authority on
+///   readiness adaptation.
+///
+///   wasDowngraded is still set on the SessionSelection when the planned
+///   intent was overridden (e.g. by fallback path), so WorkoutResolver
+///   knows to recompute volume via VolumeCalculator rather than using
+///   the pre-sized plannedDistanceKm.
 library;
 
 import '../config/workout_template_library.dart';
@@ -55,7 +68,7 @@ class SelectionContext {
   final double weekPercentageSum;
 
   /// Pre-sized session distance from WeekResolver's absorber pass.
-  /// When set (and the session isn't readiness-downgraded), WorkoutResolver
+  /// When set (and the session wasn't readiness-downgraded), WorkoutResolver
   /// uses this instead of recomputing via VolumeCalculator.
   final double? plannedDistanceKm;
 
@@ -78,7 +91,7 @@ class SelectionContext {
     this.qualitySessionsDoneThisWeek = 0,
     this.longRunDoneThisWeek = false,
     this.experienceLevel = 'intermediate',
-    this.goalIntent = 'structured',  // updated default: was 'improve'
+    this.goalIntent = 'structured',
     this.weekPercentageSum = 1.0,
     this.plannedDistanceKm,
   });
@@ -134,7 +147,7 @@ class SessionSelector {
     final intentSource = context.plannedIntent != null
         ? 'plannedIntent'
         : 'roleToIntent (fallback)';
-    var intent = context.plannedIntent ?? _roleToIntent(dayRole, context);
+    final intent = context.plannedIntent ?? _roleToIntent(dayRole, context);
 
     _log('INTENT RESOLVED', {
       'source': intentSource,
@@ -143,31 +156,10 @@ class SessionSelector {
       'resolvedIntent': intent.name,
       'dayRole': dayRole.name,
       'readiness': context.readiness.name,
+      'note': 'readiness scaling handled by WorkoutResolver (ScalingTier)',
     });
 
-    // ── Step 4: Apply readiness gating ───────────────────────────────────
-    var wasDowngraded = false;
-    final originalIntent = intent;
-
-    if (context.readiness == SelectorReadiness.red) {
-      intent = WorkoutIntent.recovery;
-      wasDowngraded = true;
-      _log('READINESS GATE: RED → recovery override', {
-        'originalIntent': originalIntent.name,
-      });
-    } else if (context.readiness == SelectorReadiness.yellow) {
-      if (intent == WorkoutIntent.vo2max ||
-          intent == WorkoutIntent.speed ||
-          intent == WorkoutIntent.raceSpecific) {
-        intent = WorkoutIntent.threshold;
-        wasDowngraded = true;
-        _log('READINESS GATE: YELLOW → downgraded to threshold', {
-          'originalIntent': originalIntent.name,
-        });
-      }
-    }
-
-    // ── Step 5: Query library ─────────────────────────────────────────────
+    // ── Step 4: Query library ─────────────────────────────────────────────
     final candidates = WorkoutLibrary.forSlot(
       intent: intent,
       raceDistance: context.raceDistance,
@@ -194,6 +186,7 @@ class SessionSelector {
           template: WorkoutLibrary.byId('easy_steady')!,
           dayRole: DayRole.easyRun,
           intent: WorkoutIntent.aerobicBase,
+          wasDowngraded: true,
           reason: 'Fallback: no templates matched',
           originalPlannedIntent: context.plannedIntent,
         );
@@ -207,12 +200,13 @@ class SessionSelector {
         variant: WorkoutLibrary.getVariant(template, context.phase),
         dayRole: dayRole,
         intent: WorkoutIntent.aerobicBase,
+        wasDowngraded: true,
         reason: 'Fallback: no templates for ${intent.name}',
         originalPlannedIntent: context.plannedIntent,
       );
     }
 
-    // ── Step 6: Pick best template ────────────────────────────────────────
+    // ── Step 5: Pick best template ────────────────────────────────────────
     final template = _pickBestTemplate(candidates, context);
     final variant = WorkoutLibrary.getVariant(template, context.phase);
     final reason = _buildReason(dayRole, intent, context, intentSource);
@@ -221,7 +215,7 @@ class SessionSelector {
       'templateId': template.id,
       'templateName': template.name,
       'intent': intent.name,
-      'wasDowngraded': wasDowngraded,
+      'readiness': context.readiness.name,
       'originalPlannedIntent': context.plannedIntent?.name,
       'reason': reason,
     });
@@ -231,7 +225,7 @@ class SessionSelector {
       variant: variant,
       dayRole: dayRole,
       intent: intent,
-      wasDowngraded: wasDowngraded,
+      wasDowngraded: false,
       reason: reason,
       originalPlannedIntent: context.plannedIntent,
     );
@@ -322,7 +316,6 @@ class SessionSelector {
         if (context.phase == TrainingPhase.base) {
           return WorkoutIntent.threshold;
         }
-        // 'steady' = finish comfortably — never push into VO2 work
         if (context.goalIntent == 'steady') return WorkoutIntent.threshold;
 
         final isBeginnerEarlyBuild = context.phase == TrainingPhase.build &&
