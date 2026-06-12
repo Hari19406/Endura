@@ -1,20 +1,22 @@
-/// VolumeCalculator — determines how far each workout should be.
+/// VolumeCalculator — final km guardrail for individual sessions.
 ///
-/// Takes the athlete's weekly volume target and the selected template,
-/// then calculates the session distance.
+/// CHANGE (Archetype v1): Primary sizing path removed.
+///   Session km now comes from ArchetypeTable via WeekResolver.
+///   This calculator is now a safety clamp layer only — it applies
+///   template distance range bounds and floor minimums on top of
+///   the archetype-resolved km value.
 ///
-/// Priority chain:
-///   1. template.recommendedPercentage × weeklyTargetKm = raw distance
-///   2. PhaseVariant.volumeMultiplier scales the raw distance
-///   3. Clamp to template.distanceByRace[raceDistance] (ALWAYS wins)
-///   4. Safety cap (single-run ceiling = 40% of weekly target; long run exempt)
-///   5. Round to nearest 0.5 km
+///   The legacy percentage-based path (recommendedPercentage × weeklyTargetKm)
+///   is REMOVED. It was the root cause of the absorber distribution problem.
 ///
-/// This is independent of pace — it only answers "how far", not "how fast".
+/// Remaining responsibilities:
+///   1. Clamp session km to template.distanceByRace[race] (min/max guardrail).
+///   2. Apply floor minimums by day role (safety net for extreme scaling).
+///   3. Round to nearest 0.5 km.
 ///
-/// NOTE: When the mileage system is active, WeekResolver pre-sizes each slot
-/// (absorber model) and WorkoutResolver uses that distance directly. This
-/// calculator is the fallback path (legacy / no planned distance).
+/// The safety cap (single-run ceiling = 40% of weekly target) is also removed.
+/// The archetype table owns correct per-session proportions — the cap was only
+/// needed because percentage distribution could produce runaway values.
 library;
 
 import '../config/workout_template_library.dart';
@@ -39,14 +41,48 @@ enum DayRole {
 class VolumeCalculator {
   const VolumeCalculator();
 
-  /// Calculate the total workout distance in km for a specific session.
+  /// Clamp and validate a session distance produced by ArchetypeTable sizing.
   ///
-  /// [weeklyTargetKm]      Total km target for this week.
-  /// [template]             The selected workout template.
-  /// [raceDistance]          What the athlete is training for.
-  /// [phase]                Current training phase.
-  /// [dayRole]              What kind of day this is (for safety caps only).
-  /// [variant]              Phase variant to apply (may be null).
+  /// [archetypeKm]       The km value from ArchetypeTable (already scaled).
+  /// [template]          The selected workout template.
+  /// [raceDistance]      What the athlete is training for.
+  /// [dayRole]           What kind of day this is (for floor enforcement).
+  /// [applyTemplateMin]  Whether to enforce the template's minimum km.
+  ///                     Set false for beginners where archetype floors apply.
+  double clampSession({
+    required double archetypeKm,
+    required WorkoutTemplate template,
+    required RaceDistance raceDistance,
+    required DayRole dayRole,
+    bool applyTemplateMin = true,
+  }) {
+    var distance = archetypeKm;
+
+    // Step 1: Clamp to template's declared distance range for this race.
+    // This is the primary guardrail — the template knows what distances
+    // are sensible for each race/experience combination.
+    distance = _clampToTemplateRange(
+      distance: distance,
+      template: template,
+      raceDistance: raceDistance,
+      applyMin: applyTemplateMin,
+    );
+
+    // Step 2: Apply role-based floor minimums.
+    // These catch extreme cases where scale factor × archetype produces
+    // something too short to be a useful workout.
+    distance = _applyMinimums(distance: distance, dayRole: dayRole);
+
+    // Step 3: Round to nearest 0.5 km.
+    return _roundHalf(distance);
+  }
+
+  /// Legacy path — kept for backward compatibility with WorkoutResolver's
+  /// fallback when no archetype km is available (e.g. first-ever session
+  /// before EngineMemory has a baseline).
+  ///
+  /// Uses template.recommendedPercentage if it still exists on the template,
+  /// otherwise falls back to the template's midpoint distance range.
   double calculateWorkoutDistance({
     required double weeklyTargetKm,
     required WorkoutTemplate template,
@@ -57,20 +93,25 @@ class VolumeCalculator {
     String experienceLevel = 'intermediate',
     double weekPercentageSum = 1.0,
   }) {
-    // Step 1: Normalize this session's share of the weekly target.
-    // weekPercentageSum = sum of all selected templates' recommendedPercentage
-    // this week. Dividing gives the true proportional slice of the pie.
-    final normalizedPct = weekPercentageSum > 0
-        ? template.recommendedPercentage / weekPercentageSum
-        : template.recommendedPercentage;
-    var distance = weeklyTargetKm * normalizedPct;
+    // Use midpoint of template's distance range as a clean fallback.
+    final range = template.distanceByRace[raceDistance];
+    double distance;
 
-    // Step 2: Apply phase variant volume multiplier.
-    if (variant != null) {
-      distance *= variant.volumeMultiplier;
+    if (range != null) {
+      distance = (range.minKm + range.maxKm) / 2;
+    } else {
+      // Absolute last resort — shouldn't happen with a well-formed template.
+      distance = switch (dayRole) {
+        DayRole.longRun          => weeklyTargetKm * 0.32,
+        DayRole.primaryQuality   => weeklyTargetKm * 0.18,
+        DayRole.secondaryQuality => weeklyTargetKm * 0.15,
+        DayRole.easyRun          => weeklyTargetKm * 0.18,
+        DayRole.recovery         => weeklyTargetKm * 0.10,
+      };
     }
 
-    // Step 3: Clamp to template's distance range for this race (ALWAYS wins).
+    if (variant != null) distance *= variant.volumeMultiplier;
+
     distance = _clampToTemplateRange(
       distance: distance,
       template: template,
@@ -78,24 +119,15 @@ class VolumeCalculator {
       applyMin: experienceLevel != 'beginner',
     );
 
-    // Step 4: Safety caps.
-    distance = _applySafetyCaps(
-      distance: distance,
-      dayRole: dayRole,
-      weeklyTargetKm: weeklyTargetKm,
-    );
-
-    // Step 5: Apply minimums.
     distance = _applyMinimums(distance: distance, dayRole: dayRole);
 
-    // Step 6: Round to nearest 0.5 km.
     return _roundHalf(distance);
   }
 
-  /// Clamp distance to the template's declared range for this race distance.
-  ///
-  /// This is the primary guardrail. The template knows what distances
-  /// are sensible for each race — we never exceed those bounds.
+  // ==========================================================================
+  // PRIVATE HELPERS
+  // ==========================================================================
+
   double _clampToTemplateRange({
     required double distance,
     required WorkoutTemplate template,
@@ -108,29 +140,6 @@ class VolumeCalculator {
     return distance.clamp(min, range.maxKm);
   }
 
-  /// Safety caps to prevent dangerous volume jumps.
-  double _applySafetyCaps({
-    required double distance,
-    required DayRole dayRole,
-    required double weeklyTargetKm,
-  }) {
-    // Single-run ceiling: no individual run should exceed ~40% of the week's
-    // total volume. This replaces the old "longest recent run × 1.15" brake —
-    // it needs no run history, is correct from week one (no hardcoded 5km
-    // fallback), and scales automatically as weekly volume grows.
-    //
-    // The long run is exempt: it is *meant* to be the week's biggest run, and
-    // is bounded instead by its template max and the weekly progression ramp
-    // in WeeklyVolumeResolver.
-    if (dayRole != DayRole.longRun && weeklyTargetKm > 0) {
-      final safeMax = weeklyTargetKm * 0.40;
-      if (distance > safeMax) distance = safeMax;
-    }
-
-    return distance;
-  }
-
-  /// Minimum distances — workouts shouldn't be too short to be useful.
   double _applyMinimums({
     required double distance,
     required DayRole dayRole,

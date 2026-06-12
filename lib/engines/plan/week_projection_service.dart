@@ -5,19 +5,21 @@
 ///   Future → projection only (selector → pace → volume, NO scaler)
 ///   Past   → actual logged data from run history
 ///
-/// CHANGE FROM v1: No longer duplicates template resolution logic.
-/// Delegates to WorkoutResolver.resolveTemplate() for consistency.
-/// Uses PaceTable + ResolverContext instead of PaceResolver + AthletePaceProfile.
+/// CHANGE (Archetype v2): GoalMode removed.
+///   projectWeek() no longer accepts goalMode — WeekResolver.resolve()
+///   no longer needs it. ExperienceLevel still required.
 library;
 
 import 'session_selector.dart';
 import 'volume_calculator.dart';
 import 'workout_resolver.dart';
+import 'week_resolver.dart';
 import '../config/workout_template_library.dart';
+import '../config/archetype_table.dart';
 import '../daily/dynamic_scaler.dart';
 import '../../models/training_phase.dart';
+import '../../models/race_plan.dart';
 import '../../utils/stats.dart' show RunHistory;
-
 
 // ============================================================================
 // OUTPUT MODELS
@@ -92,16 +94,19 @@ class WeekProjectionService {
   final VolumeCalculator _volumeCalculator;
   final WorkoutResolver _resolver;
   final DynamicScaler _scaler;
+  final WeekResolver _weekResolver;
 
   const WeekProjectionService({
     SessionSelector? selector,
     VolumeCalculator? volumeCalculator,
     WorkoutResolver? resolver,
     DynamicScaler? scaler,
+    WeekResolver? weekResolver,
   })  : _selector = selector ?? const SessionSelector(),
         _volumeCalculator = volumeCalculator ?? const VolumeCalculator(),
         _resolver = resolver ?? const WorkoutResolver(),
-        _scaler = scaler ?? const DynamicScaler();
+        _scaler = scaler ?? const DynamicScaler(),
+        _weekResolver = weekResolver ?? const WeekResolver();
 
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -114,12 +119,20 @@ class WeekProjectionService {
     required RaceDistance raceDistance,
     required double weeklyTargetKm,
     required List<RunHistory> completedRuns,
+
+    // Archetype inputs.
+    required ExperienceLevel experienceLevel,
+    required WeekTarget weekTarget,
+    bool isCutbackWeek = false,
+    int taperWeekNumber = 1,
+
     WorkoutIntent? lastCompletedIntent,
     String? lastCompletedTemplateId,
     int daysSinceLastQuality = 999,
     int daysSinceLastLongRun = 999,
     double? avgRpe,
     double weeklyVolumeCompletedKm = 0.0,
+    Map<String, int> ladderPositions = const {},
     DateTime? now,
   }) {
     final today = now ?? DateTime.now();
@@ -129,6 +142,19 @@ class WeekProjectionService {
       currentMonday.year,
       currentMonday.month,
       currentMonday.day,
+    );
+
+    // Resolve archetype week shape once for all training days.
+    final weekResolution = _weekResolver.resolve(
+      weekTarget: weekTarget,
+      trainingDayIndices: trainingDayIndices,
+      raceDistance: raceDistance,
+      phase: phase,
+      weekNumber: weekNumber,
+      isCutbackWeek: isCutbackWeek,
+      experienceLevel: experienceLevel,
+      currentWeeklyKm: weeklyTargetKm,
+      ladderPositions: ladderPositions,
     );
 
     final projectedDays = <ProjectedDay>[];
@@ -149,10 +175,9 @@ class WeekProjectionService {
       );
       final isTrainingDay = trainingDayIndices.contains(dayIdx);
 
-      // ── PAST: use actual logged data ─────────────────────────────────
+      // ── PAST ─────────────────────────────────────────────────────────
       if (isPast) {
         final run = _findRunOnDate(completedRuns, dayDate);
-
         if (run != null) {
           final intent = _intentFromWorkoutType(run.workoutType);
           projectedDays.add(ProjectedDay(
@@ -186,7 +211,7 @@ class WeekProjectionService {
         continue;
       }
 
-      // ── REST DAY ─────────────────────────────────────────────────────
+      // ── REST DAY ──────────────────────────────────────────────────────
       if (!isTrainingDay) {
         projectedDays.add(ProjectedDay(
           date: dayDate,
@@ -199,7 +224,11 @@ class WeekProjectionService {
         continue;
       }
 
-      // ── TODAY or FUTURE: resolve via pipeline ────────────────────────
+      // ── TODAY or FUTURE ───────────────────────────────────────────────
+      final archetypeSlot  = weekResolution.slotFor(dayIdx);
+      final slotDistanceKm = archetypeSlot?.distanceKm;
+      final plannedIntent  = archetypeSlot?.intent;
+
       final selectionContext = SelectionContext(
         raceDistance: raceDistance,
         phase: phase,
@@ -211,11 +240,13 @@ class WeekProjectionService {
         daysSinceLastLongRun: runningDaysSinceLong,
         lastCompletedTemplateId: runningLastTemplateId,
         lastCompletedIntent: runningLastIntent,
-        plannedIntent: null,
+        plannedIntent: plannedIntent,
         weekNumber: weekNumber,
         avgRpe: avgRpe,
         weeklyVolumeCompletedKm: weeklyVolumeCompletedKm,
         weeklyTargetKm: weeklyTargetKm,
+        weekPercentageSum: 1.0,
+        plannedDistanceKm: slotDistanceKm,
       );
 
       final selection = _selector.select(selectionContext);
@@ -232,17 +263,22 @@ class WeekProjectionService {
         continue;
       }
 
-      // Calculate distance
-      final workoutDistance = _volumeCalculator.calculateWorkoutDistance(
-        weeklyTargetKm: weeklyTargetKm,
-        template: selection.template,
-        raceDistance: raceDistance,
-        phase: phase,
-        dayRole: selection.dayRole,
-        variant: selection.variant,
-      );
+      final workoutDistance = slotDistanceKm != null
+          ? _volumeCalculator.clampSession(
+              archetypeKm: slotDistanceKm,
+              template: selection.template,
+              raceDistance: raceDistance,
+              dayRole: selection.dayRole,
+            )
+          : _volumeCalculator.calculateWorkoutDistance(
+              weeklyTargetKm: weeklyTargetKm,
+              template: selection.template,
+              raceDistance: raceDistance,
+              phase: phase,
+              dayRole: selection.dayRole,
+              variant: selection.variant,
+            );
 
-      // Resolve template → ResolvedWorkout via WorkoutResolver
       final resolvedWorkout = _resolver.resolveTemplate(
         template: selection.template,
         variant: selection.variant,
@@ -252,7 +288,6 @@ class WeekProjectionService {
         intent: selection.intent,
       );
 
-      // Apply scaler ONLY for today
       final finalWorkout = isToday
           ? _scaler.scale(resolvedWorkout, scalingSignals).workout
           : resolvedWorkout;
@@ -275,10 +310,9 @@ class WeekProjectionService {
       runningLastTemplateId = selection.template.id;
       runningDaysSinceQuality =
           _isQualityIntent(selection.intent) ? 0 : runningDaysSinceQuality + 1;
-      runningDaysSinceLong =
-          selection.intent == WorkoutIntent.endurance
-              ? 0
-              : runningDaysSinceLong + 1;
+      runningDaysSinceLong = selection.intent == WorkoutIntent.endurance
+          ? 0
+          : runningDaysSinceLong + 1;
     }
 
     return WeekProjection(
@@ -306,17 +340,15 @@ class WeekProjectionService {
     return null;
   }
 
-  WorkoutIntent? _intentFromWorkoutType(String? type) {
-    return switch (type) {
-      'easy'      => WorkoutIntent.aerobicBase,
-      'tempo'     => WorkoutIntent.threshold,
-      'threshold' => WorkoutIntent.threshold,
-      'interval'  => WorkoutIntent.vo2max,
-      'long'      => WorkoutIntent.endurance,
-      'recovery'  => WorkoutIntent.recovery,
-      _           => null,
-    };
-  }
+  WorkoutIntent? _intentFromWorkoutType(String? type) => switch (type) {
+        'easy'      => WorkoutIntent.aerobicBase,
+        'tempo'     => WorkoutIntent.threshold,
+        'threshold' => WorkoutIntent.threshold,
+        'interval'  => WorkoutIntent.vo2max,
+        'long'      => WorkoutIntent.endurance,
+        'recovery'  => WorkoutIntent.recovery,
+        _           => null,
+      };
 }
 
 bool _isQualityIntent(WorkoutIntent? intent) {

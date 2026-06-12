@@ -45,8 +45,9 @@ class WeeklyVolumeResolver {
     ProgressionDecision? decision,
     bool is3to1Cutback,
   ) {
-    // 3:1 hard cutback always wins
-    if (is3to1Cutback) return 0.70;
+    // 3:1 hard cutback: WeekResolver owns the 0.70 multiplier.
+    // Return 1.0 so the caller passes the un-reduced volume to WeekResolver.
+    if (is3to1Cutback) return 1.0;
 
     // RPE-driven cutback
     if (decision == ProgressionDecision.regress) return 0.80;

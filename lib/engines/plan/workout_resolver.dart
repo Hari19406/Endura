@@ -9,26 +9,11 @@
 /// Input:  SelectionContext + PaceTable + ScalingSignals
 /// Output: ResolvedWorkout (ready for display) or null (rest day)
 ///
-/// CHANGE FROM v1: PaceResolver (6 generic zones) replaced by
-/// PaceTable (18 specific zones). AthletePaceProfile removed entirely —
-/// the PaceTable already has CS baked in.
-///
-/// CHANGE (Phase 3b): when SelectionContext carries a pre-sized
-/// plannedDistanceKm (from WeekResolver's absorber pass) and the session was
-/// not readiness-downgraded, that distance is used directly. VolumeCalculator
-/// is the fallback path only.
-///
-/// CHANGE (V1 Adaptation System): ScalingTier introduced.
-///   green  → full (no change)
-///   yellow → reduced (80% reps / 80% distance / 85% long run)
-///   red    → minimum (62% reps / 60% distance / 70% long run)
-///
-/// Templates with supportsScaling = false (vo2_ladder, vo2_pyramid,
-/// race_simulation, race_dress_rehearsal) are substituted with a simpler
-/// same-intent template instead of scaled.
-///
-/// Minimum rep floor: 3 reps. Continuous distance floor: 2.0 km.
-/// Distance rounded to practical 0.5 km increments.
+/// v4: DurationType.fixedSeconds support added.
+///   Hill sprints and hill repeats use time-based blocks.
+///   _calculateFixedDistance estimates km at 5:30/km for budget only.
+///   _resolveBlock passes durationSeconds to ResolvedBlock for display.
+///   Recovery distance never counted anywhere — timing only.
 library;
 
 import '../config/workout_template_library.dart';
@@ -50,7 +35,7 @@ enum ScalingTier {
 }
 
 // ============================================================================
-// RESOLVER CONTEXT — everything the resolver needs to produce a workout
+// RESOLVER CONTEXT
 // ============================================================================
 
 class ResolverContext {
@@ -109,13 +94,12 @@ class WorkoutResolver {
   final DynamicScaler _scaler;
 
   static const double _maxQualityFraction = 0.40;
-
-  /// Minimum reps for any interval block after scaling.
-  /// Below this the workout loses its stimulus purpose.
   static const int _minIntervalReps = 3;
-
-  /// Minimum continuous main-block distance after scaling (km).
   static const double _minContinuousKm = 2.0;
+
+  /// Conservative hill pace for budget estimation: 5:30/km = 330 s/km.
+  /// Used only for fixedSeconds blocks — display always shows seconds.
+  static const double _hillPaceSecPerKm = 330.0;
 
   const WorkoutResolver({
     SessionSelector? selector,
@@ -130,18 +114,11 @@ class WorkoutResolver {
     required ResolverContext resolverContext,
     required ScalingSignals scalingSignals,
   }) {
-    // ── Step 1: Derive scaling tier from readiness ────────────────────────
     final tier = _tierFromReadiness(selectionContext.readiness);
 
-    // ── Step 2: Select template ───────────────────────────────────────────
-    // If tier != full and the selected template doesn't support scaling,
-    // SessionSelector still runs normally — we swap the template afterwards.
     var selection = _selector.select(selectionContext);
-    if (selection == null) {
-      return const ResolverResult.rest();
-    }
+    if (selection == null) return const ResolverResult.rest();
 
-    // ── Step 3: Substitute non-scalable templates when under-readiness ────
     final adjustments = <String>[];
     if (tier != ScalingTier.full && !selection.template.supportsScaling) {
       final substitute = _substituteTemplate(
@@ -165,10 +142,6 @@ class WorkoutResolver {
       }
     }
 
-    // ── Step 4: Total workout distance ────────────────────────────────────
-    // Prefer the pre-sized distance from WeekResolver's absorber pass. Only
-    // recompute via VolumeCalculator if there's no planned distance or the
-    // session was readiness-downgraded (the planned size no longer applies).
     final usePlanned = !selection.wasDowngraded &&
         selectionContext.plannedDistanceKm != null;
     var totalDistanceKm = usePlanned
@@ -184,9 +157,6 @@ class WorkoutResolver {
             weekPercentageSum: selectionContext.weekPercentageSum,
           );
 
-    // Apply long-run distance scaling (endurance slots only).
-    // Interval/continuous scaling happens inside resolveTemplate at the
-    // block level, not at the total-distance level.
     if (selection.intent == WorkoutIntent.endurance && tier != ScalingTier.full) {
       final scaled = _scaleLongRunDistance(totalDistanceKm, tier);
       if (scaled != totalDistanceKm) {
@@ -198,7 +168,6 @@ class WorkoutResolver {
       }
     }
 
-    // ── Step 5: Resolve blocks with real paces and distances ─────────────
     final resolvedWorkout = resolveTemplate(
       template: selection.template,
       variant: selection.variant,
@@ -211,7 +180,6 @@ class WorkoutResolver {
       scalingAdjustments: adjustments,
     );
 
-    // ── Step 6: Scale for readiness/RPE (DynamicScaler) ──────────────────
     final scaled = _scaler.scale(resolvedWorkout, scalingSignals);
 
     return ResolverResult(
@@ -223,15 +191,6 @@ class WorkoutResolver {
     );
   }
 
-  /// Resolve a template + variant into a ResolvedWorkout.
-  ///
-  /// Public so WeekProjectionService can call it directly without
-  /// going through the full resolve() pipeline.
-  ///
-  /// Budget-first distance allocation:
-  ///   1. Calculate total fixed distance (fixedKm blocks + reps + recovery)
-  ///   2. Subtract from totalDistanceKm → flexible budget
-  ///   3. Percentage blocks split the flexible budget
   ResolvedWorkout resolveTemplate({
     required WorkoutTemplate template,
     required PhaseVariant? variant,
@@ -252,7 +211,6 @@ class WorkoutResolver {
         .fold(0.0, (sum, b) => sum + b.value);
 
     final resolvedBlocks = <ResolvedBlock>[];
-
     for (final block in template.blocks) {
       resolvedBlocks.add(_resolveBlock(
         block: block,
@@ -290,8 +248,6 @@ class WorkoutResolver {
         SelectorReadiness.red    => ScalingTier.minimum,
       };
 
-  /// Scale interval reps according to tier.
-  /// Never goes below [_minIntervalReps].
   int _scaleReps(int reps, ScalingTier tier) {
     final scaled = switch (tier) {
       ScalingTier.full    => reps,
@@ -301,8 +257,6 @@ class WorkoutResolver {
     return scaled.clamp(_minIntervalReps, reps);
   }
 
-  /// Scale a continuous main-block distance according to tier.
-  /// Rounds to 0.5 km increments and floors at [_minContinuousKm].
   double _scaleContinuousDistance(double km, ScalingTier tier) {
     if (tier == ScalingTier.full) return km;
     final scaled = switch (tier) {
@@ -313,7 +267,6 @@ class WorkoutResolver {
     return _roundToPractical(scaled).clamp(_minContinuousKm, km);
   }
 
-  /// Scale a long-run total distance according to tier.
   double _scaleLongRunDistance(double km, ScalingTier tier) {
     if (tier == ScalingTier.full) return km;
     final scaled = switch (tier) {
@@ -324,28 +277,18 @@ class WorkoutResolver {
     return _roundToPractical(scaled);
   }
 
-  /// Round to the nearest 0.5 km, minimum 2.0 km.
   double _roundToPractical(double km) {
     final rounded = (km * 2).round() / 2.0;
     return rounded < _minContinuousKm ? _minContinuousKm : rounded;
   }
 
-  /// Detect whether a template's main block is interval-based (has reps)
-  /// or continuous (percentage / fixed distance without reps).
   bool _templateIsIntervalBased(WorkoutTemplate template) =>
       template.blocks.any((b) => b.type == BlockType.main && b.reps != null);
 
-  /// Find a simpler scalable substitute in the same intent pool.
-  ///
-  /// Fallback map (spec §3 "unsupported workouts"):
-  ///   vo2_ladder   / vo2_pyramid   → vo2_classic (800m) or vo2_600
-  ///   race_simulation              → race_gp_intervals
-  ///   race_dress_rehearsal         → race_gp_intervals
   WorkoutTemplate? _substituteTemplate({
     required WorkoutTemplate original,
     required SelectionContext selectionContext,
   }) {
-    // Preferred substitute ids by original id.
     final preferredIds = switch (original.id) {
       'vo2_ladder'           => ['vo2_classic', 'vo2_600'],
       'vo2_pyramid'          => ['vo2_classic', 'vo2_600'],
@@ -364,7 +307,6 @@ class WorkoutResolver {
       }
     }
 
-    // Generic fallback: any scalable template in the same intent pool.
     final pool = WorkoutLibrary.forSlot(
       intent: original.intent,
       raceDistance: selectionContext.raceDistance,
@@ -378,7 +320,8 @@ class WorkoutResolver {
   // PACE RESOLUTION
   // ========================================================================
 
-  ResolvedPace _resolvePaceZone(PaceZone zone, ResolverContext context, WorkoutIntent intent) {
+  ResolvedPace _resolvePaceZone(
+      PaceZone zone, ResolverContext context, WorkoutIntent intent) {
     if (_isGoalPaceZone(zone)) {
       if (context.hasGoalPace) {
         return context.paceTable.resolveGoalPace(
@@ -386,7 +329,6 @@ class WorkoutResolver {
           targetTimeSeconds: context.goalRaceTimeSeconds!,
         );
       }
-      // Long run goal pace blocks fall back to marathon pace, not tempo
       if (intent == WorkoutIntent.endurance) {
         return context.paceTable.resolve(PaceZone.marathonPace);
       }
@@ -395,18 +337,16 @@ class WorkoutResolver {
     return context.paceTable.resolve(zone);
   }
 
-  bool _isGoalPaceZone(PaceZone zone) {
-    return zone == PaceZone.goalPace ||
-        zone == PaceZone.raceSimulation ||
-        zone == PaceZone.dressRehearsal;
-  }
+  bool _isGoalPaceZone(PaceZone zone) =>
+      zone == PaceZone.goalPace ||
+      zone == PaceZone.raceSimulation ||
+      zone == PaceZone.dressRehearsal;
 
   // ========================================================================
   // QUALITY CAP
   // ========================================================================
 
-  void _enforceQualityCap(
-      List<ResolvedBlock> blocks, double totalDistanceKm) {
+  void _enforceQualityCap(List<ResolvedBlock> blocks, double totalDistanceKm) {
     var qualityKm = 0.0;
     final qualityIndices = <int>[];
 
@@ -419,7 +359,6 @@ class WorkoutResolver {
     }
 
     if (qualityKm <= 0 || totalDistanceKm <= 0) return;
-
     final qualityFraction = qualityKm / totalDistanceKm;
     if (qualityFraction <= _maxQualityFraction) return;
 
@@ -434,6 +373,7 @@ class WorkoutResolver {
       blocks[i] = ResolvedBlock(
         type: b.type,
         distanceKm: newDistance,
+        durationSeconds: b.durationSeconds,
         paceMinSecondsPerKm: b.paceMinSecondsPerKm,
         paceMaxSecondsPerKm: b.paceMaxSecondsPerKm,
         isRpeOnly: b.isRpeOnly,
@@ -450,6 +390,7 @@ class WorkoutResolver {
           blocks[i] = ResolvedBlock(
             type: blocks[i].type,
             distanceKm: _roundSmart(blocks[i].distanceKm + excessKm),
+            durationSeconds: blocks[i].durationSeconds,
             paceMinSecondsPerKm: blocks[i].paceMinSecondsPerKm,
             paceMaxSecondsPerKm: blocks[i].paceMaxSecondsPerKm,
             label: blocks[i].label,
@@ -471,6 +412,17 @@ class WorkoutResolver {
     for (final block in blocks) {
       if (block.durationType == DurationType.percentage) continue;
 
+      // fixedSeconds: estimate km from duration at conservative hill pace.
+      // Budget only — display shows seconds not km.
+      if (block.durationType == DurationType.fixedSeconds) {
+        final seconds = variant?.repDurationSeconds ?? block.value;
+        final reps = block.reps != null ? (variant?.reps ?? block.reps!) : 1;
+        total += (seconds / _hillPaceSecPerKm) * reps;
+        // No recovery distance — jog-down captured in recoverySeconds only.
+        continue;
+      }
+
+      // fixedKm path.
       double blockKm;
       if (block.type == BlockType.main && variant?.repDistanceKm != null) {
         blockKm = variant!.repDistanceKm!;
@@ -483,12 +435,7 @@ class WorkoutResolver {
 
       final reps = (block.reps != null) ? (variant?.reps ?? block.reps!) : 1;
       total += blockKm * reps;
-
-      if (block.recoveryMeters != null && reps > 1) {
-        final recoveryKm =
-            (variant?.recoveryMeters ?? block.recoveryMeters!) / 1000.0;
-        total += recoveryKm * (reps - 1);
-      }
+      // Recovery distance intentionally excluded — timing only.
     }
 
     return total;
@@ -511,6 +458,8 @@ class WorkoutResolver {
   }) {
     // ── Distance ─────────────────────────────────────────────────────────
     double distanceKm;
+    int? durationSeconds;
+
     switch (block.durationType) {
       case DurationType.fixedKm:
         if (block.type == BlockType.main && variant?.repDistanceKm != null) {
@@ -521,16 +470,22 @@ class WorkoutResolver {
         } else {
           distanceKm = block.value;
         }
-        break;
+
+      case DurationType.fixedSeconds:
+        // Time-based block. Store seconds for display; estimate km for budget.
+        final seconds = (variant?.repDurationSeconds ?? block.value).round();
+        durationSeconds = seconds;
+        distanceKm = seconds / _hillPaceSecPerKm;
+
       case DurationType.percentage:
         final normalizedFraction =
             percentSum > 0 ? block.value / percentSum : 1.0;
         distanceKm = flexibleBudgetKm * normalizedFraction;
-        break;
     }
 
     // ── Pace ─────────────────────────────────────────────────────────────
-    final resolvedPace = _resolvePaceZone(block.paceZone, resolverContext, intent);
+    final resolvedPace =
+        _resolvePaceZone(block.paceZone, resolverContext, intent);
 
     // ── Reps ─────────────────────────────────────────────────────────────
     int? reps;
@@ -538,14 +493,15 @@ class WorkoutResolver {
       final raw = variant?.reps ?? block.reps!;
       final experienceClamped = _clampRepsForExperience(raw, experienceLevel);
 
-      // Apply scaling tier to rep-based main blocks only.
       if (block.type == BlockType.main && scalingTier != ScalingTier.full) {
         final beforeScale = experienceClamped;
         reps = _scaleReps(experienceClamped, scalingTier);
         if (reps != beforeScale) {
+          final label = durationSeconds != null
+              ? '${durationSeconds}s rep'
+              : '${(distanceKm * 1000).round()}m';
           scalingAdjustments?.add(
-            'Reps scaled: $beforeScale → $reps '
-            '× ${(distanceKm * 1000).round()}m (${scalingTier.name})',
+            'Reps scaled: $beforeScale → $reps × $label (${scalingTier.name})',
           );
         }
       } else {
@@ -553,10 +509,10 @@ class WorkoutResolver {
       }
     }
 
-    // ── Continuous block scaling (percentage / fixed main, no reps) ───────
-    // Applied to warmup/cooldown intentionally excluded — only main blocks.
+    // ── Continuous block scaling (no reps, not time-based) ────────────────
     if (block.type == BlockType.main &&
         reps == null &&
+        durationSeconds == null &&
         scalingTier != ScalingTier.full) {
       final beforeScale = distanceKm;
       distanceKm = _scaleContinuousDistance(distanceKm, scalingTier);
@@ -569,6 +525,8 @@ class WorkoutResolver {
     }
 
     // ── Recovery ─────────────────────────────────────────────────────────
+    // recoveryMeters kept for formattedRecovery conversion (→ seconds at 360s/km).
+    // Never contributes to any distance calculation.
     final int? resolvedRecoverySeconds =
         variant?.recoverySeconds ?? block.recoverySeconds;
     final double? resolvedRecoveryMeters =
@@ -577,6 +535,7 @@ class WorkoutResolver {
     return ResolvedBlock(
       type: block.type,
       distanceKm: _roundSmart(distanceKm),
+      durationSeconds: durationSeconds,
       paceMinSecondsPerKm: resolvedPace.minSecondsPerKm,
       paceMaxSecondsPerKm: resolvedPace.maxSecondsPerKm,
       isRpeOnly: resolvedPace.isRpeOnly,

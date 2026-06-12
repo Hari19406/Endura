@@ -2,6 +2,21 @@ import 'dart:math';
 import '../../models/race_plan.dart';
 import '../../models/training_phase.dart';
 
+/// RacePlanBuilder — builds a WeekTarget list for the engine.
+///
+/// TAPER VOLUME:
+///   RacePlanBuilder passes peakVolume as targetKm for taper weeks.
+///   WeekResolver._taperMultiplier() owns the actual taper reduction.
+///   No double-scaling.
+///
+/// CUTBACK WEEKS:
+///   targetKm stores the UN-reduced build volume (same as a normal week).
+///   WeekResolver owns the 0.70 multiplier — same pattern as taper.
+///   All sessions kept — structure unchanged.
+///
+/// PEAK VOLUME:
+///   Capped at current + (buildWeeks × maxSafeWeeklyGain) rather than
+///   an arbitrary floor × multiplier. Physiologically honest progression.
 class RacePlanBuilder {
   static RacePlan build({
     required double currentWeeklyKm,
@@ -15,7 +30,7 @@ class RacePlanBuilder {
 
     if (weeksOut < 4) {
       return _buildMinimalPlan(
-        currentWeeklyKm: currentWeeklyKm, 
+        currentWeeklyKm: currentWeeklyKm,
         goalRace: goalRace,
         raceDate: raceDate,
         experienceLevel: experienceLevel,
@@ -24,60 +39,68 @@ class RacePlanBuilder {
       );
     }
 
-    final taperWeeks = _taperWeeksFor(goalRace);
-    final peakVolume = _peakVolume(goalRace, experienceLevel, currentWeeklyKm);
-    final buildWeeks = weeksOut - taperWeeks;
+    final taperWeeks  = _taperWeeksFor(goalRace);
+    final buildWeeks  = max(1, weeksOut - taperWeeks);
 
-    final rawIncrement = (peakVolume - currentWeeklyKm) / max(1, buildWeeks);
-    final maxIncrement = currentWeeklyKm * 0.10;
-    final safeIncrement = rawIncrement.clamp(-5.0, max(1.5, maxIncrement));
+    // Peak volume: physiologically honest — current + safe weekly gain over
+    // build weeks, capped by a race/experience ceiling.
+    final peakVolume  = _peakVolume(
+      goalRace: goalRace,
+      experienceLevel: experienceLevel,
+      currentWeeklyKm: currentWeeklyKm,
+      buildWeeks: buildWeeks,
+    );
 
-    final peakLongRunKm = _peakLongRunKm(goalRace, experienceLevel);
+    final rawIncrement    = (peakVolume - currentWeeklyKm) / buildWeeks;
+    final maxIncrement    = currentWeeklyKm * 0.10;
+    final safeIncrement   = rawIncrement.clamp(-5.0, max(1.5, maxIncrement));
+
+    final peakLongRunKm   = _peakLongRunKm(goalRace, experienceLevel);
     final currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
-    final longRunIncrement =
-        (peakLongRunKm - currentLongRunKm) / max(1, buildWeeks);
+    final longRunIncrement = (peakLongRunKm - currentLongRunKm) / buildWeeks;
     final safeLongRunIncrement =
         longRunIncrement.clamp(-2.0, currentLongRunKm * 0.10);
 
-    final weeks = <WeekTarget>[];
-    var volume = currentWeeklyKm;
+    final weeks  = <WeekTarget>[];
+    var volume   = currentWeeklyKm;
     var longRunKm = currentLongRunKm;
 
     for (var w = 1; w <= weeksOut; w++) {
       final phase = _phaseFor(w, weeksOut, taperWeeks);
 
-      if ((phase == TrainingPhase.base || phase == TrainingPhase.build) &&
+      // ── Cutback weeks (3:1 cycle) ─────────────────────────────────────
+      // Keep all sessions including long run. Volume via 0.70 multiplier.
+      if ((phase == TrainingPhase.base || phase == TrainingPhase.build ||
+               phase == TrainingPhase.peak) &&
           w % 4 == 0) {
         weeks.add(_buildWeek(
           week: w,
-          targetKm: volume * 0.70,
+          targetKm: volume,
           phase: phase,
           goalRace: goalRace,
           experienceLevel: experienceLevel,
-          longRunKm: longRunKm * 0.75,
+          longRunKm: longRunKm,
           isDeload: true,
         ));
         continue;
       }
 
+      // ── Taper weeks ───────────────────────────────────────────────────
+      // Pass peakVolume — WeekResolver._taperMultiplier() handles reduction.
       if (phase == TrainingPhase.taper) {
-        final taperWeek = w - (weeksOut - taperWeeks);
-        final taperFactor = 1.0 - (taperWeek * (0.5 / max(1, taperWeeks)));
-        final taperVolume = peakVolume * taperFactor.clamp(0.4, 1.0);
-        final taperLongRun =
-            (peakLongRunKm * (taperFactor + 0.1).clamp(0.5, 0.8));
         weeks.add(_buildWeek(
           week: w,
-          targetKm: taperVolume,
+          targetKm: peakVolume,
           phase: phase,
           goalRace: goalRace,
           experienceLevel: experienceLevel,
-          longRunKm: taperLongRun,
+          longRunKm: peakLongRunKm,
           isDeload: false,
         ));
         continue;
       }
 
+      // ── Normal progression weeks ──────────────────────────────────────
       volume = (volume + safeIncrement).clamp(
         currentWeeklyKm * 0.5,
         peakVolume,
@@ -112,7 +135,7 @@ class RacePlanBuilder {
     required double fourWeekAvgKm,
     required String experienceLevel,
   }) {
-    final target = fourWeekAvgKm <= 0 ? 15.0 : fourWeekAvgKm;
+    final target   = fourWeekAvgKm <= 0 ? 15.0 : fourWeekAvgKm;
     final longRunKm = max(5.0, target * 0.30);
     return WeekTarget(
       week: 1,
@@ -125,6 +148,10 @@ class RacePlanBuilder {
     );
   }
 
+  // ============================================================================
+  // PRIVATE HELPERS
+  // ============================================================================
+
   static WeekTarget _buildWeek({
     required int week,
     required double targetKm,
@@ -134,9 +161,9 @@ class RacePlanBuilder {
     required double longRunKm,
     required bool isDeload,
   }) {
-    final qualityCount = _qualityCount(phase, experienceLevel, isDeload);
-    final hasLongRun = _shouldHaveLongRun(phase, goalRace, isDeload);
-    final keySession = _keySession(phase, goalRace);
+    final qualityCount   = _qualityCount(phase, experienceLevel, isDeload);
+    final hasLongRun     = _shouldHaveLongRun(phase, goalRace);
+    final keySession     = _keySession(phase, goalRace);
     final adjustedLongRun = hasLongRun ? _roundHalf(longRunKm) : 0.0;
 
     return WeekTarget(
@@ -150,11 +177,10 @@ class RacePlanBuilder {
     );
   }
 
-  static int _qualityCount(
-      TrainingPhase phase, String level, bool isDeload) {
-    if (isDeload) return phase == TrainingPhase.build ? 1 : 0;
+  static int _qualityCount(TrainingPhase phase, String level, bool isDeload) {
+    if (isDeload) return 1; // cutback always keeps Q1
     return switch (phase) {
-      TrainingPhase.base        => level == 'advanced' ? 1 : 0,
+      TrainingPhase.base        => 1,
       TrainingPhase.build       => level == 'beginner' ? 1 : 2,
       TrainingPhase.peak        => 2,
       TrainingPhase.taper       => 1,
@@ -162,9 +188,9 @@ class RacePlanBuilder {
     };
   }
 
-  static bool _shouldHaveLongRun(
-      TrainingPhase phase, String goalRace, bool isDeload) {
-    if (isDeload) return false;
+  /// Long run is always present except 5K taper.
+  /// Cutback weeks keep the long run — just shorter via volume multiplier.
+  static bool _shouldHaveLongRun(TrainingPhase phase, String goalRace) {
     if (phase == TrainingPhase.taper) {
       return goalRace == 'half_marathon' || goalRace == 'marathon';
     }
@@ -176,69 +202,87 @@ class RacePlanBuilder {
       TrainingPhase.base        => 'easy',
       TrainingPhase.build       => switch (goalRace) {
           '5k' || '10k' => 'intervals',
-          _ => 'tempo',
+          _             => 'tempo',
         },
       TrainingPhase.peak        => switch (goalRace) {
-          '5k' => 'intervals',
+          '5k'  => 'intervals',
           '10k' => 'tempo',
-          _ => 'race_pace',
+          _     => 'race_pace',
         },
       TrainingPhase.taper       => 'easy',
       TrainingPhase.maintenance => 'easy',
     };
   }
 
-  static double _peakVolume(String race, String level, double current) {
-    final minimums = {
-      '5k': {'beginner': 25.0, 'intermediate': 40.0, 'advanced': 55.0},
-      '10k': {'beginner': 30.0, 'intermediate': 50.0, 'advanced': 70.0},
-      'half_marathon': {
-        'beginner': 40.0,
-        'intermediate': 55.0,
-        'advanced': 80.0,
-      },
-      'marathon': {
-        'beginner': 50.0,
-        'intermediate': 70.0,
-        'advanced': 110.0,
-      },
+  /// Peak volume: current + safe weekly gain over build weeks,
+  /// bounded by a physiological ceiling per race × experience.
+  static double _peakVolume({
+    required String goalRace,
+    required String experienceLevel,
+    required double currentWeeklyKm,
+    required int buildWeeks,
+  }) {
+    // Max safe weekly gain: ~2km for beginners, ~2.5km intermediate, ~3km advanced.
+    final maxWeeklyGain = switch (experienceLevel) {
+      'advanced'     => 3.0,
+      'intermediate' => 2.5,
+      _              => 2.0,
     };
-    final floor = minimums[race]?[level] ?? 30.0;
-    return max(floor, current * 1.20);
+
+    // Physiological ceiling per race × experience.
+    final ceiling = switch ((goalRace, experienceLevel)) {
+      ('5k',            'beginner')     => 35.0,
+      ('5k',            'intermediate') => 50.0,
+      ('5k',            'advanced')     => 65.0,
+      ('10k',           'beginner')     => 40.0,
+      ('10k',           'intermediate') => 60.0,
+      ('10k',           'advanced')     => 80.0,
+      ('half_marathon', 'beginner')     => 50.0,
+      ('half_marathon', 'intermediate') => 70.0,
+      ('half_marathon', 'advanced')     => 90.0,
+      ('marathon',      'beginner')     => 60.0,
+      ('marathon',      'intermediate') => 80.0,
+      ('marathon',      'advanced')     => 120.0,
+      _                                 => 50.0,
+    };
+
+    // Reachable peak given build weeks and safe gain.
+    final reachable = currentWeeklyKm + (buildWeeks * maxWeeklyGain);
+    return min(ceiling, reachable).clamp(currentWeeklyKm, ceiling);
   }
 
   static double _peakLongRunKm(String race, String level) {
     return switch (race) {
       '5k' => switch (level) {
-          'advanced' => 12.0,
+          'advanced'     => 12.0,
           'intermediate' => 10.0,
-          _ => 8.0,
+          _              => 8.0,
         },
       '10k' => switch (level) {
-          'advanced' => 16.0,
+          'advanced'     => 16.0,
           'intermediate' => 14.0,
-          _ => 10.0,
+          _              => 10.0,
         },
       'half_marathon' => switch (level) {
-          'advanced' => 24.0,
+          'advanced'     => 24.0,
           'intermediate' => 20.0,
-          _ => 16.0,
+          _              => 16.0,
         },
       'marathon' => switch (level) {
-          'advanced' => 35.0,
+          'advanced'     => 35.0,
           'intermediate' => 32.0,
-          _ => 28.0,
+          _              => 28.0,
         },
       _ => 12.0,
     };
   }
 
   static int _taperWeeksFor(String race) => switch (race) {
-        '5k' => 1,
-        '10k' => 1,
+        '5k'            => 1,
+        '10k'           => 1,
         'half_marathon' => 2,
-        'marathon' => 3,
-        _ => 1,
+        'marathon'      => 3,
+        _               => 1,
       };
 
   static TrainingPhase _phaseFor(int week, int total, int taperWeeks) {
@@ -265,8 +309,8 @@ class RacePlanBuilder {
         targetKm: isTaper ? currentWeeklyKm * 0.70 : currentWeeklyKm,
         phase: isTaper ? TrainingPhase.taper : TrainingPhase.build,
         qualityCount: isTaper ? 1 : 2,
-        hasLongRun: !isTaper,
-        longRunKm: isTaper ? 0.0 : max(5.0, currentWeeklyKm * 0.30),
+        hasLongRun: true, // always keep long run
+        longRunKm: max(5.0, currentWeeklyKm * 0.30),
         keySession: isTaper ? 'easy' : 'tempo',
       );
     });

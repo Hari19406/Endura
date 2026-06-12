@@ -3,6 +3,17 @@
 /// Accepts a vDOT score (int, 30–85) and looks up the corresponding E/M/T/I/R
 /// pace ranges from [kVdotTable]. All pace derivation logic lives here.
 /// Downstream callers use [resolve(PaceZone)] — API unchanged from Phase 1.
+///
+/// v3.4 additions:
+///   - tenKPace: between I-pace and T-pace. Used by vo2_1200 (10K-pace reps).
+///     Formula: midpoint of T and I zones — harder than threshold, easier than
+///     full VO2max. Sits at roughly t.$1 - 5 → i.$2 + 5.
+///   - hillRepeats: RPE-only zone (like hillSprints). 30–90 sec controlled
+///     uphill effort — no pace target because gradient varies too much.
+///   - steadyState: between aerobicEasy and tempo. Used by steady_state
+///     template. Sits at M-pace (marathon pace zone) — same numbers as
+///     marathonPace but kept as a distinct zone so UI can label it correctly
+///     ("Steady State" vs "Marathon Pace").
 library;
 
 import 'vdot_calculator.dart';
@@ -13,26 +24,42 @@ import 'vdot_table.dart';
 // ============================================================================
 
 enum PaceZone {
+  // ── Easy ────────────────────────────────────────────────────────────────
   shakeout,
   easyRecovery,
   aerobicEasy,
   progressiveStart,
   progressiveEnd,
-  tempo,
-  cruiseIntervals,
+
+  // ── Aerobic / moderate ───────────────────────────────────────────────────
+  steadyState,      // NEW: M-pace held continuously — HM/FM quality session
+  marathonPace,
+
+  // ── Threshold / tempo ───────────────────────────────────────────────────
   thresholdProgStart,
   thresholdProgEnd,
+  tempo,
+  cruiseIntervals,
+
+  // ── VO2max / interval ────────────────────────────────────────────────────
+  tenKPace,         // NEW: between T and I — used for 1200m 10K-pace reps
   vo2Intervals,
   shortShort,
   fourHundredRepeats,
   ladderPyramid,
+
+  // ── Speed / neuromuscular ────────────────────────────────────────────────
   strides,
   speedReps,
-  hillSprints,
+
+  // ── RPE-only ─────────────────────────────────────────────────────────────
+  hillSprints,      // 8–12 sec max-effort
+  hillRepeats,      // NEW: 30–90 sec controlled uphill — RPE-only
+
+  // ── Goal-pace (require resolveGoalPace) ──────────────────────────────────
   goalPace,
   raceSimulation,
   dressRehearsal,
-  marathonPace,
 }
 
 // ============================================================================
@@ -58,12 +85,12 @@ class ResolvedPace {
   int get targetPace => ((minSecondsPerKm + maxSecondsPerKm) / 2).round();
 
   String get formatted {
-    if (isRpeOnly) return 'RPE 9 — no pace target';
+    if (isRpeOnly) return 'RPE — no pace target';
     return '${_fmt(minSecondsPerKm)}–${_fmt(maxSecondsPerKm)}/km';
   }
 
   String get formattedTarget {
-    if (isRpeOnly) return 'RPE 9';
+    if (isRpeOnly) return 'RPE effort';
     return '${_fmt(targetPace)}/km';
   }
 
@@ -106,7 +133,11 @@ class PaceTable {
       PaceZone.progressiveEnd =>
           ResolvedPace(minSecondsPerKm: m.$1 - 5, maxSecondsPerKm: m.$1 + 5),
 
-      // ── Marathon zone ────────────────────────────────────────────────────
+      // ── Aerobic / moderate zones ─────────────────────────────────────────
+      // steadyState and marathonPace share the M-pace band.
+      // They are distinct enum values so the UI can label them differently.
+      PaceZone.steadyState =>
+          ResolvedPace(minSecondsPerKm: m.$1, maxSecondsPerKm: m.$2),
       PaceZone.marathonPace =>
           ResolvedPace(minSecondsPerKm: m.$1, maxSecondsPerKm: m.$2),
 
@@ -121,6 +152,14 @@ class PaceTable {
           ResolvedPace(minSecondsPerKm: t.$1 - 5, maxSecondsPerKm: t.$1 + 3),
 
       // ── VO2max / interval zones ──────────────────────────────────────────
+      // tenKPace: midpoint between T and I zones.
+      // Harder than threshold cruise, easier than full I-pace.
+      // Roughly: min = t.$1 - 8, max = i.$2 + 5.
+      PaceZone.tenKPace =>
+          ResolvedPace(
+            minSecondsPerKm: ((t.$1 + i.$1) ~/ 2) - 5,
+            maxSecondsPerKm: ((t.$2 + i.$2) ~/ 2) + 5,
+          ),
       PaceZone.vo2Intervals =>
           ResolvedPace(minSecondsPerKm: i.$1, maxSecondsPerKm: i.$2),
       PaceZone.ladderPyramid =>
@@ -137,17 +176,18 @@ class PaceTable {
           ResolvedPace(minSecondsPerKm: r.$1 - 5, maxSecondsPerKm: r.$1 + 3),
 
       // ── RPE-only ─────────────────────────────────────────────────────────
-      PaceZone.hillSprints => const ResolvedPace.rpeOnly(),
+      PaceZone.hillSprints  => const ResolvedPace.rpeOnly(),
+      PaceZone.hillRepeats  => const ResolvedPace.rpeOnly(),
 
-      // ── Goal-pace zones — require target finish time ──────────────────────
+      // ── Goal-pace zones — require resolveGoalPace() ───────────────────────
       PaceZone.goalPace => throw StateError(
-          'Goal pace requires target finish time. Use resolveGoalPace() instead.',
+          'goalPace requires target finish time. Use resolveGoalPace() instead.',
         ),
       PaceZone.raceSimulation => throw StateError(
-          'Race simulation uses goal pace effort. Use resolveGoalPace() instead.',
+          'raceSimulation uses goal pace effort. Use resolveGoalPace() instead.',
         ),
       PaceZone.dressRehearsal => throw StateError(
-          'Dress rehearsal uses exact goal pace. Use resolveGoalPace() instead.',
+          'dressRehearsal uses exact goal pace. Use resolveGoalPace() instead.',
         ),
     };
   }

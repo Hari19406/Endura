@@ -577,6 +577,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       OPage.weeklyMileage => OPageWeeklyMileage(
           weeklyKm:  _weeklyKm,
           goalRace:  _goal,
+          runsPerWeek: _runsPerWeek,
           onChanged: (v) => setState(() => _weeklyKm = v),
         ),
 

@@ -7,6 +7,7 @@ import '../engines/pace_trend_calculator.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../services/cloud_sync_service.dart';
 import '../engines/config/workout_template_library.dart';
+import '../engines/config/archetype_table.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../engines/memory/engine_memory_service.dart';
 import '../engines/plan/week_projection_service.dart';
@@ -14,8 +15,9 @@ import '../engines/plan/workout_resolver.dart';
 import '../engines/core/pace_table.dart';
 import '../engines/core/vdot_calculator.dart';
 import '../services/training_days_service.dart';
-import '../utils/stats.dart' show loadSavedRuns, RunHistory;
+import '../utils/stats.dart' show RunHistory;
 import '../engines/daily/dynamic_scaler.dart';
+import '../models/race_plan.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -57,8 +59,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     if (workBlocks.isEmpty) return null;
     final nonRpe = workBlocks.where((b) => !b.isRpeOnly);
     if (nonRpe.isEmpty) return null;
-    final fastest = nonRpe.map((b) => b.paceMinSecondsPerKm).reduce((a, b) => a < b ? a : b);
-    final slowest = nonRpe.map((b) => b.paceMaxSecondsPerKm).reduce((a, b) => a > b ? a : b);
+    final fastest = nonRpe
+        .map((b) => b.paceMinSecondsPerKm)
+        .reduce((a, b) => a < b ? a : b);
+    final slowest = nonRpe
+        .map((b) => b.paceMaxSecondsPerKm)
+        .reduce((a, b) => a > b ? a : b);
     return message.PaceRange(
       minSecondsPerKm: fastest,
       maxSecondsPerKm: slowest,
@@ -97,7 +103,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     final speed = widget.durationSeconds > 0
         ? (widget.distanceKm * 1000 / widget.durationSeconds)
         : 0.0;
- 
+
     final memory = await EngineMemoryService().load();
 
     await EngineRuntime.processRun(
@@ -134,7 +140,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Color(0xFFF5F5F7),
-            body: Center(child: CircularProgressIndicator(color: Colors.black)),
+            body: Center(
+                child: CircularProgressIndicator(color: Colors.black)),
           );
         }
 
@@ -152,15 +159,17 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                       children: [
                         _buildMap(),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // ── Header ──────────────────────────────────
                               Padding(
-                                padding: const EdgeInsets.only(top: 18, bottom: 14),
+                                padding: const EdgeInsets.only(
+                                    top: 18, bottom: 14),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     const Text(
                                       'Workout complete',
@@ -182,20 +191,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                   ],
                                 ),
                               ),
-
-                              // ── Stats card ───────────────────────────────
                               _buildStatsCard(),
                               const SizedBox(height: 12),
-
-                              // ── Pace & performance card ──────────────────
                               _buildPaceCard(),
                               const SizedBox(height: 12),
-
-                              // ── RPE card ─────────────────────────────────
                               _buildRpeCard(),
                               const SizedBox(height: 12),
-
-                              // ── Next up card ─────────────────────────────
                               _buildNextWorkoutCard(data),
                               const SizedBox(height: 12),
                             ],
@@ -205,8 +206,6 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     ),
                   ),
                 ),
-
-                // ── Done button ──────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   child: SizedBox(
@@ -232,7 +231,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         ),
                       ),
                       child: Text(
-                        _rpe == null ? 'Rate your effort to continue' : 'Done',
+                        _rpe == null
+                            ? 'Rate your effort to continue'
+                            : 'Done',
                         style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w700),
                       ),
@@ -253,39 +254,29 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     return _Card(
       child: Column(
         children: [
-          // Row 1: Distance · Duration · Avg pace
           IntrinsicHeight(
             child: Row(
               children: [
-                _buildStatCell(_formatDistance(widget.distanceKm), 'km', 'Distance'),
+                _buildStatCell(
+                    _formatDistance(widget.distanceKm), 'km', 'Distance'),
                 _buildCellDivider(),
-                _buildStatCell(_formatDuration(widget.durationSeconds), '', 'Duration'),
+                _buildStatCell(
+                    _formatDuration(widget.durationSeconds), '', 'Duration'),
                 _buildCellDivider(),
                 _buildStatCell(widget.averagePace, '/km', 'Avg pace'),
               ],
             ),
           ),
           Divider(color: Colors.grey.shade100, height: 1, thickness: 1),
-          // Row 2: Total time · This week · Pace trend
           IntrinsicHeight(
             child: Row(
               children: [
                 _buildStatCell(
-                  _formatDuration(_totalWorkoutSeconds),
-                  '',
-                  'Total time',
-                ),
+                    _formatDuration(_totalWorkoutSeconds), '', 'Total time'),
                 _buildCellDivider(),
-                _buildStatCell(
-                  _summaryFutureWeeklyKm,
-                  'km',
-                  'This week',
-                ),
+                _buildStatCell(_summaryFutureWeeklyKm, 'km', 'This week'),
                 _buildCellDivider(),
-                _buildStatCellRaw(
-                  _buildPaceTrendWidget(),
-                  'Pace trend',
-                ),
+                _buildStatCellRaw(_buildPaceTrendWidget(), 'Pace trend'),
               ],
             ),
           ),
@@ -294,9 +285,6 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     );
   }
 
-  // Weekly km is available after future resolves; use FutureBuilder snapshot
-  // via a helper that reads from the already-resolved future result stored
-  // in the outer FutureBuilder. We pass data down via a field set during build.
   String _summaryFutureWeeklyKm = '—';
 
   Widget _buildStatCell(String value, String unit, String label) {
@@ -307,7 +295,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
-                style: const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
+                style:
+                    const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
             const SizedBox(height: 4),
             RichText(
               text: TextSpan(
@@ -346,7 +335,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
-                style: const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
+                style:
+                    const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
             const SizedBox(height: 4),
             valueWidget,
           ],
@@ -356,7 +346,6 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   Widget _buildPaceTrendWidget() {
-    // Reads from _summaryFuture result — will be set via _latestData
     final trend = _latestData?.paceTrend ?? 'neutral';
     final label = _paceTrendLabel(trend);
     final color = trend == 'improving'
@@ -365,14 +354,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             ? const Color(0xFFD32F2F)
             : const Color(0xFF888888);
     return Text(label,
-        style: TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w700, color: color));
+        style:
+            TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color));
   }
 
-  Widget _buildCellDivider() => Container(
-        width: 0.5,
-        color: const Color(0xFFF0F0F0),
-      );
+  Widget _buildCellDivider() =>
+      Container(width: 0.5, color: const Color(0xFFF0F0F0));
 
   // ── Pace & performance card ───────────────────────────────────────────────
 
@@ -380,7 +367,6 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     final target = _targetPaceRange;
     final avgSec = _paceToSeconds(widget.averagePace);
 
-    // Badge logic
     String badgeLabel;
     Color badgeBg;
     Color badgeText;
@@ -413,32 +399,28 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Card header
-            Row(
-              children: [
-                Container(
-                  width: 26, height: 26,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5EE),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: const Icon(Icons.trending_up,
-                      color: Color(0xFF2A9D4E), size: 15),
+            Row(children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5EE),
+                  borderRadius: BorderRadius.circular(7),
                 ),
-                const SizedBox(width: 8),
-                const Text('Pace & performance',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black)),
-              ],
-            ),
+                child: const Icon(Icons.trending_up,
+                    color: Color(0xFF2A9D4E), size: 15),
+              ),
+              const SizedBox(width: 8),
+              const Text('Pace & performance',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black)),
+            ]),
             const SizedBox(height: 14),
-
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left: avg pace + badge
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,9 +429,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                           style: TextStyle(
                               fontSize: 10, color: Color(0xFFAAAAAA))),
                       const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
-                          children: [
+                      Builder(builder: (context) {
+                        return RichText(
+                          text: TextSpan(children: [
                             TextSpan(
                               text: widget.averagePace,
                               style: const TextStyle(
@@ -466,9 +448,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                 color: Color(0xFF2A9D4E),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
+                          ]),
+                        );
+                      }),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -487,8 +469,6 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   ),
                 ),
                 const SizedBox(width: 14),
-
-                // Right: target range + track (only if coached run)
                 if (target != null)
                   Expanded(
                     child: Column(
@@ -520,58 +500,50 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   Widget _buildRangeTrack(int avgSec, message.PaceRange target) {
-    // Clamp dot position within 0–1
     final rangeSec = target.maxSecondsPerKm - target.minSecondsPerKm;
-    final raw = rangeSec > 0
-        ? (avgSec - target.minSecondsPerKm) / rangeSec
-        : 0.5;
+    final raw =
+        rangeSec > 0 ? (avgSec - target.minSecondsPerKm) / rangeSec : 0.5;
     final frac = raw.clamp(0.0, 1.0);
 
     return LayoutBuilder(builder: (context, constraints) {
       final trackW = constraints.maxWidth;
       const dotR = 7.0;
-      final dotLeft = (frac * (trackW - dotR * 2)).clamp(0.0, trackW - dotR * 2);
+      final dotLeft =
+          (frac * (trackW - dotR * 2)).clamp(0.0, trackW - dotR * 2);
 
-      return Column(
-        children: [
-          SizedBox(
-            height: 14,
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                // Track background
-                Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5EE),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                // Filled zone (full width = in range)
-                Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A9D4E),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                // Dot
-                Positioned(
-                  left: dotLeft,
-                  child: Container(
-                    width: dotR * 2,
-                    height: dotR * 2,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-              ],
+      return SizedBox(
+        height: 14,
+        child: Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5EE),
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
-          ),
-        ],
+            Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A9D4E),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Positioned(
+              left: dotLeft,
+              child: Container(
+                width: dotR * 2,
+                height: dotR * 2,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     });
   }
@@ -579,16 +551,16 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   // ── RPE card ──────────────────────────────────────────────────────────────
 
   static const List<_RpeLevel> _rpeLevels = [
-    _RpeLevel(value: 1,  name: 'Very easy',      desc: 'Almost no effort, barely moving',                 color: Color(0xFF2DB87A)),
-    _RpeLevel(value: 2,  name: 'Easy',            desc: 'Light and comfortable, breathing barely changes', color: Color(0xFF3DC882)),
-    _RpeLevel(value: 3,  name: 'Light',           desc: 'Comfortable pace, easy conversation',             color: Color(0xFF72C226)),
-    _RpeLevel(value: 4,  name: 'Somewhat easy',   desc: 'Slightly elevated breathing, relaxed',            color: Color(0xFF9DC91A)),
-    _RpeLevel(value: 5,  name: 'Moderate',        desc: 'Steady effort, short sentences possible',         color: Color(0xFFD4960E)),
-    _RpeLevel(value: 6,  name: 'Somewhat hard',   desc: 'Noticeably harder, breathing heavier',            color: Color(0xFFD4730E)),
-    _RpeLevel(value: 7,  name: 'Hard',            desc: 'Pushing it, few words possible',                  color: Color(0xFFCC5410)),
-    _RpeLevel(value: 8,  name: 'Very hard',       desc: 'Very tough, focused on form and breathing',       color: Color(0xFFC43612)),
-    _RpeLevel(value: 9,  name: 'Extremely hard',  desc: 'Near limit, barely holding pace',                 color: Color(0xFFB82014)),
-    _RpeLevel(value: 10, name: 'Max effort',      desc: 'All out — could not go harder',                   color: Color(0xFF9E1016)),
+    _RpeLevel(value: 1,  name: 'Very easy',     desc: 'Almost no effort, barely moving',                 color: Color(0xFF2DB87A)),
+    _RpeLevel(value: 2,  name: 'Easy',           desc: 'Light and comfortable, breathing barely changes', color: Color(0xFF3DC882)),
+    _RpeLevel(value: 3,  name: 'Light',          desc: 'Comfortable pace, easy conversation',             color: Color(0xFF72C226)),
+    _RpeLevel(value: 4,  name: 'Somewhat easy',  desc: 'Slightly elevated breathing, relaxed',            color: Color(0xFF9DC91A)),
+    _RpeLevel(value: 5,  name: 'Moderate',       desc: 'Steady effort, short sentences possible',         color: Color(0xFFD4960E)),
+    _RpeLevel(value: 6,  name: 'Somewhat hard',  desc: 'Noticeably harder, breathing heavier',            color: Color(0xFFD4730E)),
+    _RpeLevel(value: 7,  name: 'Hard',           desc: 'Pushing it, few words possible',                  color: Color(0xFFCC5410)),
+    _RpeLevel(value: 8,  name: 'Very hard',      desc: 'Very tough, focused on form and breathing',       color: Color(0xFFC43612)),
+    _RpeLevel(value: 9,  name: 'Extremely hard', desc: 'Near limit, barely holding pace',                 color: Color(0xFFB82014)),
+    _RpeLevel(value: 10, name: 'Max effort',     desc: 'All out — could not go harder',                   color: Color(0xFF9E1016)),
   ];
 
   Widget _buildRpeCard() {
@@ -601,46 +573,41 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Row(
-              children: [
-                const Text(
-                  'HOW DID IT FEEL?',
+            Row(children: [
+              const Text(
+                'HOW DID IT FEEL?',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFAAAAAA),
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'REQUIRED',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 8,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFFAAAAAA),
-                    letterSpacing: 1.1,
+                    color: Colors.white,
+                    letterSpacing: 0.8,
                   ),
                 ),
-                const SizedBox(width: 7),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1C1C1E),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'REQUIRED',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ]),
             const SizedBox(height: 5),
             const Text(
               'Max uses this to decide your next workout.',
               style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
             ),
             const SizedBox(height: 14),
-
-            // Name + number
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -660,26 +627,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   Text(
                     '${level.value}',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: level.color,
-                    ),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: level.color),
                   ),
               ],
             ),
             if (level != null) ...[
               const SizedBox(height: 3),
-              Text(
-                level.desc,
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFAAAAAA),
-                    height: 1.4),
-              ),
+              Text(level.desc,
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFFAAAAAA), height: 1.4)),
             ],
             const SizedBox(height: 11),
-
-            // Bar
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: Container(
@@ -688,8 +648,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                 child: AnimatedFractionallySizedBox(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
-                  widthFactor:
-                      selected != null ? selected / 10.0 : 0.0,
+                  widthFactor: selected != null ? selected / 10.0 : 0.0,
                   child: Container(
                     decoration: BoxDecoration(
                       color: level?.color ?? Colors.transparent,
@@ -700,15 +659,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
               ),
             ),
             const SizedBox(height: 11),
-
-            // Dots
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(_rpeLevels.length, (i) {
                 final lvl = _rpeLevels[i];
                 final isSelected = selected == lvl.value;
-                final isPast =
-                    selected != null && lvl.value <= selected;
+                final isPast = selected != null && lvl.value <= selected;
                 return GestureDetector(
                   onTap: () => setState(() => _rpe = lvl.value),
                   child: AnimatedContainer(
@@ -721,9 +677,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                           ? lvl.color.withOpacity(0.15)
                           : Colors.grey.shade100,
                       border: Border.all(
-                        color: isSelected
-                            ? lvl.color
-                            : Colors.transparent,
+                        color: isSelected ? lvl.color : Colors.transparent,
                         width: 1.5,
                       ),
                     ),
@@ -733,9 +687,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: isPast
-                              ? lvl.color
-                              : Colors.grey.shade400,
+                          color: isPast ? lvl.color : Colors.grey.shade400,
                         ),
                       ),
                     ),
@@ -761,31 +713,31 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 26, height: 26,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8EAF6),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: const Icon(Icons.calendar_today_outlined,
-                      color: Color(0xFF3949AB), size: 14),
+            Row(children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8EAF6),
+                  borderRadius: BorderRadius.circular(7),
                 ),
-                const SizedBox(width: 8),
-                const Text('Next up',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black)),
-              ],
-            ),
+                child: const Icon(Icons.calendar_today_outlined,
+                    color: Color(0xFF3949AB), size: 14),
+              ),
+              const SizedBox(width: 8),
+              const Text('Next up',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black)),
+            ]),
             const SizedBox(height: 14),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 38, height: 38,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: accentColor,
                     borderRadius: BorderRadius.circular(9),
@@ -833,14 +785,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   _SummaryData? _latestData;
 
   Future<_SummaryData> _buildSummaryData() async {
-    final recentRuns = await DatabaseService.instance.getRecentRuns(limit: 10);
-
+    final recentRuns =
+        await DatabaseService.instance.getRecentRuns(limit: 10);
     final paceTrend = PaceTrendCalculator.calculate(
       recentRuns.map((r) => _paceToSeconds(r.averagePace)).toList(),
     );
     final weeklyDistance = _calcWeeklyDistance(recentRuns);
-
-    // Update the weekly km label for the stats card
     _summaryFutureWeeklyKm = weeklyDistance.toStringAsFixed(1);
 
     try {
@@ -849,6 +799,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       final trainingDayIndices = await TrainingDaysService.loadOrDefault(4);
 
       final goalRace = prefs.getString('goal_race') ?? '5k';
+      final experienceLevelStr =
+          prefs.getString('experience_level') ?? 'beginner';
+
       final runsPerWeek = trainingDayIndices.isNotEmpty
           ? trainingDayIndices.length
           : (prefs.getInt('runs_per_week') ?? 4);
@@ -889,6 +842,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
               runHistory.take(5).length;
       final weeklyTargetKm = recentAvg * runsPerWeek;
 
+      final weekTarget = WeekTarget(
+        week: weekNum,
+        phase: phase,
+        targetKm: weeklyTargetKm,
+        longRunKm: weeklyTargetKm * 0.30,
+        qualityCount: 1,
+        hasLongRun: true,
+        keySession: 'easy',
+      );
+
+      final experienceLevel = _toExperienceLevel(experienceLevelStr);
+      final is3to1Cutback = weekNum % 4 == 0;
+
       final service = WeekProjectionService();
       final projection = service.projectWeek(
         weekNumber: weekNum,
@@ -899,9 +865,13 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         raceDistance: raceDistance,
         weeklyTargetKm: weeklyTargetKm,
         completedRuns: runHistoryTyped,
+        experienceLevel: experienceLevel,
+        weekTarget: weekTarget,
+        isCutbackWeek: is3to1Cutback,
         lastCompletedIntent: memory.lastCompletedWorkoutIntent,
         lastCompletedTemplateId: memory.lastCompletedTemplateId,
         avgRpe: memory.averageRecentRpe(3),
+        ladderPositions: memory.ladderPositions,
       );
 
       final now = DateTime.now();
@@ -929,7 +899,6 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             : '';
         final label = '$dayLabel · ${_intentName(intent)}$distStr';
         final subtext = _intentSubtext(intent);
-
         final result = _SummaryData(
           paceTrend: paceTrend,
           weeklyDistance: weeklyDistance,
@@ -956,6 +925,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  ExperienceLevel _toExperienceLevel(String level) => switch (level) {
+        'intermediate' => ExperienceLevel.intermediate,
+        'advanced'     => ExperienceLevel.advanced,
+        _              => ExperienceLevel.beginner,
+      };
 
   double _calcWeeklyDistance(List<RunRecord> runs) {
     final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
@@ -986,8 +961,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         height: 220,
         color: Colors.grey.shade100,
         child: Center(
-          child:
-              Icon(Icons.map_outlined, size: 48, color: Colors.grey.shade300),
+          child: Icon(Icons.map_outlined,
+              size: 48, color: Colors.grey.shade300),
         ),
       );
     }
@@ -1029,7 +1004,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           MarkerLayer(markers: [
             Marker(
               point: widget.routePoints.first,
-              width: 14, height: 14,
+              width: 14,
+              height: 14,
               child: Container(
                 decoration: const BoxDecoration(
                     color: Color(0xFF388E3C), shape: BoxShape.circle),
@@ -1037,7 +1013,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             ),
             Marker(
               point: widget.routePoints.last,
-              width: 14, height: 14,
+              width: 14,
+              height: 14,
               child: Container(
                 decoration: const BoxDecoration(
                     color: Color(0xFFD32F2F), shape: BoxShape.circle),
@@ -1064,10 +1041,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
-    const weekdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
   }
 
