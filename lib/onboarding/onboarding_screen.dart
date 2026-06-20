@@ -115,7 +115,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   DateTime? _dob;
   String?   _gender;
   String    _firstName = '';
-  String    _lastName  = '';
 
   // Computed
   int  _vdot            = 40;
@@ -134,7 +133,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     )..repeat();
 
     final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, now.day + 1);
+    _startDate = DateTime(now.year, now.month, now.day);
 
     if (widget.shortenedMode) {
       _prefillFromExistingProfile();
@@ -162,7 +161,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _intensity  = prefs.getString('goal_intent');
       _gender     = prefs.getString('gender');
       _firstName  = prefs.getString('first_name') ?? '';
-      _lastName   = prefs.getString('last_name') ?? '';
       final dobRaw = prefs.getString('dob');
       if (dobRaw != null) _dob = DateTime.tryParse(dobRaw);
 
@@ -170,8 +168,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final paceMin = prefs.getInt('pace_minutes');
       final paceSec = prefs.getInt('pace_seconds') ?? 0;
       if (paceMin != null) {
-        _paceMinutes = paceMin;
-        _paceSeconds = paceSec;
+        _paceHours    = prefs.getInt('pace_hours') ?? 0;
+        _paceMinutes  = paceMin;
+        _paceSeconds  = paceSec;
         _paceDistance = prefs.getString('pace_distance') ?? '5k';
       }
       _vdot = memory.vdotScore;
@@ -205,13 +204,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   static const _fullSequence = OPage.values;
 
   /// Shortened sequence (post-plan re-onboarding).
-  /// Skips: intro, experience, bestTime, dob, gender, name.
+  /// Skips: intro, dob, gender, name — personal profile fields that don't affect plan generation.
   static const _shortSequence = [
     OPage.goal,
+    OPage.experience,
+    OPage.bestTime,
     OPage.planTimeline,
     OPage.daysCount,
     OPage.dayPicker,
+    OPage.longRunDay,
     OPage.weeklyMileage,
+    OPage.intensity,
     OPage.generatePlan,
     OPage.buildPlan,
     OPage.welcome,
@@ -362,18 +365,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       }
       await prefs.setString('plan_start_date', _startDate.toIso8601String());
 
-      // Personal fields — only persist in full mode (shortened carries existing values).
+      // bestTime (VDOT inputs) — persisted in both modes since re-onboarding includes bestTime.
+      await prefs.setString('pace_distance', _paceDistance);
+      await prefs.setInt('pace_hours', _paceHours);
+      await prefs.setInt('pace_minutes', _paceMinutes);
+      await prefs.setInt('pace_seconds', _paceSeconds);
+
+      // Personal profile fields — only persist in full mode (shortened skips these screens).
       if (!widget.shortenedMode) {
         if (_dob != null) {
           await prefs.setString('dob', _dob!.toIso8601String());
         }
         if (_gender != null) await prefs.setString('gender', _gender!);
         await prefs.setString('first_name', _firstName.trim());
-        await prefs.setString('last_name', _lastName.trim());
-        await prefs.setString('pace_distance', _paceDistance);
-        await prefs.setInt('pace_hours', _paceHours);
-        await prefs.setInt('pace_minutes', _paceMinutes);
-        await prefs.setInt('pace_seconds', _paceSeconds);
       }
 
       await prefs.setDouble('weekly_km', effectiveBaselineKm);
@@ -389,6 +393,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         longRunDayIndex:      _longRunDayIndex,
         baselineWeeklyKm:     effectiveBaselineKm,
         previousWeekTargetKm: effectiveBaselineKm,
+        firstRunDate:         _startDate,
         // Clear post-plan flags so normal flow resumes.
         clearPlanCompletedAt: true,
         isInMaintenance:      false,
@@ -411,8 +416,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       }
 
       // ── Supabase profile ───────────────────────────────────────────────
-      final displayName =
-          '${_firstName.trim()} ${_lastName.trim()}'.trim();
+      final displayName = _firstName.trim();
       await ProfileService.instance.saveProfile(UserProfile(
         gender:           _gender,
         dob:              _dob,
@@ -613,9 +617,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       OPage.name => OPageName(
           firstName:      _firstName,
-          lastName:       _lastName,
           onFirstChanged: (v) => setState(() => _firstName = v),
-          onLastChanged:  (v) => setState(() => _lastName = v),
         ),
 
       OPage.generatePlan => OPageGeneratePlan(

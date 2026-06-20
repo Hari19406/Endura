@@ -1,16 +1,14 @@
-/// Workout Template Library for Endura — Rebuild v5
+/// Workout Template Library for Endura — Rebuild v6
 ///
-/// Changes from v4:
-///   - long_cutdown  : 3-segment cutdown long run (easy → MP → faster than MP).
-///                     Marathon/HM build/peak. Distinct from long_progression
-///                     (harder final block, teaches running through fatigue).
-///   - long_surges   : Easy long run with 5 × 1min HM-effort surges scattered
-///                     through the middle. Marathon/HM build/peak. Low perceived
-///                     risk, high aerobic return — teaches gear changes on tired legs.
-///
-/// These two additions bring the marathon build/peak long run pool to 6 templates
-/// (long_steady, long_progression, long_gp_finish, long_mid_block,
-///  long_cutdown, long_surges), eliminating the repeat warnings from the sim.
+/// Changes from v5:
+///   - long_progression : extended to TrainingPhase.base — base pool now has
+///                        3 long-run templates (steady, progression, strides).
+///   - long_strides     : Easy long run with neuromuscular strides at finish.
+///                        Applicable: base/build/peak, all distances.
+///   - long_fartlek     : Easy long run with 5–6 × 2min @tempo fartlek bursts.
+///                        Applicable: build/peak, 5K/10K/HM only.
+///   - WeekResolver     : WorkoutIntent.endurance ladder added, cycling all
+///                        long-run templates by phase/distance context.
 library;
 
 import '../core/pace_table.dart';
@@ -506,7 +504,7 @@ class WorkoutLibrary {
       id: 'long_progression',
       name: 'Long Run — Progression',
       intent: WorkoutIntent.endurance,
-      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicablePhases: {TrainingPhase.base, TrainingPhase.build, TrainingPhase.peak},
       applicableRaceDistances: {
         RaceDistance.fiveK, RaceDistance.tenK,
         RaceDistance.halfMarathon, RaceDistance.marathon,
@@ -620,6 +618,68 @@ class WorkoutLibrary {
       phaseVariants: {
         TrainingPhase.build: PhaseVariant(reps: 5,  repDurationSeconds: 60, recoverySeconds: 120, note: '5 × 1min surges, 2min float recovery'),
         TrainingPhase.peak:  PhaseVariant(reps: 7,  repDurationSeconds: 60, recoverySeconds: 90,  note: '7 × 1min surges, 90s float recovery'),
+      },
+    ),
+
+    WorkoutTemplate(
+      id: 'long_strides',
+      name: 'Long Run — Strides',
+      intent: WorkoutIntent.endurance,
+      applicablePhases: {TrainingPhase.base, TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 6,  maxKm: 16),
+        RaceDistance.tenK:         DistanceRange(minKm: 8,  maxKm: 20),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 28),
+        RaceDistance.marathon:     DistanceRange(minKm: 16, maxKm: 35),
+      },
+      description:
+          'Easy long run with neuromuscular strides at the finish. '
+          'Low cost, high turnover return — appropriate from base phase onward.',
+      blocks: [
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.85, zone: PaceZone.aerobicEasy),
+        BlockTemplate.mainMeters(
+          meters: 100, zone: PaceZone.strides,
+          reps: 6, recoveryMeters: 100, label: 'Stride',
+        ),
+      ],
+      phaseVariants: {
+        TrainingPhase.base:  PhaseVariant(reps: 4, repDistanceMeters: 100, recoveryMeters: 100, note: '4 × 100m strides to finish the long run'),
+        TrainingPhase.build: PhaseVariant(reps: 6, repDistanceMeters: 100, recoveryMeters: 100, note: '6 × 100m strides to finish the long run'),
+        TrainingPhase.peak:  PhaseVariant(reps: 6, repDistanceMeters: 100, recoveryMeters: 100, note: '6 × 100m strides to finish the long run'),
+      },
+    ),
+
+    WorkoutTemplate(
+      id: 'long_fartlek',
+      name: 'Long Run — Fartlek',
+      intent: WorkoutIntent.endurance,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK, RaceDistance.halfMarathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 6,  maxKm: 16),
+        RaceDistance.tenK:         DistanceRange(minKm: 8,  maxKm: 20),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 28),
+      },
+      description:
+          'Easy long run with tempo fartlek bursts through the middle miles. '
+          '5K/10K/HM — teaches gear changes at threshold without trashing the session.',
+      blocks: [
+        BlockTemplate.percent(type: BlockType.warmup,  fraction: 0.25, zone: PaceZone.aerobicEasy),
+        BlockTemplate.mainSeconds(
+          seconds: 120, zone: PaceZone.tempo,
+          reps: 5, recoverySeconds: 120, label: 'Fartlek',
+        ),
+        BlockTemplate.percent(type: BlockType.cooldown, fraction: 0.75, zone: PaceZone.aerobicEasy),
+      ],
+      phaseVariants: {
+        TrainingPhase.build: PhaseVariant(reps: 5, repDurationSeconds: 120, recoverySeconds: 120, note: '5 × 2min @tempo, 2min float recovery'),
+        TrainingPhase.peak:  PhaseVariant(reps: 6, repDurationSeconds: 120, recoverySeconds: 90,  note: '6 × 2min @tempo, 90s float recovery'),
       },
     ),
 
@@ -796,7 +856,9 @@ class WorkoutLibrary {
           'Continuous sustained run between easy and threshold — M-pace effort. '
           'The whole run is the stimulus. Replaces junk miles with meaningful aerobic work.',
       blocks: [
-        BlockTemplate.percent(type: BlockType.main, fraction: 1.0, zone: PaceZone.steadyState),
+        BlockTemplate.percent(type: BlockType.warmup,   fraction: 0.10, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main,     fraction: 0.80, zone: PaceZone.steadyState),
+        BlockTemplate.percent(type: BlockType.cooldown, fraction: 0.10, zone: PaceZone.aerobicEasy),
       ],
       phaseVariants: {
         TrainingPhase.base:  PhaseVariant(volumeMultiplier: 0.85, note: 'Intro steady state — keep it honest, not hard'),
@@ -945,12 +1007,12 @@ class WorkoutLibrary {
         RaceDistance.halfMarathon, RaceDistance.marathon,
       },
       distanceByRace: {
-        RaceDistance.fiveK:        DistanceRange(minKm: 5, maxKm: 8),
-        RaceDistance.tenK:         DistanceRange(minKm: 6, maxKm: 10),
-        RaceDistance.halfMarathon: DistanceRange(minKm: 7, maxKm: 11),
-        RaceDistance.marathon:     DistanceRange(minKm: 8, maxKm: 13),
+        RaceDistance.fiveK:        DistanceRange(minKm: 5, maxKm: 10),
+        RaceDistance.tenK:         DistanceRange(minKm: 5, maxKm: 12),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 6, maxKm: 13),
+        RaceDistance.marathon:     DistanceRange(minKm: 6, maxKm: 14),
       },
-      description: 'Ascending ladder: 400–600–800–1000m.',
+      description: 'Ascending ladder — structure and length scale with budget.',
       blocks: [
         BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
         BlockTemplate.mainMeters(meters: 400,  zone: PaceZone.ladderPyramid, recoverySeconds: 120, label: '400m'),
@@ -966,13 +1028,18 @@ class WorkoutLibrary {
       name: 'Pyramid Intervals',
       intent: WorkoutIntent.vo2max,
       supportsScaling: false,
-      applicablePhases: {TrainingPhase.peak},
-      applicableRaceDistances: {RaceDistance.fiveK, RaceDistance.tenK},
-      distanceByRace: {
-        RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
-        RaceDistance.tenK:  DistanceRange(minKm: 6, maxKm: 10),
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
       },
-      description: 'Full pyramid: 400–600–800–600–400m.',
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 5, maxKm: 10),
+        RaceDistance.tenK:         DistanceRange(minKm: 5, maxKm: 12),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 6, maxKm: 13),
+        RaceDistance.marathon:     DistanceRange(minKm: 6, maxKm: 14),
+      },
+      description: 'Pyramid up and back — structure and length scale with budget.',
       blocks: [
         BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
         BlockTemplate.mainMeters(meters: 400, zone: PaceZone.ladderPyramid, recoverySeconds: 120, label: '400m'),

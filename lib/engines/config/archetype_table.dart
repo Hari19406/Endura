@@ -212,14 +212,14 @@ class WeeklyKmRange {
       'half_marathon': {
         3: WeeklyKmRange(min: 20, max: 42, defaultKm: 28),
         4: WeeklyKmRange(min: 28, max: 55, defaultKm: 38),
-        5: WeeklyKmRange(min: 38, max: 68, defaultKm: 50),
-        6: WeeklyKmRange(min: 48, max: 80, defaultKm: 60),
+        5: WeeklyKmRange(min: 38, max: 68, defaultKm: 46),
+        6: WeeklyKmRange(min: 48, max: 75, defaultKm: 54),
       },
       'marathon': {
         3: WeeklyKmRange(min: 22, max: 48, defaultKm: 32),
-        4: WeeklyKmRange(min: 32, max: 65, defaultKm: 46),
-        5: WeeklyKmRange(min: 45, max: 80, defaultKm: 58),
-        6: WeeklyKmRange(min: 55, max: 100, defaultKm: 72),
+        4: WeeklyKmRange(min: 32, max: 65, defaultKm: 42),
+        5: WeeklyKmRange(min: 45, max: 80, defaultKm: 52),
+        6: WeeklyKmRange(min: 55, max: 90, defaultKm: 62),
       },
     };
 
@@ -253,11 +253,36 @@ class ArchetypeTable {
         ? _taperSlots(days: days)
         : _slots(days: days, experience: experience, phase: phase);
 
-    final sessions = slots.map((slot) {
-      final km    = _round(weeklyKm * slot.fraction);
+    // Size all non-long-run sessions. Easy/recovery round to nearest 1km for
+    // natural coach numbers (5km, 6km etc.). Quality sessions are untouched —
+    // same 0.5km rounding as always; the template resolver owns their actual
+    // distance. Long run absorbs the remainder so the weekly total stays
+    // consistent across 3/4/5/6-day plans.
+    final sessions  = <ArchetypeSession>[];
+    var allocatedKm = 0.0;
+
+    for (final slot in slots) {
+      if (slot.type == ArchetypeSessionType.longRun) continue;
+
+      final rawKm = weeklyKm * slot.fraction;
       final floor = _Floors.forType(slot.type);
-      return ArchetypeSession(type: slot.type, km: km, floorKm: floor);
-    }).toList();
+
+      // Easy/recovery: round to nearest 1km.
+      // Quality (tempo/interval): 0.5km rounding — same as original, no change.
+      final km = slot.type.isEasy ? _roundKm(rawKm) : _round(rawKm);
+
+      sessions.add(ArchetypeSession(type: slot.type, km: km, floorKm: floor));
+      allocatedKm += km.clamp(floor, double.infinity);
+    }
+
+    // Long run absorbs whatever the weekly km minus all other sessions.
+    final longKm    = _round((weeklyKm - allocatedKm).clamp(0.0, double.infinity));
+    final longFloor = _Floors.forType(ArchetypeSessionType.longRun);
+    sessions.add(ArchetypeSession(
+      type: ArchetypeSessionType.longRun,
+      km: longKm,
+      floorKm: longFloor,
+    ));
 
     return ArchetypeWeek(sessions);
   }
@@ -364,5 +389,6 @@ class ArchetypeTable {
     return ArchetypeSessionType.interval;
   }
 
-  static double _round(double v) => (v * 2).round() / 2;
+  static double _round(double v)   => (v * 2).round() / 2;  // nearest 0.5km
+  static double _roundKm(double v) => v.round().toDouble();  // nearest 1km
 }

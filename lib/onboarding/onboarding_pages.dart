@@ -1417,15 +1417,13 @@ class OPageGender extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class OPageName extends StatelessWidget {
-  final String firstName, lastName;
-  final ValueChanged<String> onFirstChanged, onLastChanged;
+  final String firstName;
+  final ValueChanged<String> onFirstChanged;
 
   const OPageName({
     super.key,
     required this.firstName,
-    required this.lastName,
     required this.onFirstChanged,
-    required this.onLastChanged,
   });
 
   @override
@@ -1442,9 +1440,7 @@ class OPageName extends StatelessWidget {
           const SizedBox(height: 6),
           const _Sub("We'll use your name to make every interaction feel personal."),
           const SizedBox(height: 40),
-          _field('First name', firstName, onFirstChanged, TextInputAction.next),
-          const SizedBox(height: 12),
-          _field('Last name', lastName, onLastChanged, TextInputAction.done),
+          _field('First name', firstName, onFirstChanged, TextInputAction.done),
           const Spacer(),
           if (firstName.trim().isNotEmpty)
             Center(

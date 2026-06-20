@@ -4,7 +4,7 @@ import '../../models/weekly_plan.dart';
 import '../../models/race_plan.dart';
 import '../config/workout_template_library.dart';
 import '../core/vdot_calculator.dart';
-import '../coach_engine_v2.dart' show ProgressionDecision;
+import '../progression_decision.dart';
 
 EngineMemory defaultSafeMemory() => const EngineMemory();
 

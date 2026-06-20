@@ -29,11 +29,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.endura.runapp"
+        applicationId = "com.hari.endura"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "1.0.3"
     }
 
     signingConfigs {

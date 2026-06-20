@@ -17,6 +17,15 @@
 ///   - Taper: no sessions dropped, no rest day forced. All selected days run.
 ///     Volume via race-aware progressive multiplier (_taperMultiplier).
 ///     5K→0.55, 10K→0.75/0.55, HM→0.78/0.55, FM→0.85/0.65/0.40 by taper week.
+///
+/// CHANGE (WeekResolver v5 — cyclic anchor):
+///   - _anchoredPattern() now sorts non-LR days by CYCLIC distance from the
+///     LR day and assigns roles by rank: Easy, Q1, Easy, Q2, Easy, …
+///     This is equivalent to the user's "wrap around the long run" rule and
+///     eliminates every Q-adjacency and cutback Q-count bug in one go.
+///   - Intent is now always derived from the slot pattern (not the archetype
+///     session type) so surplus quality archetype sessions can't bleed into
+///     easy slots on cutback weeks.
 library;
 
 import '../config/workout_template_library.dart';
@@ -124,7 +133,17 @@ class WeekResolution {
 // LADDER DEFINITIONS
 // ============================================================================
 
-const Map<WorkoutIntent, List<String>> _ladderTemplateIds = {
+const Map<WorkoutIntent, List<String>> ladderTemplateIds = {
+  WorkoutIntent.endurance: [
+    'long_steady',       // base/build/peak/taper — all distances
+    'long_progression',  // base/build/peak — all distances
+    'long_strides',      // base/build/peak — all distances
+    'long_gp_finish',    // build/peak — all distances
+    'long_fartlek',      // build/peak — 5K/10K/HM
+    'long_surges',       // build/peak — HM/FM
+    'long_cutdown',      // build/peak — HM/FM
+    'long_mid_block',    // build/peak — FM only
+  ],
   WorkoutIntent.threshold: [
     'cruise_intervals_400',
     'cruise_intervals_800',
@@ -137,6 +156,8 @@ const Map<WorkoutIntent, List<String>> _ladderTemplateIds = {
     'vo2_classic',
     'vo2_1000',
     'vo2_1200',
+    'vo2_ladder',
+    'vo2_pyramid',
   ],
   WorkoutIntent.raceSpecific: [
     'race_gp_intervals',
@@ -251,9 +272,9 @@ class WeekResolver {
       }
 
       final archetypeSession = assignedSessions[weekday];
-      final intent = archetypeSession != null
-          ? archetypeSession.type.intent
-          : _slotTypeToIntent(slotType, raceDistance, phase);
+      // Intent always comes from the slot pattern, never from the archetype
+      // session type. The archetype only provides per-session distance.
+      final intent = _slotTypeToIntent(slotType, raceDistance, phase);
 
       final (templateId, updatedPositions) = _pickTemplate(
         intent: intent,
@@ -365,15 +386,11 @@ class WeekResolver {
         case SlotType.quality2:
           if (qualityIdx < qualitySessions.length) {
             result[day] = qualitySessions[qualityIdx++];
-          } else if (easyIdx < easySessions.length) {
-            result[day] = easySessions[easyIdx++];
           }
           break;
         case SlotType.easy:
           if (easyIdx < easySessions.length) {
             result[day] = easySessions[easyIdx++];
-          } else if (qualityIdx < qualitySessions.length) {
-            result[day] = qualitySessions[qualityIdx++];
           }
           break;
         case SlotType.rest:
@@ -385,12 +402,22 @@ class WeekResolver {
   }
 
   // ==========================================================================
-  // SLOT PATTERN — V4
+  // SLOT PATTERN — V5 (cyclic anchor)
   //
-  // Cutback: caps qualityCount to 1. Q2 physical slot becomes easy.
-  //          No sessions dropped — all selected days train.
-  // Taper:   caps qualityCount to 1. No sessions dropped. No forced rest days.
-  //          Volume reduction handled entirely by _taperMultiplier.
+  // Non-LR training days are sorted by their CYCLIC distance from the LR day
+  // (i.e. how many days after the LR they fall, wrapping around the week),
+  // then assigned roles by rank:
+  //
+  //   Rank: 0=Easy  1=Q1  2=Easy  3=Q2  4+=Easy
+  //
+  // This naturally gives:
+  //   3-day (2 non-LR): Easy, Q1
+  //   4-day (3 non-LR): Easy, Q1, Easy
+  //   5-day (4 non-LR): Easy, Q1, Easy, Q2
+  //   6-day (5 non-LR): Easy, Q1, Easy, Q2, Easy
+  //
+  // Cutback / taper: rank 3 (Q2) → Easy.  No sessions dropped.
+  // Volume reduction is handled separately by effectiveKm.
   // ==========================================================================
 
   Map<int, SlotType> _anchoredPattern({
@@ -400,48 +427,27 @@ class WeekResolver {
     required TrainingPhase phase,
   }) {
     final result = <int, SlotType>{};
-    final n = sorted.length;
-
     result[lrDay] = SlotType.longRun;
 
-    final remaining = sorted.where((d) => d != lrDay).toList();
+    // Sort non-LR days by cyclic offset from LR day (1..6).
+    final remaining = sorted.where((d) => d != lrDay).toList()
+      ..sort((a, b) =>
+          ((a - lrDay + 7) % 7).compareTo((b - lrDay + 7) % 7));
 
-    // Cutback and taper: max 1 quality session.
-    // Normal weeks: 2 quality for 5+ days, 1 for 3–4 days.
-    final int qualityCount;
-    if (isCutbackWeek || phase == TrainingPhase.taper) {
-      qualityCount = n >= 3 ? 1 : 0;
-    } else {
-      qualityCount = n >= 5 ? 2 : (n >= 3 ? 1 : 0);
-    }
+    final dropQ2 = isCutbackWeek || phase == TrainingPhase.taper;
 
-    final lrIdx     = sorted.indexOf(lrDay);
-    final dayBefore = lrIdx > 0 ? sorted[lrIdx - 1] : null;
-    final dayAfter  = lrIdx < sorted.length - 1 ? sorted[lrIdx + 1] : null;
-    final protected = <int>{
-      if (dayBefore != null) dayBefore,
-      if (dayAfter  != null) dayAfter,
-    };
+    for (int i = 0; i < remaining.length; i++) {
+      // Day immediately before LR (cyclic offset 6) must stay Easy —
+      // it buffers the LR the same way offset-1 buffers recovery after it.
+      final isPreLrDay = (remaining[i] - lrDay + 7) % 7 == 6;
 
-    final qualityCandidates =
-        remaining.where((d) => !protected.contains(d)).toList();
-
-    final qualityDays = <int>[];
-    if (qualityCount >= 1 && qualityCandidates.isNotEmpty) {
-      qualityDays.add(qualityCandidates.first);
-    }
-    if (qualityCount >= 2 && qualityCandidates.length >= 2) {
-      qualityDays.add(qualityCandidates.last);
-    }
-
-    for (final day in remaining) {
-      if (qualityDays.contains(day)) {
-        result[day] = qualityDays.indexOf(day) == 0
-            ? SlotType.quality1
-            : SlotType.quality2;
-      } else {
-        result[day] = SlotType.easy;
-      }
+      result[remaining[i]] = switch (i) {
+        0 => SlotType.easy,
+        1 => SlotType.quality1,
+        2 => SlotType.easy,
+        3 => (dropQ2 || isPreLrDay) ? SlotType.easy : SlotType.quality2,
+        _ => SlotType.easy,
+      };
     }
 
     return result;
@@ -478,7 +484,7 @@ class WeekResolver {
   }
 
   WorkoutIntent _secondaryQualityIntent(RaceDistance race, TrainingPhase phase) {
-    if (phase == TrainingPhase.base) return WorkoutIntent.threshold;
+    if (phase == TrainingPhase.base) return WorkoutIntent.vo2max;
     if (phase == TrainingPhase.peak) return WorkoutIntent.raceSpecific;
     return switch (race) {
       RaceDistance.fiveK        => WorkoutIntent.threshold,
@@ -518,7 +524,7 @@ class WeekResolver {
     if (candidates.isEmpty) return (null, const {});
     if (candidates.length == 1) return (candidates.first.id, const {});
 
-    final ladder = _ladderTemplateIds[intent];
+    final ladder = ladderTemplateIds[intent];
     if (ladder != null) {
       final (picked, updatedIndex) = _pickFromLadder(
         ladder: ladder,

@@ -4,7 +4,7 @@ import '../memory/engine_memory.dart';
 import '../config/workout_template_library.dart';
 import '../../models/workout_type.dart';
 import '../../utils/database_service.dart';
-import '../coach_engine_v2.dart' show ProgressionDecision;
+import '../progression_decision.dart';
 
 /// Called once after every completed run to keep all coaching state current.
 ///
@@ -69,14 +69,25 @@ class EngineRuntime {
 
       // ── Weekly: save progression evaluation date ──────────────────────
       if (_shouldEvaluateProgression(updated, runDate)) {
-        final pendingNudge = updated.pendingVdotNudge;
-        final appliedNudge = pendingNudge.clamp(-1, 1);
-        final newVdot = (updated.vdotScore + appliedNudge).clamp(30, 85);
-
         // Use caller-supplied decision if provided, otherwise derive from
         // the 3-signal spec stored in memory.
         final resolvedDecision = weeklyProgressionDecision ??
             _computeDecisionFromMemory(updated);
+
+        // Fold the weekly training-adaptation signal into the pending nudge so
+        // vDOT drifts upward after sustained progress even when the runner hits
+        // prescribed paces exactly (pace-only calibration requires outrunning
+        // the prescription to fire).
+        final decisionNudge = resolvedDecision == ProgressionDecision.progress
+            ? 1
+            : resolvedDecision == ProgressionDecision.regress
+                ? -1
+                : 0;
+
+        final pacePending = updated.pendingVdotNudge;
+        final totalNudge = (pacePending + decisionNudge).clamp(-3, 3);
+        final appliedNudge = totalNudge.clamp(-1, 1);
+        final newVdot = (updated.vdotScore + appliedNudge).clamp(30, 85);
 
         updated = updated.copyWith(
           lastProgressionEvaluationDate: runDate,
@@ -88,7 +99,7 @@ class EngineRuntime {
 
         debugPrint(
           '[EngineRuntime] Weekly eval: vDOT ${updated.vdotScore - appliedNudge} → $newVdot '
-          '(pending=$pendingNudge applied=$appliedNudge) '
+          '(pacePending=$pacePending decisionNudge=$decisionNudge applied=$appliedNudge) '
           'progression=${resolvedDecision.name}',
         );
 

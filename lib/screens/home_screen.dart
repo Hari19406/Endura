@@ -109,6 +109,7 @@ class WorkoutDisplayModel {
   final String goalText;
   final String feelText;
   final String phaseLabel;
+  final String feelHint;
 
   const WorkoutDisplayModel({
     required this.category,
@@ -123,6 +124,7 @@ class WorkoutDisplayModel {
     this.goalText = '',
     this.feelText = '',
     this.phaseLabel = '',
+    this.feelHint = '',
   });
 
   factory WorkoutDisplayModel.fromCoachMessage(CoachMessage msg) {
@@ -174,6 +176,16 @@ class WorkoutDisplayModel {
       ]);
     }
 
+    final feelHint = switch (msg.workoutIntent) {
+      WorkoutIntent.aerobicBase  => 'Conversational pace',
+      WorkoutIntent.endurance    => 'Easy and steady',
+      WorkoutIntent.threshold    => 'Comfortably hard',
+      WorkoutIntent.vo2max       => 'Hard intervals',
+      WorkoutIntent.speed        => 'Short and snappy',
+      WorkoutIntent.raceSpecific => 'Race pace',
+      WorkoutIntent.recovery     => 'Very easy',
+    };
+
     return WorkoutDisplayModel(
       category: displayStyle.category,
       title: msg.workoutTitle,
@@ -187,16 +199,17 @@ class WorkoutDisplayModel {
       goalText: msg.goalText,
       feelText: msg.feelText,
       phaseLabel: msg.phaseLabel,
+      feelHint: feelHint,
     );
   }
 
   factory WorkoutDisplayModel.empty() {
     return const WorkoutDisplayModel(
       category: WorkoutCategory.rest,
-      title: 'Log a run to unlock',
+      title: 'Your first run is waiting',
       coachingReason:
-          'Your personalised workout will appear here after a couple of runs.',
-      coachingWhy: 'Head to the Run tab to get started.',
+          "Max needs to see you run before building your plan. Head to the Run tab and log your first session.",
+      coachingWhy: "It only takes one run — Max will take it from there.",
       steps: [],
     );
   }
@@ -315,6 +328,32 @@ class WorkoutCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (workout.feelHint.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F2F0),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 11, color: Color(0xFF00A08A)),
+                        const SizedBox(width: 5),
+                        Text(
+                          workout.feelHint,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF555555),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 18),
@@ -328,31 +367,6 @@ class WorkoutCard extends StatelessWidget {
                 height: 1.1,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              workout.coachingReason,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF666666),
-                height: 1.5,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (workout.coachingWhy.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                workout.coachingWhy,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF999999),
-                  height: 1.45,
-                  fontStyle: FontStyle.italic,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
             const SizedBox(height: 20),
             Row(
               children: [

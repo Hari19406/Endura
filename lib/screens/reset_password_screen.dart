@@ -98,7 +98,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.next,
-                  decoration: _inputDecoration('At least 6 characters').copyWith(
+                  decoration: _inputDecoration('At least 8 characters').copyWith(
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -110,7 +110,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 6)           return 'Password must be at least 6 characters';
+                    if (v.length < 8)           return 'Password must be at least 8 characters';
                     return null;
                   },
                 ),

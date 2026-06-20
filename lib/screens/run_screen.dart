@@ -46,7 +46,7 @@ class RunScreen extends StatefulWidget {
   State<RunScreen> createState() => _RunScreenState();
 }
 
-class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver {
+class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   RunState _runState = RunState.ready;
   PermissionStatus _permissionStatus = PermissionStatus.checking;
 
@@ -75,8 +75,12 @@ class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver {
   double _currentBearing = 0.0;
   double _smoothedBearing = 0.0;
   LatLng? _lastCameraCenter;
-  final double _cameraMovementThreshold = 50.0;
+  final double _cameraMovementThreshold = 15.0;
   bool _userHasPannedMap = false;
+
+  late final AnimationController _cameraAnimController;
+  Animation<double>? _cameraLatAnim;
+  Animation<double>? _cameraLngAnim;
   final _kalmanLat = _KalmanFilter();
   final _kalmanLng = _KalmanFilter();
 
@@ -215,6 +219,11 @@ bool get _hasCooldown =>
     _loadSettings();
     _checkPermissions();
     _startCompassTracking();
+    _cameraAnimController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _cameraAnimController.addListener(_onCameraAnimation);
   }
 
   @override
@@ -442,7 +451,16 @@ bool get _hasCooldown =>
     ).listen(
       (Position position) {
         if (mounted && _runState == RunState.ready) {
-          setState(() => _currentLocation = LatLng(position.latitude, position.longitude));
+          final newLoc = LatLng(position.latitude, position.longitude);
+          setState(() => _currentLocation = newLoc);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _runState == RunState.ready) {
+              try {
+                final zoom = _mapController.camera.zoom;
+                _mapController.move(newLoc, zoom > 0 ? zoom : 17.5);
+              } catch (_) {}
+            }
+          });
         }
       },
       onError: (e) => debugPrint('Warmup GPS error: $e'),
@@ -546,18 +564,26 @@ bool get _hasCooldown =>
 
           final smoothedLat = _kalmanLat.filter(position.latitude);
           final smoothedLng = _kalmanLng.filter(position.longitude);
-          LatLng newPoint = LatLng(smoothedLat, smoothedLng);
+          final LatLng newPoint = LatLng(smoothedLat, smoothedLng);
 
           if (_lastPosition != null) {
-            double distanceInMeters = Geolocator.distanceBetween(_lastPosition!.latitude, _lastPosition!.longitude, position.latitude, position.longitude);
-            if (distanceInMeters >= 1) {
-              double newBearing = _calculateBearing(_lastPosition!.latitude, _lastPosition!.longitude, position.latitude, position.longitude);
-              if (mounted) setState(() => _deviceHeading = newBearing);
+            final double distanceInMeters = Geolocator.distanceBetween(_lastPosition!.latitude, _lastPosition!.longitude, position.latitude, position.longitude);
+
+            // Update bearing every GPS tick — use GPS course when valid, fall back to position delta
+            if (position.heading >= 0) {
+              double bearingDiff = position.heading - _smoothedBearing;
+              if (bearingDiff > 180) bearingDiff -= 360;
+              if (bearingDiff < -180) bearingDiff += 360;
+              _currentBearing = (_smoothedBearing + bearingDiff * 0.4 + 360) % 360;
+              _deviceHeading = position.heading;
+            } else if (distanceInMeters >= 1) {
+              final double newBearing = _calculateBearing(_lastPosition!.latitude, _lastPosition!.longitude, position.latitude, position.longitude);
               double bearingChange = newBearing - _smoothedBearing;
               if (bearingChange > 180) bearingChange -= 360;
               if (bearingChange < -180) bearingChange += 360;
-              bool sharpTurn = _isSharpTurnDetected(distanceInMeters, bearingChange);
+              final bool sharpTurn = _isSharpTurnDetected(distanceInMeters, bearingChange);
               if (!sharpTurn || distanceInMeters >= 10) _currentBearing = _smoothBearing(newBearing, _smoothedBearing);
+              _deviceHeading = newBearing;
             }
 
             if (mounted && _runState == RunState.running && !_isGPSSignalLost) {
@@ -565,6 +591,7 @@ bool get _hasCooldown =>
               if (_pendingDistance >= 1) {
                 final validDistance = _pendingDistance;
                 _pendingDistance = 0;
+                final shouldMoveCamera = _shouldUpdateCamera(newPoint);
                 setState(() {
                   _distance += validDistance;
                   _paceSnapshot = _paceEngine.addPoint(
@@ -574,8 +601,8 @@ bool get _hasCooldown =>
                   _routePoints.add(newPoint);
                   _currentLocation = newPoint;
                   _smoothedBearing = _currentBearing;
-                  if (_shouldUpdateCamera(newPoint)) _smoothMoveCamera(newPoint);
                 });
+                if (shouldMoveCamera) _smoothMoveCamera(newPoint);
                 final kmCompleted = (_distance / 1000).floor();
                 if (kmCompleted > _lastAnnouncedKm && kmCompleted > 0) {
                   _lastAnnouncedKm = kmCompleted;
@@ -583,11 +610,12 @@ bool get _hasCooldown =>
                 }
                 _checkPhaseMilestone();
               } else {
+                final shouldMoveCamera = _shouldUpdateCamera(newPoint);
                 setState(() {
                   _currentLocation = newPoint;
                   _smoothedBearing = _currentBearing;
-                  if (_shouldUpdateCamera(newPoint)) _smoothMoveCamera(newPoint);
                 });
+                if (shouldMoveCamera) _smoothMoveCamera(newPoint);
               }
             }
           } else {
@@ -684,8 +712,27 @@ bool get _hasCooldown =>
     return _getDistanceFromCamera(newLocation) > _cameraMovementThreshold;
   }
 
+  void _onCameraAnimation() {
+    if (mounted && _cameraLatAnim != null && _cameraLngAnim != null) {
+      try {
+        _mapController.move(
+          LatLng(_cameraLatAnim!.value, _cameraLngAnim!.value),
+          _mapController.camera.zoom,
+        );
+      } catch (_) {}
+    }
+  }
+
   void _smoothMoveCamera(LatLng target) {
-    _mapController.move(target, _mapController.camera.zoom);
+    try {
+      final currentCenter = _mapController.camera.center;
+      _cameraAnimController.stop();
+      _cameraLatAnim = Tween<double>(begin: currentCenter.latitude, end: target.latitude)
+          .animate(CurvedAnimation(parent: _cameraAnimController, curve: Curves.easeOutCubic));
+      _cameraLngAnim = Tween<double>(begin: currentCenter.longitude, end: target.longitude)
+          .animate(CurvedAnimation(parent: _cameraAnimController, curve: Curves.easeOutCubic));
+      _cameraAnimController.forward(from: 0);
+    } catch (_) {}
     _lastCameraCenter = target;
   }
 
@@ -852,6 +899,7 @@ bool get _hasCooldown =>
     _positionStream?.cancel();
     _warmupStream?.cancel();
     _gpsMonitorTimer?.cancel();
+    _cameraAnimController.dispose();
     _stopForegroundTask();
     AudioCueService.instance.dispose();
     super.dispose();

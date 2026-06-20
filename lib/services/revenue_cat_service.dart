@@ -1,13 +1,14 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
 class RevenueCatService {
-  static const _androidKey = 'test_ssqCThHhzwWBvTvcwdhtpPNooBE';
-  static const _iosKey = 'appl_xxxxxxxxxxxx';
+  static const _androidKey = String.fromEnvironment('REVENUECAT_ANDROID_KEY');
+  static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
 
   static Future<void> init(String supabaseUserId) async {
-    await Purchases.setLogLevel(LogLevel.debug); // remove before release
+    if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
     final config = PurchasesConfiguration(
       Platform.isAndroid ? _androidKey : _iosKey,
     )..appUserID = supabaseUserId;

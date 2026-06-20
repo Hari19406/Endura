@@ -18,6 +18,7 @@ import '../services/training_days_service.dart';
 import '../utils/stats.dart' show RunHistory;
 import '../engines/daily/dynamic_scaler.dart';
 import '../models/race_plan.dart';
+import '../models/training_phase.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -196,6 +197,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                               _buildPaceCard(),
                               const SizedBox(height: 12),
                               _buildRpeCard(),
+                              if (_rpe != null) ...[
+                                const SizedBox(height: 12),
+                                _buildCoachFeedbackCard(data),
+                              ],
                               const SizedBox(height: 12),
                               _buildNextWorkoutCard(data),
                               const SizedBox(height: 12),
@@ -701,6 +706,104 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     );
   }
 
+  // ── Coach feedback card — Max reacts to your run ─────────────────────────
+
+  Widget _buildCoachFeedbackCard(_SummaryData data) {
+    final intent = widget.activeCoachMessage?.workoutIntent;
+    final rpe = _rpe!;
+    final target = _targetPaceRange;
+    final avgSec = _paceToSeconds(widget.averagePace);
+
+    bool? isOnTarget;
+    bool ranTooFast = false;
+    if (target != null) {
+      isOnTarget = avgSec >= target.minSecondsPerKm &&
+          avgSec <= target.maxSecondsPerKm;
+      ranTooFast = avgSec < target.minSecondsPerKm;
+    }
+
+    final msg = message.CoachMessageBuilder().buildPostRunMessage(
+      intent: intent ?? WorkoutIntent.aerobicBase,
+      rpe: rpe,
+      distanceKm: widget.distanceKm,
+      totalRunsCompleted: data.totalRunCount,
+      isOnTargetPace: isOnTarget,
+      ranTooFast: ranTooFast,
+      phase: data.phase,
+      weekNumber: data.weekNumber,
+      isLongestRun: data.isLongestRun,
+      runsThisWeek: data.runsThisWeek,
+      daysUntilRace: data.daysUntilRace,
+      isCutbackWeek: data.isCutbackWeek,
+    );
+
+    return AnimatedOpacity(
+      opacity: 1.0,
+      duration: const Duration(milliseconds: 400),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 3,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF00C2A8),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    bottomLeft: Radius.circular(16),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6FAF7),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'MAX',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF00A08A),
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        msg,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF1C1C1C),
+                          height: 1.55,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Next up card ──────────────────────────────────────────────────────────
 
   Widget _buildNextWorkoutCard(_SummaryData data) {
@@ -874,7 +977,25 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         ladderPositions: memory.ladderPositions,
       );
 
+      final maxPreviousDist = runHistoryTyped.isEmpty
+          ? 0.0
+          : runHistoryTyped.map((r) => r.distance).reduce((a, b) => a > b ? a : b);
+      final isLongestRun = widget.distanceKm > maxPreviousDist;
+
       final now = DateTime.now();
+      final monday = now.subtract(Duration(days: now.weekday - 1));
+      final mondayMidnight = DateTime(monday.year, monday.month, monday.day);
+      final runsThisWeek = runHistoryTyped
+              .where((r) => r.date.isAfter(mondayMidnight))
+              .length +
+          1;
+
+      int? daysUntilRace;
+      if (memory.hasRacePlan && memory.racePlan != null) {
+        final diff = memory.racePlan!.raceDate.difference(now).inDays;
+        if (diff >= 0) daysUntilRace = diff;
+      }
+
       final todayMidnight = DateTime(now.year, now.month, now.day);
 
       ProjectedDay? nextDay;
@@ -905,6 +1026,13 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           nextIntent: intent,
           nextWorkoutLabel: label,
           nextWorkoutSubtext: subtext,
+          totalRunCount: runHistoryTyped.length,
+          phase: phase,
+          weekNumber: weekNum,
+          isLongestRun: isLongestRun,
+          runsThisWeek: runsThisWeek,
+          daysUntilRace: daysUntilRace,
+          isCutbackWeek: is3to1Cutback,
         );
         _latestData = result;
         return result;
@@ -1150,6 +1278,13 @@ class _SummaryData {
   final WorkoutIntent? nextIntent;
   final String nextWorkoutLabel;
   final String nextWorkoutSubtext;
+  final int totalRunCount;
+  final TrainingPhase phase;
+  final int weekNumber;
+  final bool isLongestRun;
+  final int runsThisWeek;
+  final int? daysUntilRace;
+  final bool isCutbackWeek;
 
   const _SummaryData({
     required this.paceTrend,
@@ -1157,6 +1292,13 @@ class _SummaryData {
     this.nextIntent,
     required this.nextWorkoutLabel,
     required this.nextWorkoutSubtext,
+    this.totalRunCount = 0,
+    this.phase = TrainingPhase.base,
+    this.weekNumber = 1,
+    this.isLongestRun = false,
+    this.runsThisWeek = 1,
+    this.daysUntilRace,
+    this.isCutbackWeek = false,
   });
 
   factory _SummaryData.empty() => const _SummaryData(

@@ -1,6 +1,6 @@
 import '../memory/engine_memory.dart';
 import '../config/workout_template_library.dart';
-import '../coach_engine_v2.dart' show ProgressionDecision;
+import '../progression_decision.dart';
 
 class WeeklyVolumeResolver {
   // ── Volume range table ───────────────────────────────────────────────────

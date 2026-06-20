@@ -9,6 +9,7 @@ import '../models/workout_type.dart';
 import '../models/training_phase.dart';
 import '../models/race_plan.dart';
 import 'memory/engine_memory.dart';
+import 'progression_decision.dart';
 
 import '../services/workout_selector.dart' as selector;
 import 'package:flutter/foundation.dart';
@@ -77,8 +78,6 @@ class UserMetrics {
   });
 }
 
-enum ProgressionDecision { progress, hold, regress }
-
 class ProgressionProfile {
   final ProgressionDecision decision;
   final double weeklyVolumeMultiplier;
@@ -111,25 +110,6 @@ class PostPlanState {
 
 class CoachEngine {
   static const double _maxSafeProgressionMultiplier = 1.0825;
-
-  static const Map<WorkoutIntent, List<String>> _ladderTemplateIds = {
-    WorkoutIntent.threshold: [
-      'cruise_intervals_400',
-      'cruise_intervals_800',
-      'cruise_intervals_mile',
-      'tempo_continuous',
-    ],
-    WorkoutIntent.vo2max: [
-      'vo2_600',
-      'vo2_classic',
-      'vo2_1000',
-    ],
-    WorkoutIntent.raceSpecific: [
-      'race_gp_intervals',
-      'race_simulation',
-      'race_dress_rehearsal',
-    ],
-  };
 
   final message.CoachMessageBuilder _coachMessageBuilder;
   final WorkoutResolver _workoutResolver;
@@ -384,6 +364,21 @@ class CoachEngine {
 
     final effectivePlannedIntent = weekResolution.intentForToday(now);
 
+    // First-ever workout must never be quality — ease them in regardless of
+    // which slot the week pattern assigned.
+    const _qualityIntents = {
+      WorkoutIntent.threshold,
+      WorkoutIntent.vo2max,
+      WorkoutIntent.speed,
+      WorkoutIntent.raceSpecific,
+    };
+    final adjustedPlannedIntent =
+        (memory.totalRunsCompleted == 0 &&
+                effectivePlannedIntent != null &&
+                _qualityIntents.contains(effectivePlannedIntent))
+            ? WorkoutIntent.aerobicBase
+            : effectivePlannedIntent;
+
     final selectionContext = session.SelectionContext(
       raceDistance: _mapGoalRace(userMetrics.goalRace),
       phase: _mapTrainingPhase(phase),
@@ -396,7 +391,7 @@ class CoachEngine {
       lastCompletedTemplateId: memory.lastCompletedTemplateId,
       lastCompletedIntent: memory.lastCompletedWorkoutIntent ??
           _lastWorkoutToIntent(lastWorkoutType),
-      plannedIntent: effectivePlannedIntent,
+      plannedIntent: adjustedPlannedIntent,
       weekNumber: weekNum,
       avgRpe: runAnalysis.avgRpe ?? userMetrics.avgRpe,
       weeklyVolumeCompletedKm: budget.volumeDoneKm,
@@ -893,7 +888,7 @@ class CoachEngine {
   }) {
     if (decision == ProgressionDecision.hold) return current;
     final updated = Map<String, int>.from(current);
-    for (final entry in _ladderTemplateIds.entries) {
+    for (final entry in ladderTemplateIds.entries) {
       final intentName = entry.key.name;
       final maxIndex = entry.value.length - 1;
       final currentIndex = updated[intentName] ?? 0;

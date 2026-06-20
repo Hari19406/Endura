@@ -26,11 +26,9 @@ class _AuthScreenState extends State<AuthScreen> {
   String? _errorMessage;
   bool _submitLocked = false;
 
-  final _firstNameController = TextEditingController();
-  final _lastNameController  = TextEditingController();
-  final _emailController     = TextEditingController();
-  final _passwordController  = TextEditingController();
-  final _formKey             = GlobalKey<FormState>();
+  final _emailController    = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _formKey            = GlobalKey<FormState>();
 
   // ── Legal URLs — replace with your actual hosted URLs ─────────────────────
   static const _termsUrl   = 'https://yourdomain.com/terms';
@@ -49,8 +47,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -70,17 +66,6 @@ class _AuthScreenState extends State<AuthScreen> {
           email:    _emailController.text.trim(),
           password: _passwordController.text,
         );
-
-        // Save first/last name to profiles table (best-effort).
-        // If a trigger creates the row, this updates it; otherwise inserts.
-        final userId = response.user?.id;
-        if (userId != null) {
-          await _saveNameToProfile(
-            userId: userId,
-            firstName: _firstNameController.text.trim(),
-            lastName:  _lastNameController.text.trim(),
-          );
-        }
 
         await Posthog().capture(
           eventName: 'signup',
@@ -176,7 +161,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (message.contains('Invalid login'))       return 'Wrong email or password.';
     if (message.contains('Email not confirmed')) return 'Please confirm your email before signing in.';
     if (message.contains('already registered'))  return 'An account with this email already exists.';
-    if (message.contains('Password should be'))  return 'Password must be at least 6 characters.';
+    if (message.contains('Password should be'))  return 'Password must be at least 8 characters.';
     return message;
   }
 
@@ -249,6 +234,7 @@ class _AuthScreenState extends State<AuthScreen> {
         _errorMessage = _friendlyError(e.message);
       });
     } catch (e) {
+      debugPrint('[GoogleSignIn] error: $e');
       _submitLocked = false;
       if (mounted) setState(() {
         _isLoading    = false;
@@ -362,61 +348,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
                 const SizedBox(height: 20),
 
-                // First / Last name — only in sign-up
-                if (_isSignUp) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('First Name'),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _firstNameController,
-                              textInputAction: TextInputAction.next,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('eg. John'),
-                              validator: (v) {
-                                if (!_isSignUp) return null;
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Last Name'),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _lastNameController,
-                              textInputAction: TextInputAction.next,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('eg. Francisco'),
-                              validator: (v) {
-                                if (!_isSignUp) return null;
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                ],
-
                 // Email
                 _label('Email'),
                 const SizedBox(height: 8),
@@ -492,8 +423,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Password is required';
-                    if (_isSignUp && v.length < 6) {
-                      return 'Password must be at least 6 characters';
+                    if (_isSignUp && v.length < 8) {
+                      return 'Password must be at least 8 characters';
                     }
                     return null;
                   },
@@ -503,7 +434,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 if (_isSignUp) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Must be at least 6 characters.',
+                    'Must be at least 8 characters.',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade500,

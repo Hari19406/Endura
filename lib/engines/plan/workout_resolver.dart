@@ -25,6 +25,40 @@ import '../daily/dynamic_scaler.dart';
 import '../../models/training_phase.dart';
 
 // ============================================================================
+// LADDER / PYRAMID CONFIG
+// ============================================================================
+
+class _LadderStep {
+  final int meters;
+  final int recoverySeconds;
+  const _LadderStep(this.meters, this.recoverySeconds);
+}
+
+class _LadderConfig {
+  final List<_LadderStep> steps;
+  const _LadderConfig(this.steps);
+  double get workKm =>
+      steps.fold(0.0, (sum, s) => sum + s.meters / 1000.0);
+}
+
+// Ascending ladders — small to large
+const _ladderConfigs = [
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150)]),
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180)]),
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(1200, 210)]),
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(1200, 210), _LadderStep(1600, 270)]),
+];
+
+// Pyramids — up then back down
+const _pyramidConfigs = [
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90)]),
+  _LadderConfig([_LadderStep(200, 60), _LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90), _LadderStep(200, 60)]),
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90)]),
+  _LadderConfig([_LadderStep(200, 60), _LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90), _LadderStep(200, 60)]),
+  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(1200, 210), _LadderStep(1000, 180), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90)]),
+];
+
+// ============================================================================
 // SCALING TIER
 // ============================================================================
 
@@ -202,6 +236,17 @@ class WorkoutResolver {
     ScalingTier scalingTier = ScalingTier.full,
     List<String>? scalingAdjustments,
   }) {
+    // Ladder and pyramid are resolved dynamically — skip standard block path.
+    if (template.id == 'vo2_ladder' || template.id == 'vo2_pyramid') {
+      return _resolveDynamicLadder(
+        template: template,
+        totalDistanceKm: totalDistanceKm,
+        resolverContext: resolverContext,
+        phase: phase,
+        intent: intent,
+      );
+    }
+
     final fixedDistanceKm = _calculateFixedDistance(template.blocks, variant);
     final flexibleBudgetKm =
         (totalDistanceKm - fixedDistanceKm).clamp(1.0, double.infinity);
@@ -210,8 +255,21 @@ class WorkoutResolver {
         .where((b) => b.durationType == DurationType.percentage)
         .fold(0.0, (sum, b) => sum + b.value);
 
+    // For interval templates, compute reps from the allocated budget so the
+    // workout fills close to totalDistanceKm instead of always resolving to
+    // the same fixed structure regardless of what the planner assigned.
+    final dynamicReps = _computeDynamicReps(
+      template: template,
+      variant: variant,
+      totalDistanceKm: totalDistanceKm,
+      scalingAdjustments: scalingAdjustments,
+    );
+
     final resolvedBlocks = <ResolvedBlock>[];
     for (final block in template.blocks) {
+      final isRepBlock = block.type == BlockType.main &&
+          block.reps != null &&
+          block.durationType == DurationType.fixedKm;
       resolvedBlocks.add(_resolveBlock(
         block: block,
         variant: variant,
@@ -222,6 +280,7 @@ class WorkoutResolver {
         intent: intent,
         scalingTier: scalingTier,
         scalingAdjustments: scalingAdjustments,
+        overrideReps: isRepBlock ? dynamicReps : null,
       ));
     }
 
@@ -455,6 +514,7 @@ class WorkoutResolver {
     required WorkoutIntent intent,
     ScalingTier scalingTier = ScalingTier.full,
     List<String>? scalingAdjustments,
+    int? overrideReps,
   }) {
     // ── Distance ─────────────────────────────────────────────────────────
     double distanceKm;
@@ -490,7 +550,7 @@ class WorkoutResolver {
     // ── Reps ─────────────────────────────────────────────────────────────
     int? reps;
     if (block.reps != null) {
-      final raw = variant?.reps ?? block.reps!;
+      final raw = overrideReps ?? variant?.reps ?? block.reps!;
       final experienceClamped = _clampRepsForExperience(raw, experienceLevel);
 
       if (block.type == BlockType.main && scalingTier != ScalingTier.full) {
@@ -544,6 +604,140 @@ class WorkoutResolver {
       recoveryMeters: resolvedRecoveryMeters,
       label: block.label,
     );
+  }
+
+  // ========================================================================
+  // DYNAMIC LADDER / PYRAMID
+  // ========================================================================
+
+  ResolvedWorkout _resolveDynamicLadder({
+    required WorkoutTemplate template,
+    required double totalDistanceKm,
+    required ResolverContext resolverContext,
+    required TrainingPhase phase,
+    required WorkoutIntent intent,
+  }) {
+    final isPyramid = template.id == 'vo2_pyramid';
+    final configs = isPyramid ? _pyramidConfigs : _ladderConfigs;
+
+    const wuKm    = 2.0;
+    const minCdKm = 1.0;
+    final availableForWork = totalDistanceKm - wuKm - minCdKm;
+
+    // Pick the largest config whose work km fits the available budget.
+    final chosen = configs.lastWhere(
+      (c) => c.workKm <= availableForWork,
+      orElse: () => configs.first,
+    );
+
+    final cdKm = (totalDistanceKm - wuKm - chosen.workKm)
+        .clamp(minCdKm, double.infinity);
+
+    final easyPace  = resolverContext.paceTable.resolve(PaceZone.aerobicEasy);
+    final workPace  = resolverContext.paceTable.resolve(PaceZone.ladderPyramid);
+
+    final blocks = <ResolvedBlock>[];
+
+    // Warmup
+    blocks.add(ResolvedBlock(
+      type: BlockType.warmup,
+      distanceKm: wuKm,
+      paceMinSecondsPerKm: easyPace.minSecondsPerKm,
+      paceMaxSecondsPerKm: easyPace.maxSecondsPerKm,
+    ));
+
+    // Work steps — each gets its own distance, pace, and recovery seconds
+    for (final step in chosen.steps) {
+      blocks.add(ResolvedBlock(
+        type: BlockType.main,
+        distanceKm: step.meters / 1000.0,
+        paceMinSecondsPerKm: workPace.minSecondsPerKm,
+        paceMaxSecondsPerKm: workPace.maxSecondsPerKm,
+        recoverySeconds: step.recoverySeconds,
+        label: '${step.meters}m',
+      ));
+    }
+
+    // Cooldown — absorbs remaining budget
+    blocks.add(ResolvedBlock(
+      type: BlockType.cooldown,
+      distanceKm: _roundSmart(cdKm),
+      paceMinSecondsPerKm: easyPace.minSecondsPerKm,
+      paceMaxSecondsPerKm: easyPace.maxSecondsPerKm,
+    ));
+
+    return ResolvedWorkout(
+      templateId: template.id,
+      name: template.name,
+      intent: intent,
+      blocks: blocks,
+      phase: phase,
+    );
+  }
+
+  // ========================================================================
+  // DYNAMIC REPS
+  // ========================================================================
+
+  // Computes how many reps fit in the allocated budget for interval templates.
+  // Returns null when not applicable (percentage-based, multi-block, time-based).
+  int? _computeDynamicReps({
+    required WorkoutTemplate template,
+    required PhaseVariant? variant,
+    required double totalDistanceKm,
+    List<String>? scalingAdjustments,
+  }) {
+    if (template.intent != WorkoutIntent.threshold &&
+        template.intent != WorkoutIntent.vo2max &&
+        template.intent != WorkoutIntent.speed &&
+        template.intent != WorkoutIntent.raceSpecific) return null;
+
+    // Only applies to templates with exactly one fixedKm main block with reps.
+    final repBlocks = template.blocks
+        .where((b) =>
+            b.type == BlockType.main &&
+            b.reps != null &&
+            b.durationType == DurationType.fixedKm)
+        .toList();
+    if (repBlocks.length != 1) return null;
+
+    final mainBlock = repBlocks.first;
+
+    final repKm = variant?.repDistanceKm ??
+        (variant?.repDistanceMeters != null
+            ? variant!.repDistanceMeters! / 1000.0
+            : null) ??
+        mainBlock.value;
+    if (repKm <= 0) return null;
+
+    // Overhead = WU + CD + recovery jog blocks (all non-main fixedKm blocks).
+    var overheadKm = 0.0;
+    for (final b in template.blocks) {
+      if (b.type == BlockType.main) continue;
+      if (b.durationType != DurationType.fixedKm) continue;
+      overheadKm += b.value;
+    }
+
+    final availableKm = totalDistanceKm - overheadKm;
+    if (availableKm <= 0) return null;
+
+    final baseReps = variant?.reps ?? mainBlock.reps!;
+    final rawDynamic = (availableKm / repKm).floor();
+
+    // If budget allows more reps, use them. If budget is tight, keep base.
+    final dynamic = rawDynamic >= baseReps
+        ? rawDynamic
+        : rawDynamic.clamp(_minIntervalReps, baseReps);
+
+    if (dynamic != baseReps) {
+      scalingAdjustments?.add(
+        'Dynamic reps: $baseReps → $dynamic × '
+        '${(repKm * 1000).round()}m '
+        '(budget: ${totalDistanceKm.toStringAsFixed(1)} km)',
+      );
+    }
+
+    return dynamic;
   }
 
   // ========================================================================

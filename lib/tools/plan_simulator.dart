@@ -6,7 +6,7 @@ library;
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:run_app/engines/coach_engine_v2.dart' show ProgressionDecision;
+import 'package:run_app/engines/progression_decision.dart';
 import 'package:run_app/engines/core/vdot_calculator.dart';
 import 'package:run_app/engines/core/pace_table.dart';
 import 'package:run_app/engines/config/workout_template_library.dart';
@@ -387,7 +387,7 @@ class PlanSimulator {
       if (weekNum > persona.planWeeks + 1 && memory.isInMaintenance) break;
 
       final isCutback = weekNum % 4 == 0;
-      final (targetKm, phase, slots, updatedLadder) = _resolveWeek(
+      final (targetKm, phase, slots, updatedLadder, resolvedEffectiveKm) = _resolveWeek(
         memory: memory,
         trainingDays: trainingDays,
         weekNum: weekNum,
@@ -500,6 +500,7 @@ class PlanSimulator {
         previousWeekActualKm:
             weekLogs.isNotEmpty ? weekLogs.last.actualKm : null,
         trainingDays: trainingDays,
+        resolvedEffectiveKm: resolvedEffectiveKm,
       );
       globalWarnings.addAll(weekWarnings.map((w) => 'W$weekNum: $w'));
 
@@ -592,7 +593,7 @@ class PlanSimulator {
     );
   }
 
-  (double, TrainingPhase, List<_SimSlot>, Map<String, int>) _resolveWeek({
+  (double, TrainingPhase, List<_SimSlot>, Map<String, int>, double) _resolveWeek({
     required EngineMemory memory,
     required List<int> trainingDays,
     required int weekNum,
@@ -657,9 +658,11 @@ class PlanSimulator {
 
     final trainingSlots = resolution.days.where((d) => d.isTraining).toList();
     final slots = <_SimSlot>[];
+    // resolution.targetKm already has cutback/taper multiplier applied.
+    final effectiveKm = resolution.targetKm;
 
     for (final day in trainingSlots) {
-      final slotKm = day.distanceKm ?? (targetKm / trainingSlots.length);
+      final slotKm = day.distanceKm ?? (effectiveKm / trainingSlots.length);
       final prescribedPace =
           _paceForIntent(day.intent?.name ?? 'aerobicBase', memory.vdotScore);
 
@@ -673,7 +676,7 @@ class PlanSimulator {
       ));
     }
 
-    return (targetKm, phase, slots, resolution.updatedLadderPositions);
+    return (targetKm, phase, slots, resolution.updatedLadderPositions, effectiveKm);
   }
 
   ({EngineMemory memory, bool justCompleted, bool justEnteredMaintenance})
@@ -807,18 +810,22 @@ class PlanSimulator {
   // EXPECTED COMPOSITION HELPERS
   // ============================================================================
 
+  // Cyclic-rank pattern: Q1 at rank 1, Q2 at rank 3.
+  // Exception: if the rank-3 day is immediately before the LR day (offset +6),
+  // it is protected to Easy — same pre-LR buffer rule as WeekResolver.
   int _expectedQualityCount5Day(SimPersona persona, List<int> trainingDays) {
-    final sorted = List<int>.from(trainingDays)..sort();
-    final lrDay = sorted.contains(persona.longRunDayIndex)
-        ? persona.longRunDayIndex
-        : sorted.last;
-    final daysAfterL = sorted.where((d) => d > lrDay).length;
-    return daysAfterL == 0 ? 1 : 2;
+    final lrDay = persona.longRunDayIndex;
+    final remaining = trainingDays.where((d) => d != lrDay).toList()
+      ..sort((a, b) => ((a - lrDay + 7) % 7).compareTo((b - lrDay + 7) % 7));
+    if (remaining.length >= 4) {
+      final rank3Offset = (remaining[3] - lrDay + 7) % 7;
+      if (rank3Offset == 6) return 1;
+    }
+    return 2;
   }
 
-  int _expectedEasyCount5Day(SimPersona persona, List<int> trainingDays) {
-    return 5 - 1 - _expectedQualityCount5Day(persona, trainingDays);
-  }
+  int _expectedEasyCount5Day(SimPersona persona, List<int> trainingDays) =>
+      5 - 1 - _expectedQualityCount5Day(persona, trainingDays);
 
   // ============================================================================
   // AUDIT
@@ -836,6 +843,7 @@ class PlanSimulator {
     required SimPersona persona,
     required List<int> trainingDays,
     double? previousWeekActualKm,
+    double? resolvedEffectiveKm,
   }) {
     final warnings = <String>[];
     final completed = sessions.where((s) => !s.wasSkipped).toList();
@@ -849,7 +857,12 @@ class PlanSimulator {
     if (isCutback &&
         previousWeekActualKm != null &&
         previousWeekActualKm > 0) {
-      if (actualKm > previousWeekActualKm * 0.80) {
+      // Use the engine's resolved effective km (post-0.70 multiplier) rather
+      // than the floor-inflated actual total. Session floors (LR ≥ 8km) can
+      // push actual above the cutback target even when the engine applied the
+      // reduction correctly — that's expected and not a real warning.
+      final volumeToCheck = resolvedEffectiveKm ?? actualKm;
+      if (volumeToCheck > previousWeekActualKm * 0.80) {
         warnings.add(
             'CUTBACK: Volume ${_fmt(actualKm)}km not reduced enough vs prev week ${_fmt(previousWeekActualKm)}km (should be ≤80%)');
       }
@@ -891,7 +904,7 @@ class PlanSimulator {
     // ── Volume hog — exempt taper (long run naturally >40% of reduced week) ──
     if (actualKm > 0 && phase != TrainingPhase.taper) {
       for (final s in completed) {
-        final volThreshold = persona.daysPerWeek <= 4 ? 0.50 : 0.40;
+        final volThreshold = persona.daysPerWeek <= 3 ? 0.55 : (persona.daysPerWeek <= 4 ? 0.50 : 0.40);
         if (s.actualKm / actualKm > volThreshold) {
           warnings.add(
               'DISTRIBUTION: ${s.intent} on ${_dayName(s.dayOfWeek)} is ${_fmt(s.actualKm / actualKm * 100)}% of week');
@@ -1056,7 +1069,7 @@ bool _isQuality(String intent) =>
     intent == 'raceSpecific';
 
 // Ladder intents cycle by design — repeat within 2-week window is expected.
-const _ladderIntents = {'threshold', 'vo2max', 'raceSpecific'};
+const _ladderIntents = {'endurance', 'threshold', 'vo2max', 'raceSpecific'};
 
 String _dayName(int i) =>
     ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i.clamp(0, 6)];

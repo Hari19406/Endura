@@ -3,11 +3,7 @@ import '../services/coach_message_builder.dart' as message;
 import '../engines/config/workout_template_library.dart';
 import 'run_screen.dart';
 
-// ── Block completion state ────────────────────────────────────────────────────
-
 enum BlockState { pending, done }
-
-// ── Screen ────────────────────────────────────────────────────────────────────
 
 class PreRunBriefingScreen extends StatefulWidget {
   final message.CoachMessage coachMessage;
@@ -60,12 +56,15 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   @override
   Widget build(BuildContext context) {
     final workout = widget.coachMessage.resolvedWorkout;
+    final hasCoachContent = widget.coachMessage.reflectionText.isNotEmpty ||
+        widget.coachMessage.goalText.isNotEmpty ||
+        widget.coachMessage.feelText.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: const Color(0xFFF2F2F2),
       appBar: AppBar(
         title: const Text(
-          'Workout Plan',
+          'Today\'s Workout',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A0A0A),
@@ -75,7 +74,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: const Color(0xFFFAFAFA),
+        backgroundColor: const Color(0xFFF2F2F2),
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0A0A0A)),
@@ -83,164 +82,202 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            if (widget.coachMessage.phaseWeekLabel.isNotEmpty) ...[
-              _PhaseWeekBanner(label: widget.coachMessage.phaseWeekLabel),
-              const SizedBox(height: 16),
-            ],
-
-            Text(
-              widget.coachMessage.workoutTitle,
-              style: const TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0A0A0A),
-                letterSpacing: -0.8,
-                height: 1.05,
-              ),
-            ),
-            const SizedBox(height: 5),
-
-            Text(
-              widget.coachMessage.hasWarmupCooldown
-                  ? 'Warmup and cooldown included — hard efforts need your muscles ready'
-                  : 'No warmup needed — this run is at an easy effort',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF999999),
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            _buildHeroStats(workout),
-            const SizedBox(height: 28),
-
-            const Text(
-              'FROM YOUR COACH',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF999999),
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              widget.coachMessage.reflectionText,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF444444),
-                height: 1.6,
-              ),
-            ),
-            if (widget.coachMessage.acknowledgementText.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                widget.coachMessage.acknowledgementText,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF888888),
-                  fontStyle: FontStyle.italic,
-                  height: 1.6,
-                ),
-              ),
-            ],
-
-            if (widget.coachMessage.goalText.isNotEmpty ||
-                widget.coachMessage.feelText.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Row(
+            // ── Header card ──────────────────────────────────────────────────
+            _Card(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.coachMessage.goalText.isNotEmpty)
-                    Expanded(
-                      child: _CoachingInsightCard(
-                        icon: Icons.flag_outlined,
-                        label: 'GOAL',
-                        text: widget.coachMessage.goalText,
-                        iconColor: const Color(0xFF1565C0),
-                      ),
+                  if (widget.coachMessage.phaseWeekLabel.isNotEmpty) ...[
+                    _PhaseWeekBanner(label: widget.coachMessage.phaseWeekLabel),
+                    const SizedBox(height: 12),
+                  ],
+                  Text(
+                    widget.coachMessage.workoutTitle,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A0A0A),
+                      letterSpacing: -0.8,
+                      height: 1.1,
                     ),
-                  if (widget.coachMessage.goalText.isNotEmpty &&
-                      widget.coachMessage.feelText.isNotEmpty)
-                    const SizedBox(width: 10),
-                  if (widget.coachMessage.feelText.isNotEmpty)
-                    Expanded(
-                      child: _CoachingInsightCard(
-                        icon: Icons.favorite_border,
-                        label: 'FEEL',
-                        text: widget.coachMessage.feelText,
-                        iconColor: const Color(0xFFE53935),
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.coachMessage.hasWarmupCooldown
+                        ? 'Warmup & cooldown included'
+                        : 'Easy effort — no warmup needed',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFAAAAAA),
                     ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildHeroStats(workout),
                 ],
               ),
-            ],
+            ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 10),
 
-            const Text(
-              'WORKOUT',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF999999),
-                letterSpacing: 1.2,
+            // ── Coach card ───────────────────────────────────────────────────
+            if (hasCoachContent)
+              _Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0A0A0A),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'M',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Max',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0A0A0A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (widget.coachMessage.reflectionText.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.coachMessage.reflectionText,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF333333),
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
+                    if (widget.coachMessage.acknowledgementText.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.coachMessage.acknowledgementText,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF888888),
+                          fontStyle: FontStyle.italic,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                    if (widget.coachMessage.goalText.isNotEmpty ||
+                        widget.coachMessage.feelText.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.coachMessage.goalText.isNotEmpty)
+                            Expanded(
+                              child: _InsightItem(
+                                icon: Icons.flag_outlined,
+                                label: 'GOAL',
+                                text: widget.coachMessage.goalText,
+                                iconColor: const Color(0xFF1565C0),
+                              ),
+                            ),
+                          if (widget.coachMessage.goalText.isNotEmpty &&
+                              widget.coachMessage.feelText.isNotEmpty)
+                            const SizedBox(width: 16),
+                          if (widget.coachMessage.feelText.isNotEmpty)
+                            Expanded(
+                              child: _InsightItem(
+                                icon: Icons.favorite_border,
+                                label: 'FEEL',
+                                text: widget.coachMessage.feelText,
+                                iconColor: const Color(0xFFE53935),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            if (hasCoachContent) const SizedBox(height: 10),
+
+            // ── Workout card ─────────────────────────────────────────────────
+            _Card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WORKOUT',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF999999),
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (_hasWarmup) ...[
+                    _WorkoutSection(
+                      stepNumber: 1,
+                      label: 'WARMUP',
+                      blocks: _warmupBlocks,
+                      accentColor: const Color(0xFF388E3C),
+                      workoutIntent: widget.coachMessage.workoutIntent,
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                    const SizedBox(height: 16),
+                  ],
+
+                  _WorkoutSection(
+                    stepNumber: _hasWarmup ? 2 : 1,
+                    label: 'MAIN SET',
+                    blocks: _workBlocks,
+                    accentColor: const Color(0xFF0A0A0A),
+                    workoutIntent: widget.coachMessage.workoutIntent,
+                  ),
+
+                  if (_hasCooldown) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                    const SizedBox(height: 16),
+                    _WorkoutSection(
+                      stepNumber: _hasWarmup ? 3 : 2,
+                      label: 'COOLDOWN',
+                      blocks: _cooldownBlocks,
+                      accentColor: const Color(0xFF1565C0),
+                      workoutIntent: widget.coachMessage.workoutIntent,
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-
-            if (_hasWarmup) ...[
-              _WorkoutBlockCard(
-                stepNumber: 1,
-                label: 'WARMUP',
-                blocks: _warmupBlocks,
-                accentColor: const Color(0xFF388E3C),
-                state: BlockState.pending,
-                isWarmupCooldown: true,
-                workoutIntent: widget.coachMessage.workoutIntent,
-              ),
-              const SizedBox(height: 10),
-            ],
-
-              _WorkoutBlockCard(
-                stepNumber: _hasWarmup ? 2 : 1,
-                label: 'MAIN SET',
-                blocks: _workBlocks,
-                accentColor: const Color(0xFF0A0A0A),
-                state: BlockState.pending,
-                isMain: true,
-                workoutIntent: widget.coachMessage.workoutIntent,
-              ),
-
-              if (_hasCooldown) ...[
-                const SizedBox(height: 10),
-                _WorkoutBlockCard(
-                  stepNumber: _hasWarmup ? 3 : 2,
-                  label: 'COOLDOWN',
-                  blocks: _cooldownBlocks,
-                  accentColor: const Color(0xFF1565C0),
-                  state: BlockState.pending,
-                  isWarmupCooldown: true,
-                  workoutIntent: widget.coachMessage.workoutIntent,
-                ),
-              ],
-
-            const SizedBox(height: 24),
 
             if (widget.coachMessage.movedFromDay != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F0),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE8E8E8)),
-                ),
+              const SizedBox(height: 10),
+              _Card(
                 child: Row(
                   children: [
                     const Icon(Icons.swap_horiz, size: 14, color: Color(0xFF999999)),
@@ -259,10 +296,10 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
             ],
 
-            // ── CTA — always enabled ────────────────────────────────────────
+            const SizedBox(height: 24),
+
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -314,12 +351,16 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     if (workBlocks.isNotEmpty) {
       final nonRpe = workBlocks.where((b) => !b.isRpeOnly);
       if (nonRpe.isNotEmpty) {
-        final fastest = nonRpe.map((b) => b.paceMinSecondsPerKm).reduce((a, b) => a < b ? a : b);
-        final slowest = nonRpe.map((b) => b.paceMaxSecondsPerKm).reduce((a, b) => a > b ? a : b);
+        final fastest = nonRpe
+            .map((b) => b.paceMinSecondsPerKm)
+            .reduce((a, b) => a < b ? a : b);
+        final slowest = nonRpe
+            .map((b) => b.paceMaxSecondsPerKm)
+            .reduce((a, b) => a > b ? a : b);
         final intent = widget.coachMessage.workoutIntent;
         if ((intent == WorkoutIntent.aerobicBase ||
-            intent == WorkoutIntent.recovery ||
-            intent == WorkoutIntent.endurance) &&
+                intent == WorkoutIntent.recovery ||
+                intent == WorkoutIntent.endurance) &&
             (slowest - fastest) >= 30) {
           final ceiling = (fastest / 5).round() * 5;
           values.add('≤ ${_fmt(ceiling)} /km');
@@ -336,50 +377,43 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
 
     if (labels.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          for (int i = 0; i < labels.length; i++) ...[
-            if (i > 0)
-              Container(width: 1, height: 36, color: const Color(0xFFEEEEEE)),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    values[i],
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0A0A0A),
-                      letterSpacing: -0.3,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    labels[i],
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF999999),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Row(
+      children: [
+        for (int i = 0; i < labels.length; i++) ...[
+          if (i > 0) ...[
+            const SizedBox(width: 12),
+            Container(width: 1, height: 32, color: const Color(0xFFE8E8E8)),
+            const SizedBox(width: 12),
           ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  values[i],
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A0A0A),
+                    letterSpacing: -0.3,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  labels[i],
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFFAAAAAA),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -390,90 +424,86 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   }
 }
 
-// ── Workout block card ────────────────────────────────────────────────────────
+// ── Shared card wrapper ───────────────────────────────────────────────────────
 
-class _WorkoutBlockCard extends StatelessWidget {
+class _Card extends StatelessWidget {
+  final Widget child;
+  const _Card({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ── Workout section (within the workout card) ─────────────────────────────────
+
+class _WorkoutSection extends StatelessWidget {
   final int stepNumber;
   final String label;
   final List<ResolvedBlock> blocks;
   final Color accentColor;
-  final BlockState state;
-  final bool isMain;
-  final bool isWarmupCooldown;
   final WorkoutIntent workoutIntent;
 
-  const _WorkoutBlockCard({
+  const _WorkoutSection({
     required this.stepNumber,
     required this.label,
     required this.blocks,
     required this.accentColor,
-    required this.state,
     required this.workoutIntent,
-    this.isMain = false,
-    this.isWarmupCooldown = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDone = state == BlockState.done;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          left: BorderSide(
-            color: isDone ? const Color(0xFF4CAF50) : accentColor,
-            width: 3,
-          ),
-          top: const BorderSide(color: Color(0xFFE8E8E8)),
-          right: const BorderSide(color: Color(0xFFE8E8E8)),
-          bottom: const BorderSide(color: Color(0xFFE8E8E8)),
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: isDone ? const Color(0xFF4CAF50) : accentColor,
-                  letterSpacing: 1.2,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: accentColor,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Text(
+                  '$stepNumber',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-              Container(
-                width: 24, height: 24,
-                decoration: BoxDecoration(
-                  color: isDone ? const Color(0xFF4CAF50) : accentColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Center(
-                  child: isDone
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : Text(
-                          '$stepNumber',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: accentColor,
+                letterSpacing: 0.8,
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (final block in blocks) ...[
-            _buildBlockRow(block),
-            const SizedBox(height: 6),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        for (int i = 0; i < blocks.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          _buildBlockRow(blocks[i]),
         ],
-      ),
+      ],
     );
   }
 
@@ -486,25 +516,28 @@ class _WorkoutBlockCard extends StatelessWidget {
                 : block.type == BlockType.cooldown
                     ? 'Cooldown'
                     : 'Run');
-    final buf = StringBuffer(blockLabel);
-    final distStr = _smartDistance(block.distanceKm);
 
+    final String quantity;
     if (block.reps != null && block.reps! > 1) {
-      buf.write(': ${block.reps} × $distStr');
+      quantity = '${block.reps} × ${_smartDistance(block.distanceKm)}';
     } else {
-      buf.write(': $distStr');
+      quantity = _smartDistance(block.distanceKm);
     }
-    buf.write(' @ ${block.formattedPaceForIntent(workoutIntent)}');
+
+    String? recovery;
     if (block.reps != null && block.reps! > 1) {
       if (block.recoverySeconds != null) {
         final m = block.recoverySeconds! ~/ 60;
         final s = block.recoverySeconds! % 60;
-        final label = m > 0 ? '$m:${s.toString().padLeft(2,'0')} recovery' : '${block.recoverySeconds}s recovery';
-        buf.write(' ($label)');
+        recovery = m > 0
+            ? '$m:${s.toString().padLeft(2, '0')} rest'
+            : '${block.recoverySeconds}s rest';
       } else if (block.recoveryMeters != null) {
-        buf.write(' (${_smartDistance(block.recoveryMeters! / 1000)} jog)');
+        recovery = '${_smartDistance(block.recoveryMeters! / 1000)} jog';
       }
     }
+
+    final pace = block.formattedPaceForIntent(workoutIntent);
 
     final icon = block.type == BlockType.recovery
         ? Icons.pause_circle_outline
@@ -514,23 +547,41 @@ class _WorkoutBlockCard extends StatelessWidget {
                 ? Icons.repeat
                 : Icons.straighten;
 
+    final detail = StringBuffer(quantity);
+    detail.write(' · $pace');
+    if (recovery != null) detail.write(' · $recovery');
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Icon(icon, size: 14, color: const Color(0xFF999999)),
+          padding: const EdgeInsets.only(top: 3),
+          child: Icon(icon, size: 14, color: const Color(0xFFCCCCCC)),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            buf.toString(),
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF0A0A0A),
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                blockLabel,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0A0A0A),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                detail.toString(),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF777777),
+                  height: 1.4,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -543,15 +594,15 @@ class _WorkoutBlockCard extends StatelessWidget {
   }
 }
 
-// ── Coaching insight card ─────────────────────────────────────────────────────
+// ── Coaching insight item ─────────────────────────────────────────────────────
 
-class _CoachingInsightCard extends StatelessWidget {
+class _InsightItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String text;
   final Color iconColor;
 
-  const _CoachingInsightCard({
+  const _InsightItem({
     required this.icon,
     required this.label,
     required this.text,
@@ -560,43 +611,34 @@ class _CoachingInsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 13, color: iconColor),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: iconColor,
-                  letterSpacing: 1.1,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 12, color: iconColor),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: iconColor,
+                letterSpacing: 1.1,
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF333333),
-              height: 1.5,
             ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF444444),
+            height: 1.5,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -610,32 +652,18 @@ class _PhaseWeekBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFE8F0FE),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8, height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1565C0),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1565C0),
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1565C0),
+        ),
       ),
     );
   }
