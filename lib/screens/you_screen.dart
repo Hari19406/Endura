@@ -6,10 +6,13 @@ import 'settings_screen.dart';
 import '../utils/database_service.dart';
 import 'run_detail_screen.dart';
 import '../utils/refreshable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../onboarding/onboarding_screen.dart';
 
 
 class YouScreen extends StatefulWidget {
-  const YouScreen({super.key});
+  final VoidCallback? onPlanUpdated;
+  const YouScreen({super.key, this.onPlanUpdated});
 
   @override
   State<YouScreen> createState() => _YouScreenState();
@@ -21,6 +24,7 @@ class _YouScreenState extends State<YouScreen>
   WeeklyStats? _stats;
   PRResults? _prResults;
   List<achieve.Achievement> _achievements = [];
+  List<String> _newAchievements = [];
   List<dynamic> _runHistory = [];
   List<dynamic> _runRecords = [];
 
@@ -29,6 +33,12 @@ class _YouScreenState extends State<YouScreen>
   late TabController _tabController;
   DateTime _selectedWeekStart = DateTime.now();
   DateTime _selectedDay = DateTime.now();
+
+  // Plan card state
+  String _goalLabel   = '';
+  int    _currentWeek = 1;
+  int    _totalWeeks  = 12;
+  bool   _hasPlan     = false;
 
 
 
@@ -55,6 +65,21 @@ class _YouScreenState extends State<YouScreen>
     });
 
     try {
+      // Load plan data
+      final prefs = await SharedPreferences.getInstance();
+      final goalRace     = prefs.getString('goal_race');
+      final startDateStr = prefs.getString('plan_start_date');
+      final startDate    = startDateStr != null ? DateTime.tryParse(startDateStr) : null;
+
+      if (goalRace != null && startDate != null) {
+        final planWeeks  = prefs.getInt('plan_weeks') ?? 12;
+        final weeksPassed = DateTime.now().difference(startDate).inDays ~/ 7 + 1;
+        _goalLabel   = _raceLabel(goalRace);
+        _currentWeek = weeksPassed.clamp(1, planWeeks);
+        _totalWeeks  = planWeeks;
+        _hasPlan     = true;
+      }
+
       WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
@@ -63,6 +88,7 @@ class _YouScreenState extends State<YouScreen>
           .map((r) => Run(
                 distanceKm: r.distance,
                 durationSeconds: _paceToSeconds(r.averagePace, r.distance),
+                date: r.date,
               ))
           .toList();
 
@@ -78,14 +104,39 @@ class _YouScreenState extends State<YouScreen>
       PRResults prResults = prEngine.calculate();
       achieve.AchievementEngine achieveEngine =
           achieve.AchievementEngine(achieveRunData);
-      List<achieve.Achievement> achievements =
+      final List<achieve.Achievement> calculated =
           achieveEngine.checkAchievements();
+
+      // Persist any newly earned achievements (INSERT OR IGNORE keeps dates frozen).
+      final List<String> newlyUnlocked = [];
+      for (final a in calculated) {
+        final isNew = await DatabaseService.instance.saveAchievementIfNew(
+          a.type.name, a.unlockedAt, a.tier,
+        );
+        if (isNew) newlyUnlocked.add(a.title);
+      }
+
+      // Merge calculated achievements with frozen unlock dates from DB.
+      final frozenDates =
+          await DatabaseService.instance.getAchievementDates();
+      final List<achieve.Achievement> achievements = calculated.map((a) {
+        final frozen = frozenDates[a.type.name];
+        if (frozen == null) return a;
+        return achieve.Achievement(
+          type: a.type,
+          title: a.title,
+          description: a.description,
+          unlockedAt: frozen,
+          tier: a.tier,
+        );
+      }).toList();
 
       if (mounted) {
         setState(() {
           _stats = stats;
           _prResults = prResults;
           _achievements = achievements;
+          _newAchievements = newlyUnlocked;
           _runRecords = records;
           _runHistory = runs;
           _isLoading = false;
@@ -116,6 +167,29 @@ class _YouScreenState extends State<YouScreen>
     );
   }
 
+  String _raceLabel(String key) => switch (key) {
+    '10k'           => '10K',
+    'half_marathon' => 'Half Marathon',
+    'marathon'      => 'Marathon',
+    _               => '5K',
+  };
+
+  Future<void> _updatePlan() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => OnboardingScreen(
+          shortenedMode: true,
+          onComplete: () {
+            Navigator.of(context).pop();
+            loadData();
+            widget.onPlanUpdated?.call();
+          },
+        ),
+      ),
+    );
+  }
+
   int _paceToSeconds(String pace, double distance) {
     if (pace == '--:--' || pace.isEmpty || distance <= 0) return 0;
     try {
@@ -131,13 +205,6 @@ class _YouScreenState extends State<YouScreen>
     } catch (e) {
       return 0;
     }
-  }
-
-  String _formatPaceFromMinutes(double paceMinPerKm) {
-    if (paceMinPerKm <= 0) return '--:--';
-    int minutes = paceMinPerKm.floor();
-    int seconds = ((paceMinPerKm - minutes) * 60).round();
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   String _formatDate(DateTime date) {
@@ -235,6 +302,152 @@ class _YouScreenState extends State<YouScreen>
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // TRAINING PLAN CARD
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildSetUpPlanCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'MY PLAN',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF999999),
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No training plan set up yet',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0A0A0A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Set a goal and Max will build your plan.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF999999)),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: _updatePlan,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A0A0A),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Text(
+                  'Set up my plan',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrainingPlanCard() {
+    final progress = (_currentWeek / _totalWeeks).clamp(0.0, 1.0);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'MY PLAN',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF999999),
+                  letterSpacing: 1.2,
+                ),
+              ),
+              GestureDetector(
+                onTap: _updatePlan,
+                child: const Text(
+                  'Update plan →',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF000000),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _goalLabel,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF000000),
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Week $_currentWeek of $_totalWeeks',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF666666),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFF0F0F0),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFF000000)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${(progress * 100).round()}% complete',
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF999999),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // SUMMARY TAB
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -249,7 +462,13 @@ class _YouScreenState extends State<YouScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
+              // ① TRAINING PLAN
+              if (_hasPlan) ...[
+                _buildTrainingPlanCard(),
+              ] else ...[
+                _buildSetUpPlanCard(),
+              ],
+              const SizedBox(height: 16),
 
               // ② THIS WEEK
               _buildWeeklySummaryCard(),
@@ -535,20 +754,7 @@ class _YouScreenState extends State<YouScreen>
   }
 
   Widget _buildPersonalRecordsCard() {
-    final records = [
-      {
-        'value': _formatPaceFromMinutes(_prResults!.fastest1KmPace),
-        'label': 'FASTEST 1KM',
-      },
-      {
-        'value': _formatPaceFromMinutes(_prResults!.bestAveragePace),
-        'label': 'BEST AVG PACE',
-      },
-      {
-        'value': _prResults!.longestDistance.toStringAsFixed(1),
-        'label': 'LONGEST RUN',
-      },
-    ];
+    final entries = _prResults!.allEntries;
 
     return Container(
       decoration: BoxDecoration(
@@ -570,12 +776,12 @@ class _YouScreenState extends State<YouScreen>
             ),
           ),
           const SizedBox(height: 16),
-          ...records.asMap().entries.map((entry) {
-            int index = entry.key;
-            var record = entry.value;
+          ...entries.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final pr = entry.value;
             return Container(
-              margin: EdgeInsets.only(
-                  bottom: index < records.length - 1 ? 12 : 0),
+              margin:
+                  EdgeInsets.only(bottom: index < entries.length - 1 ? 12 : 0),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFFFAFAFA),
@@ -585,24 +791,52 @@ class _YouScreenState extends State<YouScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    record['label']!,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF999999),
-                      letterSpacing: 0.8,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pr.label.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF999999),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      if (pr.setOn != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Set ${_formatDate(pr.setOn!)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFFBBBBBB),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  Text(
-                    record['value']!,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF000000),
-                      letterSpacing: -0.3,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        pr.value,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF000000),
+                          letterSpacing: -0.3,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      if (pr.unit != null)
+                        Text(
+                          pr.unit!,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF999999),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -614,16 +848,13 @@ class _YouScreenState extends State<YouScreen>
   }
 
   Widget _buildMilestonesCard() {
-    List<achieve.Achievement> sortedAchievements = List.from(_achievements)
-      ..sort((a, b) {
-        int tierCompare = b.tier.compareTo(a.tier);
-        if (tierCompare != 0) return tierCompare;
-        try {
-          return b.unlockedAt.compareTo(a.unlockedAt);
-        } catch (e) {
-          return 0;
-        }
-      });
+    final List<achieve.Achievement> sortedAchievements =
+        List.from(_achievements)
+          ..sort((a, b) {
+            final int tierCompare = b.tier.compareTo(a.tier);
+            if (tierCompare != 0) return tierCompare;
+            return b.unlockedAt.compareTo(a.unlockedAt);
+          });
 
     return Container(
       decoration: BoxDecoration(
@@ -646,8 +877,8 @@ class _YouScreenState extends State<YouScreen>
           ),
           const SizedBox(height: 16),
           ...sortedAchievements.asMap().entries.map((entry) {
-            int index = entry.key;
-            var achievement = entry.value;
+            final int index = entry.key;
+            final achievement = entry.value;
             return Container(
               margin: EdgeInsets.only(
                   bottom: index < sortedAchievements.length - 1 ? 12 : 0),
@@ -657,13 +888,14 @@ class _YouScreenState extends State<YouScreen>
                 border: Border.all(color: const Color(0xFFF0F0F0)),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
                           achievement.title,
                           style: const TextStyle(
                             fontSize: 14,
@@ -671,24 +903,27 @@ class _YouScreenState extends State<YouScreen>
                             color: Color(0xFF000000),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Completed ${_formatAchievementDate(achievement.unlockedAt)}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF999999),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                      ),
+                      const SizedBox(width: 8),
+                      _buildTierBadge(achievement.tier),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    achievement.description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF666666),
+                      height: 1.3,
                     ),
                   ),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _getTierColor(achievement.tier),
-                      shape: BoxShape.circle,
+                  const SizedBox(height: 5),
+                  Text(
+                    _formatAchievementDate(achievement.unlockedAt),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFFBBBBBB),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -700,23 +935,43 @@ class _YouScreenState extends State<YouScreen>
     );
   }
 
-  Color _getTierColor(int tier) {
-    switch (tier) {
-      case 1:  return const Color(0xFF8D6E63);
-      case 2:  return const Color(0xFF9E9E9E);
-      case 3:  return const Color(0xFFF9A825);
-      case 4:  return const Color(0xFF7E57C2);
-      default: return const Color(0xFF000000);
-    }
+  Widget _buildTierBadge(int tier) {
+    final (Color bg, Color text, String label) = switch (tier) {
+      1 => (const Color(0xFFF0997B), const Color(0xFF4A1B0C), 'Bronze'),
+      2 => (const Color(0xFFD3D1C7), const Color(0xFF444441), 'Silver'),
+      3 => (const Color(0xFFFAC775), const Color(0xFF412402), 'Gold'),
+      4 => (const Color(0xFFCECBF6), const Color(0xFF26215C), 'Platinum'),
+      _ => (const Color(0xFFE8E8E8), const Color(0xFF666666), 'Bronze'),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: text,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
   }
 
   String _formatAchievementDate(DateTime date) {
     final now = DateTime.now();
-    final difference = now.difference(date);
-    if (difference.inDays == 0)   return 'today';
-    if (difference.inDays == 1)   return 'yesterday';
-    if (difference.inDays < 30)   return '${difference.inDays} days ago';
-    return 'on ${date.day}/${date.month}/${date.year}';
+    final diff = now.difference(date).inDays;
+    if (diff == 0) return 'Earned today';
+    if (diff == 1) return 'Earned yesterday';
+    if (diff < 30) return 'Earned $diff days ago';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return 'Earned ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   Widget _buildTrainingStatusCard() {

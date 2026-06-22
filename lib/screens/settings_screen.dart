@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/database_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/training_days_service.dart';
+import '../services/profile_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
@@ -206,7 +207,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      await Supabase.instance.client.auth.signOut();
+      await ProfileService.instance.deleteProfile();
+      await Supabase.instance.client.rpc('delete_current_user');
       await DatabaseService.instance.deleteAllRuns();
       await DatabaseService.instance.deleteAllSnapshots();
       final prefs = await SharedPreferences.getInstance();

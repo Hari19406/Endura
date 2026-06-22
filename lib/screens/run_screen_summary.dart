@@ -29,7 +29,9 @@ class RunSummaryScreen extends StatefulWidget {
   final int warmupDurationSeconds;
   final int cooldownDurationSeconds;
   final VoidCallback onDone;
+  final VoidCallback onDiscard;
   final message.CoachMessage? activeCoachMessage;
+  final bool isFreeRun;
 
   const RunSummaryScreen({
     super.key,
@@ -41,7 +43,9 @@ class RunSummaryScreen extends StatefulWidget {
     this.warmupDurationSeconds = 0,
     this.cooldownDurationSeconds = 0,
     required this.onDone,
+    required this.onDiscard,
     this.activeCoachMessage,
+    this.isFreeRun = false,
   });
 
   @override
@@ -83,6 +87,41 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     _summaryFuture = _buildSummaryData();
   }
 
+  Future<void> _discardRun() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard activity?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        content: const Text('This run will be deleted and won\'t count toward your training.', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep', style: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // Only delete from DB if it was long enough to have been saved
+    if (widget.distanceKm >= 0.1) {
+      try {
+        final runs = await DatabaseService.instance.getRecentRuns(limit: 1);
+        if (runs.isNotEmpty && runs.first.id != null) {
+          await DatabaseService.instance.deleteRun(runs.first.id!);
+        }
+      } catch (e) {
+        debugPrint('Error discarding run: $e');
+      }
+    }
+
+    widget.onDiscard();
+  }
+
   Future<void> _finaliseRun(int rpe) async {
     if (_engineProcessed) return;
     _engineProcessed = true;
@@ -96,6 +135,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     } catch (e) {
       debugPrint('Error saving RPE: $e');
     }
+
+    if (widget.isFreeRun) return;
 
     final completedTemplateId =
         widget.activeCoachMessage?.resolvedWorkout.templateId;
@@ -172,9 +213,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Workout complete',
-                                      style: TextStyle(
+                                    Text(
+                                      widget.isFreeRun ? 'Run complete' : 'Workout complete',
+                                      style: const TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w800,
                                         color: Colors.black,
@@ -196,10 +237,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                               const SizedBox(height: 12),
                               _buildPaceCard(),
                               const SizedBox(height: 12),
-                              _buildRpeCard(),
-                              if (_rpe != null) ...[
-                                const SizedBox(height: 12),
-                                _buildCoachFeedbackCard(data),
+                              if (!widget.isFreeRun) ...[
+                                _buildRpeCard(),
+                                if (_rpe != null) ...[
+                                  const SizedBox(height: 12),
+                                  _buildCoachFeedbackCard(data),
+                                ],
                               ],
                               const SizedBox(height: 12),
                               _buildNextWorkoutCard(data),
@@ -212,19 +255,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _rpe == null
-                          ? null
-                          : () async {
-                              await _finaliseRun(_rpe!);
+                      onPressed: (widget.isFreeRun || _rpe != null)
+                          ? () async {
+                              await _finaliseRun(widget.isFreeRun ? 0 : _rpe!);
                               await Future.delayed(
                                   const Duration(milliseconds: 200));
                               widget.onDone();
-                            },
+                            }
+                          : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
@@ -236,11 +279,24 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         ),
                       ),
                       child: Text(
-                        _rpe == null
-                            ? 'Rate your effort to continue'
-                            : 'Done',
+                        (widget.isFreeRun || _rpe != null)
+                            ? 'Done'
+                            : 'Rate your effort to continue',
                         style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _discardRun,
+                      child: const Text(
+                        'Discard activity',
+                        style: TextStyle(fontSize: 14, color: Color(0xFFD32F2F), fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),

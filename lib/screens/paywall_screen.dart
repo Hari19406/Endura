@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/revenue_cat_service.dart';
+import '../services/analytics_service.dart';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -11,12 +12,21 @@ class PaywallScreen extends StatefulWidget {
 class _PaywallScreenState extends State<PaywallScreen> {
   bool _loading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    Analytics.paywallViewed();
+  }
+
   Future<void> _purchase() async {
     setState(() => _loading = true);
     try {
       await RevenueCatService.presentPaywall();
       final isPro = await RevenueCatService.isPro();
-      if (isPro && mounted) Navigator.pop(context, true);
+      if (isPro) {
+        await Analytics.subscriptionStarted();
+        if (mounted) Navigator.pop(context, true);
+      }
     } catch (e) {
       debugPrint('Purchase error: $e');
     } finally {

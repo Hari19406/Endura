@@ -24,7 +24,7 @@ import '../services/engine_state_sync_service.dart';
 import '../engines/config/workout_template_library.dart';
 import '../screens/pre_run_check.dart';
 import '../screens/plan_complete_screen.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
+import '../services/analytics_service.dart';
 
 // Import the shortened onboarding for post-plan re-onboarding.
 import '../onboarding/onboarding_screen.dart' show OnboardingScreen;
@@ -580,13 +580,17 @@ class _HomeScreenState extends State<HomeScreen>
       _planTotalKm = runs.fold(0.0, (sum, r) => sum + r.distance);
 
       if (memory.isPlanComplete && !memory.isInMaintenance) {
-        // Show celebration card instead of workout card.
-        setState(() {
-          _showPlanComplete = true;
-          _isLoading = false;
-        });
-        _isFetching = false;
-        return;
+        final snoozeStr = prefs.getString('plan_complete_snooze_until');
+        final snoozeUntil = snoozeStr != null ? DateTime.tryParse(snoozeStr) : null;
+        final isSnoozed = snoozeUntil != null && DateTime.now().isBefore(snoozeUntil);
+        if (!isSnoozed) {
+          setState(() {
+            _showPlanComplete = true;
+            _isLoading = false;
+          });
+          _isFetching = false;
+          return;
+        }
       }
       _showPlanComplete = false;
 
@@ -604,12 +608,9 @@ class _HomeScreenState extends State<HomeScreen>
         await EngineMemoryService().saveActivePlan(newPlan);
         _engineMemory = memory.copyWith(activePlan: newPlan);
         _activePlan = newPlan;
-        await Posthog().capture(
-          eventName: 'plan_created',
-          properties: {
-            'goal': prefs.getString('goal_race') ?? 'unknown',
-            'level': prefs.getString('experience_level') ?? 'unknown',
-          },
+        await Analytics.planCreated(
+          goal: prefs.getString('goal_race') ?? 'unknown',
+          level: prefs.getString('experience_level') ?? 'unknown',
         );
       } else {
         _activePlan = memory.activePlan;
@@ -756,6 +757,7 @@ class _HomeScreenState extends State<HomeScreen>
     // Snapshot current vDOT so celebration card can show before→after next time.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('vdot_before_plan', memory.vdotScore);
+    await prefs.remove('plan_complete_snooze_until');
 
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -776,24 +778,25 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// User tapped "Just keep me running" — immediately enter maintenance.
-  Future<void> _onEnterMaintenanceManually() async {
-    final memory = _engineMemory;
-    if (memory == null) return;
-
-    final maintenanceKm =
-        (memory.previousWeekTargetKm ?? memory.baselineWeeklyKm ?? 20.0) * 0.85;
-
-    final updated = memory.copyWith(
-      isInMaintenance: true,
-      currentPhase: TrainingPhase.maintenance,
-      baselineWeeklyKm: maintenanceKm,
-      previousWeekTargetKm: maintenanceKm,
-    );
-    await EngineMemoryService().save(updated);
-    _engineMemory = updated;
+  /// User tapped "I need a break — remind me in 2 weeks".
+  Future<void> _onRemindLater() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remindDate = DateTime.now().add(const Duration(days: 14));
+    await prefs.setString('plan_complete_snooze_until', remindDate.toIso8601String());
+    // Sync to Supabase so snooze survives a device switch
+    ProfileService.instance.updateField(
+      'plan_snooze_until',
+      remindDate.toIso8601String().substring(0, 10),
+    ).ignore();
     setState(() => _showPlanComplete = false);
-    await loadData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Got it! We'll check in with you in 2 weeks."),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   String _raceLabel(String goalRace) => switch (goalRace) {
@@ -960,6 +963,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _handleSkip() {
     final plan = _activePlan;
     if (plan == null) return;
+    Analytics.planDaySkipped();
     SkipService.applySkip(
       skipDate: DateTime.now(),
       plan: plan,
@@ -1143,12 +1147,6 @@ class _HomeScreenState extends State<HomeScreen>
               _buildSectionLabel("TODAY'S WORKOUT"),
               const SizedBox(height: 10),
 
-              // ── Maintenance badge (shown above workout card) ──────────────
-              if (_engineMemory?.isInMaintenance == true) ...[
-                MaintenanceBadge(onStartNewPlan: _onStartNextPlan),
-                const SizedBox(height: 10),
-              ],
-
               // ── Plan complete card OR normal workout card ────────────────
               if (_showPlanComplete && _engineMemory != null)
                 PlanCompleteCard(
@@ -1157,7 +1155,7 @@ class _HomeScreenState extends State<HomeScreen>
                   totalKmCompleted: _planTotalKm,
                   vdotBefore: _vdotBeforePlan,
                   onStartNextPlan: _onStartNextPlan,
-                  onEnterMaintenance: _onEnterMaintenanceManually,
+                  onRemindLater: _onRemindLater,
                 )
               else
                 WorkoutCard(

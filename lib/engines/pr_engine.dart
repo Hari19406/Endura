@@ -1,101 +1,133 @@
-// Model to hold a single run's data
 class Run {
   final double distanceKm;
   final int durationSeconds;
+  final DateTime date;
 
   Run({
     required this.distanceKm,
     required this.durationSeconds,
+    required this.date,
   });
 
-  // Calculate pace in minutes per km
-  double get paceMinPerKm {
-    if (distanceKm == 0) return 0;
-    return (durationSeconds / 60) / distanceKm;
-  }
-
-  // Calculate pace in seconds per km
   double get paceSecPerKm {
-    if (distanceKm == 0) return 0;
+    if (distanceKm == 0 || durationSeconds == 0) return 0;
     return durationSeconds / distanceKm;
   }
 }
 
-// Model to hold the PR (Personal Record) results
-class PRResults {
-  final double fastest1KmPace; // in minutes per km
-  final double bestAveragePace; // in minutes per km
-  final double longestDistance; // in km
+class PREntry {
+  final String label;
+  final String value;
+  final String? unit;
+  final DateTime? setOn;
 
-  PRResults({
-    required this.fastest1KmPace,
-    required this.bestAveragePace,
-    required this.longestDistance,
+  const PREntry({
+    required this.label,
+    required this.value,
+    this.unit,
+    this.setOn,
   });
-
-  @override
-  String toString() {
-    return '''
-PR Results:
-  Fastest 1km Pace: ${fastest1KmPace.toStringAsFixed(2)} min/km
-  Best Average Pace: ${bestAveragePace.toStringAsFixed(2)} min/km
-  Longest Distance: ${longestDistance.toStringAsFixed(2)} km
-''';
-  }
 }
 
-// Main PR Engine class
+class PRResults {
+  final PREntry? best5K;
+  final PREntry? best10K;
+  final PREntry? bestHalf;
+  final PREntry? bestMarathon;
+  final PREntry bestAvgPace;
+  final PREntry longestRun;
+
+  PRResults({
+    this.best5K,
+    this.best10K,
+    this.bestHalf,
+    this.bestMarathon,
+    required this.bestAvgPace,
+    required this.longestRun,
+  });
+
+  List<PREntry> get allEntries => [
+        if (best5K != null) best5K!,
+        if (best10K != null) best10K!,
+        if (bestHalf != null) bestHalf!,
+        if (bestMarathon != null) bestMarathon!,
+        bestAvgPace,
+        longestRun,
+      ];
+}
+
 class PREngine {
   final List<Run> runs;
-
   PREngine(this.runs);
+
+  String _formatTime(int totalSeconds) {
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final secs = totalSeconds % 60;
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    }
+    return '$minutes:${secs.toString().padLeft(2, '0')}';
+  }
+
+  String _formatPace(double secPerKm) {
+    if (secPerKm <= 0) return '--:--';
+    final mins = (secPerKm / 60).floor();
+    final secs = (secPerKm % 60).round();
+    return '$mins:${secs.toString().padLeft(2, '0')}';
+  }
+
+  // Among runs of at least [minKm], find the fastest-paced one and project
+  // its pace onto [targetKm] to get the PR time.
+  PREntry? _bestForDistance(double minKm, double targetKm, String label) {
+    final eligible =
+        runs.where((r) => r.distanceKm >= minKm && r.paceSecPerKm > 0).toList();
+    if (eligible.isEmpty) return null;
+    final best =
+        eligible.reduce((a, b) => a.paceSecPerKm < b.paceSecPerKm ? a : b);
+    final timeSeconds = (best.paceSecPerKm * targetKm).round();
+    return PREntry(
+      label: label,
+      value: _formatTime(timeSeconds),
+      unit: '${_formatPace(best.paceSecPerKm)} /km',
+      setOn: best.date,
+    );
+  }
 
   PRResults calculate() {
     if (runs.isEmpty) {
       return PRResults(
-        fastest1KmPace: 0,
-        bestAveragePace: 0,
-        longestDistance: 0,
+        bestAvgPace:
+            const PREntry(label: 'Best avg pace', value: '--:--', unit: '/km'),
+        longestRun:
+            const PREntry(label: 'Longest run', value: '0.0', unit: 'km'),
       );
     }
 
-    // Calculate fastest 1km pace (lowest pace value = fastest)
-    double fastest1KmPace = runs
-        .map((run) => run.paceMinPerKm)
-        .reduce((a, b) => a < b ? a : b);
-
-    // Calculate best average pace (same as fastest pace in this context)
-    double bestAveragePace = runs
-        .map((run) => run.paceMinPerKm)
-        .reduce((a, b) => a < b ? a : b);
-
-    // Calculate longest distance
-    double longestDistance = runs
-        .map((run) => run.distanceKm)
-        .reduce((a, b) => a > b ? a : b);
+    final withPace = runs.where((r) => r.paceSecPerKm > 0).toList();
+    final fastestRun = withPace.isEmpty
+        ? null
+        : withPace.reduce((a, b) => a.paceSecPerKm < b.paceSecPerKm ? a : b);
+    final longestRun =
+        runs.reduce((a, b) => a.distanceKm > b.distanceKm ? a : b);
 
     return PRResults(
-      fastest1KmPace: fastest1KmPace,
-      bestAveragePace: bestAveragePace,
-      longestDistance: longestDistance,
+      best5K: _bestForDistance(4.5, 5.0, 'Best 5K'),
+      best10K: _bestForDistance(9.0, 10.0, 'Best 10K'),
+      bestHalf: _bestForDistance(19.0, 21.0975, 'Best half'),
+      bestMarathon: _bestForDistance(40.0, 42.195, 'Best marathon'),
+      bestAvgPace: PREntry(
+        label: 'Best avg pace',
+        value: fastestRun == null ? '--:--' : _formatPace(fastestRun.paceSecPerKm),
+        unit: '/km',
+        setOn: fastestRun?.date,
+      ),
+      longestRun: PREntry(
+        label: 'Longest run',
+        value: longestRun.distanceKm.toStringAsFixed(1),
+        unit: 'km',
+        setOn: longestRun.date,
+      ),
     );
   }
 }
-
-// Example usage
-void main() {
-  List<Run> pastRuns = [
-    Run(distanceKm: 5.0, durationSeconds: 1500), // 5 min/km pace
-    Run(distanceKm: 10.0, durationSeconds: 2700), // 4.5 min/km pace
-    Run(distanceKm: 3.0, durationSeconds: 840),   // 4.67 min/km pace
-    Run(distanceKm: 21.1, durationSeconds: 6300), // 4.98 min/km pace
-    Run(distanceKm: 8.0, durationSeconds: 2160),  // 4.5 min/km pace
-  ];
-
-  PREngine engine = PREngine(pastRuns);
-  PRResults results = engine.calculate();
-
-  print(results);
-}
-
-

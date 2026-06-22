@@ -18,9 +18,8 @@ class PlanCompleteCard extends StatelessWidget {
   /// The caller should navigate to the shortened re-onboarding flow.
   final VoidCallback onStartNextPlan;
 
-  /// Called when the user taps "Just keep me running".
-  /// The caller should immediately enter maintenance mode.
-  final VoidCallback onEnterMaintenance;
+  /// Called when the user taps "I need a break — remind me in 2 weeks".
+  final VoidCallback onRemindLater;
 
   /// Display label for the completed race (e.g. "10K").
   final String completedRaceLabel;
@@ -35,7 +34,7 @@ class PlanCompleteCard extends StatelessWidget {
     super.key,
     required this.memory,
     required this.onStartNextPlan,
-    required this.onEnterMaintenance,
+    required this.onRemindLater,
     required this.completedRaceLabel,
     required this.totalKmCompleted,
     required this.vdotBefore,
@@ -168,10 +167,10 @@ class PlanCompleteCard extends StatelessWidget {
               child: GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  onEnterMaintenance();
+                  onRemindLater();
                 },
                 child: const Text(
-                  'Just keep me running',
+                  'I need a break — remind me in 2 weeks',
                   style: TextStyle(
                     fontSize: 13,
                     color: Color(0xFF999999),
@@ -242,61 +241,3 @@ class PlanCompleteCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAINTENANCE BADGE
-//
-// Small widget shown above the WorkoutCard when isInMaintenance is true.
-// ─────────────────────────────────────────────────────────────────────────────
-
-class MaintenanceBadge extends StatelessWidget {
-  final VoidCallback onStartNewPlan;
-
-  const MaintenanceBadge({super.key, required this.onStartNewPlan});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F9F7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFB2DFDB), width: 1),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.loop_rounded, size: 16, color: Color(0xFF00796B)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Maintenance Mode',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF00796B),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                GestureDetector(
-                  onTap: onStartNewPlan,
-                  child: const Text(
-                    'Start a new plan anytime →',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF00796B),
-                      decoration: TextDecoration.underline,
-                      decorationColor: Color(0xFF00796B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

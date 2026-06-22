@@ -8,11 +8,13 @@ enum BlockState { pending, done }
 class PreRunBriefingScreen extends StatefulWidget {
   final message.CoachMessage coachMessage;
   final VoidCallback onGoToRun;
+  final bool returnOnStart;
 
   const PreRunBriefingScreen({
     super.key,
     required this.coachMessage,
     required this.onGoToRun,
+    this.returnOnStart = false,
   });
 
   @override
@@ -21,6 +23,10 @@ class PreRunBriefingScreen extends StatefulWidget {
 
 class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   void _startWorkout() {
+    if (widget.returnOnStart) {
+      Navigator.pop(context, true);
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(

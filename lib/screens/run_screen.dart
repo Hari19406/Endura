@@ -11,6 +11,8 @@ import 'dart:math' show sin, cos, atan2;
 import 'dart:ui' as ui;
 import '../utils/database_service.dart';
 import '../screens/run_screen_summary.dart';
+import '../screens/pre_run_briefing_screen.dart';
+import '../screens/pre_run_check.dart';
 import '../services/audio_cue_service.dart';
 import 'dart:convert';
 import '../services/cloud_sync_service.dart';
@@ -18,7 +20,7 @@ import '../services/coach_message_builder.dart' as message;
 import '../widgets/target_pace_indicator.dart';
 import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
+import '../services/analytics_service.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
 
@@ -102,6 +104,10 @@ class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver, Tick
   String _distanceUnit = 'km';
 
   bool _isFirstRun = true;
+  bool _showRunTypeChoice = false;
+  bool _isFreeRun = false;
+  bool _workoutReadyToStart = false;
+  message.CoachMessage? _activeCoachMessage;
 
   // ── Phase management ────────────────────────────────────────────────────────
   RunMode _currentPhase = RunMode.warmup;
@@ -119,14 +125,14 @@ class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver, Tick
   static const int _warmupCooldownDurationSeconds = 600; // 10 min
 
   // ── Resolved workout helpers ──────────────────────────────────────────────
-  ResolvedWorkout? get _workout => widget.activeCoachMessage?.resolvedWorkout;
+  ResolvedWorkout? get _workout => _activeCoachMessage?.resolvedWorkout;
 
 bool get _hasWarmup =>
-    (widget.activeCoachMessage?.hasWarmupCooldown ?? false) &&
+    (_activeCoachMessage?.hasWarmupCooldown ?? false) &&
     (_workout?.blocks.any((b) => b.type == BlockType.warmup) ?? false);
 
 bool get _hasCooldown =>
-    (widget.activeCoachMessage?.hasWarmupCooldown ?? false) &&
+    (_activeCoachMessage?.hasWarmupCooldown ?? false) &&
     (_workout?.blocks.any((b) => b.type == BlockType.cooldown) ?? false);
 
   bool get _isLastPhase =>
@@ -169,13 +175,26 @@ bool get _hasCooldown =>
   /// Target pace range for the main set — extracted from work blocks.
   /// Used by TargetPaceIndicator widget.
   message.PaceRange? get _targetPaceRange {
-  if (_currentPhase != RunMode.mainSet) return null;
-  final workBlocks = _workout?.blocks.where((b) => b.type == BlockType.main);
-  if (workBlocks == null) return null;
+    if (_currentPhase != RunMode.mainSet) return null;
+    final workBlocks = _workout?.blocks.where((b) => b.type == BlockType.main);
+    if (workBlocks == null) return null;
     final nonRpe = workBlocks.where((b) => !b.isRpeOnly);
     if (nonRpe.isEmpty) return null;
     final fastest = nonRpe.map((b) => b.paceMinSecondsPerKm).reduce((a, b) => a < b ? a : b);
     final slowest = nonRpe.map((b) => b.paceMaxSecondsPerKm).reduce((a, b) => a > b ? a : b);
+
+    final intent = _activeCoachMessage?.workoutIntent;
+    if ((intent == WorkoutIntent.aerobicBase ||
+            intent == WorkoutIntent.recovery ||
+            intent == WorkoutIntent.endurance) &&
+        (slowest - fastest) >= 30) {
+      final ceiling = (fastest / 5).round() * 5;
+      return message.PaceRange(
+        minSecondsPerKm: ceiling,
+        maxSecondsPerKm: slowest,
+      );
+    }
+
     return message.PaceRange(
       minSecondsPerKm: fastest,
       maxSecondsPerKm: slowest,
@@ -212,8 +231,18 @@ bool get _hasCooldown =>
   }
 
   @override
+  void didUpdateWidget(RunScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeCoachMessage != oldWidget.activeCoachMessage &&
+        _runState == RunState.ready) {
+      setState(() => _activeCoachMessage = widget.activeCoachMessage);
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
+    _activeCoachMessage = widget.activeCoachMessage;
     WidgetsBinding.instance.addObserver(this);
     _currentPhase = _hasWarmup ? RunMode.warmup : RunMode.mainSet;
     _loadSettings();
@@ -524,13 +553,10 @@ bool get _hasCooldown =>
     }
 
     AudioCueService.instance.announceRunStart();
-    await Posthog().capture(
-      eventName: 'workout_started',
-      properties: {
-        'workout_type': widget.activeCoachMessage != null
-            ? _resolveWorkoutType(widget.activeCoachMessage!.workoutIntent)
-            : 'free',
-      },
+    await Analytics.workoutStarted(
+      _activeCoachMessage != null
+          ? _resolveWorkoutType(_activeCoachMessage!.workoutIntent)
+          : 'free',
     );
     _startGPSMonitoring();
 
@@ -657,11 +683,13 @@ bool get _hasCooldown =>
     _timer?.cancel(); _timer = null;
     _gpsMonitorTimer?.cancel(); _gpsMonitorTimer = null;
     if (mounted) setState(() { _runState = RunState.paused; _isGPSSignalLost = false; _wasRunningBeforeBackground = false; _backgroundTime = null; });
+    Analytics.workoutPaused();
   }
 
   void _resumeTracking() {
     if (_runState != RunState.paused) return;
     if (mounted) setState(() { _runState = RunState.running; _lastGPSUpdate = DateTime.now(); _isGPSSignalLost = false; _wasRunningBeforeBackground = false; _backgroundTime = null; });
+    Analytics.workoutResumed();
     _startGPSMonitoring();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _runState == RunState.running) {
@@ -760,10 +788,10 @@ bool get _hasCooldown =>
     final warmupSeconds = _hasWarmup ? _mainPhaseStartSeconds : 0;
     final cooldownSeconds = _currentPhase == RunMode.cooldown ? _seconds - _cooldownPhaseStartSeconds : 0;
     final runDate = DateTime.now();
-    final capturedWorkoutType = widget.activeCoachMessage != null
-    ? _resolveWorkoutType(widget.activeCoachMessage!.workoutIntent)
+    final capturedWorkoutType = (!_isFreeRun && _activeCoachMessage != null)
+    ? _resolveWorkoutType(_activeCoachMessage!.workoutIntent)
     : 'free';
-    if (_capturedMainDistanceM >= 100) {
+    if (_capturedMainDistanceM >= 80) {
       await AudioCueService.instance.announceRunComplete(
         distanceKm: _capturedMainDistanceM / 1000,
         averagePace: _capturedMainPace,
@@ -784,13 +812,13 @@ bool get _hasCooldown =>
         );
         await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then((r) => debugPrint('Sync: $r'));
-        await Posthog().capture(
-          eventName: 'workout_completed',
-          properties: {
-            'duration': _capturedMainSeconds,
-            'distance': double.parse(
-                (_capturedMainDistanceM / 1000).toStringAsFixed(2)),
-          },
+        await Analytics.workoutCompleted(
+          durationSeconds: _capturedMainSeconds,
+          distanceKm: double.parse(
+              (_capturedMainDistanceM / 1000).toStringAsFixed(2)),
+          workoutType: capturedWorkoutType,
+          isFreeRun: _isFreeRun,
+          averagePace: _capturedMainPace,
         );
         await _showCSCalibrationPromptIfNeeded();
       } catch (e) {
@@ -809,7 +837,13 @@ bool get _hasCooldown =>
           warmupDurationSeconds: warmupSeconds,
           cooldownDurationSeconds: cooldownSeconds,
           onDone: () => Navigator.popUntil(context, (route) => route.isFirst),
-          activeCoachMessage: widget.activeCoachMessage,
+          onDiscard: () async {
+            Navigator.pop(context);
+            await Analytics.workoutDiscarded();
+            await _resetToReady();
+          },
+          activeCoachMessage: _isFreeRun ? null : _activeCoachMessage,
+          isFreeRun: _isFreeRun,
         ),
       ));
     }
@@ -1063,10 +1097,201 @@ bool get _hasCooldown =>
     );
   }
 
+  Future<void> _onWorkoutChosen() async {
+    setState(() => _showRunTypeChoice = false);
+
+    if (_activeCoachMessage == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No workout today — check back tomorrow.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    await showPreRunCheck(
+      context: context,
+      coachMessage: _activeCoachMessage!,
+      onProceed: (scaled) async {
+        if (!mounted) return;
+        final shouldStart = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PreRunBriefingScreen(
+              coachMessage: scaled,
+              onGoToRun: () {},
+              returnOnStart: true,
+            ),
+          ),
+        );
+        if (shouldStart == true && mounted) {
+          setState(() {
+            _activeCoachMessage = scaled;
+            _isFreeRun = false;
+            _workoutReadyToStart = true;
+          });
+        }
+      },
+      onSkip: () {},
+    );
+  }
+
+  void _onFreeRunChosen() {
+    setState(() {
+      _isFreeRun = true;
+      _showRunTypeChoice = false;
+    });
+    _startTracking();
+  }
+
+  Future<void> _resetToReady() async {
+    _timer?.cancel(); _timer = null;
+    _positionStream?.cancel(); _positionStream = null;
+    _gpsMonitorTimer?.cancel(); _gpsMonitorTimer = null;
+    _stopGpsWarmup();
+    await _stopForegroundTask();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('run_start_time');
+      await prefs.remove('background_elapsed_seconds');
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _runState = RunState.ready;
+      _seconds = 0;
+      _distance = 0.0;
+      _pendingDistance = 0.0;
+      _routePoints.clear();
+      _currentPhase = RunMode.warmup;
+      _mainPhaseStartSeconds = 0;
+      _mainPhaseStartDistanceM = 0.0;
+      _cooldownPhaseStartSeconds = 0;
+      _cooldownPhaseStartDistanceM = 0.0;
+      _phaseMilestoneReached = false;
+      _capturedMainDistanceM = 0.0;
+      _capturedMainSeconds = 0;
+      _capturedMainPace = '--:--';
+      _capturedMainRoute = [];
+      _isFreeRun = false;
+      _showRunTypeChoice = false;
+      _workoutReadyToStart = false;
+      _lastAnnouncedKm = 0;
+      _isGPSSignalLost = false;
+      _activeCoachMessage = widget.activeCoachMessage;
+    });
+
+    _startGpsWarmup();
+  }
+
+  Future<void> _onFinishTapped() async {
+    final mainDistanceM = _currentPhase == RunMode.mainSet
+        ? _distance - _mainPhaseStartDistanceM
+        : _capturedMainDistanceM;
+
+    if (mainDistanceM < 80) {
+      final result = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Run too short', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          content: const Text('You need at least 80m to save a run.', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'resume'),
+              child: const Text('Keep running', style: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w600)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'discard'),
+              child: const Text('Discard', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+      if (result == 'resume' && mounted) {
+        _resumeTracking();
+      } else if (result == 'discard' && mounted) {
+        await Analytics.workoutDiscarded();
+        await _resetToReady();
+      }
+      return;
+    }
+
+    await _finishRun();
+  }
+
+  Widget _buildRunTypeButton(String label, VoidCallback onPressed, {bool outlined = false}) {
+    return SizedBox(
+      width: 140,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: outlined ? Colors.white : const Color(0xFF000000),
+          foregroundColor: outlined ? const Color(0xFF000000) : Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: outlined ? const BorderSide(color: Color(0xFFD0D0D0)) : BorderSide.none,
+          ),
+          elevation: 0,
+          shadowColor: Colors.transparent,
+        ),
+        child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     switch (_runState) {
       case RunState.ready:
-        return SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _permissionStatus == PermissionStatus.granted ? _startTracking : null, style: ElevatedButton.styleFrom(backgroundColor: _permissionStatus == PermissionStatus.granted ? const Color(0xFF000000) : const Color(0xFFCCCCCC), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Start', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5))));
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: _showRunTypeChoice
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _buildRunTypeButton('Workout', _onWorkoutChosen),
+                          const SizedBox(height: 8),
+                          _buildRunTypeButton('Free Run', _onFreeRunChosen, outlined: true),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _permissionStatus == PermissionStatus.granted
+                    ? () {
+                        if (_workoutReadyToStart) {
+                          _startTracking();
+                        } else {
+                          setState(() => _showRunTypeChoice = !_showRunTypeChoice);
+                        }
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _permissionStatus == PermissionStatus.granted ? const Color(0xFF000000) : const Color(0xFFCCCCCC),
+                  foregroundColor: const Color(0xFFFFFFFF),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('Start', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              ),
+            ),
+          ],
+        );
       case RunState.running:
         return SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _pauseTracking, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A0A0A), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Pause', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5))));
       case RunState.paused:
@@ -1074,7 +1299,7 @@ bool get _hasCooldown =>
           Expanded(child: ElevatedButton(onPressed: _resumeTracking, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A0A0A), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Resume', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))),
           const SizedBox(width: 12),
           Expanded(child: _isLastPhase
-            ? ElevatedButton(onPressed: _finishRun, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD32F2F), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Finish', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))
+            ? ElevatedButton(onPressed: _onFinishTapped, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD32F2F), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Finish', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))
             : ElevatedButton(onPressed: _tapNext, style: ElevatedButton.styleFrom(backgroundColor: _phaseColor, foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Next →', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))),
         ]);
     }

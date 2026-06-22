@@ -5,6 +5,7 @@ import '../config/workout_template_library.dart';
 import '../../models/workout_type.dart';
 import '../../utils/database_service.dart';
 import '../progression_decision.dart';
+import '../../services/profile_service.dart';
 
 /// Called once after every completed run to keep all coaching state current.
 ///
@@ -104,6 +105,8 @@ class EngineRuntime {
         );
 
         await _memoryService.save(updated);
+        // Keep profiles table vdot_score current so it reflects real fitness
+        ProfileService.instance.updateField('vdot_score', newVdot).ignore();
       }
 
       debugPrint(

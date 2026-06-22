@@ -162,8 +162,9 @@ class DatabaseService {
       // v2 → added cs_value_at_time
       // v3 → added rpe
       // v4 → added skip_counts
+      // v5 → added achievements
       // ────────────────────────────────────────────────────────────────────
-      version: 4,
+      version: 5,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -196,6 +197,13 @@ class DatabaseService {
           CREATE TABLE skip_counts (
             workout_type  TEXT    PRIMARY KEY,
             count         INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE achievements (
+            type        TEXT    PRIMARY KEY,
+            unlocked_at TEXT    NOT NULL,
+            tier        INTEGER NOT NULL
           )
         ''');
         await db.execute('CREATE INDEX idx_runs_date ON runs(date DESC)');
@@ -241,6 +249,21 @@ class DatabaseService {
             debugPrint('[DB] skip_counts already exists, skipping: $e');
           }
         }
+
+        if (oldVersion < 5) {
+          // v4 → v5: achievements
+          try {
+            await db.execute('''
+              CREATE TABLE achievements (
+                type        TEXT    PRIMARY KEY,
+                unlocked_at TEXT    NOT NULL,
+                tier        INTEGER NOT NULL
+              )
+            ''');
+          } catch (e) {
+            debugPrint('[DB] achievements already exists, skipping: $e');
+          }
+        }
       },
     );
   }
@@ -257,6 +280,11 @@ class DatabaseService {
       FirebaseCrashlytics.instance.recordError(e, stack);
       return -1;
     }
+  }
+
+  Future<void> deleteRun(int id) async {
+    final db = await database;
+    await db.delete('runs', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<RunRecord>> getAllRuns() async {
@@ -395,6 +423,46 @@ class DatabaseService {
       };
     } catch (e, stack) {
       debugPrint('[DB] getSkipCounts error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return {};
+    }
+  }
+
+  // ── CRUD: achievements ────────────────────────────────────────────────────
+
+  /// Persists an achievement the first time it is earned.
+  /// Uses INSERT OR IGNORE so the unlock date is frozen — calling this again
+  /// for an already-earned achievement is a no-op.
+  /// Returns true if the row was newly inserted (i.e. first time earning it).
+  Future<bool> saveAchievementIfNew(
+      String type, DateTime unlockedAt, int tier) async {
+    try {
+      final db = await database;
+      final affected = await db.rawInsert(
+        'INSERT OR IGNORE INTO achievements (type, unlocked_at, tier) '
+        'VALUES (?, ?, ?)',
+        [type, unlockedAt.toIso8601String(), tier],
+      );
+      return affected > 0;
+    } catch (e, stack) {
+      debugPrint('[DB] saveAchievementIfNew error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    }
+  }
+
+  /// Returns a map of achievement type name → frozen unlock date.
+  Future<Map<String, DateTime>> getAchievementDates() async {
+    try {
+      final db = await database;
+      final rows = await db.query('achievements');
+      return {
+        for (final r in rows)
+          r['type'] as String:
+              DateTime.parse(r['unlocked_at'] as String),
+      };
+    } catch (e, stack) {
+      debugPrint('[DB] getAchievementDates error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
       return {};
     }

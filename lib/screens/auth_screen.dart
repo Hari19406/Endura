@@ -5,7 +5,8 @@ import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
+import '../services/analytics_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
@@ -31,8 +32,8 @@ class _AuthScreenState extends State<AuthScreen> {
   final _formKey            = GlobalKey<FormState>();
 
   // ── Legal URLs — replace with your actual hosted URLs ─────────────────────
-  static const _termsUrl   = 'https://yourdomain.com/terms';
-  static const _privacyUrl = 'https://yourdomain.com/privacy';
+  static const _termsUrl   = 'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
+  static const _privacyUrl = 'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
 
   // ── Theme tokens ──────────────────────────────────────────────────────────
   static const _bg            = Color(0xFF000000);
@@ -62,25 +63,31 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isSignUp) {
-        final response = await Supabase.instance.client.auth.signUp(
-          email:    _emailController.text.trim(),
-          password: _passwordController.text,
+        await Supabase.instance.client.auth.signUp(
+          email:           _emailController.text.trim(),
+          password:        _passwordController.text,
+          emailRedirectTo: 'com.hari.endura://auth-callback',
         );
 
-        await Posthog().capture(
-          eventName: 'signup',
-          properties: {'method': 'email'},
-        );
+        await Analytics.signup('email');
         if (mounted) _showEmailConfirmationDialog();
       } else {
         await Supabase.instance.client.auth.signInWithPassword(
           email:    _emailController.text.trim(),
           password: _passwordController.text,
         );
+        await Analytics.login('email');
         if (mounted) widget.onAuthenticated();
       }
     } on AuthException catch (e) {
-      if (mounted) setState(() => _errorMessage = _friendlyError(e.message));
+      if (mounted) {
+        setState(() {
+          _errorMessage = _friendlyError(e.message);
+          if (e.message.contains('already registered') || e.message.contains('already been registered')) {
+            _isSignUp = false;
+          }
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _errorMessage = 'Something went wrong. Check your connection.');
     } finally {
@@ -116,7 +123,7 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'com.endura.runapp://reset-password',
+        redirectTo: 'com.hari.endura://reset-password',
       );
     } catch (_) {
       if (mounted) {
@@ -160,8 +167,11 @@ class _AuthScreenState extends State<AuthScreen> {
   String _friendlyError(String message) {
     if (message.contains('Invalid login'))       return 'Wrong email or password.';
     if (message.contains('Email not confirmed')) return 'Please confirm your email before signing in.';
-    if (message.contains('already registered'))  return 'An account with this email already exists.';
+    if (message.contains('already registered') || message.contains('already been registered'))
+      return 'An account with this email already exists. Switched to sign in.';
     if (message.contains('Password should be'))  return 'Password must be at least 8 characters.';
+    if (message.toLowerCase().contains('rate limit') || message.toLowerCase().contains('too many requests'))
+      return 'Too many attempts. Please wait a few minutes and try again.';
     return message;
   }
 
@@ -179,6 +189,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
       final GoogleSignIn googleSignIn =
           GoogleSignIn(serverClientId: webClientId);
+      await googleSignIn.signOut(); // clear cached account so picker always shows
       final googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
@@ -213,18 +224,13 @@ class _AuthScreenState extends State<AuthScreen> {
         final parts = displayName.trim().split(RegExp(r'\s+'));
         final first = parts.isNotEmpty ? parts.first : '';
         final last  = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-        await _saveNameToProfile(
-          userId: userId,
-          firstName: first,
-          lastName:  last,
-        );
+        await _saveNameToProfile(userId: userId, firstName: first, lastName: last);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('first_name', first);
       }
 
       _submitLocked = false;
-      await Posthog().capture(
-        eventName: 'signup',
-        properties: {'method': 'google'},
-      );
+      await Analytics.signup('google');
       if (mounted) widget.onAuthenticated();
 
     } on AuthException catch (e) {
@@ -234,11 +240,10 @@ class _AuthScreenState extends State<AuthScreen> {
         _errorMessage = _friendlyError(e.message);
       });
     } catch (e) {
-      debugPrint('[GoogleSignIn] error: $e');
       _submitLocked = false;
       if (mounted) setState(() {
         _isLoading    = false;
-        _errorMessage = 'Google sign in failed. Check your connection.';
+        _errorMessage = 'Google sign in failed. Try again.';
       });
     }
   }

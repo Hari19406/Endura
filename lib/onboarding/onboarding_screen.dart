@@ -7,6 +7,7 @@ import '../../engines/planner/race_plan_builder.dart';
 import '../../engines/memory/engine_memory_service.dart';
 import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
+import '../../services/analytics_service.dart';
 import 'onboarding_pages.dart';
 import '../../models/training_phase.dart';
 
@@ -138,6 +139,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (widget.shortenedMode) {
       _prefillFromExistingProfile();
     }
+
+    // onPageChanged doesn't fire for the initial page — track funnel entry here.
+    Analytics.onboardingStepViewed(_sequence.first.name, 0);
   }
 
   @override
@@ -260,6 +264,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void _onPageChanged(int p) {
     setState(() => _current = p);
     HapticFeedback.selectionClick();
+    Analytics.onboardingStepViewed(_sequence[p].name, p);
   }
 
   // ── Validation ───────────────────────────────────────────────────────────
@@ -416,21 +421,36 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       }
 
       // ── Supabase profile ───────────────────────────────────────────────
-      final displayName = _firstName.trim();
+      final nameToSave = _firstName.trim();
       await ProfileService.instance.saveProfile(UserProfile(
+        firstName:        nameToSave.isNotEmpty ? nameToSave : null,
         gender:           _gender,
         dob:              _dob,
         goal:             _goal,
         runsPerWeek:      _runsPerWeek,
         trainingDays:     _selectedDays,
         paceDistance:     _paceDistance,
+        paceHours:        _paceHours,
         paceMinutes:      _paceMinutes,
         paceSeconds:      _paceSeconds,
         raceDate:         _raceDate,
         useMetric:        true,
-        displayName:      displayName.isNotEmpty ? displayName : null,
         baselineWeeklyKm: effectiveBaselineKm,
+        planStartDate:    _startDate,
+        planWeeks:        _planWeeks,
+        vdotScore:        _vdot,
+        vdotIsProvisional: _vdotProvisional,
+        experienceLevel:  exp,
+        goalIntent:       _intensity,
+        longRunDayIndex:  _longRunDayIndex,
       ));
+
+      await Analytics.onboardingCompleted(
+        goal: _goal ?? '5k',
+        level: exp,
+        runsPerWeek: _runsPerWeek,
+        planWeeks: _effectivePlanWeeks,
+      );
     } catch (e) {
       debugPrint('[Onboarding] Save error: $e');
     }

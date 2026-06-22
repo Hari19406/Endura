@@ -15,7 +15,10 @@ import 'dart:async';
 import 'utils/refreshable.dart';
 import 'services/coach_message_builder.dart' as message;
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'services/analytics_service.dart';
 import 'services/revenue_cat_service.dart';
+import 'services/profile_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
   try {
@@ -70,14 +73,18 @@ void main() async {
         ..captureApplicationLifecycleEvents = true,
     );
     debugPrint('[Startup] PostHog initialized');
+
+    // If a user is already logged in at cold start, tie events to them
+    // immediately (the auth listener's initialSession event also covers this,
+    // but doing it here avoids a race for the very first app_opened event).
+    final existingUser = Supabase.instance.client.auth.currentUser;
+    if (existingUser != null) {
+      await Analytics.identify(existingUser.id,
+          properties: {'email': existingUser.email ?? ''});
+    }
+    await Analytics.appOpened();
   } else {
     debugPrint('[Startup] PostHog skipped — missing credentials');
-  }
-
-  if (posthogApiKey.isNotEmpty && posthogHost.isNotEmpty) {
-    await Posthog().capture(
-      eventName: 'app_opened',
-    );
   }
 
   runApp(const MyApp());
@@ -193,6 +200,17 @@ class _AppInitializerState extends State<AppInitializer> {
     _listenAuthEvents();
   }
 
+  Future<void> _savePushToken() async {
+    final messaging = FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(alert: false, badge: false, sound: false);
+    if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+    final token = await messaging.getToken();
+    if (token != null) {
+      await ProfileService.instance.updateField('push_token', token);
+      debugPrint('[Startup] push token saved');
+    }
+  }
+
   Future<void> _initialize() async {
     try {
       final service = await FirstRunService.create();
@@ -203,6 +221,14 @@ class _AppInitializerState extends State<AppInitializer> {
       if (user != null) {
         await RevenueCatService.init(user.id);
         debugPrint('[Startup] RevenueCat initialized');
+        // Sync plan state: backfill Supabase for existing users, restore for new devices
+        ProfileService.instance.syncPlanState().catchError(
+          (e) => debugPrint('[Startup] syncPlanState error: $e'),
+        );
+        // Save FCM push token to Supabase for future notifications
+        _savePushToken().catchError(
+          (e) => debugPrint('[Startup] savePushToken error: $e'),
+        );
       }
       if (mounted) {
         setState(() {
@@ -233,9 +259,18 @@ class _AppInitializerState extends State<AppInitializer> {
         }
 
         // AFTER
-        if (event == AuthChangeEvent.signedIn) {
+        if (event == AuthChangeEvent.signedIn ||
+            event == AuthChangeEvent.initialSession) {
           final user = Supabase.instance.client.auth.currentUser;
-        if (user != null) await RevenueCatService.init(user.id);
+          if (user != null) {
+            await RevenueCatService.init(user.id);
+            await Analytics.identify(user.id,
+                properties: {'email': user.email ?? ''});
+          }
+        }
+
+        if (event == AuthChangeEvent.signedOut) {
+          await Analytics.reset();
         }
         if (mounted) setState(() {});
       },
@@ -350,6 +385,10 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
+  void _onPlanUpdated() {
+    _homeKey.currentState?._refreshData();
+  }
+
   void _navigateToYou() => setState(() => _currentIndex = 2);
   void _navigateToRun() => setState(() => _currentIndex = 1);
 
@@ -371,8 +410,8 @@ class _MainNavigationState extends State<MainNavigation> {
             onNavigateToRun: _navigateToRun,
             onCoachMessageReady: _onCoachMessageReady,
           ),
-          RunScreenWrapper(onRunCompleted: _onRunCompleted),
-          YouScreenWrapper(key: _youKey),
+          RunScreenWrapper(onRunCompleted: _onRunCompleted, activeCoachMessage: _activeCoachMessage),
+          YouScreenWrapper(key: _youKey, onPlanUpdated: _onPlanUpdated),
         ],
       ),
       bottomNavigationBar: Container(
@@ -454,17 +493,22 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
 
 class RunScreenWrapper extends StatelessWidget {
   final VoidCallback onRunCompleted;
+  final message.CoachMessage? activeCoachMessage;
 
-  const RunScreenWrapper({super.key, required this.onRunCompleted,});
+  const RunScreenWrapper({super.key, required this.onRunCompleted, this.activeCoachMessage});
 
   @override
   Widget build(BuildContext context) {
-    return RunScreen(onWorkoutCompleted: onRunCompleted);
+    return RunScreen(
+      onWorkoutCompleted: onRunCompleted,
+      activeCoachMessage: activeCoachMessage,
+    );
   }
 }
 
 class YouScreenWrapper extends StatefulWidget {
-  const YouScreenWrapper({super.key});
+  final VoidCallback? onPlanUpdated;
+  const YouScreenWrapper({super.key, this.onPlanUpdated});
 
   @override
   State<YouScreenWrapper> createState() => _YouScreenWrapperState();
@@ -483,6 +527,6 @@ class _YouScreenWrapperState extends State<YouScreenWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return YouScreen(key: _childKey);
+    return YouScreen(key: _childKey, onPlanUpdated: widget.onPlanUpdated);
   }
 }
