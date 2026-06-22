@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/coach_engine_v2.dart';
 import '../engines/vdot_engine/run_history_service.dart';
@@ -290,11 +291,12 @@ class WorkoutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: c.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -334,7 +336,7 @@ class WorkoutCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F0),
+                      color: c.divider,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -345,9 +347,9 @@ class WorkoutCard extends StatelessWidget {
                         const SizedBox(width: 5),
                         Text(
                           workout.feelHint,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF555555),
+                            color: c.textSecondary,
                           ),
                         ),
                       ],
@@ -359,10 +361,10 @@ class WorkoutCard extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               workout.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0A0A0A),
+                color: c.textPrimary,
                 letterSpacing: -0.8,
                 height: 1.1,
               ),
@@ -371,7 +373,7 @@ class WorkoutCard extends StatelessWidget {
             Row(
               children: [
                 if (workout.distance != null)
-                  _chipWidget(Icons.straighten, workout.distance!),
+                  _chipWidget(context, Icons.straighten, workout.distance!),
                 const Spacer(),
                 if (!_isEmpty && onTap != null)
                   GestureDetector(
@@ -380,10 +382,10 @@ class WorkoutCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF333333),
+                        color: c.accent,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
@@ -391,12 +393,12 @@ class WorkoutCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: c.onAccent,
                             ),
                           ),
-                          SizedBox(width: 5),
+                          const SizedBox(width: 5),
                           Icon(Icons.arrow_forward_rounded,
-                              size: 13, color: Colors.white),
+                              size: 13, color: c.onAccent),
                         ],
                       ),
                     ),
@@ -409,24 +411,25 @@ class WorkoutCard extends StatelessWidget {
     );
   }
 
-  Widget _chipWidget(IconData icon, String label) {
+  Widget _chipWidget(BuildContext context, IconData icon, String label) {
+    final c = context.colors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: c.divider,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: const Color(0xFF999999)),
+          Icon(icon, size: 13, color: c.textTertiary),
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF0A0A0A),
+              color: c.textPrimary,
             ),
           ),
         ],
@@ -1116,26 +1119,26 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: c.background,
       appBar: AppBar(
-        title: const Text('Home', style: TextStyle(
-          fontWeight: FontWeight.w600, color: Color(0xFF000000),
+        title: Text('Home', style: TextStyle(
+          fontWeight: FontWeight.w600, color: c.textPrimary,
           fontSize: 16, letterSpacing: -0.3,
         )),
         centerTitle: true, elevation: 0,
-        backgroundColor: const Color(0xFFFFFFFF),
+        backgroundColor: c.surface,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF000000)))
+          ? const Center(child: CircularProgressIndicator())
           : _buildDashboardContent(),
     );
   }
 
   Widget _buildDashboardContent() {
     return RefreshIndicator(
-      color: const Color(0xFF000000),
+      color: context.colors.accent,
       onRefresh: loadData,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -1199,9 +1202,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildSectionLabel(String text) {
-    return Text(text, style: const TextStyle(
+    return Text(text, style: TextStyle(
       fontSize: 11, fontWeight: FontWeight.w600,
-      color: Color(0xFF999999), letterSpacing: 1.2,
+      color: context.colors.textTertiary, letterSpacing: 1.2,
     ));
   }
 
@@ -1230,9 +1233,9 @@ class _HomeScreenState extends State<HomeScreen>
     return Container(
       width: width, height: 190,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: context.colors.border),
       ),
       padding: const EdgeInsets.all(18),
       child: child,
@@ -1255,6 +1258,7 @@ class _HomeScreenState extends State<HomeScreen>
     final ratio = weeklyTarget > 0
         ? (runsThisWeek / weeklyTarget).clamp(0.0, 1.0)
         : 0.0;
+    final c = context.colors;
 
     return _carouselShell(
       width: width,
@@ -1262,9 +1266,9 @@ class _HomeScreenState extends State<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('THIS WEEK', style: TextStyle(
+          Text('THIS WEEK', style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w600,
-            color: Color(0xFF999999), letterSpacing: 1.2,
+            color: c.textTertiary, letterSpacing: 1.2,
           )),
           const SizedBox(height: 14),
           Row(
@@ -1278,23 +1282,21 @@ class _HomeScreenState extends State<HomeScreen>
                   Text(dayLabels[i], style: TextStyle(
                     fontSize: 12,
                     fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                    color: isToday ? const Color(0xFF0A0A0A) : const Color(0xFF999999),
+                    color: isToday ? c.textPrimary : c.textTertiary,
                   )),
                   const SizedBox(height: 8),
                   Container(
                     width: 32, height: 32,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: hasRun ? const Color(0xFF0A0A0A) : Colors.transparent,
+                      color: hasRun ? c.accent : Colors.transparent,
                       border: Border.all(
-                        color: hasRun
-                            ? Colors.transparent
-                            : const Color(0xFFDDDDDD),
+                        color: hasRun ? Colors.transparent : c.border,
                         width: 1.5,
                       ),
                     ),
                     child: hasRun
-                        ? const Icon(Icons.check, size: 15, color: Colors.white)
+                        ? Icon(Icons.check, size: 15, color: c.onAccent)
                         : null,
                   ),
                 ],
@@ -1306,13 +1308,13 @@ class _HomeScreenState extends State<HomeScreen>
             text: TextSpan(children: [
               TextSpan(
                 text: '$runsThisWeek',
-                style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0A0A0A),
+                style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary,
                 ),
               ),
               TextSpan(
                 text: ' / $weeklyTarget runs',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF999999)),
+                style: TextStyle(fontSize: 14, color: c.textTertiary),
               ),
             ]),
           ),
@@ -1321,8 +1323,8 @@ class _HomeScreenState extends State<HomeScreen>
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
               value: ratio, minHeight: 3,
-              backgroundColor: const Color(0xFFEEEEEE),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0A0A0A)),
+              backgroundColor: c.divider,
+              valueColor: AlwaysStoppedAnimation<Color>(c.accent),
             ),
           ),
         ],
@@ -1340,18 +1342,19 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildLastRunCarouselCard(double width) {
+    final c = context.colors;
     return _carouselShell(
       width: width,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('LAST RUN', style: TextStyle(
+          Text('LAST RUN', style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w600,
-            color: Color(0xFF999999), letterSpacing: 1.2,
+            color: c.textTertiary, letterSpacing: 1.2,
           )),
           const SizedBox(height: 2),
-          Text(_formatDate(_lastRun!.date), style: const TextStyle(
-            fontSize: 11, color: Color(0xFF999999),
+          Text(_formatDate(_lastRun!.date), style: TextStyle(
+            fontSize: 11, color: c.textTertiary,
           )),
           const SizedBox(height: 14),
           Row(
@@ -1360,9 +1363,9 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('DIST', style: TextStyle(
+                    Text('DIST', style: TextStyle(
                       fontSize: 9, fontWeight: FontWeight.w600,
-                      color: Color(0xFF999999), letterSpacing: 0.8,
+                      color: c.textTertiary, letterSpacing: 0.8,
                     )),
                     const SizedBox(height: 4),
                     Row(
@@ -1370,16 +1373,16 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         Text(
                           _convertDistance(_lastRun!.distance).toStringAsFixed(1),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 28, fontWeight: FontWeight.w600,
-                            color: Color(0xFF0A0A0A), letterSpacing: -0.5,
-                            fontFeatures: [FontFeature.tabularFigures()],
+                            color: c.textPrimary, letterSpacing: -0.5,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4, left: 3),
-                          child: Text(_distanceLabel, style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF999999),
+                          child: Text(_distanceLabel, style: TextStyle(
+                            fontSize: 12, color: c.textTertiary,
                             fontWeight: FontWeight.w500,
                           )),
                         ),
@@ -1392,23 +1395,23 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('PACE', style: TextStyle(
+                    Text('PACE', style: TextStyle(
                       fontSize: 9, fontWeight: FontWeight.w600,
-                      color: Color(0xFF999999), letterSpacing: 0.8,
+                      color: c.textTertiary, letterSpacing: 0.8,
                     )),
                     const SizedBox(height: 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(_lastRun!.averagePace, style: const TextStyle(
+                        Text(_lastRun!.averagePace, style: TextStyle(
                           fontSize: 28, fontWeight: FontWeight.w600,
-                          color: Color(0xFF0A0A0A), letterSpacing: -0.5,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          color: c.textPrimary, letterSpacing: -0.5,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         )),
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 4, left: 3),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4, left: 3),
                           child: Text('/km', style: TextStyle(
-                            fontSize: 12, color: Color(0xFF999999),
+                            fontSize: 12, color: c.textTertiary,
                             fontWeight: FontWeight.w500,
                           )),
                         ),
@@ -1424,12 +1427,12 @@ class _HomeScreenState extends State<HomeScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: c.divider,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFEEEEEE)),
+                border: Border.all(color: c.border),
               ),
-              child: Text('RPE ${_lastRun!.rpe}/10', style: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0A0A0A),
+              child: Text('RPE ${_lastRun!.rpe}/10', style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, color: c.textPrimary,
               )),
             ),
           ],
@@ -1439,6 +1442,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildFirstRunPromptCard(double width) {
+    final c = context.colors;
     return _carouselShell(
       width: width,
       child: Row(
@@ -1446,27 +1450,27 @@ class _HomeScreenState extends State<HomeScreen>
           Container(
             width: 44, height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
+              color: c.divider,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.directions_run,
-                color: Color(0xFF999999), size: 22),
+            child: Icon(Icons.directions_run,
+                color: c.textTertiary, size: 22),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('No runs yet', style: TextStyle(
                   fontSize: 15, fontWeight: FontWeight.w700,
-                  color: Color(0xFF0A0A0A),
+                  color: c.textPrimary,
                 )),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Head to the Run tab to record your first run',
                   style: TextStyle(
-                    fontSize: 12, color: Color(0xFF999999), height: 1.4,
+                    fontSize: 12, color: c.textTertiary, height: 1.4,
                   ),
                 ),
               ],
@@ -1478,12 +1482,13 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildWelcomeHeroCard() {
+    final c = context.colors;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: c.surface,
         borderRadius: const BorderRadius.all(Radius.circular(16)),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: c.border),
       ),
       padding: const EdgeInsets.all(28),
       child: Column(
@@ -1492,23 +1497,23 @@ class _HomeScreenState extends State<HomeScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFDDDDDD)),
+              border: Border.all(color: c.border),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text('WELCOME', style: TextStyle(
+            child: Text('WELCOME', style: TextStyle(
               fontSize: 10, fontWeight: FontWeight.w700,
-              color: Color(0xFF999999), letterSpacing: 2,
+              color: c.textTertiary, letterSpacing: 2,
             )),
           ),
           const SizedBox(height: 20),
-          const Text('Ready to\ntrain?', style: TextStyle(
+          Text('Ready to\ntrain?', style: TextStyle(
             fontSize: 48, fontWeight: FontWeight.w800,
-            color: Color(0xFF0A0A0A), height: 1.05, letterSpacing: -1.5,
+            color: c.textPrimary, height: 1.05, letterSpacing: -1.5,
           )),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Complete your first run to unlock\nyour adaptive plan.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF999999), height: 1.6),
+            style: TextStyle(fontSize: 13, color: c.textTertiary, height: 1.6),
           ),
         ],
       ),

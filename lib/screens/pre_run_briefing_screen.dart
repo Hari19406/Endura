@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../engines/config/workout_template_library.dart';
+import '../theme/app_colors.dart';
 import 'run_screen.dart';
 
 enum BlockState { pending, done }
@@ -66,24 +67,25 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         widget.coachMessage.goalText.isNotEmpty ||
         widget.coachMessage.feelText.isNotEmpty;
 
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F2),
+      backgroundColor: c.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Today\'s Workout',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: Color(0xFF0A0A0A),
+            color: c.textPrimary,
             fontSize: 16,
             letterSpacing: -0.3,
           ),
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: const Color(0xFFF2F2F2),
+        backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0A0A0A)),
+          icon: Icon(Icons.arrow_back, color: c.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -104,10 +106,10 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                   ],
                   Text(
                     widget.coachMessage.workoutTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF0A0A0A),
+                      color: c.textPrimary,
                       letterSpacing: -0.8,
                       height: 1.1,
                     ),
@@ -117,9 +119,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                     widget.coachMessage.hasWarmupCooldown
                         ? 'Warmup & cooldown included'
                         : 'Easy effort — no warmup needed',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFAAAAAA),
+                      color: c.textTertiary,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -141,28 +143,28 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                         Container(
                           width: 24,
                           height: 24,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0A0A0A),
+                          decoration: BoxDecoration(
+                            color: c.accent,
                             shape: BoxShape.circle,
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'M',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: c.onAccent,
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'Max',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF0A0A0A),
+                            color: c.textPrimary,
                           ),
                         ),
                       ],
@@ -171,9 +173,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       const SizedBox(height: 12),
                       Text(
                         widget.coachMessage.reflectionText,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF333333),
+                          color: c.textPrimary,
                           height: 1.6,
                         ),
                       ),
@@ -182,9 +184,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       const SizedBox(height: 4),
                       Text(
                         widget.coachMessage.acknowledgementText,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF888888),
+                          color: c.textTertiary,
                           fontStyle: FontStyle.italic,
                           height: 1.5,
                         ),
@@ -193,7 +195,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                     if (widget.coachMessage.goalText.isNotEmpty ||
                         widget.coachMessage.feelText.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                      Divider(height: 1, thickness: 1, color: c.divider),
                       const SizedBox(height: 16),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,12 +235,12 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'WORKOUT',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF999999),
+                      color: c.textTertiary,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -253,7 +255,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       workoutIntent: widget.coachMessage.workoutIntent,
                     ),
                     const SizedBox(height: 16),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                    Divider(height: 1, thickness: 1, color: c.divider),
                     const SizedBox(height: 16),
                   ],
 
@@ -261,13 +263,13 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                     stepNumber: _hasWarmup ? 2 : 1,
                     label: 'MAIN SET',
                     blocks: _workBlocks,
-                    accentColor: const Color(0xFF0A0A0A),
+                    accentColor: c.textPrimary,
                     workoutIntent: widget.coachMessage.workoutIntent,
                   ),
 
                   if (_hasCooldown) ...[
                     const SizedBox(height: 16),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                    Divider(height: 1, thickness: 1, color: c.divider),
                     const SizedBox(height: 16),
                     _WorkoutSection(
                       stepNumber: _hasWarmup ? 3 : 2,
@@ -286,15 +288,15 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
               _Card(
                 child: Row(
                   children: [
-                    const Icon(Icons.swap_horiz, size: 14, color: Color(0xFF999999)),
+                    Icon(Icons.swap_horiz, size: 14, color: c.textTertiary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${widget.coachMessage.workoutTitle} moved from '
                         '${widget.coachMessage.movedFromDay}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF666666),
+                          color: c.textSecondary,
                           height: 1.4,
                         ),
                       ),
@@ -312,8 +314,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
               child: ElevatedButton(
                 onPressed: _startWorkout,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A0A0A),
-                  foregroundColor: Colors.white,
+                  backgroundColor: c.accent,
+                  foregroundColor: c.onAccent,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -442,7 +444,7 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: child,
@@ -484,10 +486,12 @@ class _WorkoutSection extends StatelessWidget {
               child: Center(
                 child: Text(
                   '$stepNumber',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: accentColor.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white,
                   ),
                 ),
               ),
@@ -557,12 +561,14 @@ class _WorkoutSection extends StatelessWidget {
     detail.write(' · $pace');
     if (recovery != null) detail.write(' · $recovery');
 
+    return Builder(builder: (context) {
+    final c = context.colors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 3),
-          child: Icon(icon, size: 14, color: const Color(0xFFCCCCCC)),
+          child: Icon(icon, size: 14, color: c.textFaint),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -571,20 +577,20 @@ class _WorkoutSection extends StatelessWidget {
             children: [
               Text(
                 blockLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF0A0A0A),
+                  color: c.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 detail.toString(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF777777),
+                  color: c.textSecondary,
                   height: 1.4,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -592,6 +598,7 @@ class _WorkoutSection extends StatelessWidget {
         ),
       ],
     );
+    });
   }
 
   String _smartDistance(double km) {
@@ -638,9 +645,9 @@ class _InsightItem extends StatelessWidget {
         const SizedBox(height: 5),
         Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: Color(0xFF444444),
+            color: context.colors.textSecondary,
             height: 1.5,
           ),
         ),

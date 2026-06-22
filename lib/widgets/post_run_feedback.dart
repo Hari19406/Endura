@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import '../services/coach_message_builder.dart' as message;
 import 'target_pace_indicator.dart' show PaceComparator, PaceStatus;
+import '../theme/app_colors.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST RUN FEEDBACK WIDGET
@@ -31,14 +32,14 @@ class PostRunFeedback extends StatelessWidget {
   Widget build(BuildContext context) {
     // No target pace assigned → free run feedback
     if (targetRange == null) {
-      return _buildFreeRunFeedback();
+      return _buildFreeRunFeedback(context);
     }
 
     final avgPaceSeconds = _parseAvgPace(avgPace);
 
     // Unparseable pace → graceful fallback
     if (avgPaceSeconds <= 0) {
-      return _buildFreeRunFeedback();
+      return _buildFreeRunFeedback(context);
     }
 
     final status = PaceComparator.compare(
@@ -48,26 +49,27 @@ class PostRunFeedback extends StatelessWidget {
 
     // noData shouldn't happen here (we checked above), but handle safely
     if (status == PaceStatus.noData) {
-      return _buildFreeRunFeedback();
+      return _buildFreeRunFeedback(context);
     }
 
-    return _buildPaceFeedback(avgPaceSeconds, status);
+    return _buildPaceFeedback(context, avgPaceSeconds, status);
   }
 
   // ── Pace comparison card ─────────────────────────────────────────────────
 
-  Widget _buildPaceFeedback(int avgPaceSeconds, PaceStatus status) {
+  Widget _buildPaceFeedback(
+      BuildContext context, int avgPaceSeconds, PaceStatus status) {
     final _FeedbackConfig cfg = _configForStatus(status);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'HOW YOU DID',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF999999),
+            color: context.colors.textTertiary,
             letterSpacing: 1.2,
           ),
         ),
@@ -172,16 +174,17 @@ class PostRunFeedback extends StatelessWidget {
 
   // ── Free run / no target feedback ────────────────────────────────────────
 
-  Widget _buildFreeRunFeedback() {
+  Widget _buildFreeRunFeedback(BuildContext context) {
+    final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'HOW YOU DID',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF999999),
+            color: c.textTertiary,
             letterSpacing: 1.2,
           ),
         ),
@@ -189,9 +192,9 @@ class PostRunFeedback extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F8F8),
+            color: c.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEEEEEE)),
+            border: Border.all(color: c.border),
           ),
           child: Row(
             children: [
@@ -199,17 +202,17 @@ class PostRunFeedback extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.black,
+                  color: c.accent,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.directions_run,
-                  color: Colors.white,
+                  color: c.onAccent,
                   size: 18,
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -218,15 +221,15 @@ class PostRunFeedback extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0A0A0A),
+                        color: c.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       'Good effort — keep it comfortable.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF888888),
+                        color: c.textTertiary,
                         height: 1.4,
                       ),
                     ),

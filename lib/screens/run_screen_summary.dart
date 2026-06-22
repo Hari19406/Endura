@@ -19,6 +19,7 @@ import '../utils/stats.dart' show RunHistory;
 import '../engines/daily/dynamic_scaler.dart';
 import '../models/race_plan.dart';
 import '../models/training_phase.dart';
+import '../theme/app_colors.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -92,11 +93,11 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Discard activity?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        content: const Text('This run will be deleted and won\'t count toward your training.', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+        content: Text('This run will be deleted and won\'t count toward your training.', style: TextStyle(fontSize: 14, color: context.colors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep', style: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w600)),
+            child: Text('Keep', style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.w600)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -180,17 +181,16 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       future: _summaryFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Color(0xFFF5F5F7),
-            body: Center(
-                child: CircularProgressIndicator(color: Colors.black)),
+          return Scaffold(
+            backgroundColor: context.colors.background,
+            body: const Center(child: CircularProgressIndicator()),
           );
         }
 
         final data = snapshot.data ?? _SummaryData.empty();
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F7),
+          backgroundColor: context.colors.background,
           body: SafeArea(
             child: Column(
               children: [
@@ -215,19 +215,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                   children: [
                                     Text(
                                       widget.isFreeRun ? 'Run complete' : 'Workout complete',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w800,
-                                        color: Colors.black,
+                                        color: context.colors.textPrimary,
                                         letterSpacing: -0.5,
                                       ),
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
                                       _formatDate(widget.runDate),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
-                                        color: Color(0xFF999999),
+                                        color: context.colors.textTertiary,
                                       ),
                                     ),
                                   ],
@@ -269,10 +269,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade200,
-                        disabledForegroundColor: Colors.grey.shade400,
+                        backgroundColor: context.colors.accent,
+                        foregroundColor: context.colors.onAccent,
+                        disabledBackgroundColor: context.colors.divider,
+                        disabledForegroundColor: context.colors.textFaint,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -328,7 +328,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
               ],
             ),
           ),
-          Divider(color: Colors.grey.shade100, height: 1, thickness: 1),
+          Divider(color: context.colors.divider, height: 1, thickness: 1),
           IntrinsicHeight(
             child: Row(
               children: [
@@ -357,26 +357,26 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           children: [
             Text(label,
                 style:
-                    const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
+                    TextStyle(fontSize: 10, color: context.colors.textTertiary)),
             const SizedBox(height: 4),
             RichText(
               text: TextSpan(
                 children: [
                   TextSpan(
                     text: value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   if (unit.isNotEmpty)
                     TextSpan(
                       text: ' $unit',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF999999),
+                        color: context.colors.textTertiary,
                       ),
                     ),
                 ],
@@ -397,7 +397,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           children: [
             Text(label,
                 style:
-                    const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
+                    TextStyle(fontSize: 10, color: context.colors.textTertiary)),
             const SizedBox(height: 4),
             valueWidget,
           ],
@@ -420,7 +420,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   Widget _buildCellDivider() =>
-      Container(width: 0.5, color: const Color(0xFFF0F0F0));
+      Container(width: 0.5, color: context.colors.divider);
 
   // ── Pace & performance card ───────────────────────────────────────────────
 
@@ -433,8 +433,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     Color badgeText;
     if (target == null) {
       badgeLabel = 'Free run';
-      badgeBg = const Color(0xFFF0F0F0);
-      badgeText = const Color(0xFF888888);
+      badgeBg = context.colors.divider;
+      badgeText = context.colors.textTertiary;
     } else {
       final inRange = avgSec >= target.minSecondsPerKm &&
           avgSec <= target.maxSecondsPerKm;
@@ -472,11 +472,11 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     color: Color(0xFF2A9D4E), size: 15),
               ),
               const SizedBox(width: 8),
-              const Text('Pace & performance',
+              Text('Pace & performance',
                   style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black)),
+                      color: context.colors.textPrimary)),
             ]),
             const SizedBox(height: 14),
             Row(
@@ -486,9 +486,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Average pace',
+                      Text('Average pace',
                           style: TextStyle(
-                              fontSize: 10, color: Color(0xFFAAAAAA))),
+                              fontSize: 10, color: context.colors.textTertiary)),
                       const SizedBox(height: 4),
                       Builder(builder: (context) {
                         return RichText(
@@ -535,9 +535,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Target range',
+                        Text('Target range',
                             style: TextStyle(
-                                fontSize: 10, color: Color(0xFFAAAAAA))),
+                                fontSize: 10, color: context.colors.textTertiary)),
                         const SizedBox(height: 4),
                         Text(
                           '${_formatPaceSecs(target.minSecondsPerKm)} – ${_formatPaceSecs(target.maxSecondsPerKm)} /km',
@@ -635,12 +635,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              const Text(
+              Text(
                 'HOW DID IT FEEL?',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFFAAAAAA),
+                  color: context.colors.textTertiary,
                   letterSpacing: 1.1,
                 ),
               ),
@@ -664,9 +664,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
               ),
             ]),
             const SizedBox(height: 5),
-            const Text(
+            Text(
               'Max uses this to decide your next workout.',
-              style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
+              style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
             ),
             const SizedBox(height: 14),
             Row(
@@ -681,7 +681,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     fontWeight: FontWeight.w600,
                     color: level != null
                         ? level.color
-                        : const Color(0xFFAAAAAA),
+                        : context.colors.textTertiary,
                   ),
                 ),
                 if (level != null)
@@ -697,15 +697,15 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             if (level != null) ...[
               const SizedBox(height: 3),
               Text(level.desc,
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFFAAAAAA), height: 1.4)),
+                  style: TextStyle(
+                      fontSize: 11, color: context.colors.textTertiary, height: 1.4)),
             ],
             const SizedBox(height: 11),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: Container(
                 height: 9,
-                color: Colors.grey.shade100,
+                color: context.colors.divider,
                 child: AnimatedFractionallySizedBox(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
@@ -736,7 +736,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                       shape: BoxShape.circle,
                       color: isPast
                           ? lvl.color.withOpacity(0.15)
-                          : Colors.grey.shade100,
+                          : context.colors.divider,
                       border: Border.all(
                         color: isSelected ? lvl.color : Colors.transparent,
                         width: 1.5,
@@ -748,7 +748,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: isPast ? lvl.color : Colors.grey.shade400,
+                          color: isPast ? lvl.color : context.colors.textFaint,
                         ),
                       ),
                     ),
@@ -799,9 +799,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+          border: Border.all(color: context.colors.border, width: 0.5),
         ),
         child: IntrinsicHeight(
           child: Row(
@@ -843,9 +843,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                       const SizedBox(height: 8),
                       Text(
                         msg,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF1C1C1C),
+                          color: context.colors.textPrimary,
                           height: 1.55,
                         ),
                       ),
@@ -884,11 +884,11 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     color: Color(0xFF3949AB), size: 14),
               ),
               const SizedBox(width: 8),
-              const Text('Next up',
+              Text('Next up',
                   style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black)),
+                      color: context.colors.textPrimary)),
             ]),
             const SizedBox(height: 14),
             Row(
@@ -910,10 +910,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     children: [
                       Text(
                         data.nextWorkoutLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: Colors.black87,
+                          color: context.colors.textPrimary,
                           height: 1.4,
                         ),
                       ),
@@ -921,9 +921,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         const SizedBox(height: 3),
                         Text(
                           data.nextWorkoutSubtext,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFFAAAAAA),
+                            color: context.colors.textTertiary,
                             height: 1.4,
                           ),
                         ),
@@ -1143,10 +1143,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     if (widget.routePoints.isEmpty) {
       return Container(
         height: 220,
-        color: Colors.grey.shade100,
+        color: context.colors.divider,
         child: Center(
           child: Icon(Icons.map_outlined,
-              size: 48, color: Colors.grey.shade300),
+              size: 48, color: context.colors.textFaint),
         ),
       );
     }
@@ -1317,9 +1317,9 @@ class _Card extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        border: Border.all(color: context.colors.border, width: 0.5),
       ),
       child: child,
     );

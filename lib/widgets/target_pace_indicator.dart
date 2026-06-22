@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import '../services/coach_message_builder.dart' as message;
+import '../theme/app_colors.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PACE STATUS ENUM
@@ -146,24 +147,24 @@ class TargetPaceIndicator extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'TARGET',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF999999),
+                    color: context.colors.textTertiary,
                     letterSpacing: 1.2,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   range,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF000000),
+                    color: context.colors.textPrimary,
                     letterSpacing: -0.3,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
@@ -174,7 +175,7 @@ class TargetPaceIndicator extends StatelessWidget {
           Container(
             width: 1,
             height: 32,
-            color: const Color(0xFFE8E8E8),
+            color: context.colors.border,
             margin: const EdgeInsets.symmetric(horizontal: 14),
           ),
 
@@ -201,40 +202,43 @@ class TargetPaceIndicator extends StatelessWidget {
   }
 
   Widget _buildFreeRunBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.directions_run,
-            size: 15,
-            color: Color(0xFF999999),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'FREE RUN',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF999999),
-              letterSpacing: 1,
+    return Builder(builder: (context) {
+      final c = context.colors;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: c.divider,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: c.border),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.directions_run,
+              size: 15,
+              color: c.textTertiary,
             ),
-          ),
-          const Spacer(),
-          Text(
-            'No target pace',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade400,
+            const SizedBox(width: 8),
+            Text(
+              'FREE RUN',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: c.textTertiary,
+                letterSpacing: 1,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+            const Spacer(),
+            Text(
+              'No target pace',
+              style: TextStyle(
+                fontSize: 11,
+                color: c.textFaint,
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }

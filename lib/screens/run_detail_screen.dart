@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../theme/app_colors.dart';
 
 class RunDetailScreen extends StatelessWidget {
   final dynamic run;
@@ -71,7 +72,7 @@ class RunDetailScreen extends StatelessWidget {
     final gpsPoints = _getGpsPoints();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: context.colors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -185,26 +186,29 @@ class RunDetailScreen extends StatelessWidget {
                   // Primary stats
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.colors.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFEEEEEE)),
+                      border: Border.all(color: context.colors.border),
                     ),
                     padding: const EdgeInsets.all(24),
                     child: Row(
                       children: [
                         _buildStat(
+                          context,
                           label: 'DISTANCE',
                           value: distance.toStringAsFixed(2),
                           unit: 'km',
                         ),
-                        _buildDivider(),
+                        _buildDivider(context),
                         _buildStat(
+                          context,
                           label: 'AVG PACE',
                           value: pace,
                           unit: '/km',
                         ),
-                        _buildDivider(),
+                        _buildDivider(context),
                         _buildStat(
+                          context,
                           label: 'TIME',
                           value: _formatDuration(duration),
                           unit: '',
@@ -219,6 +223,7 @@ class RunDetailScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _buildSecondaryCard(
+                          context,
                           icon: Icons.local_fire_department_outlined,
                           label: 'CALORIES',
                           value: '$calories',
@@ -228,6 +233,7 @@ class RunDetailScreen extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildSecondaryCard(
+                          context,
                           icon: Icons.speed_outlined,
                           label: 'CRITICAL SPEED',
                           value: csValue != null
@@ -248,40 +254,42 @@ class RunDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStat({
+  Widget _buildStat(
+    BuildContext context, {
     required String label,
     required String value,
     required String unit,
   }) {
+    final c = context.colors;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: Color(0xFFAAAAAA),
+              color: c.textTertiary,
               letterSpacing: 1.2,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0A0A0A),
+              color: c.textPrimary,
               letterSpacing: -0.5,
             ),
           ),
           if (unit.isNotEmpty)
             Text(
               unit,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF999999),
+                color: c.textTertiary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -290,58 +298,60 @@ class RunDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(BuildContext context) {
     return Container(
       width: 1,
       height: 48,
-      color: const Color(0xFFEEEEEE),
+      color: context.colors.border,
       margin: const EdgeInsets.symmetric(horizontal: 12),
     );
   }
 
-  Widget _buildSecondaryCard({
+  Widget _buildSecondaryCard(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
     required String unit,
   }) {
+    final c = context.colors;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: c.border),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: const Color(0xFF999999)),
+          Icon(icon, size: 20, color: c.textTertiary),
           const SizedBox(height: 12),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: Color(0xFFAAAAAA),
+              color: c.textTertiary,
               letterSpacing: 1.2,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0A0A0A),
+              color: c.textPrimary,
               letterSpacing: -0.5,
             ),
           ),
           if (unit.isNotEmpty)
             Text(
               unit,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF999999),
+                color: c.textTertiary,
               ),
             ),
         ],

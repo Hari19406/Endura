@@ -11,6 +11,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../engines/daily/pre_run_scaler.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/coach_message_builder.dart' as message;
@@ -134,9 +135,9 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFFAFAFA),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(
         24, 20, 24,
@@ -235,22 +236,23 @@ class _ChestWarningStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _dragHandle(),
+        _dragHandle(context),
         const SizedBox(height: 24),
         const Text('❤️', style: TextStyle(fontSize: 48)),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Take today off',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0A0A0A)),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.textPrimary),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Chest pain or breathing issues during exercise should always be checked. Consider speaking to a doctor before your next run.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Color(0xFF666666), height: 1.5),
+          style: TextStyle(fontSize: 14, color: c.textSecondary, height: 1.5),
         ),
         const SizedBox(height: 24),
         SizedBox(
@@ -260,13 +262,13 @@ class _ChestWarningStep extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
+                color: c.accent,
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
-              child: const Text(
+              child: Text(
                 'Got it, taking rest today',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                style: TextStyle(color: c.onAccent, fontWeight: FontWeight.w600, fontSize: 15),
               ),
             ),
           ),
@@ -295,26 +297,27 @@ class _StepShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(child: _dragHandle()),
+        Center(child: _dragHandle(context)),
         const SizedBox(height: 20),
-        Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0A0A0A), letterSpacing: -0.5)),
+        Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.textPrimary, letterSpacing: -0.5)),
         const SizedBox(height: 4),
-        Text(subtitle, style: const TextStyle(fontSize: 13, color: Color(0xFF999999), height: 1.4)),
+        Text(subtitle, style: TextStyle(fontSize: 13, color: c.textTertiary, height: 1.4)),
         const SizedBox(height: 20),
         ...children.expand((w) => [w, const SizedBox(height: 10)]).toList()..removeLast(),
         if (onBack != null) ...[
           const SizedBox(height: 14),
           GestureDetector(
             onTap: onBack,
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.arrow_back_ios_rounded, size: 13, color: Color(0xFF999999)),
-                SizedBox(width: 4),
-                Text('Go back', style: TextStyle(fontSize: 13, color: Color(0xFF999999), fontWeight: FontWeight.w500)),
+                Icon(Icons.arrow_back_ios_rounded, size: 13, color: c.textTertiary),
+                const SizedBox(width: 4),
+                Text('Go back', style: TextStyle(fontSize: 13, color: c.textTertiary, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -324,9 +327,9 @@ class _StepShell extends StatelessWidget {
   }
 }
 
-Widget _dragHandle() => Container(
+Widget _dragHandle(BuildContext context) => Container(
   width: 36, height: 4,
-  decoration: BoxDecoration(color: const Color(0xFFDDDDDD), borderRadius: BorderRadius.circular(2)),
+  decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(2)),
 );
 
 class _OptionCard extends StatelessWidget {
@@ -344,14 +347,15 @@ class _OptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: c.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE8E8E8), width: 1.5),
+          border: Border.all(color: c.border, width: 1.5),
         ),
         child: Row(
           children: [
@@ -361,13 +365,13 @@ class _OptionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0A0A0A))),
+                  Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.textPrimary)),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: c.textTertiary)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFFCCCCCC)),
+            Icon(Icons.arrow_forward_ios_rounded, size: 13, color: c.textFaint),
           ],
         ),
       ),

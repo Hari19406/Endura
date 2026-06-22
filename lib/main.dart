@@ -18,6 +18,9 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'services/analytics_service.dart';
 import 'services/revenue_cat_service.dart';
 import 'services/profile_service.dart';
+import 'services/theme_service.dart';
+import 'theme/app_theme.dart';
+import 'theme/app_colors.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
@@ -87,6 +90,9 @@ void main() async {
     debugPrint('[Startup] PostHog skipped — missing credentials');
   }
 
+  // Load the saved theme preference before first frame to avoid a flash.
+  await ThemeController.instance.load();
+
   runApp(const MyApp());
 }
 
@@ -126,56 +132,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Endura',
-      theme: ThemeData(
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF0A0A0A),
-          secondary: Color(0xFF0A0A0A),
-          surface: Colors.white,
-          onPrimary: Colors.white,
-          onSecondary: Colors.white,
-          onSurface: Color(0xFF0A0A0A),
-        ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFAFAFA),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFFAFAFA),
-          foregroundColor: Color(0xFF0A0A0A),
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.white,
-          selectedItemColor: Color(0xFF0A0A0A),
-          unselectedItemColor: Color(0xFF999999),
-          elevation: 0,
-        ),
-        switchTheme: SwitchThemeData(
-          thumbColor: WidgetStateProperty.resolveWith((states) =>
-              states.contains(WidgetState.selected)
-                  ? Colors.white
-                  : const Color(0xFFFFFFFF)),
-          trackColor: WidgetStateProperty.resolveWith((states) =>
-              states.contains(WidgetState.selected)
-                  ? const Color(0xFF555555)
-                  : const Color(0xFFDDDDDD)),
-          trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
-              states.contains(WidgetState.selected)
-                  ? const Color(0xFF555555)
-                  : const Color(0xFFCCCCCC)),
-        ),
-        progressIndicatorTheme: const ProgressIndicatorThemeData(
-          color: Color(0xFF0A0A0A),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF0A0A0A),
-          ),
-        ),
-      ),
-      home: const AppInitializer(),
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          title: 'Endura',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: mode,
+          home: const AppInitializer(),
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }
@@ -266,6 +234,9 @@ class _AppInitializerState extends State<AppInitializer> {
             await RevenueCatService.init(user.id);
             await Analytics.identify(user.id,
                 properties: {'email': user.email ?? ''});
+            // Pull the account's saved theme preference (new-device restore).
+            final profile = await ProfileService.instance.fetchProfile();
+            await ThemeController.instance.applyFromRemote(profile?.themeMode);
           }
         }
 
@@ -289,9 +260,8 @@ class _AppInitializerState extends State<AppInitializer> {
     // Still initializing
     if (!_initDone && !_initError) {
       return const Scaffold(
-        backgroundColor: Color(0xFFFAFAFA),
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF0A0A0A)),
+          child: CircularProgressIndicator(),
         ),
       );
     }
@@ -299,16 +269,16 @@ class _AppInitializerState extends State<AppInitializer> {
     // Init failed
     if (_initError) {
       return Scaffold(
-        backgroundColor: Colors.white,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              Icon(Icons.error_outline, size: 48, color: context.colors.danger),
               const SizedBox(height: 16),
               Text(
                 'Failed to initialize app',
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                style: TextStyle(
+                    fontSize: 16, color: context.colors.textSecondary),
               ),
               const SizedBox(height: 8),
               TextButton(
@@ -417,15 +387,15 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           border: Border(
-              top: BorderSide(color: Colors.grey.shade200, width: 1)),
+              top: BorderSide(color: context.colors.divider, width: 1)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: const Color(0xFF0A0A0A),
-          unselectedItemColor: const Color(0xFF999999),
+          backgroundColor: context.colors.surface,
+          selectedItemColor: context.colors.textPrimary,
+          unselectedItemColor: context.colors.textTertiary,
           selectedFontSize: 12,
           unselectedFontSize: 12,
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),

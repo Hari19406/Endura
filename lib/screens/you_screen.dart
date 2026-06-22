@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/pr_engine.dart';
 import '../engines/achievement_engine.dart' as achieve;
@@ -218,27 +219,28 @@ class _YouScreenState extends State<YouScreen>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: c.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'You',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0A0A0A),
+            color: c.textPrimary,
             fontSize: 18,
             letterSpacing: -0.5,
           ),
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: const Color(0xFFFAFAFA),
+        backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.settings_outlined,
-              color: Color(0xFF666666),
+              color: c.textSecondary,
               size: 22,
             ),
             onPressed: _navigateToSettings,
@@ -247,10 +249,10 @@ class _YouScreenState extends State<YouScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: const Color(0xFF000000),
+          indicatorColor: c.accent,
           indicatorWeight: 2,
-          labelColor: const Color(0xFF000000),
-          unselectedLabelColor: const Color(0xFF999999),
+          labelColor: c.textPrimary,
+          unselectedLabelColor: c.textTertiary,
           labelStyle: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -266,27 +268,25 @@ class _YouScreenState extends State<YouScreen>
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF000000)))
+          ? const Center(child: CircularProgressIndicator())
           : _errorMessage.isNotEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline,
-                          size: 48, color: Color(0xFF999999)),
+                      Icon(Icons.error_outline,
+                          size: 48, color: c.textTertiary),
                       const SizedBox(height: 16),
                       Text(
                         _errorMessage,
-                        style: const TextStyle(
-                            color: Color(0xFF666666), fontSize: 14),
+                        style: TextStyle(
+                            color: c.textSecondary, fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
                       TextButton(
                         onPressed: loadData,
-                        child: const Text('Retry',
-                            style: TextStyle(color: Color(0xFF000000))),
+                        child: const Text('Retry'),
                       ),
                     ],
                   ),
@@ -306,38 +306,39 @@ class _YouScreenState extends State<YouScreen>
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildSetUpPlanCard() {
+    final c = context.colors;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: c.surface,
+        border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(16),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'MY PLAN',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF999999),
+              color: c.textTertiary,
               letterSpacing: 1.0,
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No training plan set up yet',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF0A0A0A),
+              color: c.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Set a goal and Max will build your plan.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF999999)),
+            style: TextStyle(fontSize: 13, color: c.textTertiary),
           ),
           const SizedBox(height: 16),
           GestureDetector(
@@ -346,16 +347,16 @@ class _YouScreenState extends State<YouScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 13),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0A0A),
+                color: c.accent,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'Set up my plan',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: c.onAccent,
                   ),
                 ),
               ),
@@ -368,11 +369,12 @@ class _YouScreenState extends State<YouScreen>
 
   Widget _buildTrainingPlanCard() {
     final progress = (_currentWeek / _totalWeeks).clamp(0.0, 1.0);
+    final c = context.colors;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: c.surface,
+        border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(24.0),
@@ -382,23 +384,23 @@ class _YouScreenState extends State<YouScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'MY PLAN',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF999999),
+                  color: c.textTertiary,
                   letterSpacing: 1.2,
                 ),
               ),
               GestureDetector(
                 onTap: _updatePlan,
-                child: const Text(
+                child: Text(
                   'Update plan →',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF000000),
+                    color: c.textPrimary,
                   ),
                 ),
               ),
@@ -407,19 +409,19 @@ class _YouScreenState extends State<YouScreen>
           const SizedBox(height: 16),
           Text(
             _goalLabel,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF000000),
+              color: c.textPrimary,
               letterSpacing: -0.4,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Week $_currentWeek of $_totalWeeks',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: Color(0xFF666666),
+              color: c.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -429,16 +431,16 @@ class _YouScreenState extends State<YouScreen>
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: const Color(0xFFF0F0F0),
-              valueColor: const AlwaysStoppedAnimation(Color(0xFF000000)),
+              backgroundColor: c.divider,
+              valueColor: AlwaysStoppedAnimation(c.accent),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '${(progress * 100).round()}% complete',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              color: Color(0xFF999999),
+              color: c.textTertiary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -453,7 +455,7 @@ class _YouScreenState extends State<YouScreen>
 
   Widget _buildSummaryTab() {
     return RefreshIndicator(
-      color: const Color(0xFF000000),
+      color: context.colors.accent,
       onRefresh: loadData,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -521,11 +523,12 @@ class _YouScreenState extends State<YouScreen>
         : _getDayName(_selectedDay);
 
     bool isCurrentWeek = _isSameWeek(_selectedWeekStart, DateTime.now());
+    final c = context.colors;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: c.surface,
+        border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(24.0),
@@ -535,20 +538,20 @@ class _YouScreenState extends State<YouScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'THIS WEEK',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF999999),
+                  color: c.textTertiary,
                   letterSpacing: 1.2,
                 ),
               ),
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left,
-                        color: Color(0xFF999999), size: 20),
+                    icon: Icon(Icons.chevron_left,
+                        color: c.textTertiary, size: 20),
                     onPressed: () {
                       DateTime prevWeek = _selectedWeekStart
                           .subtract(const Duration(days: 7));
@@ -575,10 +578,10 @@ class _YouScreenState extends State<YouScreen>
                     },
                     child: Text(
                       dateRangeText,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF999999),
+                        color: c.textTertiary,
                       ),
                     ),
                   ),
@@ -587,8 +590,8 @@ class _YouScreenState extends State<YouScreen>
                     icon: Icon(
                       Icons.chevron_right,
                       color: isCurrentWeek
-                          ? const Color(0xFFCCCCCC)
-                          : const Color(0xFF999999),
+                          ? c.textFaint
+                          : c.textTertiary,
                       size: 20,
                     ),
                     onPressed: isCurrentWeek
@@ -614,8 +617,8 @@ class _YouScreenState extends State<YouScreen>
 
           Container(
             padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0))),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: c.divider)),
             ),
             child: Row(
               children: [
@@ -628,34 +631,34 @@ class _YouScreenState extends State<YouScreen>
                         children: [
                           Text(
                             totalDistance.toStringAsFixed(1),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF000000),
+                              color: c.textPrimary,
                               letterSpacing: -0.5,
-                              fontFeatures: [FontFeature.tabularFigures()],
+                              fontFeatures: const [FontFeature.tabularFigures()],
                             ),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 4, left: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4, left: 4),
                             child: Text(
                               'km',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFF999999),
+                                color: c.textTertiary,
                               ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'DISTANCE',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF999999),
+                          color: c.textTertiary,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -668,21 +671,21 @@ class _YouScreenState extends State<YouScreen>
                     children: [
                       Text(
                         totalTime,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF000000),
+                          color: c.textPrimary,
                           letterSpacing: -0.5,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'TIME',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF999999),
+                          color: c.textTertiary,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -695,21 +698,21 @@ class _YouScreenState extends State<YouScreen>
                     children: [
                       Text(
                         '$totalRuns',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF000000),
+                          color: c.textPrimary,
                           letterSpacing: -0.5,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         totalRuns == 1 ? 'RUN' : 'RUNS',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF999999),
+                          color: c.textTertiary,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -727,9 +730,7 @@ class _YouScreenState extends State<YouScreen>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: weekRuns.isEmpty
-                    ? const Color(0xFF999999)
-                    : const Color(0xFF000000),
+                color: weekRuns.isEmpty ? c.textTertiary : c.textPrimary,
               ),
             ),
           ),
@@ -755,23 +756,24 @@ class _YouScreenState extends State<YouScreen>
 
   Widget _buildPersonalRecordsCard() {
     final entries = _prResults!.allEntries;
+    final c = context.colors;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: c.surface,
+        border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'PERSONAL RECORDS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF999999),
+              color: c.textTertiary,
               letterSpacing: 1.2,
             ),
           ),
@@ -784,8 +786,8 @@ class _YouScreenState extends State<YouScreen>
                   EdgeInsets.only(bottom: index < entries.length - 1 ? 12 : 0),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFA),
-                border: Border.all(color: const Color(0xFFF0F0F0)),
+                color: c.background,
+                border: Border.all(color: c.divider),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -796,10 +798,10 @@ class _YouScreenState extends State<YouScreen>
                     children: [
                       Text(
                         pr.label.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF999999),
+                          color: c.textTertiary,
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -807,9 +809,9 @@ class _YouScreenState extends State<YouScreen>
                         const SizedBox(height: 2),
                         Text(
                           'Set ${_formatDate(pr.setOn!)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: Color(0xFFBBBBBB),
+                            color: c.textFaint,
                           ),
                         ),
                       ],
@@ -820,20 +822,20 @@ class _YouScreenState extends State<YouScreen>
                     children: [
                       Text(
                         pr.value,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF000000),
+                          color: c.textPrimary,
                           letterSpacing: -0.3,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                       if (pr.unit != null)
                         Text(
                           pr.unit!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: Color(0xFF999999),
+                            color: c.textTertiary,
                           ),
                         ),
                     ],
@@ -856,22 +858,23 @@ class _YouScreenState extends State<YouScreen>
             return b.unlockedAt.compareTo(a.unlockedAt);
           });
 
+    final c = context.colors;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: c.surface,
+        border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'MILESTONES',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF999999),
+              color: c.textTertiary,
               letterSpacing: 1.2,
             ),
           ),
@@ -884,8 +887,8 @@ class _YouScreenState extends State<YouScreen>
                   bottom: index < sortedAchievements.length - 1 ? 12 : 0),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFA),
-                border: Border.all(color: const Color(0xFFF0F0F0)),
+                color: c.background,
+                border: Border.all(color: c.divider),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -897,10 +900,10 @@ class _YouScreenState extends State<YouScreen>
                       Expanded(
                         child: Text(
                           achievement.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF000000),
+                            color: c.textPrimary,
                           ),
                         ),
                       ),
@@ -911,18 +914,18 @@ class _YouScreenState extends State<YouScreen>
                   const SizedBox(height: 5),
                   Text(
                     achievement.description,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF666666),
+                      color: c.textSecondary,
                       height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     _formatAchievementDate(achievement.unlockedAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: Color(0xFFBBBBBB),
+                      color: c.textFaint,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -984,12 +987,13 @@ class _YouScreenState extends State<YouScreen>
         ? null
         : rpeValues.reduce((a, b) => a + b) / rpeValues.length;
 
+    final c = context.colors;
     final Color statusColor;
     final String statusLabel;
     final String statusMessage;
 
     if (avgRpe == null) {
-      statusColor = const Color(0xFF999999);
+      statusColor = c.textTertiary;
       statusLabel = 'No data';
       statusMessage = 'Complete a few runs with RPE feedback to see your training status.';
     } else if (avgRpe >= 7.0) {
@@ -1008,20 +1012,20 @@ class _YouScreenState extends State<YouScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: c.surface,
+        border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'TRAINING STATUS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF999999),
+              color: c.textTertiary,
               letterSpacing: 1.2,
             ),
           ),
@@ -1029,12 +1033,12 @@ class _YouScreenState extends State<YouScreen>
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: c.surface,
               border: Border(
                 left: BorderSide(color: statusColor, width: 3),
-                top: const BorderSide(color: Color(0xFFE8E8E8)),
-                right: const BorderSide(color: Color(0xFFE8E8E8)),
-                bottom: const BorderSide(color: Color(0xFFE8E8E8)),
+                top: BorderSide(color: c.border),
+                right: BorderSide(color: c.border),
+                bottom: BorderSide(color: c.border),
               ),
             ),
             child: Column(
@@ -1043,12 +1047,12 @@ class _YouScreenState extends State<YouScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'READINESS',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF999999),
+                        color: c.textTertiary,
                         letterSpacing: 1,
                       ),
                     ),
@@ -1066,9 +1070,9 @@ class _YouScreenState extends State<YouScreen>
                 const SizedBox(height: 12),
                 Text(
                   statusMessage,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF666666),
+                    color: c.textSecondary,
                     height: 1.5,
                   ),
                 ),
@@ -1076,9 +1080,9 @@ class _YouScreenState extends State<YouScreen>
                   const SizedBox(height: 8),
                   Text(
                     'Avg RPE (last ${rpeValues.length} runs): ${avgRpe.toStringAsFixed(1)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF999999),
+                      color: c.textTertiary,
                     ),
                   ),
                 ],
@@ -1096,7 +1100,7 @@ class _YouScreenState extends State<YouScreen>
 
   Widget _buildHistoryTab() {
     return RefreshIndicator(
-      color: const Color(0xFF000000),
+      color: context.colors.accent,
       onRefresh: loadData,
       child: _runHistory.isEmpty
           ? Center(
@@ -1111,30 +1115,31 @@ class _YouScreenState extends State<YouScreen>
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
+                          color: context.colors.divider,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Icon(
                             Icons.directions_run,
                             size: 32,
-                            color: Color(0xFFCCCCCC),
+                            color: context.colors.textFaint,
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      const Text(
+                      Text(
                         'No runs yet',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF000000),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Your first run will show here',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF999999)),
+                        style: TextStyle(
+                            fontSize: 13, color: context.colors.textTertiary),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1160,12 +1165,13 @@ class _YouScreenState extends State<YouScreen>
   }
 
   Widget _buildRunHistoryCard(dynamic run, {dynamic record}) {
+    final c = context.colors;
     return GestureDetector(
       onTap: () => _openRunDetail(run, record: record),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: const Color(0xFFE8E8E8)),
+          color: c.surface,
+          border: Border.all(color: c.border),
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.all(20),
@@ -1177,20 +1183,20 @@ class _YouScreenState extends State<YouScreen>
                 children: [
                   Text(
                     '${run.distance.toStringAsFixed(1)} km',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF000000),
+                      color: c.textPrimary,
                       letterSpacing: -0.3,
-                      fontFeatures: [FontFeature.tabularFigures()],
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _formatDate(run.date),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF999999),
+                      color: c.textTertiary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1202,20 +1208,20 @@ class _YouScreenState extends State<YouScreen>
               children: [
                 Text(
                   run.averagePace,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF000000),
+                    color: c.textPrimary,
                     letterSpacing: -0.2,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
+                Text(
                   'PER KM',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Color(0xFF999999),
+                    color: c.textTertiary,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.5,
                   ),
@@ -1224,9 +1230,9 @@ class _YouScreenState extends State<YouScreen>
                   const SizedBox(height: 6),
                   Text(
                     'RPE ${run.rpe}/10',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: Color(0xFF999999),
+                      color: c.textTertiary,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.3,
                     ),
@@ -1303,6 +1309,7 @@ class _YouScreenState extends State<YouScreen>
     if (maxDistance == 0) maxDistance = 1;
 
     const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final c = context.colors;
 
     return SizedBox(
       height: 180,
@@ -1327,10 +1334,10 @@ class _YouScreenState extends State<YouScreen>
                       height: 120 * heightFactor,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFF000000)
+                            ? c.accent
                             : distance > 0
-                                ? const Color(0xFFCCCCCC)
-                                : const Color(0xFFF0F0F0),
+                                ? c.textFaint
+                                : c.divider,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(4),
                         ),
@@ -1342,9 +1349,7 @@ class _YouScreenState extends State<YouScreen>
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: isSelected
-                            ? const Color(0xFF000000)
-                            : const Color(0xFF999999),
+                        color: isSelected ? c.textPrimary : c.textTertiary,
                       ),
                     ),
                   ],

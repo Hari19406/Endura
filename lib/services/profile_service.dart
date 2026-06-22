@@ -32,6 +32,7 @@ class UserProfile {
   final int? longRunDayIndex;
   final DateTime? planSnoozeUntil;
   final String? pushToken;
+  final String? themeMode;
 
   const UserProfile({
     this.firstName,
@@ -56,6 +57,7 @@ class UserProfile {
     this.longRunDayIndex,
     this.planSnoozeUntil,
     this.pushToken,
+    this.themeMode,
   });
 
   Map<String, dynamic> toMap(String userId) => {
@@ -85,6 +87,7 @@ class UserProfile {
         if (planSnoozeUntil != null)
           'plan_snooze_until': planSnoozeUntil!.toIso8601String().substring(0, 10),
         if (pushToken != null) 'push_token': pushToken,
+        if (themeMode != null) 'theme_mode': themeMode,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
@@ -119,6 +122,7 @@ class UserProfile {
             ? DateTime.tryParse(map['plan_snooze_until'] as String)
             : null,
         pushToken: map['push_token'] as String?,
+        themeMode: map['theme_mode'] as String?,
       );
 
   UserProfile copyWith({
@@ -144,6 +148,7 @@ class UserProfile {
     int? longRunDayIndex,
     DateTime? planSnoozeUntil,
     String? pushToken,
+    String? themeMode,
   }) =>
       UserProfile(
         firstName: firstName ?? this.firstName,
@@ -168,6 +173,7 @@ class UserProfile {
         longRunDayIndex: longRunDayIndex ?? this.longRunDayIndex,
         planSnoozeUntil: planSnoozeUntil ?? this.planSnoozeUntil,
         pushToken: pushToken ?? this.pushToken,
+        themeMode: themeMode ?? this.themeMode,
       );
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../engines/memory/engine_memory.dart';
+import '../theme/app_colors.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLAN COMPLETE SCREEN
@@ -46,11 +47,12 @@ class PlanCompleteCard extends StatelessWidget {
     final vdotAfter = memory.vdotScore;
     final vdotGain = vdotAfter - vdotBefore;
 
+    final c = context.colors;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: c.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -87,20 +89,20 @@ class PlanCompleteCard extends StatelessWidget {
             // ── Headline ───────────────────────────────────────────────────
             Text(
               'You finished your\n$completedRaceLabel plan 🎉',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0A0A0A),
+                color: c.textPrimary,
                 letterSpacing: -0.6,
                 height: 1.15,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               "That's a serious commitment. Max noticed.",
               style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF666666),
+                color: c.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -110,12 +112,14 @@ class PlanCompleteCard extends StatelessWidget {
             Row(
               children: [
                 _statChip(
+                  context,
                   label: 'Runs',
                   value: '$totalRuns',
                   icon: Icons.directions_run_rounded,
                 ),
                 const SizedBox(width: 10),
                 _statChip(
+                  context,
                   label: 'km',
                   value: totalKmCompleted.toStringAsFixed(0),
                   icon: Icons.straighten_rounded,
@@ -123,6 +127,7 @@ class PlanCompleteCard extends StatelessWidget {
                 if (vdotGain > 0) ...[
                   const SizedBox(width: 10),
                   _statChip(
+                    context,
                     label: 'vDOT',
                     value: '$vdotBefore → $vdotAfter',
                     icon: Icons.trending_up_rounded,
@@ -144,16 +149,16 @@ class PlanCompleteCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A0A0A),
+                    color: c.accent,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'Start your next plan',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: c.onAccent,
                       ),
                     ),
                   ),
@@ -169,13 +174,13 @@ class PlanCompleteCard extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   onRemindLater();
                 },
-                child: const Text(
+                child: Text(
                   'I need a break — remind me in 2 weeks',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF999999),
+                    color: c.textTertiary,
                     decoration: TextDecoration.underline,
-                    decorationColor: Color(0xFF999999),
+                    decorationColor: c.textTertiary,
                   ),
                 ),
               ),
@@ -186,19 +191,21 @@ class PlanCompleteCard extends StatelessWidget {
     );
   }
 
-  Widget _statChip({
+  Widget _statChip(
+    BuildContext context, {
     required String label,
     required String value,
     required IconData icon,
     bool highlight = false,
   }) {
+    final c = context.colors;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: highlight
               ? const Color(0xFF004D40).withOpacity(0.08)
-              : const Color(0xFFF5F5F5),
+              : c.divider,
           borderRadius: BorderRadius.circular(10),
           border: highlight
               ? Border.all(
@@ -213,7 +220,7 @@ class PlanCompleteCard extends StatelessWidget {
               size: 13,
               color: highlight
                   ? const Color(0xFF00796B)
-                  : const Color(0xFF999999),
+                  : c.textTertiary,
             ),
             const SizedBox(height: 4),
             Text(
@@ -223,14 +230,14 @@ class PlanCompleteCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 color: highlight
                     ? const Color(0xFF00796B)
-                    : const Color(0xFF0A0A0A),
+                    : c.textPrimary,
               ),
             ),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
-                color: Color(0xFF999999),
+                color: c.textTertiary,
                 fontWeight: FontWeight.w500,
               ),
             ),

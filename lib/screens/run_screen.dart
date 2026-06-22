@@ -21,6 +21,7 @@ import '../widgets/target_pace_indicator.dart';
 import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/analytics_service.dart';
+import '../theme/app_colors.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
 
@@ -984,7 +985,7 @@ bool get _hasCooldown =>
       body: Stack(
         children: [
           _currentLocation == null
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF000000)))
+              ? const Center(child: CircularProgressIndicator())
               : FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(initialCenter: _currentLocation!, initialZoom: 17.5, minZoom: 10.0, maxZoom: 18.0, interactionOptions: const InteractionOptions(flags: InteractiveFlag.all)),
@@ -1016,37 +1017,39 @@ bool get _hasCooldown =>
   Widget _buildPermissionError() {
     IconData icon; String title; String bodyMessage; String buttonText;
     switch (_permissionStatus) {
-      case PermissionStatus.checking: return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF000000))));
+      case PermissionStatus.checking: return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case PermissionStatus.serviceDisabled: icon = Icons.location_off; title = 'Location is off'; bodyMessage = 'Turn on location to track your runs.'; buttonText = 'Turn on location';
       case PermissionStatus.denied: icon = Icons.location_disabled; title = 'Location needed'; bodyMessage = 'We need location to track your runs and show your route.'; buttonText = 'Allow location';
       case PermissionStatus.deniedForever: icon = Icons.settings_outlined; title = 'Location blocked'; bodyMessage = 'You permanently blocked location access. To fix this:\n\n1. Tap "Open settings" below\n2. Tap "Permissions"\n3. Tap "Location"\n4. Select "While using the app"'; buttonText = 'Open settings';
-      default: return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF000000))));
+      default: return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: const Text('Endura', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF000000), fontSize: 16, letterSpacing: -0.3)), centerTitle: true, elevation: 0, backgroundColor: const Color(0xFFFFFFFF)),
+      backgroundColor: c.background,
+      appBar: AppBar(title: Text('Endura', style: TextStyle(fontWeight: FontWeight.w600, color: c.textPrimary, fontSize: 16, letterSpacing: -0.3)), centerTitle: true, elevation: 0, backgroundColor: c.surface),
       body: Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(icon, size: 48, color: const Color(0xFF999999)),
+        Icon(icon, size: 48, color: c.textTertiary),
         const SizedBox(height: 24),
-        Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF000000))),
+        Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: c.textPrimary)),
         const SizedBox(height: 12),
-        Text(bodyMessage, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: Color(0xFF666666), height: 1.6)),
+        Text(bodyMessage, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: c.textSecondary, height: 1.6)),
         const SizedBox(height: 32),
-        SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _requestPermission, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF000000), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: Text(buttonText, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)))),
+        SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _requestPermission, style: ElevatedButton.styleFrom(backgroundColor: c.accent, foregroundColor: c.onAccent, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: Text(buttonText, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)))),
         const SizedBox(height: 12),
         if (_permissionStatus == PermissionStatus.deniedForever)
-          SizedBox(width: double.infinity, child: OutlinedButton(onPressed: _checkPermissions, style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), side: const BorderSide(color: Color(0xFFE8E8E8)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('I\'ve updated settings, check again', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF666666)))))
-        else TextButton(onPressed: _checkPermissions, style: TextButton.styleFrom(foregroundColor: const Color(0xFF666666)), child: const Text('Check again')),
+          SizedBox(width: double.infinity, child: OutlinedButton(onPressed: _checkPermissions, style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), side: BorderSide(color: c.border), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: Text('I\'ve updated settings, check again', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: c.textSecondary))))
+        else TextButton(onPressed: _checkPermissions, style: TextButton.styleFrom(foregroundColor: c.textSecondary), child: const Text('Check again')),
       ]))),
     );
   }
 
   Widget _buildWelcomeCard() {
+    final c = context.colors;
     return Positioned(top: 60, left: 20, right: 20, child: Container(
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE8E8E8)), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: c.surface, border: Border.all(color: c.border), borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.all(24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Ready to run?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF000000), letterSpacing: -0.3)),
+        Text('Ready to run?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary, letterSpacing: -0.3)),
         const SizedBox(height: 16),
         _buildWelcomeTip('Tap Start to begin'),
         const SizedBox(height: 8),
@@ -1055,7 +1058,7 @@ bool get _hasCooldown =>
         _buildWelcomeTip('Pause anytime you need'),
         if (_targetPaceRange != null) ...[
           const SizedBox(height: 16),
-          Container(height: 1, color: const Color(0xFFF0F0F0)),
+          Container(height: 1, color: c.divider),
           const SizedBox(height: 16),
           _buildWelcomeTip('Today\'s target: ${PaceComparator.formatRange(_targetPaceRange!)}'),
         ],
@@ -1064,10 +1067,11 @@ bool get _hasCooldown =>
   }
 
   Widget _buildWelcomeTip(String text) {
+    final c = context.colors;
     return Row(children: [
-      Container(width: 4, height: 4, decoration: const BoxDecoration(color: Color(0xFF000000), shape: BoxShape.circle)),
+      Container(width: 4, height: 4, decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle)),
       const SizedBox(width: 12),
-      Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: Color(0xFF666666), height: 1.4))),
+      Expanded(child: Text(text, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4))),
     ]);
   }
 
@@ -1076,23 +1080,24 @@ bool get _hasCooldown =>
     final isWarmupOrCooldown = _currentPhase != RunMode.mainSet;
     final showPaceIndicator = _currentPhase == RunMode.mainSet && isActive;
 
+    final c = context.colors;
     return Container(
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE8E8E8)), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: c.surface, border: Border.all(color: c.border), borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.all(20),
       child: Column(children: [
-        if (_runState == RunState.paused) Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(border: Border.all(color: const Color(0xFF0A0A0A)), borderRadius: BorderRadius.circular(8)), child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF0A0A0A), shape: BoxShape.circle)), const SizedBox(width: 8), const Text('PAUSED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0A0A0A), letterSpacing: 1))])),
+        if (_runState == RunState.paused) Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(border: Border.all(color: c.textPrimary), borderRadius: BorderRadius.circular(8)), child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: BoxDecoration(color: c.textPrimary, shape: BoxShape.circle)), const SizedBox(width: 8), Text('PAUSED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.textPrimary, letterSpacing: 1))])),
         if (_runState == RunState.running && _isGPSSignalLost) Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(border: Border.all(color: const Color(0xFFD32F2F)), borderRadius: BorderRadius.circular(8)), child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFFD32F2F), shape: BoxShape.circle)), const SizedBox(width: 8), const Text('GPS LOST', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFD32F2F), letterSpacing: 1))])),
         if (isActive) ...[
           Row(children: [Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: _phaseColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: _phaseColor.withOpacity(0.25))), child: Text(_phaseName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _phaseColor, letterSpacing: 1.1)))]),
           const SizedBox(height: 14),
         ],
         Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'COUNTDOWN' : 'TIME', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF999999), letterSpacing: 0.8)), const SizedBox(height: 6), Text(isWarmupOrCooldown && isActive ? _formatTime(_phaseCountdownSeconds) : _formatTime(_seconds), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: isWarmupOrCooldown && isActive && _phaseCountdownSeconds == 0 ? const Color(0xFF388E3C) : const Color(0xFF000000), letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('DISTANCE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF999999), letterSpacing: 0.8)), const SizedBox(height: 6), Text(isActive ? _buildDistanceText() : '0.00 ${_getDistanceLabel()}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF000000), letterSpacing: -0.3, fontFeatures: [FontFeature.tabularFigures()]))])),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'FREE PACE' : 'PACE', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF999999), letterSpacing: 0.8)), const SizedBox(height: 6), Text('${_paceSnapshot.formattedCurrent}/km', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _paceSnapshot.isStale ? const Color(0xFF999999) : const Color(0xFF000000), letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'COUNTDOWN' : 'TIME', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text(isWarmupOrCooldown && isActive ? _formatTime(_phaseCountdownSeconds) : _formatTime(_seconds), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: isWarmupOrCooldown && isActive && _phaseCountdownSeconds == 0 ? const Color(0xFF388E3C) : c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('DISTANCE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text(isActive ? _buildDistanceText() : '0.00 ${_getDistanceLabel()}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'FREE PACE' : 'PACE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text('${_paceSnapshot.formattedCurrent}/km', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _paceSnapshot.isStale ? c.textTertiary : c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
         ]),
-        if (showPaceIndicator) ...[const SizedBox(height: 14), Container(height: 1, color: const Color(0xFFF0F0F0)), const SizedBox(height: 14), TargetPaceIndicator(currentPaceSecondsPerKm: _paceSnapshot.smoothedPaceSecondsPerKm, targetRange: _targetPaceRange)],
-        if (_phaseMilestoneReached && isActive) ...[const SizedBox(height: 14), Container(height: 1, color: const Color(0xFFF0F0F0)), const SizedBox(height: 14), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF388E3C).withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF388E3C).withOpacity(0.25))), child: Row(children: [const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF388E3C)), const SizedBox(width: 8), Text(_milestoneHint, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF388E3C)))]))],
+        if (showPaceIndicator) ...[const SizedBox(height: 14), Container(height: 1, color: c.divider), const SizedBox(height: 14), TargetPaceIndicator(currentPaceSecondsPerKm: _paceSnapshot.smoothedPaceSecondsPerKm, targetRange: _targetPaceRange)],
+        if (_phaseMilestoneReached && isActive) ...[const SizedBox(height: 14), Container(height: 1, color: c.divider), const SizedBox(height: 14), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF388E3C).withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF388E3C).withOpacity(0.25))), child: Row(children: [const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF388E3C)), const SizedBox(width: 8), Text(_milestoneHint, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF388E3C)))]))],
       ]),
     );
   }
@@ -1198,11 +1203,11 @@ bool get _hasCooldown =>
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           title: const Text('Run too short', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          content: const Text('You need at least 80m to save a run.', style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+          content: Text('You need at least 80m to save a run.', style: TextStyle(fontSize: 14, color: context.colors.textSecondary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, 'resume'),
-              child: const Text('Keep running', style: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w600)),
+              child: Text('Keep running', style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.w600)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, 'discard'),
@@ -1229,12 +1234,12 @@ bool get _hasCooldown =>
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: outlined ? Colors.white : const Color(0xFF000000),
-          foregroundColor: outlined ? const Color(0xFF000000) : Colors.white,
+          backgroundColor: outlined ? context.colors.surface : context.colors.accent,
+          foregroundColor: outlined ? context.colors.textPrimary : context.colors.onAccent,
           padding: const EdgeInsets.symmetric(vertical: 13),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: outlined ? const BorderSide(color: Color(0xFFD0D0D0)) : BorderSide.none,
+            side: outlined ? BorderSide(color: context.colors.border) : BorderSide.none,
           ),
           elevation: 0,
           shadowColor: Colors.transparent,
@@ -1281,8 +1286,8 @@ bool get _hasCooldown =>
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _permissionStatus == PermissionStatus.granted ? const Color(0xFF000000) : const Color(0xFFCCCCCC),
-                  foregroundColor: const Color(0xFFFFFFFF),
+                  backgroundColor: _permissionStatus == PermissionStatus.granted ? context.colors.accent : context.colors.textFaint,
+                  foregroundColor: context.colors.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
@@ -1293,10 +1298,10 @@ bool get _hasCooldown =>
           ],
         );
       case RunState.running:
-        return SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _pauseTracking, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A0A0A), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Pause', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5))));
+        return SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _pauseTracking, style: ElevatedButton.styleFrom(backgroundColor: context.colors.accent, foregroundColor: context.colors.onAccent, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Pause', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5))));
       case RunState.paused:
         return Row(children: [
-          Expanded(child: ElevatedButton(onPressed: _resumeTracking, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A0A0A), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Resume', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))),
+          Expanded(child: ElevatedButton(onPressed: _resumeTracking, style: ElevatedButton.styleFrom(backgroundColor: context.colors.accent, foregroundColor: context.colors.onAccent, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Resume', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))),
           const SizedBox(width: 12),
           Expanded(child: _isLastPhase
             ? ElevatedButton(onPressed: _onFinishTapped, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD32F2F), foregroundColor: const Color(0xFFFFFFFF), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: const Text('Finish', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5)))

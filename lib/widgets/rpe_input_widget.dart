@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 /// A compact RPE (Rate of Perceived Exertion) input shown after every run.
 /// Emits the selected value via [onRpeSelected].
@@ -34,12 +35,12 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'HOW DID IT FEEL?',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF999999),
+                color: context.colors.textTertiary,
                 letterSpacing: 1.2,
               ),
             ),
@@ -90,14 +91,14 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
         const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             Text(
               'Easy',
-              style: TextStyle(fontSize: 10, color: Color(0xFF999999)),
+              style: TextStyle(fontSize: 10, color: context.colors.textTertiary),
             ),
             Text(
               'Max effort',
-              style: TextStyle(fontSize: 10, color: Color(0xFF999999)),
+              style: TextStyle(fontSize: 10, color: context.colors.textTertiary),
             ),
           ],
         ),

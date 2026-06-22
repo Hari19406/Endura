@@ -6,6 +6,8 @@ import '../utils/database_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/training_days_service.dart';
 import '../services/profile_service.dart';
+import '../services/theme_service.dart';
+import '../theme/app_colors.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
@@ -54,47 +56,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Settings saved'),
-          backgroundColor: Color(0xFF388E3C),
+        SnackBar(
+          content: const Text('Settings saved'),
+          backgroundColor: context.colors.success,
           behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
   }
 
   Future<void> _signOut() async {
+    final c = context.colors;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: c.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
+        title: Text(
           'Sign out?',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF000000),
+            color: c.textPrimary,
           ),
         ),
-        content: const Text(
+        content: Text(
           'Your runs are safely backed up to the cloud. Sign back in anytime to restore them.',
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF666666),
+            color: c.textSecondary,
             height: 1.5,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF666666))),
+            child: Text('Cancel', style: TextStyle(color: c.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.black),
+            style: TextButton.styleFrom(foregroundColor: c.textPrimary),
             child: const Text('Sign out',
                 style: TextStyle(fontWeight: FontWeight.w600)),
           ),
@@ -116,37 +118,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteAccount() async {
+    final c = context.colors;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: c.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
+        title: Text(
           'Delete account?',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF000000),
+            color: c.textPrimary,
           ),
         ),
-        content: const Text(
+        content: Text(
           'This permanently deletes all your runs, training history, and account. This cannot be undone.',
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF666666),
+            color: c.textSecondary,
             height: 1.5,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF666666))),
+            child: Text('Cancel', style: TextStyle(color: c.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFD32F2F)),
+            style: TextButton.styleFrom(foregroundColor: c.danger),
             child: const Text('Delete everything',
                 style: TextStyle(fontWeight: FontWeight.w600)),
           ),
@@ -160,13 +161,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const AlertDialog(
-          backgroundColor: Colors.white,
+        builder: (_) => AlertDialog(
+          backgroundColor: c.surface,
           content: Row(
             children: [
-              CircularProgressIndicator(color: Colors.black),
-              SizedBox(width: 16),
-              Text('Deleting your account...'),
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text('Deleting your account...',
+                  style: TextStyle(color: c.textPrimary)),
             ],
           ),
         ),
@@ -182,18 +184,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              backgroundColor: Colors.white,
+              backgroundColor: c.surface,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
-              title: const Text('Delete failed',
+              title: Text('Delete failed',
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF000000))),
-              content: const Text(
+                      color: c.textPrimary)),
+              content: Text(
                 'Could not delete your cloud data. Check your connection and try again.',
                 style: TextStyle(
-                    fontSize: 14, color: Color(0xFF666666), height: 1.5),
+                    fontSize: 14, color: c.textSecondary, height: 1.5),
               ),
               actions: [
                 TextButton(
@@ -226,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error deleting account: $e'),
-            backgroundColor: const Color(0xFFD32F2F),
+            backgroundColor: context.colors.danger,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -236,36 +238,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: c.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Settings',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0A0A0A),
+            color: c.textPrimary,
             fontSize: 18,
             letterSpacing: -0.5,
           ),
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: const Color(0xFFFAFAFA),
+        backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0A0A0A)),
+          icon: Icon(Icons.arrow_back, color: c.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF000000)))
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // APPEARANCE
+                    _buildSectionHeader('APPEARANCE'),
+                    const SizedBox(height: 12),
+                    _buildCard(child: _buildThemeSelector()),
+                    const SizedBox(height: 24),
+
                     // UNITS
                     _buildSectionHeader('UNITS'),
                     const SizedBox(height: 12),
@@ -325,7 +333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Endura v1.1.0',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade400,
+                          color: c.textFaint,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -341,10 +349,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF999999),
+        color: context.colors.textTertiary,
         letterSpacing: 1.2,
       ),
     );
@@ -353,12 +361,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildCard({required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(20),
       child: child,
+    );
+  }
+
+  Widget _buildThemeSelector() {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance,
+      builder: (context, mode, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Theme',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: context.colors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Choose how Endura looks',
+              style: TextStyle(
+                fontSize: 12,
+                color: context.colors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildThemeOption('Light', ThemeMode.light, mode),
+                const SizedBox(width: 8),
+                _buildThemeOption('Dark', ThemeMode.dark, mode),
+                const SizedBox(width: 8),
+                _buildThemeOption('System', ThemeMode.system, mode),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildThemeOption(String label, ThemeMode value, ThemeMode current) {
+    final c = context.colors;
+    final selected = value == current;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => ThemeController.instance.setMode(value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? c.accent : Colors.transparent,
+            border: Border.all(
+              color: selected ? c.accent : c.border,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? c.onAccent : c.textSecondary,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -368,6 +444,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final c = context.colors;
     return Row(
       children: [
         Expanded(
@@ -376,19 +453,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF000000),
+                  color: c.textPrimary,
                 ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF999999),
+                    color: c.textTertiary,
                   ),
                 ),
               ],
@@ -404,6 +481,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSignOutRow() {
+    final c = context.colors;
     final currentUser = Supabase.instance.client.auth.currentUser;
 
     return InkWell(
@@ -417,12 +495,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Sign out',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF000000),
+                      color: c.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -430,15 +508,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     currentUser?.email ??
                         currentUser?.userMetadata?['full_name'] as String? ??
                         '',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF999999),
+                      color: c.textTertiary,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.logout, color: Color(0xFF999999), size: 20),
+            Icon(Icons.logout, color: c.textTertiary, size: 20),
           ],
         ),
       ),
@@ -450,6 +528,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String subtitle,
     required VoidCallback onPressed,
   }) {
+    final c = context.colors;
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(8),
@@ -463,26 +542,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFFD32F2F),
+                      color: c.danger,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF999999),
+                      color: c.textTertiary,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right,
-              color: Color(0xFF999999),
+              color: c.textTertiary,
               size: 20,
             ),
           ],
