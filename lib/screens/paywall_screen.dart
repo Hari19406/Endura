@@ -7,9 +7,8 @@ import '../theme/app_colors.dart';
 
 // Endura teal — brand color, intentionally not a theme token (fixed across light/dark)
 const _kBrand = Color(0xFF00E5CC);
-// Replace these before App Store submission
-const _kTermsUrl = 'https://endurarun.app/terms';
-const _kPrivacyUrl = 'https://endurarun.app/privacy';
+const _kTermsUrl = 'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
+const _kPrivacyUrl = 'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
