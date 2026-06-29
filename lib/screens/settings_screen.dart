@@ -105,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true) {
+      await CloudSyncService.instance.syncPendingRuns();
       await Supabase.instance.client.auth.signOut();
       await DatabaseService.instance.deleteAllRuns();
       await DatabaseService.instance.deleteAllSnapshots();
