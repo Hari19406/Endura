@@ -76,14 +76,16 @@ int vdotFromPr({
 int vdotFromEasyPace(double easyPaceSecPerKm) {
   if (easyPaceSecPerKm <= 0) return 40;
 
-  // Walk scores from high to low; return the first whose E range covers the pace.
-  for (int v = 85; v >= 30; v--) {
+  // Walk scores from low to high; return the first vDOT whose fast-end
+  // the runner meets. Lower bounds decrease as vDOT rises, so the first
+  // match gives the correct (lowest plausible) vDOT for this pace.
+  for (int v = 30; v <= 85; v++) {
     final paces = kVdotTable[v]!;
     if (easyPaceSecPerKm >= paces.ePaceSecPerKm.$1) {
       return v.clamp(32, 85);
     }
   }
-  return 32;
+  return 85;
 }
 
 // ============================================================================
