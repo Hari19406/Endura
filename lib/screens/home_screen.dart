@@ -28,7 +28,9 @@ import '../screens/pre_run_check.dart';
 import '../screens/plan_complete_screen.dart';
 import '../screens/manage_plan_screen.dart';
 import '../screens/notifications_screen.dart';
+import '../screens/paywall_screen.dart';
 import '../services/analytics_service.dart';
+import '../services/revenue_cat_service.dart';
 
 // Import the shortened onboarding for post-plan re-onboarding.
 import '../onboarding/onboarding_screen.dart' show OnboardingScreen;
@@ -1238,7 +1240,16 @@ class _HomeScreenState extends State<HomeScreen>
                     steps: [],
                   ),
                   onTap: _coachMessage != null
-                      ? () => showPreRunCheck(
+                      ? () {
+                          if (!RevenueCatService.isProNotifier.value) {
+                            Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PaywallScreen()),
+                            );
+                            return;
+                          }
+                          showPreRunCheck(
                             context: context,
                             coachMessage: _coachMessage!,
                             onProceed: (scaled) => Navigator.push(
@@ -1246,12 +1257,14 @@ class _HomeScreenState extends State<HomeScreen>
                               MaterialPageRoute(
                                 builder: (_) => PreRunBriefingScreen(
                                   coachMessage: scaled,
-                                  onGoToRun: () => widget.onNavigateToRun?.call(),
+                                  onGoToRun: () =>
+                                      widget.onNavigateToRun?.call(),
                                 ),
                               ),
                             ),
                             onSkip: _handleSkip,
-                          )
+                          );
+                        }
                       : null,
                 ),
 
