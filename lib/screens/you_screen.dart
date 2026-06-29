@@ -6,14 +6,12 @@ import '../engines/achievement_engine.dart' as achieve;
 import 'settings_screen.dart';
 import '../utils/database_service.dart';
 import 'run_detail_screen.dart';
+import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../onboarding/onboarding_screen.dart';
 
 
 class YouScreen extends StatefulWidget {
-  final VoidCallback? onPlanUpdated;
-  const YouScreen({super.key, this.onPlanUpdated});
+  const YouScreen({super.key});
 
   @override
   State<YouScreen> createState() => _YouScreenState();
@@ -34,12 +32,6 @@ class _YouScreenState extends State<YouScreen>
   late TabController _tabController;
   DateTime _selectedWeekStart = DateTime.now();
   DateTime _selectedDay = DateTime.now();
-
-  // Plan card state
-  String _goalLabel   = '';
-  int    _currentWeek = 1;
-  int    _totalWeeks  = 12;
-  bool   _hasPlan     = false;
 
 
 
@@ -66,21 +58,6 @@ class _YouScreenState extends State<YouScreen>
     });
 
     try {
-      // Load plan data
-      final prefs = await SharedPreferences.getInstance();
-      final goalRace     = prefs.getString('goal_race');
-      final startDateStr = prefs.getString('plan_start_date');
-      final startDate    = startDateStr != null ? DateTime.tryParse(startDateStr) : null;
-
-      if (goalRace != null && startDate != null) {
-        final planWeeks  = prefs.getInt('plan_weeks') ?? 12;
-        final weeksPassed = DateTime.now().difference(startDate).inDays ~/ 7 + 1;
-        _goalLabel   = _raceLabel(goalRace);
-        _currentWeek = weeksPassed.clamp(1, planWeeks);
-        _totalWeeks  = planWeeks;
-        _hasPlan     = true;
-      }
-
       WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
@@ -165,29 +142,6 @@ class _YouScreenState extends State<YouScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const SettingsScreen()),
-    );
-  }
-
-  String _raceLabel(String key) => switch (key) {
-    '10k'           => '10K',
-    'half_marathon' => 'Half Marathon',
-    'marathon'      => 'Marathon',
-    _               => '5K',
-  };
-
-  Future<void> _updatePlan() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => OnboardingScreen(
-          shortenedMode: true,
-          onComplete: () {
-            Navigator.of(context).pop();
-            loadData();
-            widget.onPlanUpdated?.call();
-          },
-        ),
-      ),
     );
   }
 
@@ -302,154 +256,6 @@ class _YouScreenState extends State<YouScreen>
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TRAINING PLAN CARD
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildSetUpPlanCard() {
-    final c = context.colors;
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'MY PLAN',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: c.textTertiary,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No training plan set up yet',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: c.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Set a goal and Max will build your plan.',
-            style: TextStyle(fontSize: 13, color: c.textTertiary),
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: _updatePlan,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: BoxDecoration(
-                color: c.accent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  'Set up my plan',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: c.onAccent,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrainingPlanCard() {
-    final progress = (_currentWeek / _totalWeeks).clamp(0.0, 1.0);
-    final c = context.colors;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'MY PLAN',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: c.textTertiary,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              GestureDetector(
-                onTap: _updatePlan,
-                child: Text(
-                  'Update plan →',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: c.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _goalLabel,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: c.textPrimary,
-              letterSpacing: -0.4,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Week $_currentWeek of $_totalWeeks',
-            style: TextStyle(
-              fontSize: 13,
-              color: c.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: c.divider,
-              valueColor: AlwaysStoppedAnimation(c.accent),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${(progress * 100).round()}% complete',
-            style: TextStyle(
-              fontSize: 11,
-              color: c.textTertiary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
   // SUMMARY TAB
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -464,15 +270,7 @@ class _YouScreenState extends State<YouScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ① TRAINING PLAN
-              if (_hasPlan) ...[
-                _buildTrainingPlanCard(),
-              ] else ...[
-                _buildSetUpPlanCard(),
-              ],
-              const SizedBox(height: 16),
-
-              // ② THIS WEEK
+              // ① THIS WEEK
               _buildWeeklySummaryCard(),
               const SizedBox(height: 16),
 
@@ -493,8 +291,47 @@ class _YouScreenState extends State<YouScreen>
                 _buildTrainingStatusCard(),
                 const SizedBox(height: 16),
               ],
+
+              // ⑥ FEEDBACK
+              _buildFeedbackRow(),
+              const SizedBox(height: 8),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedbackRow() {
+    final c = context.colors;
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: c.surface,
+          border: Border.all(color: c.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Icon(Icons.feedback_outlined, color: c.textSecondary, size: 20),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                'Feedback & Support',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: c.textPrimary,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: c.textFaint, size: 20),
+          ],
         ),
       ),
     );

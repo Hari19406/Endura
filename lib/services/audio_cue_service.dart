@@ -53,6 +53,20 @@ class AudioCueService {
     await _speak('Run started. Good luck!');
   }
 
+  /// Called when transitioning from warmup to main set
+  Future<void> announceMainSetStart({String? targetPace}) async {
+    if (targetPace != null) {
+      await _speak('Warmup complete. Main set starting. Target pace $targetPace per kilometre.');
+    } else {
+      await _speak('Warmup complete. Main set starting.');
+    }
+  }
+
+  /// Called when transitioning from main set to cooldown
+  Future<void> announceCooldownStart() async {
+    await _speak('Main set done. Cool down now. Well done.');
+  }
+
   /// Called every completed kilometre
   /// [kmCompleted] — how many km just completed (1, 2, 3...)
   /// [paceString] — current average pace e.g. "5:30"

@@ -22,6 +22,8 @@ import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/analytics_service.dart';
 import '../theme/app_colors.dart';
+import '../config/map_config.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
 
@@ -330,14 +332,7 @@ bool get _hasCooldown =>
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? historyJson = prefs.getString('run_history');
-      final settingsJson = prefs.getString('app_settings');
-      if (settingsJson != null) {
-        final decoded = jsonDecode(settingsJson);
-        if (decoded is Map) {
-          final map = Map<String, dynamic>.from(decoded);
-          _voiceCoachingEnabled = map['voiceCoaching'] as bool? ?? false;
-        }
-      }
+      _voiceCoachingEnabled = prefs.getBool('voice_coaching') ?? false;
       await AudioCueService.instance.initialize(enabled: _voiceCoachingEnabled);
       if (mounted) {
         setState(() {
@@ -799,6 +794,11 @@ bool get _hasCooldown =>
         elapsedSeconds: _capturedMainSeconds,
       );
 
+      FirebaseCrashlytics.instance.setCustomKey('run_distance_km', (_capturedMainDistanceM / 1000).toStringAsFixed(2));
+      FirebaseCrashlytics.instance.setCustomKey('run_duration_s', _capturedMainSeconds.toString());
+      FirebaseCrashlytics.instance.setCustomKey('run_workout_type', capturedWorkoutType);
+      FirebaseCrashlytics.instance.setCustomKey('run_is_free', _isFreeRun.toString());
+
       try {
         final polyline = encodeRouteToPolyline(
           _capturedMainRoute.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
@@ -822,8 +822,10 @@ bool get _hasCooldown =>
           averagePace: _capturedMainPace,
         );
         await _showCSCalibrationPromptIfNeeded();
-      } catch (e) {
+      } catch (e, stack) {
         debugPrint('Error saving run: $e');
+        FirebaseCrashlytics.instance.recordError(e, stack, reason: 'run_save_failed', fatal: false);
+        Analytics.runSaveFailed(e.toString());
       }
     }
 
@@ -837,7 +839,10 @@ bool get _hasCooldown =>
           runDate: runDate,
           warmupDurationSeconds: warmupSeconds,
           cooldownDurationSeconds: cooldownSeconds,
-          onDone: () => Navigator.popUntil(context, (route) => route.isFirst),
+          onDone: () {
+            widget.onWorkoutCompleted?.call();
+            Navigator.popUntil(context, (route) => route.isFirst);
+          },
           onDiscard: () async {
             Navigator.pop(context);
             await Analytics.workoutDiscarded();
@@ -865,14 +870,31 @@ bool get _hasCooldown =>
 
   // ── Phase management ────────────────────────────────────────────────────────
 
+  /// Average of the main set pace range formatted for TTS, e.g. "5 minutes 30 seconds".
+  String? get _mainSetTargetPaceForSpeech {
+    final workBlocks = _workout?.blocks.where((b) => b.type == BlockType.main);
+    if (workBlocks == null || workBlocks.isEmpty) return null;
+    final nonRpe = workBlocks.where((b) => !b.isRpeOnly).toList();
+    if (nonRpe.isEmpty) return null;
+    final fastest = nonRpe.map((b) => b.paceMinSecondsPerKm).reduce((a, b) => a < b ? a : b);
+    final slowest = nonRpe.map((b) => b.paceMaxSecondsPerKm).reduce((a, b) => a > b ? a : b);
+    final avg = ((fastest + slowest) / 2).round();
+    final mins = avg ~/ 60;
+    final secs = avg % 60;
+    if (secs == 0) return '$mins minutes';
+    return '$mins minutes $secs seconds';
+  }
+
   void _advancePhase() {
     if (_currentPhase == RunMode.warmup) {
+      final paceStr = _mainSetTargetPaceForSpeech;
       setState(() {
         _mainPhaseStartSeconds = _seconds;
         _mainPhaseStartDistanceM = _distance;
         _currentPhase = RunMode.mainSet;
         _phaseMilestoneReached = false;
       });
+      AudioCueService.instance.announceMainSetStart(targetPace: paceStr);
     } else if (_currentPhase == RunMode.mainSet) {
       _capturedMainDistanceM = _distance - _mainPhaseStartDistanceM;
       _capturedMainSeconds = _seconds - _mainPhaseStartSeconds;
@@ -884,6 +906,7 @@ bool get _hasCooldown =>
         _currentPhase = RunMode.cooldown;
         _phaseMilestoneReached = false;
       });
+      AudioCueService.instance.announceCooldownStart();
     }
   }
 
@@ -990,7 +1013,7 @@ bool get _hasCooldown =>
                   mapController: _mapController,
                   options: MapOptions(initialCenter: _currentLocation!, initialZoom: 17.5, minZoom: 10.0, maxZoom: 18.0, interactionOptions: const InteractionOptions(flags: InteractiveFlag.all)),
                   children: [
-                    TileLayer(urlTemplate: 'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=3Iy00qmbWys8hyAY1PIe', userAgentPackageName: 'com.example.runtracker', maxZoom: 19, subdomains: const ['a', 'b', 'c'], tileProvider: NetworkTileProvider()),
+                    TileLayer(urlTemplate: mapTilerStreetsUrlTemplate, userAgentPackageName: 'com.example.runtracker', maxZoom: 19, subdomains: const ['a', 'b', 'c'], tileProvider: NetworkTileProvider()),
                     PolylineLayer(polylines: [Polyline(points: _routePoints, strokeWidth: 4.0, color: const Color(0xFF000000), borderStrokeWidth: 2.0, borderColor: Colors.white)]),
                     if (_currentLocation != null)
                       MarkerLayer(markers: [

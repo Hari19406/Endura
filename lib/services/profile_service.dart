@@ -75,7 +75,7 @@ class UserProfile {
         if (raceDate != null)
           'race_date': raceDate!.toIso8601String().substring(0, 10),
         'use_metric': useMetric,
-        if (baselineWeeklyKm != null) 'baseline_weekly_km': baselineWeeklyKm,
+        if (baselineWeeklyKm != null) 'baseline_weekly_mileage_km': baselineWeeklyKm,
         if (planStartDate != null)
           'plan_start_date': planStartDate!.toIso8601String().substring(0, 10),
         if (planWeeks != null) 'plan_weeks': planWeeks,
@@ -108,7 +108,7 @@ class UserProfile {
             ? DateTime.tryParse(map['race_date'] as String)
             : null,
         useMetric: map['use_metric'] as bool? ?? true,
-        baselineWeeklyKm: (map['baseline_weekly_km'] as num?)?.toDouble(),
+        baselineWeeklyKm: (map['baseline_weekly_mileage_km'] as num?)?.toDouble(),
         planStartDate: map['plan_start_date'] != null
             ? DateTime.tryParse(map['plan_start_date'] as String)
             : null,
@@ -251,7 +251,7 @@ class ProfileService {
         paceSeconds:       prefs.getInt('pace_seconds'),
         raceDate:          raceDateStr != null ? DateTime.tryParse(raceDateStr) : null,
         useMetric:         true,
-        baselineWeeklyKm:  prefs.getDouble('weekly_km'),
+        baselineWeeklyKm:  prefs.getDouble('weekly_mileage_km'),
         planStartDate:     startDate,
         planWeeks:         prefs.getInt('plan_weeks'),
         vdotScore:         prefs.getInt('vdot_score'),
@@ -278,7 +278,7 @@ class ProfileService {
     if (p.dob != null)             await prefs.setString('dob',                p.dob!.toIso8601String());
     if (p.raceDate != null)        await prefs.setString('race_date',          p.raceDate!.toIso8601String());
     if (p.planStartDate != null)   await prefs.setString('plan_start_date',    p.planStartDate!.toIso8601String());
-    if (p.baselineWeeklyKm != null) await prefs.setDouble('weekly_km',         p.baselineWeeklyKm!);
+    if (p.baselineWeeklyKm != null) await prefs.setDouble('weekly_mileage_km',         p.baselineWeeklyKm!);
     if (p.runsPerWeek != null)     await prefs.setInt('runs_per_week',         p.runsPerWeek!);
     if (p.planWeeks != null)       await prefs.setInt('plan_weeks',            p.planWeeks!);
     if (p.vdotScore != null)       await prefs.setInt('vdot_score',            p.vdotScore!);

@@ -20,6 +20,7 @@ import '../engines/daily/dynamic_scaler.dart';
 import '../models/race_plan.dart';
 import '../models/training_phase.dart';
 import '../theme/app_colors.dart';
+import '../config/map_config.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -1169,8 +1170,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         ),
         children: [
           TileLayer(
-            urlTemplate:
-                'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=3Iy00qmbWys8hyAY1PIeg',
+            urlTemplate: mapTilerStreetsUrlTemplate,
             userAgentPackageName: 'com.example.runapp',
             maxZoom: 19,
             subdomains: const ['a', 'b', 'c'],

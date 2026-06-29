@@ -117,4 +117,8 @@ class Analytics {
   static Future<void> subscriptionStarted() => capture('subscription_started');
 
   static Future<void> paywallDismissed() => capture('paywall_dismissed');
+
+  // ── Errors ─────────────────────────────────────────────────────────────────
+  static Future<void> runSaveFailed(String reason) =>
+      capture('run_save_failed', properties: {'reason': reason});
 }

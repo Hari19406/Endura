@@ -1495,6 +1495,124 @@ class OPageName extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PAGE — RACE DAY
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPageRaceDay extends StatelessWidget {
+  final DateTime startDate;
+  final int planWeeks;
+  final int selectedDayIndex;
+  final ValueChanged<int> onSelect;
+
+  static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  const OPageRaceDay({
+    super.key,
+    required this.startDate,
+    required this.planWeeks,
+    required this.selectedDayIndex,
+    required this.onSelect,
+  });
+
+  DateTime get _lastWeekMonday {
+    final endOfPlan = startDate.add(Duration(days: planWeeks * 7));
+    return endOfPlan.subtract(Duration(days: endOfPlan.weekday - 1));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final monday = _lastWeekMonday;
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          const _Label('Race week'),
+          const SizedBox(height: 8),
+          const _Title('Which day is\nyour race?'),
+          const SizedBox(height: 6),
+          const _Sub('Pick the day in your final training week. Sunday is the most common race day.'),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: 7,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) {
+                final date = monday.add(Duration(days: i));
+                final sel = selectedDayIndex == i;
+                final dateLabel = '${date.day} ${_months[date.month - 1]}';
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onSelect(i);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 15),
+                    decoration: BoxDecoration(
+                      color: sel ? EC.surface2 : EC.surface,
+                      borderRadius: BorderRadius.circular(ET.cardRadius),
+                      border: Border.all(
+                        color: sel ? EC.teal : EC.border,
+                        width: sel ? 1.5 : ET.borderWidth,
+                      ),
+                    ),
+                    child: Row(children: [
+                      SizedBox(
+                        width: 36,
+                        child: Text(_dayLabels[i],
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: EC.textPrimary)),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(dateLabel,
+                          style: const TextStyle(
+                              fontSize: 13, color: EC.textSecondary)),
+                      const Spacer(),
+                      if (i == 6)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: EC.teal.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Most common',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: EC.teal,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      if (sel)
+                        const Icon(Icons.check_circle_rounded,
+                            size: 20, color: EC.teal)
+                      else
+                        const SizedBox(width: 20),
+                    ]),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PAGE 13 — GENERATE PLAN
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1503,6 +1621,7 @@ class OPageGeneratePlan extends StatelessWidget {
   final DateTime startDate;
   final int? planWeeks;
   final DateTime? raceDate;
+  final int raceDayIndex;
   final int runsPerWeek;
   final List<int> selectedDays;
   final String? intensity;
@@ -1522,6 +1641,7 @@ class OPageGeneratePlan extends StatelessWidget {
     required this.startDate,
     required this.planWeeks,
     required this.raceDate,
+    required this.raceDayIndex,
     required this.runsPerWeek,
     required this.selectedDays,
     required this.intensity,
@@ -1551,7 +1671,13 @@ class OPageGeneratePlan extends StatelessWidget {
   }
 
   String get _endDateLabel {
-    final d = raceDate ?? startDate.add(Duration(days: _weeks * 7));
+    if (raceDate != null) {
+      final d = raceDate!;
+      return '${d.day} ${_months[d.month - 1]} ${d.year}';
+    }
+    final endOfPlan = startDate.add(Duration(days: _weeks * 7));
+    final lastWeekMonday = endOfPlan.subtract(Duration(days: endOfPlan.weekday - 1));
+    final d = lastWeekMonday.add(Duration(days: raceDayIndex));
     return '${d.day} ${_months[d.month - 1]} ${d.year}';
   }
 

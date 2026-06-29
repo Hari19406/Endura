@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart';
 
@@ -10,27 +11,68 @@ class PaywallScreen extends StatefulWidget {
 }
 
 class _PaywallScreenState extends State<PaywallScreen> {
-  bool _loading = false;
+  Package? _annualPackage;
+  Package? _monthlyPackage;
+  bool _loadingOffering = true;
+  String? _purchasingId; // which package is currently purchasing
 
   @override
   void initState() {
     super.initState();
     Analytics.paywallViewed();
+    _loadOffering();
   }
 
-  Future<void> _purchase() async {
-    setState(() => _loading = true);
+  Future<void> _loadOffering() async {
+    final offering = await RevenueCatService.getOffering();
+    if (mounted) {
+      setState(() {
+        _annualPackage = offering.annual;
+        _monthlyPackage = offering.monthly;
+        _loadingOffering = false;
+      });
+    }
+  }
+
+  Future<void> _purchase(Package package) async {
+    setState(() => _purchasingId = package.identifier);
     try {
-      await RevenueCatService.presentPaywall();
-      final isPro = await RevenueCatService.isPro();
-      if (isPro) {
+      final nowPro = await RevenueCatService.purchasePackage(package);
+      if (nowPro) {
         await Analytics.subscriptionStarted();
         if (mounted) Navigator.pop(context, true);
       }
+    } on PurchasesErrorCode catch (e) {
+      if (e == PurchasesErrorCode.purchaseCancelledError) return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Purchase failed: ${e.name}')),
+        );
+      }
     } catch (e) {
-      debugPrint('Purchase error: $e');
+      debugPrint('[Paywall] purchase error: $e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _purchasingId = null);
+    }
+  }
+
+  Future<void> _restore() async {
+    setState(() => _purchasingId = 'restore');
+    try {
+      final nowPro = await RevenueCatService.restorePurchases();
+      if (mounted) {
+        if (nowPro) {
+          Navigator.pop(context, true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No active subscription found.')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[Paywall] restore error: $e');
+    } finally {
+      if (mounted) setState(() => _purchasingId = null);
     }
   }
 
@@ -51,7 +93,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     fontWeight: FontWeight.bold,
                   )),
               const SizedBox(height: 8),
-              const Text('Unlock Max\'s full coaching intelligence',
+              const Text("Unlock Max's full coaching intelligence",
                   style: TextStyle(color: Colors.white70, fontSize: 16)),
               const SizedBox(height: 32),
 
@@ -74,31 +116,45 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
               const Spacer(),
 
-              _PlanButton(
-                label: 'Annual — ₹3,999/yr',
-                sublabel: 'Best value · 7-day free trial',
-                highlight: true,
-                loading: _loading,
-                onTap: _purchase,
-              ),
-              const SizedBox(height: 12),
-              _PlanButton(
-                label: 'Monthly — ₹499/mo',
-                sublabel: '7-day free trial',
-                highlight: false,
-                loading: _loading,
-                onTap: _purchase,
-              ),
-              const SizedBox(height: 16),
+              if (_loadingOffering)
+                const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF00E5CC)),
+                )
+              else ...[
+                if (_annualPackage != null)
+                  _PlanButton(
+                    label:
+                        'Annual — ${_annualPackage!.storeProduct.priceString}/yr',
+                    sublabel: 'Best value',
+                    highlight: true,
+                    loading: _purchasingId == _annualPackage!.identifier,
+                    onTap: () => _purchase(_annualPackage!),
+                  ),
+                const SizedBox(height: 12),
+                if (_monthlyPackage != null)
+                  _PlanButton(
+                    label:
+                        'Monthly — ${_monthlyPackage!.storeProduct.priceString}/mo',
+                    sublabel: 'Cancel anytime',
+                    highlight: false,
+                    loading: _purchasingId == _monthlyPackage!.identifier,
+                    onTap: () => _purchase(_monthlyPackage!),
+                  ),
+              ],
 
+              const SizedBox(height: 16),
               Center(
                 child: TextButton(
-                  onPressed: () async {
-                    await RevenueCatService.restorePurchases();
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  child: const Text('Restore purchases',
-                      style: TextStyle(color: Colors.white38)),
+                  onPressed: _purchasingId != null ? null : _restore,
+                  child: _purchasingId == 'restore'
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white38),
+                        )
+                      : const Text('Restore purchases',
+                          style: TextStyle(color: Colors.white38)),
                 ),
               ),
             ],
@@ -137,20 +193,31 @@ class _PlanButton extends StatelessWidget {
               : const Color(0xFF2C2C2E),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: highlight ? Colors.black : Colors.white,
-              )),
-          const SizedBox(height: 2),
-          Text(sublabel,
-              style: TextStyle(
-                fontSize: 13,
-                color: highlight ? Colors.black54 : Colors.white38,
-              )),
-        ]),
+        child: loading
+            ? Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: highlight ? Colors.black : Colors.white,
+                  ),
+                ),
+              )
+            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: highlight ? Colors.black : Colors.white,
+                    )),
+                const SizedBox(height: 2),
+                Text(sublabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: highlight ? Colors.black54 : Colors.white38,
+                    )),
+              ]),
       ),
     );
   }

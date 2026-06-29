@@ -300,7 +300,18 @@ class CoachEngine {
 
     final double finalWeeklyTargetKm;
 
-    if (memory.baselineWeeklyKm != null) {
+    if (memory.hasRacePlan) {
+      // RacePlan is the single source of truth for weekly volume. weekTarget
+      // already holds this week's progressive (un-reduced) target from
+      // racePlan.currentWeek(now); WeekResolver applies cutback/taper on top.
+      // RPE progression still nudges it ±. No recent-average cap here — that
+      // cap would flatten the ramp, and RacePlanBuilder already bounds the
+      // week-over-week step (~10%) at plan-build time.
+      final adjustedTargetKm = weekTarget.targetKm *
+          progression.weeklyVolumeMultiplier
+              .clamp(0.90, _maxSafeProgressionMultiplier);
+      finalWeeklyTargetKm = _roundHalf(adjustedTargetKm);
+    } else if (memory.baselineWeeklyKm != null) {
       finalWeeklyTargetKm = _volumeResolver.resolveWeeklyTarget(
         memory: memory,
         goalRace: _mapGoalRace(userMetrics.goalRace),

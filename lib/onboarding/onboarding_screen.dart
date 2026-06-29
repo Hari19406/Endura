@@ -51,6 +51,7 @@ enum OPage {
   weeklyMileage,
   intensity,
   planTimeline,
+  raceDay,
   dob,
   gender,
   name,
@@ -108,9 +109,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   String?   _intensity;
 
   // Plan timeline
-  DateTime  _startDate  = DateTime.now();
+  DateTime  _startDate   = DateTime.now();
   int?      _planWeeks;
   DateTime? _raceDate;
+  int       _raceDayIndex = 6; // 0=Mon … 6=Sun, default Sunday
 
   // Personal (carried over in shortened mode)
   DateTime? _dob;
@@ -214,6 +216,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     OPage.experience,
     OPage.bestTime,
     OPage.planTimeline,
+    OPage.raceDay,
     OPage.daysCount,
     OPage.dayPicker,
     OPage.longRunDay,
@@ -244,20 +247,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       0.05 + (_current / max(1, _total - 1)) * 0.95;
 
   void _next() {
-    if (_current < _total - 1) {
-      _ctrl.nextPage(
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeInOut,
-      );
+    int next = _current + 1;
+    if (next < _total && _sequence[next] == OPage.raceDay && _raceDate != null) {
+      next++;
+    }
+    if (next < _total) {
+      _ctrl.animateToPage(next,
+          duration: const Duration(milliseconds: 320), curve: Curves.easeInOut);
     }
   }
 
   void _prev() {
-    if (_current > 0) {
-      _ctrl.previousPage(
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeInOut,
-      );
+    int prev = _current - 1;
+    if (prev >= 0 && _sequence[prev] == OPage.raceDay && _raceDate != null) {
+      prev--;
+    }
+    if (prev >= 0) {
+      _ctrl.animateToPage(prev,
+          duration: const Duration(milliseconds: 320), curve: Curves.easeInOut);
     }
   }
 
@@ -281,6 +288,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       case OPage.weeklyMileage:  return _weeklyKm >= 5;
       case OPage.intensity:      return _intensity != null;
       case OPage.planTimeline:   return _planWeeks != null || _raceDate != null;
+      case OPage.raceDay:        return true;
       case OPage.dob:            return _dob != null;
       case OPage.gender:         return _gender != null;
       case OPage.name:           return _firstName.trim().isNotEmpty;
@@ -362,9 +370,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       if (_intensity != null) {
         await prefs.setString('goal_intent', _intensity!);
       }
+      final effectiveWeeks = _planWeeks ?? 12;
+      final DateTime computedRaceDate;
       if (_raceDate != null) {
-        await prefs.setString('race_date', _raceDate!.toIso8601String());
+        computedRaceDate = _raceDate!;
+      } else {
+        final endOfPlan = _startDate.add(Duration(days: effectiveWeeks * 7));
+        final lastWeekMonday = endOfPlan.subtract(Duration(days: endOfPlan.weekday - 1));
+        computedRaceDate = lastWeekMonday.add(Duration(days: _raceDayIndex));
       }
+      await prefs.setString('race_date', computedRaceDate.toIso8601String());
       if (_planWeeks != null) {
         await prefs.setInt('plan_weeks', _planWeeks!);
       }
@@ -385,7 +400,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         await prefs.setString('first_name', _firstName.trim());
       }
 
-      await prefs.setDouble('weekly_km', effectiveBaselineKm);
+      await prefs.setDouble('weekly_mileage_km', effectiveBaselineKm);
       await prefs.setInt('vdot_score', _vdot);
       await prefs.setBool('vdot_is_provisional', _vdotProvisional);
 
@@ -406,13 +421,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ));
 
       // ── Race plan ──────────────────────────────────────────────────────
-      final effectiveRaceDate = _raceDate ??
-          _startDate.add(Duration(days: (_planWeeks ?? 12) * 7));
       try {
         final plan = RacePlanBuilder.build(
           currentWeeklyKm: effectiveBaselineKm,
           goalRace:        _goal ?? '5k',
-          raceDate:        effectiveRaceDate,
+          raceDate:        computedRaceDate,
           experienceLevel: exp,
         );
         await EngineMemoryService().saveRacePlan(plan);
@@ -610,6 +623,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           onSelect: (v) => setState(() => _intensity = v),
         ),
 
+      OPage.raceDay => OPageRaceDay(
+          startDate:        _startDate,
+          planWeeks:        _planWeeks ?? 12,
+          selectedDayIndex: _raceDayIndex,
+          onSelect: (i) => setState(() => _raceDayIndex = i),
+        ),
+
       OPage.planTimeline => OPagePlanTimeline(
           startDate:      _startDate,
           planWeeks:      _planWeeks,
@@ -646,6 +666,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           startDate:    _startDate,
           planWeeks:    _planWeeks,
           raceDate:     _raceDate,
+          raceDayIndex: _raceDayIndex,
           runsPerWeek:  _runsPerWeek,
           selectedDays: _selectedDays,
           intensity:    _intensity,

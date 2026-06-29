@@ -166,6 +166,18 @@ class _AppInitializerState extends State<AppInitializer> {
     super.initState();
     _initialize();
     _listenAuthEvents();
+    _listenPushMessages();
+  }
+
+  void _listenPushMessages() {
+    // Foreground messages — app is open
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('[FCM] Foreground message: ${message.notification?.title}');
+    });
+    // User tapped a notification while app was in background
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('[FCM] Notification tapped: ${message.notification?.title}');
+    });
   }
 
   Future<void> _savePushToken() async {
@@ -204,8 +216,9 @@ class _AppInitializerState extends State<AppInitializer> {
           _initDone = true;
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('[AppInitializer] Init error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'app_init_failed', fatal: true);
       if (mounted) setState(() => _initError = true);
     }
   }
@@ -234,6 +247,7 @@ class _AppInitializerState extends State<AppInitializer> {
             await RevenueCatService.init(user.id);
             await Analytics.identify(user.id,
                 properties: {'email': user.email ?? ''});
+            FirebaseCrashlytics.instance.setUserIdentifier(user.id);
             // Pull the account's saved theme preference (new-device restore).
             final profile = await ProfileService.instance.fetchProfile();
             await ThemeController.instance.applyFromRemote(profile?.themeMode);
@@ -355,10 +369,6 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
-  void _onPlanUpdated() {
-    _homeKey.currentState?._refreshData();
-  }
-
   void _navigateToYou() => setState(() => _currentIndex = 2);
   void _navigateToRun() => setState(() => _currentIndex = 1);
 
@@ -381,7 +391,7 @@ class _MainNavigationState extends State<MainNavigation> {
             onCoachMessageReady: _onCoachMessageReady,
           ),
           RunScreenWrapper(onRunCompleted: _onRunCompleted, activeCoachMessage: _activeCoachMessage),
-          YouScreenWrapper(key: _youKey, onPlanUpdated: _onPlanUpdated),
+          YouScreenWrapper(key: _youKey),
         ],
       ),
       bottomNavigationBar: Container(
@@ -477,8 +487,7 @@ class RunScreenWrapper extends StatelessWidget {
 }
 
 class YouScreenWrapper extends StatefulWidget {
-  final VoidCallback? onPlanUpdated;
-  const YouScreenWrapper({super.key, this.onPlanUpdated});
+  const YouScreenWrapper({super.key});
 
   @override
   State<YouScreenWrapper> createState() => _YouScreenWrapperState();
@@ -497,6 +506,6 @@ class _YouScreenWrapperState extends State<YouScreenWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return YouScreen(key: _childKey, onPlanUpdated: widget.onPlanUpdated);
+    return YouScreen(key: _childKey);
   }
 }
