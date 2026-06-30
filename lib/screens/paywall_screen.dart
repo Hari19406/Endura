@@ -257,7 +257,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _kBrand,
                           foregroundColor: Colors.black,
-                          disabledBackgroundColor: _kBrand.withOpacity(0.5),
+                          disabledBackgroundColor: _kBrand.withValues(alpha: 0.5),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),
@@ -425,7 +425,7 @@ class _TimelineStep extends StatelessWidget {
                 Expanded(
                   child: Container(
                     width: 2.5,
-                    color: _kBrand.withOpacity(0.35),
+                    color: _kBrand.withValues(alpha: 0.35),
                   ),
                 ),
             ],
@@ -568,7 +568,7 @@ class _PriceSummary extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _kBrand.withOpacity(0.15),
+                  color: _kBrand.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -739,7 +739,7 @@ class _PlanRow extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _kBrand.withOpacity(0.15),
+                            color: _kBrand.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
