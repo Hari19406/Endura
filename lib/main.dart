@@ -36,6 +36,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
   PlatformDispatcher.instance.onError = (error, stack) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
@@ -251,6 +252,9 @@ class _AppInitializerState extends State<AppInitializer> {
             // Pull the account's saved theme preference (new-device restore).
             final profile = await ProfileService.instance.fetchProfile();
             await ThemeController.instance.applyFromRemote(profile?.themeMode);
+            _savePushToken().catchError(
+              (e) => debugPrint('[Auth] savePushToken error: $e'),
+            );
           }
         }
 
