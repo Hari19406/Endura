@@ -51,6 +51,10 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Positive / success.
   final Color success;
 
+  /// Brand cyan used for data-viz highlights (charts, graphs). Same value as
+  /// the paywall brand color — does not invert between palettes.
+  final Color chartAccent;
+
   const AppColors({
     required this.background,
     required this.surface,
@@ -65,6 +69,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.onAccent,
     required this.danger,
     required this.success,
+    required this.chartAccent,
   });
 
   static const AppColors light = AppColors(
@@ -81,6 +86,7 @@ class AppColors extends ThemeExtension<AppColors> {
     onAccent: Color(0xFFFFFFFF),
     danger: Color(0xFFD32F2F),
     success: Color(0xFF388E3C),
+    chartAccent: Color(0xFF00E5CC),
   );
 
   static const AppColors dark = AppColors(
@@ -97,6 +103,7 @@ class AppColors extends ThemeExtension<AppColors> {
     onAccent: Color(0xFF0B0B0C),
     danger: Color(0xFFEF5350),
     success: Color(0xFF66BB6A),
+    chartAccent: Color(0xFF00E5CC),
   );
 
   @override
@@ -114,6 +121,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? onAccent,
     Color? danger,
     Color? success,
+    Color? chartAccent,
   }) {
     return AppColors(
       background: background ?? this.background,
@@ -129,6 +137,7 @@ class AppColors extends ThemeExtension<AppColors> {
       onAccent: onAccent ?? this.onAccent,
       danger: danger ?? this.danger,
       success: success ?? this.success,
+      chartAccent: chartAccent ?? this.chartAccent,
     );
   }
 
@@ -149,6 +158,7 @@ class AppColors extends ThemeExtension<AppColors> {
       onAccent: Color.lerp(onAccent, other.onAccent, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
       success: Color.lerp(success, other.success, t)!,
+      chartAccent: Color.lerp(chartAccent, other.chartAccent, t)!,
     );
   }
 }

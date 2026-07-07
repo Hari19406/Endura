@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/pr_engine.dart';
@@ -31,7 +32,6 @@ class _YouScreenState extends State<YouScreen>
   String _errorMessage = '';
   late TabController _tabController;
   DateTime _selectedWeekStart = DateTime.now();
-  DateTime _selectedDay = DateTime.now();
 
 
 
@@ -40,7 +40,6 @@ class _YouScreenState extends State<YouScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _selectedWeekStart = _getWeekStart(DateTime.now());
-    _selectedDay = _getLastRunDayInWeek(_selectedWeekStart);
     loadData();
   }
 
@@ -354,11 +353,6 @@ class _YouScreenState extends State<YouScreen>
     String totalTime = _formatDuration(totalSeconds);
     int totalRuns = weekRuns.length;
 
-    double selectedDayDistance = _getDistanceForDay(_selectedDay);
-    String selectedDayText = selectedDayDistance > 0
-        ? '${_getDayName(_selectedDay)} • ${selectedDayDistance.toStringAsFixed(1)} km'
-        : _getDayName(_selectedDay);
-
     bool isCurrentWeek = _isSameWeek(_selectedWeekStart, DateTime.now());
     final c = context.colors;
 
@@ -396,8 +390,6 @@ class _YouScreenState extends State<YouScreen>
                           .subtract(const Duration(days: 365)))) return;
                       setState(() {
                         _selectedWeekStart = prevWeek;
-                        _selectedDay =
-                            _getLastRunDayInWeek(_selectedWeekStart);
                       });
                     },
                     padding: EdgeInsets.zero,
@@ -409,8 +401,6 @@ class _YouScreenState extends State<YouScreen>
                     onTap: () {
                       setState(() {
                         _selectedWeekStart = _getWeekStart(DateTime.now());
-                        _selectedDay =
-                            _getLastRunDayInWeek(_selectedWeekStart);
                       });
                     },
                     child: Text(
@@ -439,8 +429,6 @@ class _YouScreenState extends State<YouScreen>
                             if (nextWeek.isAfter(DateTime.now())) return;
                             setState(() {
                               _selectedWeekStart = nextWeek;
-                              _selectedDay =
-                                  _getLastRunDayInWeek(_selectedWeekStart);
                             });
                           },
                     padding: EdgeInsets.zero,
@@ -561,23 +549,18 @@ class _YouScreenState extends State<YouScreen>
           ),
           const SizedBox(height: 20),
 
-          Center(
-            child: Text(
-              weekRuns.isEmpty ? 'No runs this week' : selectedDayText,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: weekRuns.isEmpty ? c.textTertiary : c.textPrimary,
-              ),
+          Text(
+            'PAST 8 WEEKS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: c.textTertiary,
+              letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          _buildWeekBarChart(_selectedWeekStart, _selectedDay, (DateTime day) {
-            setState(() {
-              _selectedDay = day;
-            });
-          }),
+          _buildWeeklyTrendChart(_getWeeklyTotals(8)),
         ],
       ),
     );
@@ -1097,104 +1080,93 @@ class _YouScreenState extends State<YouScreen>
     return _getWeekStart(date1).isAtSameMomentAs(_getWeekStart(date2));
   }
 
-  bool _isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year &&
-        date1.month == date2.month &&
-        date1.day == date2.day;
-  }
-
   List<dynamic> _getRunsInWeek(DateTime weekStart) {
     return _runHistory
         .where((run) => _isSameWeek(weekStart, run.date))
         .toList();
   }
 
-  DateTime _getLastRunDayInWeek(DateTime weekStart) {
-    List<dynamic> weekRuns = _getRunsInWeek(weekStart);
-    if (weekRuns.isEmpty) return weekStart;
-    weekRuns.sort((a, b) => b.date.compareTo(a.date));
-    return DateTime(weekRuns.first.date.year, weekRuns.first.date.month,
-        weekRuns.first.date.day);
+  /// Total distance per week for the [weeks] weeks ending at
+  /// `_selectedWeekStart`, oldest first.
+  List<double> _getWeeklyTotals(int weeks) {
+    return List.generate(weeks, (i) {
+      final weekStart =
+          _selectedWeekStart.subtract(Duration(days: 7 * (weeks - 1 - i)));
+      return _getRunsInWeek(weekStart)
+          .fold(0.0, (sum, run) => sum + run.distance);
+    });
   }
 
-  double _getDistanceForDay(DateTime day) {
-    return _runHistory
-        .where((run) => _isSameDay(run.date, day))
-        .fold(0.0, (sum, run) => sum + run.distance);
-  }
-
-  String _getDayName(DateTime date) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[date.weekday - 1];
-  }
-
-  Widget _buildWeekBarChart(DateTime weekStart, DateTime selectedDay,
-      Function(DateTime) onDayTap) {
-    Map<int, double> dailyDistances = {};
-    for (int i = 0; i < 7; i++) {
-      dailyDistances[i] = 0.0;
-    }
-    for (var run in _runHistory) {
-      if (_isSameWeek(weekStart, run.date)) {
-        int dayIndex = run.date.weekday - 1; // Mon=0 … Sun=6
-        dailyDistances[dayIndex] =
-            (dailyDistances[dayIndex] ?? 0) + run.distance;
-      }
-    }
-    double maxDistance =
-        dailyDistances.values.reduce((a, b) => a > b ? a : b);
-    if (maxDistance == 0) maxDistance = 1;
-
-    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  Widget _buildWeeklyTrendChart(List<double> weeklyTotals) {
     final c = context.colors;
+    final maxDistance =
+        weeklyTotals.fold(0.0, (m, v) => v > m ? v : m);
+    final maxY = maxDistance <= 0 ? 10.0 : maxDistance * 1.2;
+
+    final spots = List.generate(
+      weeklyTotals.length,
+      (i) => FlSpot(i.toDouble(), weeklyTotals[i]),
+    );
 
     return SizedBox(
-      height: 180,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(7, (index) {
-          final distance = dailyDistances[index] ?? 0;
-          final heightFactor = (distance / maxDistance).clamp(0.0, 1.0);
-          final day = weekStart.add(Duration(days: index));
-          final isSelected = _isSameDay(day, selectedDay);
-
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onDayTap(day),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      height: 120 * heightFactor,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? c.accent
-                            : distance > 0
-                                ? c.textFaint
-                                : c.divider,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      dayLabels[index],
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: isSelected ? c.textPrimary : c.textTertiary,
-                      ),
-                    ),
+      height: 120,
+      child: LineChart(
+        LineChartData(
+          minY: 0,
+          maxY: maxY,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: maxY,
+            getDrawingHorizontalLine: (value) =>
+                FlLine(color: c.divider, strokeWidth: 1),
+          ),
+          titlesData: FlTitlesData(
+            topTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                interval: maxY,
+                getTitlesWidget: (value, meta) => Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    '${value.toStringAsFixed(0)} km',
+                    style: TextStyle(fontSize: 10, color: c.textTertiary),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          lineTouchData: const LineTouchData(enabled: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: false,
+              color: c.chartAccent,
+              barWidth: 2,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    c.chartAccent.withOpacity(0.25),
+                    c.chartAccent.withOpacity(0.0),
                   ],
                 ),
               ),
             ),
-          );
-        }),
+          ],
+        ),
+        duration: Duration.zero,
       ),
     );
   }
