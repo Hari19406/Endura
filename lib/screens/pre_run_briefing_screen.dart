@@ -340,6 +340,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   }
 
   Widget _buildHeroStats(ResolvedWorkout workout) {
+    final c = context.colors;
     final labels = <String>[];
     final values = <String>[];
 
@@ -390,7 +391,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         for (int i = 0; i < labels.length; i++) ...[
           if (i > 0) ...[
             const SizedBox(width: 12),
-            Container(width: 1, height: 32, color: const Color(0xFFE8E8E8)),
+            Container(width: 1, height: 32, color: c.divider),
             const SizedBox(width: 12),
           ],
           Expanded(
@@ -399,21 +400,21 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
               children: [
                 Text(
                   values[i],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0A0A0A),
+                    color: c.textPrimary,
                     letterSpacing: -0.3,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   labels[i],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFFAAAAAA),
+                    color: c.textTertiary,
                     letterSpacing: 0.5,
                   ),
                 ),
