@@ -3,7 +3,6 @@ import 'services/coach_message_builder.dart' as message;
 import 'engines/config/workout_template_library.dart';
 import 'models/training_phase.dart';
 import 'screens/pre_run_briefing_screen.dart';
-import 'theme/app_theme.dart';
 
 void main() {
   runApp(const PreviewApp());
@@ -16,9 +15,6 @@ class PreviewApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
       home: PreRunBriefingScreen(
         coachMessage: _mockThresholdMessage(),
         onGoToRun: () {},
