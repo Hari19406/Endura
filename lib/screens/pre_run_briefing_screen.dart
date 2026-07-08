@@ -90,7 +90,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 32),
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -102,35 +102,35 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                 children: [
                   if (widget.coachMessage.phaseWeekLabel.isNotEmpty) ...[
                     _PhaseWeekBanner(label: widget.coachMessage.phaseWeekLabel),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                   ],
                   Text(
                     widget.coachMessage.workoutTitle,
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: c.textPrimary,
-                      letterSpacing: -0.8,
+                      letterSpacing: -0.5,
                       height: 1.1,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     widget.coachMessage.hasWarmupCooldown
                         ? 'Warmup & cooldown included'
                         : 'Easy effort — no warmup needed',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       color: c.textTertiary,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   _buildHeroStats(workout),
                 ],
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // ── Coach card ───────────────────────────────────────────────────
             if (hasCoachContent)
@@ -170,13 +170,13 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       ],
                     ),
                     if (widget.coachMessage.reflectionText.isNotEmpty) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Text(
                         widget.coachMessage.reflectionText,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: c.textPrimary,
-                          height: 1.6,
+                          height: 1.5,
                         ),
                       ),
                     ],
@@ -185,18 +185,18 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       Text(
                         widget.coachMessage.acknowledgementText,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: c.textTertiary,
                           fontStyle: FontStyle.italic,
-                          height: 1.5,
+                          height: 1.4,
                         ),
                       ),
                     ],
                     if (widget.coachMessage.goalText.isNotEmpty ||
                         widget.coachMessage.feelText.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       Divider(height: 1, thickness: 1, color: c.divider),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -228,7 +228,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                 ),
               ),
 
-            if (hasCoachContent) const SizedBox(height: 10),
+            if (hasCoachContent) const SizedBox(height: 8),
 
             // ── Workout card ─────────────────────────────────────────────────
             _Card(
@@ -244,7 +244,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       letterSpacing: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   if (_hasWarmup) ...[
                     _WorkoutSection(
@@ -254,9 +254,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       accentColor: const Color(0xFF388E3C),
                       workoutIntent: widget.coachMessage.workoutIntent,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Divider(height: 1, thickness: 1, color: c.divider),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                   ],
 
                   _WorkoutSection(
@@ -268,9 +268,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                   ),
 
                   if (_hasCooldown) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Divider(height: 1, thickness: 1, color: c.divider),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     _WorkoutSection(
                       stepNumber: _hasWarmup ? 3 : 2,
                       label: 'COOLDOWN',
@@ -284,7 +284,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
             ),
 
             if (widget.coachMessage.movedFromDay != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               _Card(
                 child: Row(
                   children: [
@@ -305,35 +305,42 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                 ),
               ),
             ],
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _startWorkout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: c.accent,
-                  foregroundColor: c.onAccent,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        child: Container(
+          padding: const EdgeInsets.only(top: 10),
+          decoration: BoxDecoration(
+            color: c.background,
+            border: Border(top: BorderSide(color: c.divider, width: 1)),
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _startWorkout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: c.accent,
+                foregroundColor: c.onAccent,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(
-                  widget.coachMessage.hasWarmupCooldown
-                      ? 'Start Workout'
-                      : 'Start Run',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.1,
-                  ),
+              ),
+              child: Text(
+                widget.coachMessage.hasWarmupCooldown
+                    ? 'Start Workout'
+                    : 'Start Run',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -443,7 +450,7 @@ class _Card extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
