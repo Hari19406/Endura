@@ -1102,14 +1102,18 @@ class _YouScreenState extends State<YouScreen>
     final maxDistance =
         weeklyTotals.fold(0.0, (m, v) => v > m ? v : m);
     final maxY = maxDistance <= 0 ? 10.0 : maxDistance * 1.2;
+    final weeks = weeklyTotals.length;
+
+    DateTime weekStartFor(int index) =>
+        _selectedWeekStart.subtract(Duration(days: 7 * (weeks - 1 - index)));
 
     final spots = List.generate(
-      weeklyTotals.length,
+      weeks,
       (i) => FlSpot(i.toDouble(), weeklyTotals[i]),
     );
 
     return SizedBox(
-      height: 120,
+      height: 140,
       child: LineChart(
         LineChartData(
           minY: 0,
@@ -1123,8 +1127,6 @@ class _YouScreenState extends State<YouScreen>
           ),
           titlesData: FlTitlesData(
             topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles:
                 const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             leftTitles:
                 const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -1140,6 +1142,30 @@ class _YouScreenState extends State<YouScreen>
                     style: TextStyle(fontSize: 10, color: c.textTertiary),
                   ),
                 ),
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 18,
+                interval: 1,
+                getTitlesWidget: (value, meta) {
+                  final index = value.round();
+                  if (index < 0 || index >= weeks) {
+                    return const SizedBox.shrink();
+                  }
+                  final month = weekStartFor(index).month;
+                  final prevMonth =
+                      index == 0 ? null : weekStartFor(index - 1).month;
+                  if (month == prevMonth) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _getMonthName(month),
+                      style: TextStyle(fontSize: 10, color: c.textTertiary),
+                    ),
+                  );
+                },
               ),
             ),
           ),
