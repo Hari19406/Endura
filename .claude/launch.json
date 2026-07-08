@@ -6,6 +6,12 @@
       "runtimeExecutable": "flutter",
       "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8765", "--web-hostname", "0.0.0.0"],
       "port": 8765
+    },
+    {
+      "name": "flutter-preview",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-t", "lib/main_preview.dart", "-d", "web-server", "--web-port", "8766", "--web-hostname", "0.0.0.0"],
+      "port": 8766
     }
   ]
 }
