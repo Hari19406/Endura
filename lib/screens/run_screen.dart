@@ -13,6 +13,8 @@ import '../utils/database_service.dart';
 import '../screens/run_screen_summary.dart';
 import '../screens/pre_run_briefing_screen.dart';
 import '../screens/pre_run_check.dart';
+import '../screens/paywall_screen.dart';
+import '../services/revenue_cat_service.dart';
 import '../services/audio_cue_service.dart';
 import 'dart:convert';
 import '../services/cloud_sync_service.dart';
@@ -1216,6 +1218,15 @@ bool get _hasCooldown =>
 
   Future<void> _onWorkoutChosen() async {
     setState(() => _showRunTypeChoice = false);
+
+    if (!RevenueCatService.isProNotifier.value) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PaywallScreen()),
+      );
+      return;
+    }
 
     if (_activeCoachMessage == null) {
       if (!mounted) return;
