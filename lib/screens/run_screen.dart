@@ -128,7 +128,7 @@ class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver, Tick
   static const int _warmupCooldownDurationSeconds = 600; // 10 min
 
   // ── Resolved workout helpers ──────────────────────────────────────────────
-  ResolvedWorkout? get _workout => _activeCoachMessage?.resolvedWorkout;
+  ResolvedWorkout? get _workout => _isFreeRun ? null : _activeCoachMessage?.resolvedWorkout;
 
 bool get _hasWarmup =>
     (_activeCoachMessage?.hasWarmupCooldown ?? false) &&
@@ -839,9 +839,10 @@ bool get _hasCooldown =>
           runDate: runDate,
           warmupDurationSeconds: warmupSeconds,
           cooldownDurationSeconds: cooldownSeconds,
-          onDone: () {
+          onDone: () async {
             widget.onWorkoutCompleted?.call();
             Navigator.popUntil(context, (route) => route.isFirst);
+            await _resetToReady();
           },
           onDiscard: () async {
             Navigator.pop(context);
