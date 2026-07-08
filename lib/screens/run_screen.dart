@@ -205,6 +205,7 @@ bool get _hasCooldown =>
   }
 
   String get _phaseName {
+    if (_isFreeRun) return 'FREE RUN';
     switch (_currentPhase) {
       case RunMode.warmup:   return 'WARMUP';
       case RunMode.mainSet:  return 'MAIN SET';
