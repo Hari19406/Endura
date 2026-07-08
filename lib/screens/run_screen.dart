@@ -112,6 +112,13 @@ class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver, Tick
   bool _workoutReadyToStart = false;
   message.CoachMessage? _activeCoachMessage;
 
+  // ── Start countdown ─────────────────────────────────────────────────────────
+  bool _showCountdown = false;
+  int _countdownIndex = 0;
+  Timer? _countdownTimer;
+  Completer<void>? _countdownCompleter;
+  static const List<String> _countdownSteps = ['3', '2', '1', 'GO!'];
+
   // ── Phase management ────────────────────────────────────────────────────────
   RunMode _currentPhase = RunMode.warmup;
   int _mainPhaseStartSeconds = 0;
@@ -503,6 +510,39 @@ bool get _hasCooldown =>
     if (_runState != RunState.ready) return;
     if (_permissionStatus != PermissionStatus.granted) { _requestPermission(); return; }
 
+    await _runCountdown();
+    if (!mounted || _runState != RunState.ready) return;
+    await _executeStartTracking();
+  }
+
+  Future<void> _runCountdown() {
+    _countdownCompleter = Completer<void>();
+    setState(() {
+      _showCountdown = true;
+      _countdownIndex = 0;
+    });
+    _countdownTimer = Timer.periodic(const Duration(milliseconds: 800), (timer) {
+      if (_countdownIndex >= _countdownSteps.length - 1) {
+        _completeCountdown();
+      } else if (mounted) {
+        setState(() => _countdownIndex++);
+      }
+    });
+    return _countdownCompleter!.future;
+  }
+
+  void _completeCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    if (mounted) setState(() => _showCountdown = false);
+    if (_countdownCompleter != null && !_countdownCompleter!.isCompleted) {
+      _countdownCompleter!.complete();
+    }
+  }
+
+  void _skipCountdown() => _completeCountdown();
+
+  Future<void> _executeStartTracking() async {
     _runStartTime = DateTime.now();
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -959,6 +999,7 @@ bool get _hasCooldown =>
     _positionStream?.cancel();
     _warmupStream?.cancel();
     _gpsMonitorTimer?.cancel();
+    _countdownTimer?.cancel();
     _cameraAnimController.dispose();
     _stopForegroundTask();
     AudioCueService.instance.dispose();
@@ -1034,7 +1075,53 @@ bool get _hasCooldown =>
           if (_currentLocation != null) Positioned(bottom: _runState == RunState.paused ? 140 : 110, right: 20, child: _buildCompassIcon()),
           Positioned(bottom: 40, left: 20, right: 20, child: _buildActionButtons()),
           if (_runState == RunState.running) _buildGPSLostBanner(),
+          if (_showCountdown) _buildCountdownOverlay(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCountdownOverlay() {
+    final step = _countdownSteps[_countdownIndex];
+    final isGo = step == 'GO!';
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: _skipCountdown,
+        child: Container(
+          color: Colors.black.withOpacity(0.78),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, anim) => ScaleTransition(
+                  scale: anim,
+                  child: FadeTransition(opacity: anim, child: child),
+                ),
+                child: Text(
+                  step,
+                  key: ValueKey(_countdownIndex),
+                  style: TextStyle(
+                    fontSize: isGo ? 72 : 96,
+                    fontWeight: FontWeight.w800,
+                    color: isGo ? context.colors.accent : Colors.white,
+                    letterSpacing: -1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Tap to skip',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
