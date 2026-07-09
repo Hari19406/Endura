@@ -171,8 +171,32 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
     return Scaffold(
       backgroundColor: c.background,
-      body: SafeArea(
-        child: Column(
+      body: Stack(
+        children: [
+          // Teal hero glow behind the header, fading into the background.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 320,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      _kBrand.withValues(alpha: 0.35),
+                      _kBrand.withValues(alpha: 0.12),
+                      _kBrand.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
           children: [
             Align(
               alignment: Alignment.topRight,
@@ -271,9 +295,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                     strokeWidth: 2, color: Colors.black45),
                               )
                             : Text(
-                                hasTrial
-                                    ? 'Start ${_trialDays(intro)}-Day Free Trial'
-                                    : 'Subscribe',
+                                hasTrial ? 'Continue' : 'Subscribe',
                                 style: const TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.bold,
@@ -329,8 +351,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   ],
                 ),
               ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -364,6 +388,7 @@ class _TrialTimeline extends StatelessWidget {
             title: 'Today',
             body:
                 'Unlock Endura Pro in full — adaptive plans, guided sessions and race paces from Max.',
+            isFirst: true,
             isLast: false,
           ),
           _TimelineStep(
@@ -372,6 +397,7 @@ class _TrialTimeline extends StatelessWidget {
             title: 'Day $reminderDay',
             body:
                 "We'll send a reminder that your free trial is ending soon.",
+            isFirst: false,
             isLast: false,
           ),
           _TimelineStep(
@@ -380,6 +406,7 @@ class _TrialTimeline extends StatelessWidget {
             title: 'Day $trialDays',
             body:
                 'Your subscription begins. Cancel any time before this to avoid being charged.',
+            isFirst: false,
             isLast: true,
           ),
         ],
@@ -393,6 +420,7 @@ class _TimelineStep extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
+  final bool isFirst;
   final bool isLast;
 
   const _TimelineStep({
@@ -400,6 +428,7 @@ class _TimelineStep extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.body,
+    required this.isFirst,
     required this.isLast,
   });
 
@@ -408,27 +437,37 @@ class _TimelineStep extends StatelessWidget {
     final c = colors;
     return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: _kBrand,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: Colors.black, size: 18),
+          // Continuous vertical bar: solid through the steps, rounded cap on
+          // the first, fading out below the last icon (Buddy-style).
+          SizedBox(
+            width: 36,
+            child: Container(
+              decoration: BoxDecoration(
+                color: isLast ? null : _kBrand,
+                gradient: isLast
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          _kBrand,
+                          _kBrand.withValues(alpha: 0.0),
+                        ],
+                      )
+                    : null,
+                borderRadius: isFirst
+                    ? const BorderRadius.vertical(top: Radius.circular(18))
+                    : null,
               ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2.5,
-                    color: _kBrand.withValues(alpha: 0.35),
-                  ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: EdgeInsets.only(top: isFirst ? 10 : 6),
+                  child: Icon(icon, color: Colors.black, size: 18),
                 ),
-            ],
+              ),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
