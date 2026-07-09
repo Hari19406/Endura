@@ -550,6 +550,7 @@ bool get _hasCooldown =>
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('run_start_time', _runStartTime!.millisecondsSinceEpoch);
       await prefs.setInt('background_elapsed_seconds', 0);
+      await prefs.setDouble('run_distance_meters', 0.0);
     } catch (e) { debugPrint('Error saving start time: $e'); }
 
     await _initForegroundTask();
@@ -667,6 +668,9 @@ bool get _hasCooldown =>
                   _currentLocation = newPoint;
                   _smoothedBearing = _currentBearing;
                 });
+                SharedPreferences.getInstance().then(
+                  (prefs) => prefs.setDouble('run_distance_meters', _distance),
+                );
                 if (shouldMoveCamera) _smoothMoveCamera(newPoint);
                 final kmCompleted = (_distance / 1000).floor();
                 if (kmCompleted > _lastAnnouncedKm && kmCompleted > 0) {
@@ -1285,6 +1289,7 @@ bool get _hasCooldown =>
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('run_start_time');
       await prefs.remove('background_elapsed_seconds');
+      await prefs.remove('run_distance_meters');
     } catch (_) {}
 
     if (!mounted) return;

@@ -8,45 +8,44 @@ void startCallback() {
 }
 
 class RunTrackingTaskHandler extends TaskHandler {
-  int _backgroundSeconds = 0;
-  DateTime? _lastTickTime;
-  
+  DateTime? _startTime;
+
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     print('[ForegroundTask] Started at $timestamp');
-    _lastTickTime = timestamp;
-    _backgroundSeconds = 0;
-    
+
     // Load the start time from preferences
     final prefs = await SharedPreferences.getInstance();
     final startTimeMillis = prefs.getInt('run_start_time');
-    if (startTimeMillis != null) {
-      final startTime = DateTime.fromMillisecondsSinceEpoch(startTimeMillis);
-      final elapsed = timestamp.difference(startTime).inSeconds;
-      _backgroundSeconds = elapsed > 0 ? elapsed : 0;
-      print('[ForegroundTask] Resumed with $_backgroundSeconds seconds elapsed');
-    }
+    _startTime = startTimeMillis != null
+        ? DateTime.fromMillisecondsSinceEpoch(startTimeMillis)
+        : timestamp;
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    if (_lastTickTime != null) {
-      final elapsed = timestamp.difference(_lastTickTime!).inSeconds;
-      _backgroundSeconds += elapsed;
-      
-      // Save current elapsed time to shared preferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('background_elapsed_seconds', _backgroundSeconds);
-      
-      print('[ForegroundTask] Elapsed: $_backgroundSeconds seconds');
-      
-      // Update notification
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Run in progress',
-        notificationText: '${_formatTime(_backgroundSeconds)} elapsed',
-      );
-    }
-    _lastTickTime = timestamp;
+    if (_startTime == null) return;
+
+    // Always derive elapsed time from the absolute start time rather than
+    // accumulating per-tick deltas, so a delayed/missed tick (Android can
+    // throttle repeating background events) can't cause the displayed time
+    // to drift behind the real elapsed time.
+    final elapsed = timestamp.difference(_startTime!).inSeconds;
+    final backgroundSeconds = elapsed > 0 ? elapsed : 0;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('background_elapsed_seconds', backgroundSeconds);
+    final distanceMeters = prefs.getDouble('run_distance_meters') ?? 0.0;
+    final useMiles = prefs.getString('distance_unit') == 'miles';
+
+    print('[ForegroundTask] Elapsed: $backgroundSeconds seconds, distance: $distanceMeters m');
+
+    // Update notification
+    FlutterForegroundTask.updateService(
+      notificationTitle: 'Run in progress',
+      notificationText:
+          '${_formatTime(backgroundSeconds)} · ${_formatDistance(distanceMeters, useMiles)}',
+    );
   }
 
   @override
@@ -57,17 +56,24 @@ class RunTrackingTaskHandler extends TaskHandler {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('run_start_time');
     await prefs.remove('background_elapsed_seconds');
+    await prefs.remove('run_distance_meters');
   }
-  
+
   String _formatTime(int seconds) {
     int hours = seconds ~/ 3600;
     int minutes = (seconds % 3600) ~/ 60;
     int secs = seconds % 60;
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m ${secs}s';
     } else {
       return '${minutes}m ${secs}s';
     }
+  }
+
+  String _formatDistance(double meters, bool useMiles) {
+    final km = meters / 1000;
+    final value = useMiles ? km * 0.621371 : km;
+    return '${value.toStringAsFixed(2)} ${useMiles ? 'mi' : 'km'}';
   }
 }
