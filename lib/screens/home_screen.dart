@@ -234,11 +234,13 @@ class WorkoutDisplayModel {
 class WorkoutCard extends StatelessWidget {
   final WorkoutDisplayModel workout;
   final VoidCallback? onTap;
+  final bool locked;
 
   const WorkoutCard({
     super.key,
     required this.workout,
     this.onTap,
+    this.locked = false,
   });
 
   WorkoutDisplayStyle get _style {
@@ -364,52 +366,98 @@ class WorkoutCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            Text(
-              workout.title,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: c.textPrimary,
-                letterSpacing: -0.8,
-                height: 1.1,
+            if (locked && !_isEmpty) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lock_outline_rounded, size: 22, color: c.textTertiary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Subscribe to Endura Pro to unlock today\'s workout',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                        letterSpacing: -0.4,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                if (workout.distance != null)
-                  _chipWidget(context, Icons.straighten, workout.distance!),
-                const Spacer(),
-                if (!_isEmpty && onTap != null)
-                  GestureDetector(
+              const SizedBox(height: 18),
+              if (onTap != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
                     onTap: onTap,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: c.accent,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'View Workout',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: c.onAccent,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Icon(Icons.arrow_forward_rounded,
-                              size: 13, color: c.onAccent),
-                        ],
+                      child: Text(
+                        'Unlock Workout',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: c.onAccent,
+                        ),
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ] else ...[
+              Text(
+                workout.title,
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  color: c.textPrimary,
+                  letterSpacing: -0.8,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  if (workout.distance != null)
+                    _chipWidget(context, Icons.straighten, workout.distance!),
+                  const Spacer(),
+                  if (!_isEmpty && onTap != null)
+                    GestureDetector(
+                      onTap: onTap,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: c.accent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'View Workout',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: c.onAccent,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Icon(Icons.arrow_forward_rounded,
+                                size: 13, color: c.onAccent),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1232,40 +1280,44 @@ class _HomeScreenState extends State<HomeScreen>
               else if (_engineMemory?.hasRacePlan != true)
                 _buildStartPlanCard()
               else
-                WorkoutCard(
-                  workout: _workoutModel ?? const WorkoutDisplayModel(
-                    category: WorkoutCategory.rest,
-                    title: 'Rest Day',
-                    coachingReason: 'Rest up today. Your next workout is already lined up.',
-                    steps: [],
-                  ),
-                  onTap: _coachMessage != null
-                      ? () {
-                          if (!RevenueCatService.isProNotifier.value) {
-                            Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const PaywallScreen()),
-                            );
-                            return;
-                          }
-                          showPreRunCheck(
-                            context: context,
-                            coachMessage: _coachMessage!,
-                            onProceed: (scaled) => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PreRunBriefingScreen(
-                                  coachMessage: scaled,
-                                  onGoToRun: () =>
-                                      widget.onNavigateToRun?.call(),
+                ValueListenableBuilder<bool>(
+                  valueListenable: RevenueCatService.isProNotifier,
+                  builder: (context, isPro, _) => WorkoutCard(
+                    workout: _workoutModel ?? const WorkoutDisplayModel(
+                      category: WorkoutCategory.rest,
+                      title: 'Rest Day',
+                      coachingReason: 'Rest up today. Your next workout is already lined up.',
+                      steps: [],
+                    ),
+                    locked: !isPro,
+                    onTap: _coachMessage != null
+                        ? () {
+                            if (!isPro) {
+                              Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const PaywallScreen()),
+                              );
+                              return;
+                            }
+                            showPreRunCheck(
+                              context: context,
+                              coachMessage: _coachMessage!,
+                              onProceed: (scaled) => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PreRunBriefingScreen(
+                                    coachMessage: scaled,
+                                    onGoToRun: () =>
+                                        widget.onNavigateToRun?.call(),
+                                  ),
                                 ),
                               ),
-                            ),
-                            onSkip: _handleSkip,
-                          );
-                        }
-                      : null,
+                              onSkip: _handleSkip,
+                            );
+                          }
+                        : null,
+                  ),
                 ),
 
               if (_engineMemory?.hasRacePlan == true) ...[
