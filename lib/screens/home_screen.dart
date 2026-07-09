@@ -366,7 +366,7 @@ class WorkoutCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            if (locked && !_isEmpty) ...[
+            if (locked) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1290,33 +1290,31 @@ class _HomeScreenState extends State<HomeScreen>
                       steps: [],
                     ),
                     locked: !isPro,
-                    onTap: _coachMessage != null
-                        ? () {
-                            if (!isPro) {
-                              Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const PaywallScreen()),
-                              );
-                              return;
-                            }
-                            showPreRunCheck(
-                              context: context,
-                              coachMessage: _coachMessage!,
-                              onProceed: (scaled) => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PreRunBriefingScreen(
-                                    coachMessage: scaled,
-                                    onGoToRun: () =>
-                                        widget.onNavigateToRun?.call(),
+                    onTap: !isPro
+                        ? () => Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PaywallScreen()),
+                            )
+                        : (_coachMessage != null
+                            ? () {
+                                showPreRunCheck(
+                                  context: context,
+                                  coachMessage: _coachMessage!,
+                                  onProceed: (scaled) => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => PreRunBriefingScreen(
+                                        coachMessage: scaled,
+                                        onGoToRun: () =>
+                                            widget.onNavigateToRun?.call(),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                              onSkip: _handleSkip,
-                            );
-                          }
-                        : null,
+                                  onSkip: _handleSkip,
+                                );
+                              }
+                            : null),
                   ),
                 ),
 
