@@ -72,6 +72,37 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 
     return Scaffold(
       backgroundColor: context.colors.background,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SizedBox(
+        width: MediaQuery.of(context).size.width - 48,
+        height: 54,
+        child: FloatingActionButton.extended(
+          onPressed: () => showRunShareSheet(
+            context,
+            ShareRunData(
+              distanceKm: distance,
+              averagePace: pace,
+              durationSeconds: duration,
+              date: date,
+              workoutType: workoutType,
+              gpsPoints: gpsPoints,
+              useMiles: _useMiles,
+            ),
+            source: 'run_detail',
+          ),
+          backgroundColor: context.colors.accent,
+          foregroundColor: context.colors.onAccent,
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          icon: const Icon(Icons.ios_share, size: 20),
+          label: const Text(
+            'Share',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -83,25 +114,6 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.ios_share, color: Colors.white),
-                tooltip: 'Share run',
-                onPressed: () => showRunShareSheet(
-                  context,
-                  ShareRunData(
-                    distanceKm: distance,
-                    averagePace: pace,
-                    durationSeconds: duration,
-                    date: date,
-                    workoutType: workoutType,
-                    gpsPoints: gpsPoints,
-                    useMiles: _useMiles,
-                  ),
-                  source: 'run_detail',
-                ),
-              ),
-            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
@@ -247,7 +259,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       unit: 'kcal',
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  // Clearance for the floating Share button.
+                  const SizedBox(height: 96),
                 ],
               ),
             ),
