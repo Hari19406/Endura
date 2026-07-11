@@ -1359,7 +1359,7 @@ class _HomeScreenState extends State<HomeScreen>
                 _buildWelcomeHeroCard(),
                 const SizedBox(height: 16),
               ],
-              _buildSectionLabel('YOUR WEEK'),
+              _buildSectionLabel('INSIGHTS'),
               const SizedBox(height: 10),
               _buildBottomCarousel(),
             ],
@@ -1408,23 +1408,15 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildBottomCarousel() {
-    final cardWidth = MediaQuery.of(context).size.width - 60;
-    final cards = <Widget>[
-      _buildWeeklyCarouselCard(cardWidth),
-      _lastRun != null
-          ? _buildLastRunCarouselCard(cardWidth)
-          : _buildFirstRunPromptCard(cardWidth),
-    ];
-    return SizedBox(
-      height: 190,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(right: 20),
-        physics: const BouncingScrollPhysics(),
-        itemCount: cards.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => cards[i],
-      ),
+    final cardWidth = MediaQuery.of(context).size.width - 40;
+    return Column(
+      children: [
+        _buildWeeklyCarouselCard(cardWidth),
+        const SizedBox(height: 12),
+        _lastRun != null
+            ? _buildLastRunCarouselCard(cardWidth)
+            : _buildFirstRunPromptCard(cardWidth),
+      ],
     );
   }
 
