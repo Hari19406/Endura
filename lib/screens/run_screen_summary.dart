@@ -23,6 +23,7 @@ import '../models/training_phase.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import '../utils/unit_utils.dart';
+import '../widgets/run_share_card.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -169,6 +170,27 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     );
   }
 
+  void _shareRun() {
+    final workoutType = widget.isFreeRun
+        ? 'free'
+        : _resolveWorkoutType(widget.activeCoachMessage?.workoutIntent);
+    showRunShareSheet(
+      context,
+      ShareRunData(
+        distanceKm: widget.distanceKm,
+        averagePace: widget.averagePace,
+        durationSeconds: widget.durationSeconds,
+        date: widget.runDate,
+        workoutType: workoutType,
+        gpsPoints: widget.routePoints
+            .map((p) => {'lat': p.latitude, 'lng': p.longitude})
+            .toList(),
+        useMiles: _useMiles,
+      ),
+      source: 'run_summary',
+    );
+  }
+
   String _resolveWorkoutType(WorkoutIntent? intent) {
     if (intent == null) return 'easy';
     return switch (intent) {
@@ -216,25 +238,40 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(
                                     top: 18, bottom: 14),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
-                                    Text(
-                                      widget.isFreeRun ? 'Run complete' : 'Workout complete',
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w800,
-                                        color: context.colors.textPrimary,
-                                        letterSpacing: -0.5,
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            widget.isFreeRun ? 'Run complete' : 'Workout complete',
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w800,
+                                              color: context.colors.textPrimary,
+                                              letterSpacing: -0.5,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            _formatDate(widget.runDate),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: context.colors.textTertiary,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      _formatDate(widget.runDate),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: context.colors.textTertiary,
+                                    IconButton(
+                                      onPressed: _shareRun,
+                                      tooltip: 'Share run',
+                                      icon: Icon(
+                                        Icons.ios_share,
+                                        size: 22,
+                                        color: context.colors.textPrimary,
                                       ),
                                     ),
                                   ],

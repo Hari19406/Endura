@@ -111,6 +111,15 @@ class Analytics {
         if (averagePace != null) 'average_pace': averagePace,
       });
 
+  static Future<void> runShared({
+    required String workoutType,
+    required String source,
+  }) =>
+      capture('run_shared', properties: {
+        'workout_type': workoutType,
+        'source': source,
+      });
+
   // ── Revenue ────────────────────────────────────────────────────────────────
   static Future<void> paywallViewed() => capture('paywall_viewed');
 

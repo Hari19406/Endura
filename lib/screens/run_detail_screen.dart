@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
+import '../widgets/run_share_card.dart';
 
 class RunDetailScreen extends StatefulWidget {
   final dynamic run;
@@ -82,6 +83,25 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.ios_share, color: Colors.white),
+                tooltip: 'Share run',
+                onPressed: () => showRunShareSheet(
+                  context,
+                  ShareRunData(
+                    distanceKm: distance,
+                    averagePace: pace,
+                    durationSeconds: duration,
+                    date: date,
+                    workoutType: workoutType,
+                    gpsPoints: gpsPoints,
+                    useMiles: _useMiles,
+                  ),
+                  source: 'run_detail',
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
