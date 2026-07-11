@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
+import '../utils/workout_type_style.dart';
 
 class RunDetailScreen extends StatefulWidget {
   final dynamic run;
@@ -43,27 +44,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 
   int _estimateCalories(double distanceKm) => (distanceKm * 65).round();
 
-  String _workoutLabel(String type) {
-    switch (type.toLowerCase()) {
-      case 'easy': return 'Easy Run';
-      case 'tempo': return 'Tempo';
-      case 'interval': return 'Interval';
-      case 'long': return 'Long Run';
-      case 'recovery': return 'Recovery';
-      default: return type;
-    }
-  }
+  String _workoutLabel(String type) => WorkoutTypeStyle.label(type);
 
-  Color _workoutColor(String type) {
-    switch (type.toLowerCase()) {
-      case 'easy': return const Color(0xFF4CAF50);
-      case 'tempo': return const Color(0xFFF57C00);
-      case 'interval': return const Color(0xFFD32F2F);
-      case 'long': return const Color(0xFF1976D2);
-      case 'recovery': return const Color(0xFF7B1FA2);
-      default: return const Color(0xFF888888);
-    }
-  }
+  Color _workoutColor(String type) => WorkoutTypeStyle.color(type);
 
   List<Map<String, double>> _getGpsPoints() {
     try {

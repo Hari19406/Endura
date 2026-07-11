@@ -10,6 +10,7 @@ import 'run_detail_screen.dart';
 import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
+import '../utils/workout_type_style.dart';
 
 
 class YouScreen extends StatefulWidget {
@@ -990,6 +991,11 @@ class _YouScreenState extends State<YouScreen>
 
   Widget _buildRunHistoryCard(dynamic run, {dynamic record}) {
     final c = context.colors;
+    final workoutType = record?.workoutType as String? ?? 'easy';
+    final durationSeconds = record?.durationSeconds as int?;
+    final typeLabel = WorkoutTypeStyle.label(workoutType);
+    final typeColor = WorkoutTypeStyle.color(workoutType);
+
     return GestureDetector(
       onTap: () => _openRunDetail(run, record: record),
       child: Container(
@@ -999,13 +1005,43 @@ class _YouScreenState extends State<YouScreen>
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.all(20),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: typeColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    typeLabel.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: typeColor,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatDate(run.date),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: c.textTertiary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
                     '${UnitUtils.displayDistance(run.distance, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
                     style: TextStyle(
                       fontSize: 20,
@@ -1015,55 +1051,69 @@ class _YouScreenState extends State<YouScreen>
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _formatDate(run.date),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textTertiary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  run.averagePace,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: c.textPrimary,
-                    letterSpacing: -0.2,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'PER KM',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: c.textTertiary,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                if (run.rpe != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'RPE ${run.rpe}/10',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: c.textTertiary,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.3,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      UnitUtils.formatPaceString(run.averagePace, _useMiles),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: c.textPrimary,
+                        letterSpacing: -0.2,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      'PER ${_useMiles ? 'MI' : 'KM'}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: c.textTertiary,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
+            if (durationSeconds != null || run.rpe != null) ...[
+              const SizedBox(height: 10),
+              Divider(color: c.divider, height: 1, thickness: 1),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (durationSeconds != null) ...[
+                    Icon(Icons.schedule, size: 13, color: c.textTertiary),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatDuration(durationSeconds),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: c.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                  if (durationSeconds != null && run.rpe != null)
+                    const SizedBox(width: 14),
+                  if (run.rpe != null) ...[
+                    Icon(Icons.speed, size: 13, color: c.textTertiary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'RPE ${run.rpe}/10',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: c.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ],
         ),
       ),
