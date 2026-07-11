@@ -65,7 +65,6 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final date = widget.run.date as DateTime;
     final duration = widget.record?.durationSeconds as int? ?? 0;
     final workoutType = widget.record?.workoutType as String? ?? 'easy';
-    final csValue = widget.record?.csValueAtTime as double?;
     final calories = _estimateCalories(distance);
     final wColor = _workoutColor(workoutType);
     final gpsPoints = _getGpsPoints();
@@ -218,30 +217,15 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                   const SizedBox(height: 16),
 
                   // Secondary stats
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSecondaryCard(
-                          context,
-                          icon: Icons.local_fire_department_outlined,
-                          label: 'CALORIES',
-                          value: '$calories',
-                          unit: 'kcal',
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSecondaryCard(
-                          context,
-                          icon: Icons.speed_outlined,
-                          label: 'CRITICAL SPEED',
-                          value: csValue != null
-                              ? csValue.toStringAsFixed(2)
-                              : '—',
-                          unit: csValue != null ? 'm/s' : '',
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: _buildSecondaryCard(
+                      context,
+                      icon: Icons.local_fire_department_outlined,
+                      label: 'CALORIES',
+                      value: '$calories',
+                      unit: 'kcal',
+                    ),
                   ),
                   const SizedBox(height: 24),
                 ],
