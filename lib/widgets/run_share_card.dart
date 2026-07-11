@@ -297,7 +297,6 @@ class RunShareCard extends StatelessWidget {
                           size: Size.infinite,
                           painter: _ShareRoutePainter(
                             points: data.gpsPoints,
-                            glowColor: wColor,
                           ),
                         )
                       : const Center(
@@ -423,13 +422,11 @@ class RunShareCard extends StatelessWidget {
   }
 }
 
-/// Glowing route trace on a transparent background — same treatment as the
-/// run-detail hero, minus the solid fill so the card's glow shows through.
+/// Clean white route trace on a transparent background.
 class _ShareRoutePainter extends CustomPainter {
   final List<Map<String, double>> points;
-  final Color glowColor;
 
-  const _ShareRoutePainter({required this.points, required this.glowColor});
+  const _ShareRoutePainter({required this.points});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -475,15 +472,6 @@ class _ShareRoutePainter extends CustomPainter {
       path.lineTo(o.dx, o.dy);
     }
 
-    final glowPaint = Paint()
-      ..color = glowColor.withOpacity(0.25)
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawPath(path, glowPaint);
-
     final linePaint = Paint()
       ..color = Colors.white.withOpacity(0.95)
       ..strokeWidth = 3
@@ -491,17 +479,6 @@ class _ShareRoutePainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, linePaint);
-
-    canvas.drawCircle(
-      toOffset(points.first),
-      5,
-      Paint()..color = const Color(0xFF4CAF50),
-    );
-    canvas.drawCircle(
-      toOffset(points.last),
-      5,
-      Paint()..color = glowColor,
-    );
   }
 
   @override
