@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -34,9 +36,13 @@ class ShareRunData {
   });
 }
 
-/// Opens a bottom sheet with a story-format preview of the run card and a
-/// Share button that exports it as a PNG through the system share sheet
-/// (Instagram stories, WhatsApp status, etc).
+/// Visual style of the exported card.
+/// [transparent] has no background at all — stats and route float on alpha,
+/// for overlaying on the user's own photos/videos (Strava-style).
+enum ShareCardStyle { classic, transparent }
+
+/// Opens a bottom sheet with a story-format preview of the run card, a style
+/// toggle (dark card / transparent overlay), and Save + Share actions.
 Future<void> showRunShareSheet(
   BuildContext context,
   ShareRunData data, {
@@ -61,19 +67,26 @@ class _RunShareSheet extends StatefulWidget {
 
 class _RunShareSheetState extends State<_RunShareSheet> {
   final GlobalKey _cardKey = GlobalKey();
-  bool _sharing = false;
+  ShareCardStyle _style = ShareCardStyle.classic;
+  bool _busy = false;
+
+  String get _styleName =>
+      _style == ShareCardStyle.transparent ? 'transparent' : 'classic';
+
+  Future<Uint8List> _renderPng() async {
+    final boundary =
+        _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    // 360x640 logical * 3 = 1080x1920, native story resolution.
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
 
   Future<void> _share() async {
-    if (_sharing) return;
-    setState(() => _sharing = true);
+    if (_busy) return;
+    setState(() => _busy = true);
     try {
-      final boundary = _cardKey.currentContext!.findRenderObject()
-          as RenderRepaintBoundary;
-      // 360x640 logical * 3 = 1080x1920, native story resolution.
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = byteData!.buffer.asUint8List();
-
+      final bytes = await _renderPng();
       final dir = await getTemporaryDirectory();
       final file = File(
           '${dir.path}/endura_run_${DateTime.now().millisecondsSinceEpoch}.png');
@@ -82,6 +95,8 @@ class _RunShareSheetState extends State<_RunShareSheet> {
       await Analytics.runShared(
         workoutType: widget.data.workoutType,
         source: widget.source,
+        style: _styleName,
+        action: 'share',
       );
 
       await SharePlus.instance.share(ShareParams(
@@ -89,20 +104,56 @@ class _RunShareSheetState extends State<_RunShareSheet> {
       ));
     } catch (e) {
       debugPrint('[RunShareSheet] share failed: $e');
+      _showError('Couldn\'t create share image');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _saveToGallery() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final hasAccess = await Gal.hasAccess() || await Gal.requestAccess();
+      if (!hasAccess) {
+        _showError('Gallery access denied');
+        return;
+      }
+      final bytes = await _renderPng();
+      await Gal.putImageBytes(bytes,
+          name: 'endura_run_${DateTime.now().millisecondsSinceEpoch}');
+
+      await Analytics.runShared(
+        workoutType: widget.data.workoutType,
+        source: widget.source,
+        style: _styleName,
+        action: 'save',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Couldn\'t create share image')),
+          const SnackBar(content: Text('Saved to gallery')),
         );
       }
+    } catch (e) {
+      debugPrint('[RunShareSheet] save failed: $e');
+      _showError('Couldn\'t save image');
     } finally {
-      if (mounted) setState(() => _sharing = false);
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showError(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final previewHeight = MediaQuery.of(context).size.height * 0.52;
+    final isTransparent = _style == ShareCardStyle.transparent;
+    final previewHeight = MediaQuery.of(context).size.height * 0.46;
 
     return Container(
       decoration: BoxDecoration(
@@ -133,63 +184,147 @@ class _RunShareSheetState extends State<_RunShareSheet> {
               color: c.textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // Style toggle
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildStyleChip('Dark card', ShareCardStyle.classic),
+              const SizedBox(width: 8),
+              _buildStyleChip('Transparent', ShareCardStyle.transparent),
+            ],
+          ),
+          const SizedBox(height: 14),
+
           SizedBox(
             height: previewHeight,
             child: FittedBox(
               fit: BoxFit.contain,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: RepaintBoundary(
-                  key: _cardKey,
-                  child: RunShareCard(data: widget.data),
+                // Checkerboard sits OUTSIDE the RepaintBoundary so the
+                // exported PNG keeps its alpha channel.
+                child: CustomPaint(
+                  painter:
+                      isTransparent ? _CheckerboardPainter() : null,
+                  child: RepaintBoundary(
+                    key: _cardKey,
+                    child: RunShareCard(data: widget.data, style: _style),
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          Text(
+            isTransparent
+                ? 'No background — overlay it on your own photo or video'
+                : 'Ready to post as-is',
+            style: TextStyle(fontSize: 11, color: c.textTertiary),
+          ),
+          const SizedBox(height: 14),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _sharing ? null : _share,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: c.accent,
-                  foregroundColor: c.onAccent,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : _saveToGallery,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: c.textPrimary,
+                        side: BorderSide(color: c.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.download_outlined, size: 18),
+                      label: const Text(
+                        'Save',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   ),
                 ),
-                icon: _sharing
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2, color: c.onAccent),
-                      )
-                    : const Icon(Icons.ios_share, size: 18),
-                label: Text(
-                  _sharing ? 'Preparing…' : 'Share',
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _busy ? null : _share,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: c.accent,
+                        foregroundColor: c.onAccent,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: _busy
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: c.onAccent),
+                            )
+                          : const Icon(Icons.ios_share, size: 18),
+                      label: Text(
+                        _busy ? 'Working…' : 'Share',
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildStyleChip(String label, ShareCardStyle style) {
+    final c = context.colors;
+    final selected = _style == style;
+    return GestureDetector(
+      onTap: () => setState(() => _style = style),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? c.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? c.accent : c.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? c.onAccent : c.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// The story-format (9:16) card itself. Always dark regardless of app theme —
-/// it's a branded export, not an in-app surface.
+/// it's a branded export, not an in-app surface. The [ShareCardStyle.transparent]
+/// variant drops the background entirely so the PNG keeps its alpha channel.
 class RunShareCard extends StatelessWidget {
   final ShareRunData data;
-  const RunShareCard({super.key, required this.data});
+  final ShareCardStyle style;
+  const RunShareCard({
+    super.key,
+    required this.data,
+    this.style = ShareCardStyle.classic,
+  });
 
   static const double width = 360;
   static const double height = 640;
@@ -219,28 +354,30 @@ class RunShareCard extends StatelessWidget {
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
     final hasRoute = data.gpsPoints.length > 1;
+    final isTransparent = style == ShareCardStyle.transparent;
 
     return Container(
       width: width,
       height: height,
-      color: const Color(0xFF0A0A0A),
+      color: isTransparent ? null : const Color(0xFF0A0A0A),
       child: Stack(
         children: [
-          // Subtle brand glow behind the route.
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.2),
-                  radius: 1.1,
-                  colors: [
-                    wColor.withOpacity(0.10),
-                    Colors.transparent,
-                  ],
+          if (!isTransparent)
+            // Subtle brand glow behind the route.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.2),
+                    radius: 1.1,
+                    colors: [
+                      wColor.withOpacity(0.10),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
             child: Column(
@@ -299,13 +436,15 @@ class RunShareCard extends StatelessWidget {
                             points: data.gpsPoints,
                           ),
                         )
-                      : const Center(
-                          child: Icon(
-                            Icons.directions_run,
-                            color: Colors.white12,
-                            size: 110,
-                          ),
-                        ),
+                      : isTransparent
+                          ? const SizedBox.expand()
+                          : const Center(
+                              child: Icon(
+                                Icons.directions_run,
+                                color: Colors.white12,
+                                size: 110,
+                              ),
+                            ),
                 ),
 
                 // Hero distance
@@ -483,4 +622,27 @@ class _ShareRoutePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ShareRoutePainter oldDelegate) => false;
+}
+
+/// Grey checkerboard shown behind the transparent preview so the user can
+/// see which parts of the export have no background.
+class _CheckerboardPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const cell = 16.0;
+    final light = Paint()..color = const Color(0xFF3A3A3C);
+    final dark = Paint()..color = const Color(0xFF2C2C2E);
+    for (double y = 0; y < size.height; y += cell) {
+      for (double x = 0; x < size.width; x += cell) {
+        final isLight = ((x / cell).floor() + (y / cell).floor()) % 2 == 0;
+        canvas.drawRect(
+          Rect.fromLTWH(x, y, cell, cell),
+          isLight ? light : dark,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CheckerboardPainter oldDelegate) => false;
 }

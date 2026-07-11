@@ -114,10 +114,14 @@ class Analytics {
   static Future<void> runShared({
     required String workoutType,
     required String source,
+    String style = 'classic',
+    String action = 'share',
   }) =>
       capture('run_shared', properties: {
         'workout_type': workoutType,
         'source': source,
+        'style': style,
+        'action': action,
       });
 
   // ── Revenue ────────────────────────────────────────────────────────────────
