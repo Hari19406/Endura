@@ -1274,6 +1274,7 @@ class _HomeScreenState extends State<HomeScreen>
                   completedRaceLabel: _completedRaceLabel,
                   totalKmCompleted: _planTotalKm,
                   vdotBefore: _vdotBeforePlan,
+                  useMiles: _distanceUnit == 'miles',
                   onStartNextPlan: _onStartNextPlan,
                   onRemindLater: _onRemindLater,
                 )

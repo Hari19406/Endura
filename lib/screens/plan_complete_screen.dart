@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../engines/memory/engine_memory.dart';
 import '../theme/app_colors.dart';
+import '../utils/unit_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLAN COMPLETE SCREEN
@@ -31,6 +32,9 @@ class PlanCompleteCard extends StatelessWidget {
   /// vDOT at plan start (stored before plan started, passed in by caller).
   final int vdotBefore;
 
+  /// Whether to display distances in miles instead of km.
+  final bool useMiles;
+
   const PlanCompleteCard({
     super.key,
     required this.memory,
@@ -39,6 +43,7 @@ class PlanCompleteCard extends StatelessWidget {
     required this.completedRaceLabel,
     required this.totalKmCompleted,
     required this.vdotBefore,
+    this.useMiles = false,
   });
 
   @override
@@ -120,8 +125,8 @@ class PlanCompleteCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 _statChip(
                   context,
-                  label: 'km',
-                  value: totalKmCompleted.toStringAsFixed(0),
+                  label: UnitUtils.unitLabel(useMiles),
+                  value: UnitUtils.displayDistance(totalKmCompleted, useMiles).toStringAsFixed(0),
                   icon: Icons.straighten_rounded,
                 ),
                 if (vdotGain > 0) ...[

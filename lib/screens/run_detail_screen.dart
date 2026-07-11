@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../theme/app_colors.dart';
+import '../utils/unit_utils.dart';
 
-class RunDetailScreen extends StatelessWidget {
+class RunDetailScreen extends StatefulWidget {
   final dynamic run;
   final dynamic record;
   const RunDetailScreen({super.key, required this.run, this.record});
+
+  @override
+  State<RunDetailScreen> createState() => _RunDetailScreenState();
+}
+
+class _RunDetailScreenState extends State<RunDetailScreen> {
+  bool _useMiles = false;
+
+  @override
+  void initState() {
+    super.initState();
+    UnitUtils.isMiles().then((v) {
+      if (mounted) setState(() => _useMiles = v);
+    });
+  }
 
   String _formatDuration(int seconds) {
     final h = seconds ~/ 3600;
@@ -51,7 +67,7 @@ class RunDetailScreen extends StatelessWidget {
 
   List<Map<String, double>> _getGpsPoints() {
     try {
-      final points = run.gpsPoints;
+      final points = widget.run.gpsPoints;
       if (points == null || (points as List).isEmpty) return [];
       return List<Map<String, double>>.from(points);
     } catch (_) {
@@ -61,12 +77,12 @@ class RunDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final distance = run.distance as double;
-    final pace = run.averagePace as String;
-    final date = run.date as DateTime;
-    final duration = record?.durationSeconds as int? ?? 0;
-    final workoutType = record?.workoutType as String? ?? 'easy';
-    final csValue = record?.csValueAtTime as double?;
+    final distance = widget.run.distance as double;
+    final pace = widget.run.averagePace as String;
+    final date = widget.run.date as DateTime;
+    final duration = widget.record?.durationSeconds as int? ?? 0;
+    final workoutType = widget.record?.workoutType as String? ?? 'easy';
+    final csValue = widget.record?.csValueAtTime as double?;
     final calories = _estimateCalories(distance);
     final wColor = _workoutColor(workoutType);
     final gpsPoints = _getGpsPoints();
@@ -196,15 +212,15 @@ class RunDetailScreen extends StatelessWidget {
                         _buildStat(
                           context,
                           label: 'DISTANCE',
-                          value: distance.toStringAsFixed(2),
-                          unit: 'km',
+                          value: UnitUtils.displayDistance(distance, _useMiles).toStringAsFixed(2),
+                          unit: UnitUtils.unitLabel(_useMiles),
                         ),
                         _buildDivider(context),
                         _buildStat(
                           context,
                           label: 'AVG PACE',
-                          value: pace,
-                          unit: '/km',
+                          value: UnitUtils.formatPaceString(pace, _useMiles),
+                          unit: UnitUtils.perUnitLabel(_useMiles),
                         ),
                         _buildDivider(context),
                         _buildStat(

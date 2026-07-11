@@ -3,6 +3,7 @@ import '../services/coach_message_builder.dart' as message;
 import '../engines/config/workout_template_library.dart';
 import '../theme/app_colors.dart';
 import 'run_screen.dart';
+import '../utils/unit_utils.dart';
 
 enum BlockState { pending, done }
 
@@ -23,6 +24,16 @@ class PreRunBriefingScreen extends StatefulWidget {
 }
 
 class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
+  bool _useMiles = false;
+
+  @override
+  void initState() {
+    super.initState();
+    UnitUtils.isMiles().then((v) {
+      if (mounted) setState(() => _useMiles = v);
+    });
+  }
+
   void _startWorkout() {
     if (widget.returnOnStart) {
       Navigator.pop(context, true);
@@ -253,6 +264,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       blocks: _warmupBlocks,
                       accentColor: const Color(0xFF388E3C),
                       workoutIntent: widget.coachMessage.workoutIntent,
+                      useMiles: _useMiles,
                     ),
                     const SizedBox(height: 12),
                     Divider(height: 1, thickness: 1, color: c.divider),
@@ -265,6 +277,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                     blocks: _workBlocks,
                     accentColor: c.textPrimary,
                     workoutIntent: widget.coachMessage.workoutIntent,
+                    useMiles: _useMiles,
                   ),
 
                   if (_hasCooldown) ...[
@@ -277,6 +290,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       blocks: _cooldownBlocks,
                       accentColor: const Color(0xFF1565C0),
                       workoutIntent: widget.coachMessage.workoutIntent,
+                      useMiles: _useMiles,
                     ),
                   ],
                 ],
@@ -353,7 +367,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
 
     final totalDist = workout.totalDistanceKm;
     if (totalDist > 0) {
-      values.add('${totalDist.toStringAsFixed(1)} km');
+      values.add('${UnitUtils.displayDistance(totalDist, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}');
       labels.add('DISTANCE');
     }
 
@@ -379,13 +393,13 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                 intent == WorkoutIntent.endurance) &&
             (slowest - fastest) >= 30) {
           final ceiling = (fastest / 5).round() * 5;
-          values.add('≤ ${_fmt(ceiling)} /km');
+          values.add('≤ ${_fmt(ceiling)} ${UnitUtils.perUnitLabel(_useMiles)}');
         } else {
           final lo = (fastest / 5).round() * 5;
           final hi = (slowest / 5).round() * 5;
           values.add(lo == hi
-              ? '${_fmt(lo)} /km'
-              : '${_fmt(lo)}–${_fmt(hi)} /km');
+              ? '${_fmt(lo)} ${UnitUtils.perUnitLabel(_useMiles)}'
+              : '${_fmt(lo)}–${_fmt(hi)} ${UnitUtils.perUnitLabel(_useMiles)}');
         }
         labels.add('PACE');
       }
@@ -434,9 +448,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   }
 
   String _fmt(int secondsPerKm) {
-    final mins = secondsPerKm ~/ 60;
-    final secs = secondsPerKm % 60;
-    return '$mins:${secs.toString().padLeft(2, '0')}';
+    final displaySeconds = UnitUtils.displayPaceSeconds(secondsPerKm.toDouble(), _useMiles);
+    return UnitUtils.formatSeconds(displaySeconds.round());
   }
 }
 
@@ -468,6 +481,7 @@ class _WorkoutSection extends StatelessWidget {
   final List<ResolvedBlock> blocks;
   final Color accentColor;
   final WorkoutIntent workoutIntent;
+  final bool useMiles;
 
   const _WorkoutSection({
     required this.stepNumber,
@@ -475,6 +489,7 @@ class _WorkoutSection extends StatelessWidget {
     required this.blocks,
     required this.accentColor,
     required this.workoutIntent,
+    this.useMiles = false,
   });
 
   @override
@@ -555,7 +570,7 @@ class _WorkoutSection extends StatelessWidget {
       }
     }
 
-    final pace = block.formattedPaceForIntent(workoutIntent);
+    final pace = _paceForIntent(block, workoutIntent);
 
     final icon = block.type == BlockType.recovery
         ? Icons.pause_circle_outline
@@ -610,8 +625,32 @@ class _WorkoutSection extends StatelessWidget {
   }
 
   String _smartDistance(double km) {
+    final displayKm = UnitUtils.displayDistance(km, useMiles);
     if (km < 1.0) return '${(km * 1000).round()}m';
-    return '${km.toStringAsFixed(1)} km';
+    return '${displayKm.toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
+  }
+
+  String _paceForIntent(ResolvedBlock block, WorkoutIntent intent) {
+    if (block.isRpeOnly) return 'RPE effort';
+    final isEasy = (intent == WorkoutIntent.aerobicBase ||
+            intent == WorkoutIntent.recovery ||
+            intent == WorkoutIntent.endurance) &&
+        block.paceMaxSecondsPerKm - block.paceMinSecondsPerKm >= 30;
+    final unit = UnitUtils.perUnitLabel(useMiles);
+    if (isEasy) {
+      final ceiling = (block.paceMinSecondsPerKm / 5).round() * 5;
+      return '≤ ${_formatDisplayPace(ceiling)}$unit';
+    }
+    final lo = (block.paceMinSecondsPerKm / 5).round() * 5;
+    final hi = (block.paceMaxSecondsPerKm / 5).round() * 5;
+    return lo == hi
+        ? '${_formatDisplayPace(lo)}$unit'
+        : '${_formatDisplayPace(lo)}–${_formatDisplayPace(hi)}$unit';
+  }
+
+  String _formatDisplayPace(int secondsPerKm) {
+    final displaySeconds = UnitUtils.displayPaceSeconds(secondsPerKm.toDouble(), useMiles);
+    return UnitUtils.formatSeconds(displaySeconds.round());
   }
 }
 

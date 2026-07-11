@@ -9,6 +9,7 @@ import '../utils/database_service.dart';
 import 'run_detail_screen.dart';
 import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
+import '../utils/unit_utils.dart';
 
 
 class YouScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _YouScreenState extends State<YouScreen>
   String _errorMessage = '';
   late TabController _tabController;
   DateTime _selectedWeekStart = DateTime.now();
+  bool _useMiles = false;
 
 
 
@@ -57,6 +59,7 @@ class _YouScreenState extends State<YouScreen>
     });
 
     try {
+      final useMiles = await UnitUtils.isMiles();
       WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
@@ -116,6 +119,7 @@ class _YouScreenState extends State<YouScreen>
           _newAchievements = newlyUnlocked;
           _runRecords = records;
           _runHistory = runs;
+          _useMiles = useMiles;
           _isLoading = false;
         });
       }
@@ -455,7 +459,7 @@ class _YouScreenState extends State<YouScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            totalDistance.toStringAsFixed(1),
+                            UnitUtils.displayDistance(totalDistance, _useMiles).toStringAsFixed(1),
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w600,
@@ -467,7 +471,7 @@ class _YouScreenState extends State<YouScreen>
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4, left: 4),
                             child: Text(
-                              'km',
+                              UnitUtils.unitLabel(_useMiles),
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -1002,7 +1006,7 @@ class _YouScreenState extends State<YouScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${run.distance.toStringAsFixed(1)} km',
+                    '${UnitUtils.displayDistance(run.distance, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
@@ -1097,8 +1101,11 @@ class _YouScreenState extends State<YouScreen>
     });
   }
 
-  Widget _buildWeeklyTrendChart(List<double> weeklyTotals) {
+  Widget _buildWeeklyTrendChart(List<double> weeklyTotalsKm) {
     final c = context.colors;
+    final weeklyTotals = weeklyTotalsKm
+        .map((km) => UnitUtils.displayDistance(km, _useMiles))
+        .toList();
     final maxDistance =
         weeklyTotals.fold(0.0, (m, v) => v > m ? v : m);
     final maxY = maxDistance <= 0 ? 10.0 : maxDistance * 1.2;
@@ -1138,7 +1145,7 @@ class _YouScreenState extends State<YouScreen>
                 getTitlesWidget: (value, meta) => Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
-                    '${value.toStringAsFixed(0)} km',
+                    '${value.toStringAsFixed(0)} ${UnitUtils.unitLabel(_useMiles)}',
                     style: TextStyle(fontSize: 10, color: c.textTertiary),
                   ),
                 ),

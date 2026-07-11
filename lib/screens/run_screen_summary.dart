@@ -22,6 +22,7 @@ import '../models/race_plan.dart';
 import '../models/training_phase.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
+import '../utils/unit_utils.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -59,6 +60,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   int? _rpe;
   bool _engineProcessed = false;
   late Future<_SummaryData> _summaryFuture;
+  bool _useMiles = false;
 
   message.PaceRange? get _targetPaceRange {
     final workout = widget.activeCoachMessage?.resolvedWorkout;
@@ -88,6 +90,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   void initState() {
     super.initState();
     _summaryFuture = _buildSummaryData();
+    UnitUtils.isMiles().then((v) {
+      if (mounted) setState(() => _useMiles = v);
+    });
   }
 
   Future<void> _discardRun() async {
@@ -321,12 +326,14 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             child: Row(
               children: [
                 _buildStatCell(
-                    _formatDistance(widget.distanceKm), 'km', 'Distance'),
+                    _formatDistance(UnitUtils.displayDistance(widget.distanceKm, _useMiles)),
+                    UnitUtils.unitLabel(_useMiles), 'Distance'),
                 _buildCellDivider(),
                 _buildStatCell(
                     _formatDuration(widget.durationSeconds), '', 'Duration'),
                 _buildCellDivider(),
-                _buildStatCell(widget.averagePace, '/km', 'Avg pace'),
+                _buildStatCell(UnitUtils.formatPaceString(widget.averagePace, _useMiles),
+                    UnitUtils.perUnitLabel(_useMiles), 'Avg pace'),
               ],
             ),
           ),
@@ -337,7 +344,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                 _buildStatCell(
                     _formatDuration(_totalWorkoutSeconds), '', 'Total time'),
                 _buildCellDivider(),
-                _buildStatCell(_summaryFutureWeeklyKm, 'km', 'This week'),
+                _buildStatCell(
+                    _summaryFutureWeeklyKm == '—'
+                        ? _summaryFutureWeeklyKm
+                        : _formatDistance(UnitUtils.displayDistance(
+                            double.parse(_summaryFutureWeeklyKm), _useMiles)),
+                    UnitUtils.unitLabel(_useMiles), 'This week'),
                 _buildCellDivider(),
                 _buildStatCellRaw(_buildPaceTrendWidget(), 'Pace trend'),
               ],
@@ -496,16 +508,16 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         return RichText(
                           text: TextSpan(children: [
                             TextSpan(
-                              text: widget.averagePace,
+                              text: UnitUtils.formatPaceString(widget.averagePace, _useMiles),
                               style: const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF2A9D4E),
                               ),
                             ),
-                            const TextSpan(
-                              text: ' /km',
-                              style: TextStyle(
+                            TextSpan(
+                              text: ' ${UnitUtils.perUnitLabel(_useMiles)}',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w400,
                                 color: Color(0xFF2A9D4E),
@@ -542,7 +554,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                 fontSize: 10, color: context.colors.textTertiary)),
                         const SizedBox(height: 4),
                         Text(
-                          '${_formatPaceSecs(target.minSecondsPerKm)} – ${_formatPaceSecs(target.maxSecondsPerKm)} /km',
+                          '${_formatDisplayPaceSecs(target.minSecondsPerKm)} – ${_formatDisplayPaceSecs(target.maxSecondsPerKm)} ${UnitUtils.perUnitLabel(_useMiles)}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -1074,7 +1086,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         final dayLabel =
             daysAhead == 1 ? 'Tomorrow' : _weekdayName(nextDay.weekday);
         final distStr = nextDay.distanceKm > 0
-            ? ' · ${nextDay.distanceKm.toStringAsFixed(1)} km'
+            ? ' · ${UnitUtils.displayDistance(nextDay.distanceKm, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}'
             : '';
         final label = '$dayLabel · ${_intentName(intent)}$distStr';
         final subtext = _intentSubtext(intent);
@@ -1135,10 +1147,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     return 0;
   }
 
-  String _formatPaceSecs(int totalSeconds) {
-    final m = totalSeconds ~/ 60;
-    final s = totalSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
+  String _formatDisplayPaceSecs(int secondsPerKm) {
+    final displaySeconds = UnitUtils.displayPaceSeconds(secondsPerKm.toDouble(), _useMiles);
+    return UnitUtils.formatSeconds(displaySeconds.round());
   }
 
   Widget _buildMap() {

@@ -26,6 +26,7 @@ import '../services/analytics_service.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../utils/unit_utils.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
 
@@ -399,6 +400,15 @@ bool get _hasCooldown =>
   }
 
   String _getDistanceLabel() => _distanceUnit == 'miles' ? 'mi' : 'km';
+
+  String _displayPace(double paceSecondsPerKm) {
+    if (paceSecondsPerKm <= 0 || paceSecondsPerKm.isInfinite || paceSecondsPerKm.isNaN) {
+      return '--:--';
+    }
+    final displaySeconds = UnitUtils.displayPaceSeconds(paceSecondsPerKm, _distanceUnit == 'miles');
+    if (displaySeconds > 5999) return '99:59';
+    return UnitUtils.formatSeconds(displaySeconds.round());
+  }
 
   Future<void> _checkPermissions() async {
     if (!mounted) return;
@@ -1221,7 +1231,7 @@ bool get _hasCooldown =>
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'COUNTDOWN' : 'TIME', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text(isWarmupOrCooldown && isActive ? _formatTime(_phaseCountdownSeconds) : _formatTime(_seconds), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: isWarmupOrCooldown && isActive && _phaseCountdownSeconds == 0 ? const Color(0xFF388E3C) : c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('DISTANCE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text(isActive ? _buildDistanceText() : '0.00 ${_getDistanceLabel()}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'FREE PACE' : 'PACE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text('${_paceSnapshot.formattedCurrent}/km', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _paceSnapshot.isStale ? c.textTertiary : c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isWarmupOrCooldown ? 'FREE PACE' : 'PACE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c.textTertiary, letterSpacing: 0.8)), const SizedBox(height: 6), Text('${_displayPace(_paceSnapshot.currentPaceSecondsPerKm)}${UnitUtils.perUnitLabel(_distanceUnit == 'miles')}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _paceSnapshot.isStale ? c.textTertiary : c.textPrimary, letterSpacing: -0.3, fontFeatures: const [FontFeature.tabularFigures()]))])),
         ]),
         if (showPaceIndicator) ...[const SizedBox(height: 14), Container(height: 1, color: c.divider), const SizedBox(height: 14), TargetPaceIndicator(currentPaceSecondsPerKm: _paceSnapshot.smoothedPaceSecondsPerKm, targetRange: _targetPaceRange)],
         if (_phaseMilestoneReached && isActive) ...[const SizedBox(height: 14), Container(height: 1, color: c.divider), const SizedBox(height: 14), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: const Color(0xFF388E3C).withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF388E3C).withOpacity(0.25))), child: Row(children: [const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF388E3C)), const SizedBox(width: 8), Text(_milestoneHint, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF388E3C)))]))],
