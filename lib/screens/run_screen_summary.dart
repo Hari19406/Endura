@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:latlong2/latlong.dart';
 import '../utils/database_service.dart';
 import '../engines/runtime/engine_runtime.dart';
@@ -1175,6 +1176,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             maxZoom: 19,
             subdomains: const ['a', 'b', 'c'],
             tileProvider: NetworkTileProvider(),
+            errorTileCallback: (tile, error, stack) {
+              FirebaseCrashlytics.instance.recordError(error, stack, reason: 'maptiler_tile_load_failed', fatal: false);
+            },
           ),
           PolylineLayer(polylines: [
             Polyline(

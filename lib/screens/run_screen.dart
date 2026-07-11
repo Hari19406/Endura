@@ -1062,7 +1062,16 @@ bool get _hasCooldown =>
                   mapController: _mapController,
                   options: MapOptions(initialCenter: _currentLocation!, initialZoom: 17.5, minZoom: 10.0, maxZoom: 18.0, interactionOptions: const InteractionOptions(flags: InteractiveFlag.all)),
                   children: [
-                    TileLayer(urlTemplate: mapTilerStreetsUrlTemplate, userAgentPackageName: 'com.example.runtracker', maxZoom: 19, subdomains: const ['a', 'b', 'c'], tileProvider: NetworkTileProvider()),
+                    TileLayer(
+                      urlTemplate: mapTilerStreetsUrlTemplate,
+                      userAgentPackageName: 'com.example.runtracker',
+                      maxZoom: 19,
+                      subdomains: const ['a', 'b', 'c'],
+                      tileProvider: NetworkTileProvider(),
+                      errorTileCallback: (tile, error, stack) {
+                        FirebaseCrashlytics.instance.recordError(error, stack, reason: 'maptiler_tile_load_failed', fatal: false);
+                      },
+                    ),
                     PolylineLayer(polylines: [Polyline(points: _routePoints, strokeWidth: 4.0, color: const Color(0xFF000000), borderStrokeWidth: 2.0, borderColor: Colors.white)]),
                     if (_currentLocation != null)
                       MarkerLayer(markers: [
