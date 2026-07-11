@@ -311,61 +311,63 @@ class WorkoutCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _accent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_icon, size: 13, color: _accent),
-                      const SizedBox(width: 6),
-                      Text(
-                        _badge,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _accent,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (workout.feelHint.isNotEmpty) ...[
-                  const SizedBox(width: 8),
+            if (!locked) ...[
+              Row(
+                children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                        horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: c.divider,
+                      color: _accent.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.chat_bubble_outline_rounded,
-                            size: 11, color: Color(0xFF00A08A)),
-                        const SizedBox(width: 5),
+                        Icon(_icon, size: 13, color: _accent),
+                        const SizedBox(width: 6),
                         Text(
-                          workout.feelHint,
+                          _badge,
                           style: TextStyle(
-                            fontSize: 11,
-                            color: c.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _accent,
+                            letterSpacing: 1.0,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  if (workout.feelHint.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: c.divider,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.chat_bubble_outline_rounded,
+                              size: 11, color: Color(0xFF00A08A)),
+                          const SizedBox(width: 5),
+                          Text(
+                            workout.feelHint,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: c.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-            const SizedBox(height: 18),
+              ),
+              const SizedBox(height: 18),
+            ],
             if (locked) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
