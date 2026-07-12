@@ -61,7 +61,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   int? _rpe;
   bool _engineProcessed = false;
   late Future<_SummaryData> _summaryFuture;
-  bool _useMiles = false;
+  bool _useMiles = UnitUtils.useMilesNotifier.value;
 
   message.PaceRange? get _targetPaceRange {
     final workout = widget.activeCoachMessage?.resolvedWorkout;
@@ -91,9 +91,17 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   void initState() {
     super.initState();
     _summaryFuture = _buildSummaryData();
-    UnitUtils.isMiles().then((v) {
-      if (mounted) setState(() => _useMiles = v);
-    });
+    UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
+  }
+
+  void _onUnitPrefChanged() {
+    if (mounted) setState(() => _useMiles = UnitUtils.useMilesNotifier.value);
+  }
+
+  @override
+  void dispose() {
+    UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    super.dispose();
   }
 
   Future<void> _discardRun() async {

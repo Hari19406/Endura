@@ -43,11 +43,18 @@ class _YouScreenState extends State<YouScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _selectedWeekStart = _getWeekStart(DateTime.now());
+    _useMiles = UnitUtils.useMilesNotifier.value;
+    UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
     loadData();
+  }
+
+  void _onUnitPrefChanged() {
+    if (mounted) setState(() => _useMiles = UnitUtils.useMilesNotifier.value);
   }
 
   @override
   void dispose() {
+    UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -60,7 +67,6 @@ class _YouScreenState extends State<YouScreen>
     });
 
     try {
-      final useMiles = await UnitUtils.isMiles();
       WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
@@ -120,7 +126,6 @@ class _YouScreenState extends State<YouScreen>
           _newAchievements = newlyUnlocked;
           _runRecords = records;
           _runHistory = runs;
-          _useMiles = useMiles;
           _isLoading = false;
         });
       }

@@ -22,6 +22,7 @@ import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'utils/unit_utils.dart';
 
 Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
   try {
@@ -95,6 +96,7 @@ void main() async {
 
   // Load the saved theme preference before first frame to avoid a flash.
   await ThemeController.instance.load();
+  await UnitUtils.init();
 
   runApp(const MyApp());
 }

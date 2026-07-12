@@ -259,6 +259,8 @@ bool get _hasCooldown =>
     _activeCoachMessage = widget.activeCoachMessage;
     WidgetsBinding.instance.addObserver(this);
     _currentPhase = _hasWarmup ? RunMode.warmup : RunMode.mainSet;
+    _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km';
+    UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
     _loadSettings();
     _checkPermissions();
     _startCompassTracking();
@@ -347,12 +349,17 @@ bool get _hasCooldown =>
       await AudioCueService.instance.initialize(enabled: _voiceCoachingEnabled);
       if (mounted) {
         setState(() {
-          _distanceUnit = prefs.getString('distance_unit') ?? 'km';
           _isFirstRun = (historyJson == null || historyJson.isEmpty);
         });
       }
     } catch (e) {
       debugPrint('Error loading settings: $e');
+    }
+  }
+
+  void _onUnitPrefChanged() {
+    if (mounted) {
+      setState(() => _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km');
     }
   }
 
@@ -1011,6 +1018,7 @@ bool get _hasCooldown =>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
     _timer?.cancel();
     _positionStream?.cancel();
     _warmupStream?.cancel();

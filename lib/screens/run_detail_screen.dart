@@ -15,14 +15,22 @@ class RunDetailScreen extends StatefulWidget {
 }
 
 class _RunDetailScreenState extends State<RunDetailScreen> {
-  bool _useMiles = false;
+  bool _useMiles = UnitUtils.useMilesNotifier.value;
 
   @override
   void initState() {
     super.initState();
-    UnitUtils.isMiles().then((v) {
-      if (mounted) setState(() => _useMiles = v);
-    });
+    UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
+  }
+
+  void _onUnitPrefChanged() {
+    if (mounted) setState(() => _useMiles = UnitUtils.useMilesNotifier.value);
+  }
+
+  @override
+  void dispose() {
+    UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    super.dispose();
   }
 
   String _formatDuration(int seconds) {

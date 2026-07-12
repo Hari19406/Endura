@@ -8,6 +8,7 @@ import '../services/training_days_service.dart';
 import '../services/profile_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/unit_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
@@ -285,6 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         value: _useMetric,
                         onChanged: (value) {
                           setState(() => _useMetric = value);
+                          UnitUtils.setMiles(!value);
                           _saveSettings();
                         },
                       ),

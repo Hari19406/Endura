@@ -31,6 +31,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
+import '../utils/unit_utils.dart';
 
 // Import the shortened onboarding for post-plan re-onboarding.
 import '../onboarding/onboarding_screen.dart' show OnboardingScreen;
@@ -558,6 +559,8 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     _coachEngine = CoachEngine();
+    _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km';
+    UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
   }
 
   @override
@@ -567,6 +570,18 @@ class _HomeScreenState extends State<HomeScreen>
       loadData();
       _isLoaded = true;
     }
+  }
+
+  void _onUnitPrefChanged() {
+    if (mounted) {
+      setState(() => _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km');
+    }
+  }
+
+  @override
+  void dispose() {
+    UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -584,7 +599,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
       if (mounted) {
         setState(() {
-          _distanceUnit = prefs.getString('distance_unit') ?? 'km';
           _userName = name.split(' ').first;
         });
       }

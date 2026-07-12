@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Single source of truth for the user's distance-unit preference.
@@ -5,6 +6,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// screen writes to (`'km'` or `'miles'`).
 class UnitUtils {
   static const String prefsKey = 'distance_unit';
+
+  /// Live value of the unit preference. Seeded by [init] at app startup and
+  /// updated by [setMiles] whenever the user flips the Settings toggle, so
+  /// any screen listening to this notifier updates immediately without
+  /// needing a manual refresh.
+  static final ValueNotifier<bool> useMilesNotifier = ValueNotifier<bool>(false);
+
+  /// Loads the stored preference into [useMilesNotifier]. Call once at app
+  /// startup.
+  static Future<void> init() async {
+    useMilesNotifier.value = await isMiles();
+  }
+
+  /// Persists the preference and updates [useMilesNotifier] so all
+  /// listening screens reflect the change immediately.
+  static Future<void> setMiles(bool useMiles) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(prefsKey, useMiles ? 'miles' : 'km');
+    useMilesNotifier.value = useMiles;
+  }
 
   static Future<bool> isMiles() async {
     final prefs = await SharedPreferences.getInstance();
