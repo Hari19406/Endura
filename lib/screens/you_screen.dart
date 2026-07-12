@@ -139,12 +139,13 @@ class _YouScreenState extends State<YouScreen>
     }
   }
 
-  void _openRunDetail(dynamic run, {dynamic record}) {
-    Navigator.of(context).push(
+  void _openRunDetail(dynamic run, {dynamic record}) async {
+    final deleted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => RunDetailScreen(run: run, record: record),
       ),
     );
+    if (deleted == true) loadData();
   }
 
   void _navigateToSettings() {

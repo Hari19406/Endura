@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
+import '../utils/database_service.dart';
 import '../widgets/run_share_card.dart';
 
 class RunDetailScreen extends StatefulWidget {
@@ -56,6 +57,39 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   String _workoutLabel(String type) => WorkoutTypeStyle.label(type);
 
   Color _workoutColor(String type) => WorkoutTypeStyle.color(type);
+
+  Future<void> _confirmDeleteWorkout() async {
+    final c = context.colors;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: c.surface,
+        title: const Text('Delete workout?'),
+        content: const Text(
+          'This run will be permanently removed from your history. This can\'t be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Delete', style: TextStyle(color: c.danger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final id = widget.record?.id as int?;
+    if (id == null) return;
+
+    await DatabaseService.instance.deleteRun(id);
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  }
 
   List<Map<String, double>> _getGpsPoints() {
     try {
@@ -122,6 +156,13 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.white),
+                onPressed: _confirmDeleteWorkout,
+                tooltip: 'Delete workout',
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
