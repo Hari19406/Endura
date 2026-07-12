@@ -1193,7 +1193,7 @@ bool get _hasCooldown =>
         _buildWelcomeTip('We\'ll track your route'),
         const SizedBox(height: 8),
         _buildWelcomeTip('Pause anytime you need'),
-        if (_targetPaceRange != null) ...[
+        if (_targetPaceRange != null && RevenueCatService.isProNotifier.value) ...[
           const SizedBox(height: 16),
           Container(height: 1, color: c.divider),
           const SizedBox(height: 16),
