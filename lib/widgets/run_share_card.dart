@@ -268,15 +268,13 @@ class _RunShareSheetState extends State<_RunShareSheet> {
               children: [
                 _buildQuickAction(
                   label: 'Instagram',
-                  icon: Icons.camera_alt_outlined,
-                  color: const Color(0xFFE1306C),
+                  asset: 'assets/instagram_logo.png',
                   onTap: () => _shareToApp(
                       SocialShareService.instagramPackage, 'instagram'),
                 ),
                 _buildQuickAction(
                   label: 'WhatsApp',
-                  icon: Icons.chat_outlined,
-                  color: const Color(0xFF25D366),
+                  asset: 'assets/whatsapp_logo.png',
                   onTap: () => _shareToApp(
                       SocialShareService.whatsappPackage, 'whatsapp'),
                 ),
@@ -302,11 +300,13 @@ class _RunShareSheetState extends State<_RunShareSheet> {
 
   Widget _buildQuickAction({
     required String label,
-    required IconData icon,
-    required Color color,
+    IconData? icon,
+    String? asset,
+    Color? color,
     required VoidCallback onTap,
   }) {
     final c = context.colors;
+    final tint = color ?? c.textPrimary;
     return GestureDetector(
       onTap: _busy ? null : onTap,
       child: Opacity(
@@ -317,12 +317,24 @@ class _RunShareSheetState extends State<_RunShareSheet> {
             Container(
               width: 56,
               height: 56,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
-                border: Border.all(color: color.withOpacity(0.35)),
-              ),
-              child: Icon(icon, size: 24, color: color),
+              decoration: asset != null
+                  // Brand logos carry their own color — neutral circle.
+                  ? BoxDecoration(
+                      color: c.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: c.border),
+                    )
+                  : BoxDecoration(
+                      color: tint.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: tint.withOpacity(0.35)),
+                    ),
+              child: asset != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Image.asset(asset, fit: BoxFit.contain),
+                    )
+                  : Icon(icon, size: 24, color: tint),
             ),
             const SizedBox(height: 6),
             Text(
