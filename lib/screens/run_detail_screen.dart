@@ -337,12 +337,20 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
       ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
         children: [
-          Icon(icon, size: 20, color: c.textTertiary),
-          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: c.divider,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: c.textTertiary),
+          ),
+          const SizedBox(width: 14),
           Text(
             label,
             style: TextStyle(
@@ -352,7 +360,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 4),
+          const Spacer(),
           Text(
             value,
             style: TextStyle(
@@ -362,14 +370,20 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               letterSpacing: -0.5,
             ),
           ),
-          if (unit.isNotEmpty)
-            Text(
-              unit,
-              style: TextStyle(
-                fontSize: 11,
-                color: c.textTertiary,
+          if (unit.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text(
+                unit,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: c.textTertiary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
+          ],
         ],
       ),
     );
