@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../services/analytics_service.dart';
+import '../services/social_share_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
@@ -82,15 +83,20 @@ class _RunShareSheetState extends State<_RunShareSheet> {
     return byteData!.buffer.asUint8List();
   }
 
+  Future<File> _writeTempPng() async {
+    final bytes = await _renderPng();
+    final dir = await getTemporaryDirectory();
+    final file = File(
+        '${dir.path}/endura_run_${DateTime.now().millisecondsSinceEpoch}.png');
+    await file.writeAsBytes(bytes);
+    return file;
+  }
+
   Future<void> _share() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final bytes = await _renderPng();
-      final dir = await getTemporaryDirectory();
-      final file = File(
-          '${dir.path}/endura_run_${DateTime.now().millisecondsSinceEpoch}.png');
-      await file.writeAsBytes(bytes);
+      final file = await _writeTempPng();
 
       await Analytics.runShared(
         workoutType: widget.data.workoutType,
@@ -104,6 +110,36 @@ class _RunShareSheetState extends State<_RunShareSheet> {
       ));
     } catch (e) {
       debugPrint('[RunShareSheet] share failed: $e');
+      _showError('Couldn\'t create share image');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Targeted share to a specific app; falls back to the system sheet when
+  /// the app isn't installed.
+  Future<void> _shareToApp(String packageName, String analyticsAction) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final file = await _writeTempPng();
+
+      await Analytics.runShared(
+        workoutType: widget.data.workoutType,
+        source: widget.source,
+        style: _styleName,
+        action: analyticsAction,
+      );
+
+      final opened =
+          await SocialShareService.shareImageTo(file.path, packageName);
+      if (!opened) {
+        await SharePlus.instance.share(ShareParams(
+          files: [XFile(file.path, mimeType: 'image/png')],
+        ));
+      }
+    } catch (e) {
+      debugPrint('[RunShareSheet] targeted share failed: $e');
       _showError('Couldn\'t create share image');
     } finally {
       if (mounted) setState(() => _busy = false);
