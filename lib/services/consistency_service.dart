@@ -42,23 +42,33 @@ class ConsistencyService {
 
     final now = DateTime.now();
 
-    // Runs this week (Mon–Sun)
+    // Runs this week (Mon–Sun) — count unique days run, not raw run rows,
+    // so multiple runs logged on the same day (e.g. a workout + a free run)
+    // only count once toward the weekly target.
     final thisWeekStart = _getWeekStart(now);
-    final runsThisWeek = allRuns
-        .where((r) => r.date.isAfter(thisWeekStart) ||
-            _isSameDay(r.date, thisWeekStart))
-        .length;
+    final daysRunThisWeek = <String>{};
+    for (final r in allRuns) {
+      if (r.date.isAfter(thisWeekStart) || _isSameDay(r.date, thisWeekStart)) {
+        daysRunThisWeek.add('${r.date.year}-${r.date.month}-${r.date.day}');
+      }
+    }
+    final runsThisWeek = daysRunThisWeek.length;
 
     final targetHitThisWeek = runsThisWeek >= weeklyTarget;
 
-    // Build weekly run counts going back up to 52 weeks
-    // key = week start date string, value = run count
-    final Map<String, int> weekCounts = {};
+    // Build weekly run-day counts going back up to 52 weeks — unique days
+    // per week, not raw run rows, for the same reason as above.
+    // key = week start date string, value = set of unique day keys run that week
+    final Map<String, Set<String>> weekDaySets = {};
     for (final run in allRuns) {
       final weekStart = _getWeekStart(run.date);
-      final key = '${weekStart.year}-${weekStart.month}-${weekStart.day}';
-      weekCounts[key] = (weekCounts[key] ?? 0) + 1;
+      final weekKey = '${weekStart.year}-${weekStart.month}-${weekStart.day}';
+      final dayKey = '${run.date.year}-${run.date.month}-${run.date.day}';
+      weekDaySets.putIfAbsent(weekKey, () => <String>{}).add(dayKey);
     }
+    final Map<String, int> weekCounts = weekDaySets.map(
+      (key, days) => MapEntry(key, days.length),
+    );
 
     // Calculate current streak — count consecutive past weeks where target was hit
     // Start from last completed week (not current week)
