@@ -50,10 +50,11 @@ void main() async {
   debugPrint('[Startup] SUPABASE_ANON_KEY length=${supabaseAnonKey.length}');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    runApp(const _StartupErrorApp(
-      message: 'Supabase credentials missing.\n\n'
-          'Run with: flutter run --dart-define-from-file=dart_defines.env',
-    ));
+    const debugMessage = 'Supabase credentials missing.\n\n'
+        'Run with: flutter build/run --dart-define-from-file=dart_defines.env';
+    await FirebaseCrashlytics.instance
+        .recordError(Exception(debugMessage), null, fatal: true);
+    runApp(_StartupErrorApp(debugMessage: debugMessage));
     return;
   }
 
@@ -62,7 +63,8 @@ void main() async {
     debugPrint('[Startup] Supabase initialized successfully');
   } catch (e) {
     debugPrint('[Startup] Supabase.initialize() failed: $e');
-    runApp(_StartupErrorApp(message: 'Supabase init failed:\n$e'));
+    await FirebaseCrashlytics.instance.recordError(e, null, fatal: true);
+    runApp(_StartupErrorApp(debugMessage: 'Supabase init failed:\n$e'));
     return;
   }
 
@@ -98,11 +100,14 @@ void main() async {
 }
 
 class _StartupErrorApp extends StatelessWidget {
-  final String message;
-  const _StartupErrorApp({required this.message});
+  final String debugMessage;
+  const _StartupErrorApp({required this.debugMessage});
 
   @override
   Widget build(BuildContext context) {
+    final displayMessage = kDebugMode
+        ? debugMessage
+        : "We couldn't start Endura. Please try again later.";
     return MaterialApp(
       home: Scaffold(
         backgroundColor: Colors.white,
@@ -115,7 +120,7 @@ class _StartupErrorApp extends StatelessWidget {
                 const Icon(Icons.error_outline, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(
-                  message,
+                  displayMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                 ),
