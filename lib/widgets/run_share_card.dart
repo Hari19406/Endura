@@ -264,62 +264,77 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: _busy ? null : _saveToGallery,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: c.textPrimary,
-                        side: BorderSide(color: c.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      icon: const Icon(Icons.download_outlined, size: 18),
-                      label: const Text(
-                        'Save',
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
+                _buildQuickAction(
+                  label: 'Instagram',
+                  icon: Icons.camera_alt_outlined,
+                  color: const Color(0xFFE1306C),
+                  onTap: () => _shareToApp(
+                      SocialShareService.instagramPackage, 'instagram'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      onPressed: _busy ? null : _share,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: c.accent,
-                        foregroundColor: c.onAccent,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      icon: _busy
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: c.onAccent),
-                            )
-                          : const Icon(Icons.ios_share, size: 18),
-                      label: Text(
-                        _busy ? 'Working…' : 'Share',
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
+                _buildQuickAction(
+                  label: 'WhatsApp',
+                  icon: Icons.chat_outlined,
+                  color: const Color(0xFF25D366),
+                  onTap: () => _shareToApp(
+                      SocialShareService.whatsappPackage, 'whatsapp'),
+                ),
+                _buildQuickAction(
+                  label: 'Save',
+                  icon: Icons.download_outlined,
+                  color: c.textPrimary,
+                  onTap: _saveToGallery,
+                ),
+                _buildQuickAction(
+                  label: 'More',
+                  icon: Icons.ios_share,
+                  color: c.textPrimary,
+                  onTap: _share,
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAction({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final c = context.colors;
+    return GestureDetector(
+      onTap: _busy ? null : onTap,
+      child: Opacity(
+        opacity: _busy ? 0.4 : 1.0,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: color.withOpacity(0.35)),
+              ),
+              child: Icon(icon, size: 24, color: color),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: c.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
