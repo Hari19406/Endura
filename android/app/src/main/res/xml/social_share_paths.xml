@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Share cards are written to the app cache dir (getTemporaryDirectory). -->
+    <cache-path name="share_cache" path="." />
+</paths>
