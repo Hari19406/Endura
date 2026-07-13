@@ -39,11 +39,16 @@ class ShareRunData {
 
 /// Visual style of the exported card.
 /// [transparent] has no background at all — stats and route float on alpha,
-/// for overlaying on the user's own photos/videos (Strava-style).
+/// for overlaying on the user's own photos/videos (Strava-style). Applies to
+/// every [ShareCardTemplate], including [ShareCardTemplate.poster].
 enum ShareCardStyle { classic, transparent }
 
-/// Opens a bottom sheet with a story-format preview of the run card, a style
-/// toggle (dark card / transparent overlay), and Save + Share actions.
+/// Layout of the exported card. All four render at the same story size.
+enum ShareCardTemplate { full, compact, blank, poster }
+
+/// Opens a bottom sheet with a story-format preview of the run card, a
+/// template picker, a style toggle (opaque / transparent), and quick
+/// share/save actions.
 Future<void> showRunShareSheet(
   BuildContext context,
   ShareRunData data, {
@@ -68,11 +73,19 @@ class _RunShareSheet extends StatefulWidget {
 
 class _RunShareSheetState extends State<_RunShareSheet> {
   final GlobalKey _cardKey = GlobalKey();
+  ShareCardTemplate _template = ShareCardTemplate.full;
   ShareCardStyle _style = ShareCardStyle.classic;
   bool _busy = false;
 
   String get _styleName =>
       _style == ShareCardStyle.transparent ? 'transparent' : 'classic';
+
+  String get _templateName => switch (_template) {
+        ShareCardTemplate.full => 'full',
+        ShareCardTemplate.compact => 'compact',
+        ShareCardTemplate.blank => 'blank',
+        ShareCardTemplate.poster => 'poster',
+      };
 
   Future<Uint8List> _renderPng() async {
     final boundary =
@@ -102,6 +115,7 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         workoutType: widget.data.workoutType,
         source: widget.source,
         style: _styleName,
+        template: _templateName,
         action: 'share',
       );
 
@@ -128,6 +142,7 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         workoutType: widget.data.workoutType,
         source: widget.source,
         style: _styleName,
+        template: _templateName,
         action: analyticsAction,
       );
 
@@ -163,6 +178,7 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         workoutType: widget.data.workoutType,
         source: widget.source,
         style: _styleName,
+        template: _templateName,
         action: 'save',
       );
 
@@ -222,13 +238,42 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           ),
           const SizedBox(height: 14),
 
+          // Template picker
+          Center(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildChip('Full', _template == ShareCardTemplate.full,
+                      () => setState(() => _template = ShareCardTemplate.full)),
+                  const SizedBox(width: 8),
+                  _buildChip(
+                      'Compact',
+                      _template == ShareCardTemplate.compact,
+                      () => setState(
+                          () => _template = ShareCardTemplate.compact)),
+                  const SizedBox(width: 8),
+                  _buildChip('Blank', _template == ShareCardTemplate.blank,
+                      () => setState(() => _template = ShareCardTemplate.blank)),
+                  const SizedBox(width: 8),
+                  _buildChip('Poster', _template == ShareCardTemplate.poster,
+                      () => setState(() => _template = ShareCardTemplate.poster)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
           // Style toggle
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildStyleChip('Dark card', ShareCardStyle.classic),
+              _buildChip('Opaque', _style == ShareCardStyle.classic,
+                  () => setState(() => _style = ShareCardStyle.classic)),
               const SizedBox(width: 8),
-              _buildStyleChip('Transparent', ShareCardStyle.transparent),
+              _buildChip('Transparent', _style == ShareCardStyle.transparent,
+                  () => setState(() => _style = ShareCardStyle.transparent)),
             ],
           ),
           const SizedBox(height: 14),
@@ -246,7 +291,11 @@ class _RunShareSheetState extends State<_RunShareSheet> {
                       isTransparent ? _CheckerboardPainter() : null,
                   child: RepaintBoundary(
                     key: _cardKey,
-                    child: RunShareCard(data: widget.data, style: _style),
+                    child: RunShareCard(
+                      data: widget.data,
+                      template: _template,
+                      style: _style,
+                    ),
                   ),
                 ),
               ),
@@ -351,14 +400,13 @@ class _RunShareSheetState extends State<_RunShareSheet> {
     );
   }
 
-  Widget _buildStyleChip(String label, ShareCardStyle style) {
+  Widget _buildChip(String label, bool selected, VoidCallback onTap) {
     final c = context.colors;
-    final selected = _style == style;
     return GestureDetector(
-      onTap: () => setState(() => _style = style),
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? c.accent : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
@@ -377,20 +425,31 @@ class _RunShareSheetState extends State<_RunShareSheet> {
   }
 }
 
-/// The story-format (9:16) card itself. Always dark regardless of app theme —
-/// it's a branded export, not an in-app surface. The [ShareCardStyle.transparent]
-/// variant drops the background entirely so the PNG keeps its alpha channel.
+/// The story-format (9:16) card itself. Always uses its own fixed palette
+/// regardless of app theme — it's a branded export, not an in-app surface.
+/// [ShareCardStyle.transparent] drops the background entirely (any template)
+/// so the exported PNG keeps its alpha channel; text/route colors stay put
+/// so legibility is the user's call based on what they overlay it on.
 class RunShareCard extends StatelessWidget {
   final ShareRunData data;
+  final ShareCardTemplate template;
   final ShareCardStyle style;
+
   const RunShareCard({
     super.key,
     required this.data,
+    this.template = ShareCardTemplate.full,
     this.style = ShareCardStyle.classic,
   });
 
   static const double width = 360;
   static const double height = 640;
+
+  static const Color _darkBg = Color(0xFF0A0A0A);
+  static const Color _posterBg = Color(0xFFF3EFE6);
+  static const Color _posterInk = Color(0xFF2A2620);
+  static const Color _posterInkMuted = Color(0xFF8C8577);
+  static const Color _posterAccent = Color(0xFFE2531A);
 
   String _formatDuration(int seconds) {
     final h = seconds ~/ 3600;
@@ -414,18 +473,24 @@ class RunShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wColor = WorkoutTypeStyle.color(data.workoutType);
-    final distanceValue =
-        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
-    final hasRoute = data.gpsPoints.length > 1;
     final isTransparent = style == ShareCardStyle.transparent;
+    final isPoster = template == ShareCardTemplate.poster;
+    final background = isTransparent ? null : (isPoster ? _posterBg : _darkBg);
+
+    final content = switch (template) {
+      ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
+      ShareCardTemplate.compact => _buildCompactContent(),
+      ShareCardTemplate.blank => _buildBlankContent(),
+      ShareCardTemplate.poster => _buildPosterContent(),
+    };
 
     return Container(
       width: width,
       height: height,
-      color: isTransparent ? null : const Color(0xFF0A0A0A),
+      color: background,
       child: Stack(
         children: [
-          if (!isTransparent)
+          if (template == ShareCardTemplate.full && !isTransparent)
             // Subtle brand glow behind the route.
             Positioned.fill(
               child: DecoratedBox(
@@ -443,139 +508,112 @@ class RunShareCard extends StatelessWidget {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header — wordmark + workout chip
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'ENDURA',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 5,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: wColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: wColor.withOpacity(0.5)),
-                      ),
-                      child: Text(
-                        WorkoutTypeStyle.label(data.workoutType).toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: wColor,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _formatDate(data.date),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-
-                // Route trace
-                Expanded(
-                  child: hasRoute
-                      ? CustomPaint(
-                          size: Size.infinite,
-                          painter: _ShareRoutePainter(
-                            points: data.gpsPoints,
-                          ),
-                        )
-                      : isTransparent
-                          ? const SizedBox.expand()
-                          : const Center(
-                              child: Icon(
-                                Icons.directions_run,
-                                color: Colors.white12,
-                                size: 110,
-                              ),
-                            ),
-                ),
-
-                // Hero distance
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      distanceValue.toStringAsFixed(2),
-                      style: const TextStyle(
-                        fontSize: 62,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -2,
-                        height: 1.0,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      UnitUtils.unitLabel(data.useMiles),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white54,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Secondary stats
-                Row(
-                  children: [
-                    _buildStat(
-                      'AVG PACE',
-                      UnitUtils.formatPaceString(
-                          data.averagePace, data.useMiles),
-                      UnitUtils.perUnitLabel(data.useMiles),
-                    ),
-                    const SizedBox(width: 36),
-                    if (data.durationSeconds > 0)
-                      _buildStat(
-                          'TIME', _formatDuration(data.durationSeconds), ''),
-                  ],
-                ),
-                const SizedBox(height: 28),
-
-                // Footer
-                Row(
-                  children: [
-                    Icon(Icons.directions_run, size: 13, color: wColor),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'COACHED BY MAX',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white38,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            child: content,
           ),
         ],
       ),
+    );
+  }
+
+  // ── Full — route trace + hero distance ──────────────────────────────────
+
+  Widget _buildFullContent(Color wColor, bool isTransparent) {
+    final hasRoute = data.gpsPoints.length > 1;
+    final distanceValue =
+        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ENDURA',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _formatDate(data.date),
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white54,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: hasRoute
+              ? CustomPaint(
+                  size: Size.infinite,
+                  painter: _ShareRoutePainter(points: data.gpsPoints),
+                )
+              : isTransparent
+                  ? const SizedBox.expand()
+                  : const Center(
+                      child: Icon(
+                        Icons.directions_run,
+                        color: Colors.white12,
+                        size: 110,
+                      ),
+                    ),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              distanceValue.toStringAsFixed(2),
+              style: const TextStyle(
+                fontSize: 62,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: -2,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              UnitUtils.unitLabel(data.useMiles),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white54,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            _buildStat(
+              'AVG PACE',
+              UnitUtils.formatPaceString(data.averagePace, data.useMiles),
+              UnitUtils.perUnitLabel(data.useMiles),
+            ),
+            const SizedBox(width: 36),
+            if (data.durationSeconds > 0)
+              _buildStat('TIME', _formatDuration(data.durationSeconds), ''),
+          ],
+        ),
+        const SizedBox(height: 28),
+        Row(
+          children: [
+            Icon(Icons.directions_run, size: 13, color: wColor),
+            const SizedBox(width: 6),
+            const Text(
+              'COACHED BY MAX',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white38,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -622,13 +660,298 @@ class RunShareCard extends StatelessWidget {
       ],
     );
   }
+
+  // ── Compact — stacked stats, no route, no dividers ──────────────────────
+
+  Widget _buildCompactContent() {
+    final distanceValue =
+        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ENDURA',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 5,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          '${distanceValue.toStringAsFixed(2)}${UnitUtils.unitLabel(data.useMiles)} ${WorkoutTypeStyle.label(data.workoutType)}',
+          style: const TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _formatDate(data.date),
+          style: const TextStyle(
+            fontSize: 11,
+            color: Colors.white54,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const Expanded(child: SizedBox()),
+        _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
+            UnitUtils.unitLabel(data.useMiles)),
+        const SizedBox(height: 18),
+        _buildCompactStat(
+            'PACE',
+            UnitUtils.formatPaceString(data.averagePace, data.useMiles),
+            UnitUtils.perUnitLabel(data.useMiles)),
+        if (data.durationSeconds > 0) ...[
+          const SizedBox(height: 18),
+          _buildCompactStat('TIME', _formatDuration(data.durationSeconds), ''),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCompactStat(String label, String value, String unit) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.white38,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.5,
+              ),
+            ),
+            if (unit.isNotEmpty) ...[
+              const SizedBox(width: 5),
+              Text(
+                unit,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.white38,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Blank — centered mark, stats pinned low ─────────────────────────────
+
+  Widget _buildBlankContent() {
+    final distanceValue =
+        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Center(
+            child: Text(
+              'E',
+              style: TextStyle(
+                fontSize: 96,
+                fontWeight: FontWeight.w900,
+                color: Colors.white.withOpacity(0.12),
+                letterSpacing: 8,
+              ),
+            ),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildBlankStat('DISTANCE',
+                '${distanceValue.toStringAsFixed(2)}${UnitUtils.unitLabel(data.useMiles)}'),
+            _buildBlankStat('PACE',
+                '${UnitUtils.formatPaceString(data.averagePace, data.useMiles)}${UnitUtils.perUnitLabel(data.useMiles)}'),
+            if (data.durationSeconds > 0)
+              _buildBlankStat('TIME', _formatDuration(data.durationSeconds)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBlankStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.white54,
+            letterSpacing: 1.3,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Poster — light ground, one bold route stroke ────────────────────────
+
+  Widget _buildPosterContent() {
+    final hasRoute = data.gpsPoints.length > 1;
+    final distanceValue =
+        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            const Text(
+              'ENDURA',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: _posterInk,
+                letterSpacing: 3,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              _formatDate(data.date),
+              style: const TextStyle(
+                fontSize: 11,
+                color: _posterInkMuted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        Expanded(
+          child: hasRoute
+              ? CustomPaint(
+                  size: Size.infinite,
+                  painter: _ShareRoutePainter(
+                    points: data.gpsPoints,
+                    color: _posterAccent,
+                    strokeWidth: 9,
+                  ),
+                )
+              : const SizedBox.expand(),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'DISTANCE',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: _posterInkMuted,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      distanceValue.toStringAsFixed(2),
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: _posterInk,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      UnitUtils.unitLabel(data.useMiles),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _posterInkMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'PACE',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: _posterInkMuted,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${UnitUtils.formatPaceString(data.averagePace, data.useMiles)}${UnitUtils.perUnitLabel(data.useMiles)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _posterInk,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
-/// Clean white route trace on a transparent background.
+/// Route trace on a transparent background. White by default; [color] and
+/// [strokeWidth] let the poster template draw a heavier, colored stroke.
 class _ShareRoutePainter extends CustomPainter {
   final List<Map<String, double>> points;
+  final Color color;
+  final double strokeWidth;
 
-  const _ShareRoutePainter({required this.points});
+  const _ShareRoutePainter({
+    required this.points,
+    this.color = Colors.white,
+    this.strokeWidth = 3,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -675,8 +998,8 @@ class _ShareRoutePainter extends CustomPainter {
     }
 
     final linePaint = Paint()
-      ..color = Colors.white.withOpacity(0.95)
-      ..strokeWidth = 3
+      ..color = color.withOpacity(0.95)
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
@@ -684,7 +1007,10 @@ class _ShareRoutePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ShareRoutePainter oldDelegate) => false;
+  bool shouldRepaint(_ShareRoutePainter oldDelegate) =>
+      oldDelegate.points != points ||
+      oldDelegate.color != color ||
+      oldDelegate.strokeWidth != strokeWidth;
 }
 
 /// Grey checkerboard shown behind the transparent preview so the user can

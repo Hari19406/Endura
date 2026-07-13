@@ -115,12 +115,14 @@ class Analytics {
     required String workoutType,
     required String source,
     String style = 'classic',
+    String template = 'full',
     String action = 'share',
   }) =>
       capture('run_shared', properties: {
         'workout_type': workoutType,
         'source': source,
         'style': style,
+        'template': template,
         'action': action,
       });
 
