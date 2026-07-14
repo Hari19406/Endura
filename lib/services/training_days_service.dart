@@ -10,6 +10,7 @@ import 'engine_state_sync_service.dart';
 
 class TrainingDaysService {
   static const _key = 'training_day_indices';
+  static const _updatedAtKey = 'training_day_indices_updated_at';
 
   /// Smart defaults keyed by runs-per-week count.
   /// Patterns try to:
@@ -46,11 +47,21 @@ class TrainingDaysService {
     return (await load()) ?? defaultsFor(fallbackCount);
   }
 
+  /// Local last-write timestamp, used to decide (against the cloud's
+  /// `updatedAt`) which copy is newer when reconciling across devices.
+  static Future<DateTime?> loadUpdatedAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_updatedAtKey);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
   /// Persists the training day indices.
   static Future<void> save(List<int> indices, {bool syncToCloud = true}) async {
     final prefs = await SharedPreferences.getInstance();
     final sorted = [...indices]..sort();
     await prefs.setString(_key, jsonEncode(sorted));
+    await prefs.setString(_updatedAtKey, DateTime.now().toUtc().toIso8601String());
     if (syncToCloud) {
       await EngineStateSyncService.instance.syncTrainingDays(sorted);
     }

@@ -49,15 +49,34 @@ class EngineStateSyncService {
 
   /// Refreshes the auth session once and returns both engine memory and
   /// training days — avoids two round-trips when both are needed together.
-  Future<({EngineMemory? memory, List<int>? trainingDays})> fetchCloudCoachingState() async {
+  Future<({
+    EngineMemory? memory,
+    DateTime? memoryUpdatedAt,
+    List<int>? trainingDays,
+    DateTime? trainingDaysUpdatedAt,
+  })> fetchCloudCoachingState() async {
     try {
       await _client.auth.refreshSession();
     } catch (_) {}
     final metadata = _user?.userMetadata;
     return (
       memory: _parseEngineMemory(metadata),
+      memoryUpdatedAt: _parseUpdatedAt(metadata, _engineMemoryKey),
       trainingDays: _parseTrainingDays(metadata),
+      trainingDaysUpdatedAt: _parseUpdatedAt(metadata, _trainingDaysKey),
     );
+  }
+
+  DateTime? _parseUpdatedAt(Map<String, dynamic>? metadata, String key) {
+    try {
+      final raw = metadata?[key];
+      if (raw is! Map) return null;
+      final ts = raw['updatedAt'];
+      if (ts is! String) return null;
+      return DateTime.tryParse(ts);
+    } catch (_) {
+      return null;
+    }
   }
 
   EngineMemory? _parseEngineMemory(Map<String, dynamic>? metadata) {

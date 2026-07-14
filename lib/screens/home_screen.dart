@@ -923,18 +923,39 @@ class _HomeScreenState extends State<HomeScreen>
     final cloudMemory = cloudState.memory;
     final cloudDays = cloudState.trainingDays;
 
+    // ── Training days: last-write-wins by timestamp, with the old
+    // "local is empty" rule kept as a fallback for devices that predate
+    // the updatedAt tracking (no local timestamp recorded yet). ─────────
     final localDays = await TrainingDaysService.load();
+    final localDaysUpdatedAt = await TrainingDaysService.loadUpdatedAt();
+    final cloudDaysNewer = cloudDays != null &&
+        (localDaysUpdatedAt == null ||
+            (cloudState.trainingDaysUpdatedAt?.isAfter(localDaysUpdatedAt) ?? false));
     if (cloudDays != null &&
-        (localDays == null || !_intListsEqual(localDays, cloudDays))) {
+        (localDays == null || !_intListsEqual(localDays, cloudDays)) &&
+        (cloudDaysNewer || localDays == null)) {
       await TrainingDaysService.save(cloudDays, syncToCloud: false);
-    } else if (cloudDays == null && localDays != null && localDays.isNotEmpty) {
+    } else if (localDays != null &&
+        (cloudDays == null || !_intListsEqual(localDays, cloudDays)) &&
+        !cloudDaysNewer) {
       await EngineStateSyncService.instance.syncTrainingDays(localDays);
     }
 
+    // ── Engine memory (active plan, vDOT, race plan, etc.): same
+    // last-write-wins policy so a device that already has local state
+    // (e.g. a dev simulator) still picks up a newer plan pushed from
+    // another device, instead of being stuck forever on its own copy. ──
     final localMemory = await EngineMemoryService().load();
-    if (cloudMemory != null && _shouldRestoreCloudMemory(localMemory)) {
+    final localMemoryUpdatedAt = await EngineMemoryService().loadUpdatedAt();
+    final cloudMemoryNewer = cloudMemory != null &&
+        (localMemoryUpdatedAt == null ||
+            (cloudState.memoryUpdatedAt?.isAfter(localMemoryUpdatedAt) ?? false));
+    final shouldRestoreCloudMemory =
+        cloudMemory != null && (cloudMemoryNewer || _shouldRestoreCloudMemory(localMemory));
+
+    if (shouldRestoreCloudMemory) {
       await EngineMemoryService().save(cloudMemory, syncToCloud: false);
-    } else if (cloudMemory == null && !_shouldRestoreCloudMemory(localMemory)) {
+    } else if (!cloudMemoryNewer) {
       await EngineStateSyncService.instance.syncEngineMemory(localMemory);
     }
   }

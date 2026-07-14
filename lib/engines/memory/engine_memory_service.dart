@@ -11,6 +11,7 @@ import '../../services/engine_state_sync_service.dart';
 
 class EngineMemoryService {
   static const String _key = 'engine_memory_v2';
+  static const String _updatedAtKey = 'engine_memory_v2_updated_at';
 
   Future<EngineMemory> load() async {
     try {
@@ -25,9 +26,19 @@ class EngineMemoryService {
     }
   }
 
+  /// Local last-write timestamp, used to decide (against the cloud's
+  /// `updatedAt`) which copy is newer when reconciling across devices.
+  Future<DateTime?> loadUpdatedAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_updatedAtKey);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
   Future<void> save(EngineMemory memory, {bool syncToCloud = true}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(memory.toJson()));
+    await prefs.setString(_updatedAtKey, DateTime.now().toUtc().toIso8601String());
     if (syncToCloud) {
       await EngineStateSyncService.instance.syncEngineMemory(memory);
     }
