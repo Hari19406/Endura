@@ -489,7 +489,7 @@ class RunShareCard extends StatelessWidget {
 
     final content = switch (template) {
       ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
-      ShareCardTemplate.compact => _buildCompactContent(),
+      ShareCardTemplate.compact => _buildCompactContent(isTransparent),
       ShareCardTemplate.blank => _buildBlankContent(isTransparent),
       ShareCardTemplate.poster => _buildPosterContent(),
     };
@@ -669,28 +669,63 @@ class RunShareCard extends StatelessWidget {
     );
   }
 
-  // ── Compact — stacked stats, no route, no dividers ──────────────────────
+  // ── Compact — route on top, stats centered, wordmark on bottom ──────────
 
-  Widget _buildCompactContent() {
+  Widget _buildCompactContent(bool isTransparent) {
+    final hasRoute = data.gpsPoints.length > 1;
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Expanded(
+          flex: 3,
+          child: hasRoute
+              ? CustomPaint(
+                  size: Size.infinite,
+                  painter: _ShareRoutePainter(
+                    points: data.gpsPoints,
+                    color: _mapBlue,
+                  ),
+                )
+              : isTransparent
+                  ? const SizedBox.expand()
+                  : const Center(
+                      child: Icon(
+                        Icons.directions_run,
+                        color: Colors.white12,
+                        size: 90,
+                      ),
+                    ),
+        ),
+        Expanded(
+          flex: 4,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
+                    UnitUtils.unitLabel(data.useMiles)),
+                const SizedBox(height: 20),
+                _buildCompactStat(
+                    'PACE',
+                    UnitUtils.formatPaceString(
+                        data.averagePace, data.useMiles),
+                    UnitUtils.perUnitLabel(data.useMiles)),
+                if (data.durationSeconds > 0) ...[
+                  const SizedBox(height: 20),
+                  _buildCompactStat(
+                      'TIME', _formatDuration(data.durationSeconds), ''),
+                ],
+              ],
+            ),
+          ),
+        ),
         Text(
           'ENDURA',
           style: _wordmarkStyle.copyWith(color: Colors.white),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          '${distanceValue.toStringAsFixed(2)}${UnitUtils.unitLabel(data.useMiles)} ${WorkoutTypeStyle.label(data.workoutType)}',
-          style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            height: 1.25,
-          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -701,25 +736,13 @@ class RunShareCard extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        const Expanded(child: SizedBox()),
-        _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
-            UnitUtils.unitLabel(data.useMiles)),
-        const SizedBox(height: 18),
-        _buildCompactStat(
-            'PACE',
-            UnitUtils.formatPaceString(data.averagePace, data.useMiles),
-            UnitUtils.perUnitLabel(data.useMiles)),
-        if (data.durationSeconds > 0) ...[
-          const SizedBox(height: 18),
-          _buildCompactStat('TIME', _formatDuration(data.durationSeconds), ''),
-        ],
       ],
     );
   }
 
   Widget _buildCompactStat(String label, String value, String unit) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
@@ -732,6 +755,7 @@ class RunShareCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Row(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
