@@ -633,7 +633,7 @@ class RunShareCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: Colors.white54,
+                color: Colors.white,
               ),
             ),
           ],
@@ -680,7 +680,7 @@ class RunShareCard extends StatelessWidget {
           style: const TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.w700,
-            color: Colors.white38,
+            color: Colors.white,
             letterSpacing: 1.5,
           ),
         ),
@@ -704,7 +704,7 @@ class RunShareCard extends StatelessWidget {
                 unit,
                 style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.white38,
+                  color: Colors.white,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -775,7 +775,7 @@ class RunShareCard extends StatelessWidget {
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: Colors.white38,
+            color: Colors.white,
             letterSpacing: 1.5,
           ),
         ),
@@ -800,7 +800,7 @@ class RunShareCard extends StatelessWidget {
                 unit,
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.white38,
+                  color: Colors.white,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -855,7 +855,7 @@ class RunShareCard extends StatelessWidget {
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: Colors.white54,
+            color: Colors.white,
             letterSpacing: 1.3,
           ),
         ),
