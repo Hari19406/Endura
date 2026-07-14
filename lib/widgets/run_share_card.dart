@@ -482,6 +482,44 @@ class RunShareCard extends StatelessWidget {
     letterSpacing: 3,
   );
 
+  /// Route trace capped to a fixed box and centered in whatever space the
+  /// template gives it — so a long thin out-and-back doesn't blow up to
+  /// fill the whole card while a tight loop looks tiny. Same fixed size on
+  /// every template regardless of container/route shape.
+  Widget _buildRouteBox({
+    required bool isTransparent,
+    required double boxWidth,
+    required double boxHeight,
+    double strokeWidth = 3,
+    bool showPlaceholderIcon = true,
+  }) {
+    final hasRoute = data.gpsPoints.length > 1;
+    if (!hasRoute) {
+      if (isTransparent || !showPlaceholderIcon) return const SizedBox.expand();
+      return Center(
+        child: Icon(
+          Icons.directions_run,
+          color: Colors.white12,
+          size: boxWidth * 0.5,
+        ),
+      );
+    }
+    return Center(
+      child: SizedBox(
+        width: boxWidth,
+        height: boxHeight,
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: _ShareRoutePainter(
+            points: data.gpsPoints,
+            color: _mapBlue,
+            strokeWidth: strokeWidth,
+          ),
+        ),
+      ),
+    );
+  }
+
   String _formatDuration(int seconds) {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
@@ -512,7 +550,7 @@ class RunShareCard extends StatelessWidget {
       ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
       ShareCardTemplate.compact => _buildCompactContent(isTransparent),
       ShareCardTemplate.blank => _buildBlankContent(isTransparent),
-      ShareCardTemplate.poster => _buildPosterContent(),
+      ShareCardTemplate.poster => _buildPosterContent(isTransparent),
     };
 
     return Container(
@@ -549,7 +587,6 @@ class RunShareCard extends StatelessWidget {
   // ── Full — route trace + hero distance ──────────────────────────────────
 
   Widget _buildFullContent(Color wColor, bool isTransparent) {
-    final hasRoute = data.gpsPoints.length > 1;
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
 
@@ -570,23 +607,11 @@ class RunShareCard extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: hasRoute
-              ? CustomPaint(
-                  size: Size.infinite,
-                  painter: _ShareRoutePainter(
-                    points: data.gpsPoints,
-                    color: _mapBlue,
-                  ),
-                )
-              : isTransparent
-                  ? const SizedBox.expand()
-                  : const Center(
-                      child: Icon(
-                        Icons.directions_run,
-                        color: Colors.white12,
-                        size: 110,
-                      ),
-                    ),
+          child: _buildRouteBox(
+            isTransparent: isTransparent,
+            boxWidth: 220,
+            boxHeight: 220,
+          ),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -693,7 +718,6 @@ class RunShareCard extends StatelessWidget {
   // ── Compact — route on top, stats centered, wordmark on bottom ──────────
 
   Widget _buildCompactContent(bool isTransparent) {
-    final hasRoute = data.gpsPoints.length > 1;
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
 
@@ -702,23 +726,11 @@ class RunShareCard extends StatelessWidget {
       children: [
         Expanded(
           flex: 3,
-          child: hasRoute
-              ? CustomPaint(
-                  size: Size.infinite,
-                  painter: _ShareRoutePainter(
-                    points: data.gpsPoints,
-                    color: _mapBlue,
-                  ),
-                )
-              : isTransparent
-                  ? const SizedBox.expand()
-                  : const Center(
-                      child: Icon(
-                        Icons.directions_run,
-                        color: Colors.white12,
-                        size: 90,
-                      ),
-                    ),
+          child: _buildRouteBox(
+            isTransparent: isTransparent,
+            boxWidth: 150,
+            boxHeight: 150,
+          ),
         ),
         Expanded(
           flex: 4,
@@ -804,7 +816,6 @@ class RunShareCard extends StatelessWidget {
   Widget _buildBlankContent(bool isTransparent) {
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
-    final hasRoute = data.gpsPoints.length > 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,23 +825,11 @@ class RunShareCard extends StatelessWidget {
           style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
         Expanded(
-          child: hasRoute
-              ? CustomPaint(
-                  size: Size.infinite,
-                  painter: _ShareRoutePainter(
-                    points: data.gpsPoints,
-                    color: _mapBlue,
-                  ),
-                )
-              : isTransparent
-                  ? const SizedBox.expand()
-                  : const Center(
-                      child: Icon(
-                        Icons.directions_run,
-                        color: Colors.white12,
-                        size: 110,
-                      ),
-                    ),
+          child: _buildRouteBox(
+            isTransparent: isTransparent,
+            boxWidth: 220,
+            boxHeight: 220,
+          ),
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -875,8 +874,7 @@ class RunShareCard extends StatelessWidget {
 
   // ── Poster — light ground, one bold route stroke ────────────────────────
 
-  Widget _buildPosterContent() {
-    final hasRoute = data.gpsPoints.length > 1;
+  Widget _buildPosterContent(bool isTransparent) {
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
 
@@ -903,16 +901,13 @@ class RunShareCard extends StatelessWidget {
           ],
         ),
         Expanded(
-          child: hasRoute
-              ? CustomPaint(
-                  size: Size.infinite,
-                  painter: _ShareRoutePainter(
-                    points: data.gpsPoints,
-                    color: _mapBlue,
-                    strokeWidth: 9,
-                  ),
-                )
-              : const SizedBox.expand(),
+          child: _buildRouteBox(
+            isTransparent: isTransparent,
+            boxWidth: 230,
+            boxHeight: 320,
+            strokeWidth: 9,
+            showPlaceholderIcon: false,
+          ),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
