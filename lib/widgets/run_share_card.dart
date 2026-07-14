@@ -72,7 +72,13 @@ class _RunShareSheet extends StatefulWidget {
 }
 
 class _RunShareSheetState extends State<_RunShareSheet> {
-  final GlobalKey _cardKey = GlobalKey();
+  // One RepaintBoundary key per template — the PageView can keep neighboring
+  // pages built for caching, so a single shared GlobalKey would collide.
+  final Map<ShareCardTemplate, GlobalKey> _cardKeys = {
+    for (final t in ShareCardTemplate.values) t: GlobalKey(),
+  };
+  late final PageController _pageController =
+      PageController(initialPage: ShareCardTemplate.values.indexOf(_template));
   ShareCardTemplate _template = ShareCardTemplate.full;
   ShareCardStyle _style = ShareCardStyle.classic;
   bool _busy = false;
@@ -87,9 +93,22 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         ShareCardTemplate.poster => 'poster',
       };
 
+  String get _templateLabel => switch (_template) {
+        ShareCardTemplate.full => 'Full',
+        ShareCardTemplate.compact => 'Compact',
+        ShareCardTemplate.blank => 'Blank',
+        ShareCardTemplate.poster => 'Poster',
+      };
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   Future<Uint8List> _renderPng() async {
-    final boundary =
-        _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final boundary = _cardKeys[_template]!.currentContext!.findRenderObject()
+        as RenderRepaintBoundary;
     // 360x640 logical * 3 = 1080x1920, native story resolution.
     final image = await boundary.toImage(pixelRatio: 3.0);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -238,33 +257,6 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           ),
           const SizedBox(height: 14),
 
-          // Template picker
-          Center(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildChip('Full', _template == ShareCardTemplate.full,
-                      () => setState(() => _template = ShareCardTemplate.full)),
-                  const SizedBox(width: 8),
-                  _buildChip(
-                      'Compact',
-                      _template == ShareCardTemplate.compact,
-                      () => setState(
-                          () => _template = ShareCardTemplate.compact)),
-                  const SizedBox(width: 8),
-                  _buildChip('Blank', _template == ShareCardTemplate.blank,
-                      () => setState(() => _template = ShareCardTemplate.blank)),
-                  const SizedBox(width: 8),
-                  _buildChip('Poster', _template == ShareCardTemplate.poster,
-                      () => setState(() => _template = ShareCardTemplate.poster)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
           // Style toggle
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -278,34 +270,62 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           ),
           const SizedBox(height: 14),
 
+          // Swipeable template carousel
           SizedBox(
             height: previewHeight,
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                // Checkerboard sits OUTSIDE the RepaintBoundary so the
-                // exported PNG keeps its alpha channel.
-                child: CustomPaint(
-                  painter:
-                      isTransparent ? _CheckerboardPainter() : null,
-                  child: RepaintBoundary(
-                    key: _cardKey,
-                    child: RunShareCard(
-                      data: widget.data,
-                      template: _template,
-                      style: _style,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: ShareCardTemplate.values.length,
+              onPageChanged: (i) =>
+                  setState(() => _template = ShareCardTemplate.values[i]),
+              itemBuilder: (context, i) {
+                final t = ShareCardTemplate.values[i];
+                return Center(
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      // Checkerboard sits OUTSIDE the RepaintBoundary so the
+                      // exported PNG keeps its alpha channel.
+                      child: CustomPaint(
+                        painter: isTransparent ? _CheckerboardPainter() : null,
+                        child: RepaintBoundary(
+                          key: _cardKeys[t],
+                          child: RunShareCard(
+                            data: widget.data,
+                            template: t,
+                            style: _style,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
+          ),
+          const SizedBox(height: 10),
+
+          // Page dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (final t in ShareCardTemplate.values)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: t == _template ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: t == _template ? c.accent : c.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
-            isTransparent
-                ? 'No background — overlay it on your own photo or video'
-                : 'Ready to post as-is',
+            '$_templateLabel · ${isTransparent ? 'transparent overlay' : 'ready to post as-is'}',
             style: TextStyle(fontSize: 11, color: c.textTertiary),
           ),
           const SizedBox(height: 14),
