@@ -482,10 +482,11 @@ class RunShareCard extends StatelessWidget {
     letterSpacing: 3,
   );
 
-  /// Route trace capped to a fixed box and centered in whatever space the
-  /// template gives it — so a long thin out-and-back doesn't blow up to
-  /// fill the whole card while a tight loop looks tiny. Same fixed size on
-  /// every template regardless of container/route shape.
+  /// Route trace capped to a fixed box — a long thin out-and-back doesn't
+  /// blow up to fill the whole card, a tight loop doesn't look tiny. Always
+  /// returns a fixed-footprint widget (never `Expanded`/`.expand()`-based),
+  /// so it's safe to drop straight into a `Center`-ed, shrink-wrapped
+  /// Column (Compact) as well as inside an `Expanded` (Full/Blank/Poster).
   Widget _buildRouteBox({
     required bool isTransparent,
     required double boxWidth,
@@ -494,30 +495,28 @@ class RunShareCard extends StatelessWidget {
     bool showPlaceholderIcon = true,
   }) {
     final hasRoute = data.gpsPoints.length > 1;
-    if (!hasRoute) {
-      if (isTransparent || !showPlaceholderIcon) return const SizedBox.expand();
-      return Center(
+    Widget inner;
+    if (hasRoute) {
+      inner = CustomPaint(
+        size: Size.infinite,
+        painter: _ShareRoutePainter(
+          points: data.gpsPoints,
+          color: _mapBlue,
+          strokeWidth: strokeWidth,
+        ),
+      );
+    } else if (showPlaceholderIcon && !isTransparent) {
+      inner = Center(
         child: Icon(
           Icons.directions_run,
           color: Colors.white12,
           size: boxWidth * 0.5,
         ),
       );
+    } else {
+      inner = const SizedBox.shrink();
     }
-    return Center(
-      child: SizedBox(
-        width: boxWidth,
-        height: boxHeight,
-        child: CustomPaint(
-          size: Size.infinite,
-          painter: _ShareRoutePainter(
-            points: data.gpsPoints,
-            color: _mapBlue,
-            strokeWidth: strokeWidth,
-          ),
-        ),
-      ),
-    );
+    return SizedBox(width: boxWidth, height: boxHeight, child: inner);
   }
 
   String _formatDuration(int seconds) {
@@ -548,7 +547,7 @@ class RunShareCard extends StatelessWidget {
 
     final content = switch (template) {
       ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
-      ShareCardTemplate.compact => _buildCompactContent(),
+      ShareCardTemplate.compact => _buildCompactContent(isTransparent),
       ShareCardTemplate.blank => _buildBlankContent(isTransparent),
       ShareCardTemplate.poster => _buildPosterContent(isTransparent),
     };
@@ -607,10 +606,12 @@ class RunShareCard extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: _buildRouteBox(
-            isTransparent: isTransparent,
-            boxWidth: 220,
-            boxHeight: 220,
+          child: Center(
+            child: _buildRouteBox(
+              isTransparent: isTransparent,
+              boxWidth: 220,
+              boxHeight: 220,
+            ),
           ),
         ),
         Row(
@@ -717,36 +718,46 @@ class RunShareCard extends StatelessWidget {
 
   // ── Compact — wordmark + date header, stats stacked at the bottom ───────
 
-  Widget _buildCompactContent() {
+  Widget _buildCompactContent(bool isTransparent) {
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ENDURA',
-          style: _wordmarkStyle.copyWith(color: Colors.white),
-        ),
-        const Expanded(child: SizedBox()),
-        _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
-            UnitUtils.unitLabel(data.useMiles)),
-        const SizedBox(height: 10),
-        _buildCompactStat(
-            'PACE',
-            UnitUtils.formatPaceString(data.averagePace, data.useMiles),
-            UnitUtils.perUnitLabel(data.useMiles)),
-        if (data.durationSeconds > 0) ...[
-          const SizedBox(height: 10),
-          _buildCompactStat('TIME', _formatDuration(data.durationSeconds), ''),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildRouteBox(
+            isTransparent: isTransparent,
+            boxWidth: 170,
+            boxHeight: 170,
+          ),
+          const SizedBox(height: 24),
+          _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
+              UnitUtils.unitLabel(data.useMiles)),
+          const SizedBox(height: 14),
+          _buildCompactStat(
+              'PACE',
+              UnitUtils.formatPaceString(data.averagePace, data.useMiles),
+              UnitUtils.perUnitLabel(data.useMiles)),
+          if (data.durationSeconds > 0) ...[
+            const SizedBox(height: 14),
+            _buildCompactStat(
+                'TIME', _formatDuration(data.durationSeconds), ''),
+          ],
+          const SizedBox(height: 28),
+          Text(
+            'ENDURA',
+            style: _wordmarkStyle.copyWith(color: Colors.white),
+          ),
         ],
-      ],
+      ),
     );
   }
 
   Widget _buildCompactStat(String label, String value, String unit) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
@@ -759,6 +770,7 @@ class RunShareCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Row(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
@@ -802,10 +814,12 @@ class RunShareCard extends StatelessWidget {
           style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
         Expanded(
-          child: _buildRouteBox(
-            isTransparent: isTransparent,
-            boxWidth: 220,
-            boxHeight: 220,
+          child: Center(
+            child: _buildRouteBox(
+              isTransparent: isTransparent,
+              boxWidth: 220,
+              boxHeight: 220,
+            ),
           ),
         ),
         Row(
@@ -863,12 +877,14 @@ class RunShareCard extends StatelessWidget {
           style: _wordmarkStyle.copyWith(color: _posterInk),
         ),
         Expanded(
-          child: _buildRouteBox(
-            isTransparent: isTransparent,
-            boxWidth: 230,
-            boxHeight: 320,
-            strokeWidth: 9,
-            showPlaceholderIcon: false,
+          child: Center(
+            child: _buildRouteBox(
+              isTransparent: isTransparent,
+              boxWidth: 230,
+              boxHeight: 320,
+              strokeWidth: 9,
+              showPlaceholderIcon: false,
+            ),
           ),
         ),
         Row(
