@@ -744,17 +744,10 @@ class RunShareCard extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          'ENDURA',
-          style: _wordmarkStyle.copyWith(color: Colors.white),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _formatDate(data.date),
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.white54,
-            fontWeight: FontWeight.w500,
+        Center(
+          child: Text(
+            'ENDURA',
+            style: _wordmarkStyle.copyWith(color: Colors.white),
           ),
         ),
       ],
