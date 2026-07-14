@@ -490,7 +490,7 @@ class RunShareCard extends StatelessWidget {
     final content = switch (template) {
       ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
       ShareCardTemplate.compact => _buildCompactContent(),
-      ShareCardTemplate.blank => _buildBlankContent(),
+      ShareCardTemplate.blank => _buildBlankContent(isTransparent),
       ShareCardTemplate.poster => _buildPosterContent(),
     };
 
@@ -761,11 +761,12 @@ class RunShareCard extends StatelessWidget {
     );
   }
 
-  // ── Blank — wordmark header, empty middle, stats pinned low ─────────────
+  // ── Blank — wordmark header, route trace, stats pinned low ──────────────
 
-  Widget _buildBlankContent() {
+  Widget _buildBlankContent(bool isTransparent) {
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+    final hasRoute = data.gpsPoints.length > 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,7 +775,25 @@ class RunShareCard extends StatelessWidget {
           'ENDURA',
           style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
-        const Expanded(child: SizedBox()),
+        Expanded(
+          child: hasRoute
+              ? CustomPaint(
+                  size: Size.infinite,
+                  painter: _ShareRoutePainter(
+                    points: data.gpsPoints,
+                    color: _mapBlue,
+                  ),
+                )
+              : isTransparent
+                  ? const SizedBox.expand()
+                  : const Center(
+                      child: Icon(
+                        Icons.directions_run,
+                        color: Colors.white12,
+                        size: 110,
+                      ),
+                    ),
+        ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
