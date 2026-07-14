@@ -449,7 +449,17 @@ class RunShareCard extends StatelessWidget {
   static const Color _posterBg = Color(0xFFF3EFE6);
   static const Color _posterInk = Color(0xFF2A2620);
   static const Color _posterInkMuted = Color(0xFF8C8577);
-  static const Color _posterAccent = Color(0xFFE2531A);
+
+  /// The app's own blue (same as WorkoutTypeStyle's "long run" color) — used
+  /// for the route trace on every template, not just Poster.
+  static const Color _mapBlue = Color(0xFF1976D2);
+
+  /// Shared big/bold wordmark treatment used at the top of every template.
+  static const TextStyle _wordmarkStyle = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w900,
+    letterSpacing: 3,
+  );
 
   String _formatDuration(int seconds) {
     final h = seconds ~/ 3600;
@@ -525,16 +535,11 @@ class RunShareCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'ENDURA',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: 5,
-          ),
+          style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           _formatDate(data.date),
           style: const TextStyle(
@@ -547,7 +552,10 @@ class RunShareCard extends StatelessWidget {
           child: hasRoute
               ? CustomPaint(
                   size: Size.infinite,
-                  painter: _ShareRoutePainter(points: data.gpsPoints),
+                  painter: _ShareRoutePainter(
+                    points: data.gpsPoints,
+                    color: _mapBlue,
+                  ),
                 )
               : isTransparent
                   ? const SizedBox.expand()
@@ -670,14 +678,9 @@ class RunShareCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'ENDURA',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: 5,
-          ),
+          style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
         const SizedBox(height: 18),
         Text(
@@ -758,7 +761,7 @@ class RunShareCard extends StatelessWidget {
     );
   }
 
-  // ── Blank — centered mark, stats pinned low ─────────────────────────────
+  // ── Blank — wordmark header, empty middle, stats pinned low ─────────────
 
   Widget _buildBlankContent() {
     final distanceValue =
@@ -767,19 +770,11 @@ class RunShareCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Center(
-            child: Text(
-              'E',
-              style: TextStyle(
-                fontSize: 96,
-                fontWeight: FontWeight.w900,
-                color: Colors.white.withOpacity(0.12),
-                letterSpacing: 8,
-              ),
-            ),
-          ),
+        Text(
+          'ENDURA',
+          style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
+        const Expanded(child: SizedBox()),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -835,14 +830,9 @@ class RunShareCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            const Text(
+            Text(
               'ENDURA',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                color: _posterInk,
-                letterSpacing: 3,
-              ),
+              style: _wordmarkStyle.copyWith(color: _posterInk),
             ),
             const Spacer(),
             Text(
@@ -861,7 +851,7 @@ class RunShareCard extends StatelessWidget {
                   size: Size.infinite,
                   painter: _ShareRoutePainter(
                     points: data.gpsPoints,
-                    color: _posterAccent,
+                    color: _mapBlue,
                     strokeWidth: 9,
                   ),
                 )
