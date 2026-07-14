@@ -548,7 +548,7 @@ class RunShareCard extends StatelessWidget {
 
     final content = switch (template) {
       ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
-      ShareCardTemplate.compact => _buildCompactContent(isTransparent),
+      ShareCardTemplate.compact => _buildCompactContent(),
       ShareCardTemplate.blank => _buildBlankContent(isTransparent),
       ShareCardTemplate.poster => _buildPosterContent(isTransparent),
     };
@@ -715,60 +715,47 @@ class RunShareCard extends StatelessWidget {
     );
   }
 
-  // ── Compact — route on top, stats centered, wordmark on bottom ──────────
+  // ── Compact — wordmark + date header, stats stacked at the bottom ───────
 
-  Widget _buildCompactContent(bool isTransparent) {
+  Widget _buildCompactContent() {
     final distanceValue =
         UnitUtils.displayDistance(data.distanceKm, data.useMiles);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 3,
-          child: _buildRouteBox(
-            isTransparent: isTransparent,
-            boxWidth: 150,
-            boxHeight: 150,
+        Text(
+          'ENDURA',
+          style: _wordmarkStyle.copyWith(color: Colors.white),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _formatDate(data.date),
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white54,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        Expanded(
-          flex: 4,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
-                    UnitUtils.unitLabel(data.useMiles)),
-                const SizedBox(height: 20),
-                _buildCompactStat(
-                    'PACE',
-                    UnitUtils.formatPaceString(
-                        data.averagePace, data.useMiles),
-                    UnitUtils.perUnitLabel(data.useMiles)),
-                if (data.durationSeconds > 0) ...[
-                  const SizedBox(height: 20),
-                  _buildCompactStat(
-                      'TIME', _formatDuration(data.durationSeconds), ''),
-                ],
-              ],
-            ),
-          ),
-        ),
-        Center(
-          child: Text(
-            'ENDURA',
-            style: _wordmarkStyle.copyWith(color: Colors.white),
-          ),
-        ),
+        const Expanded(child: SizedBox()),
+        _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
+            UnitUtils.unitLabel(data.useMiles)),
+        const SizedBox(height: 10),
+        _buildCompactStat(
+            'PACE',
+            UnitUtils.formatPaceString(data.averagePace, data.useMiles),
+            UnitUtils.perUnitLabel(data.useMiles)),
+        if (data.durationSeconds > 0) ...[
+          const SizedBox(height: 10),
+          _buildCompactStat('TIME', _formatDuration(data.durationSeconds), ''),
+        ],
       ],
     );
   }
 
   Widget _buildCompactStat(String label, String value, String unit) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -781,7 +768,6 @@ class RunShareCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Row(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
