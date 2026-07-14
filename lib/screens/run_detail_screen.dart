@@ -117,32 +117,61 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: SizedBox(
         width: MediaQuery.of(context).size.width - 48,
-        height: 54,
-        child: FloatingActionButton.extended(
-          onPressed: () => showRunShareSheet(
-            context,
-            ShareRunData(
-              distanceKm: distance,
-              averagePace: pace,
-              durationSeconds: duration,
-              date: date,
-              workoutType: workoutType,
-              gpsPoints: gpsPoints,
-              useMiles: _useMiles,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 54,
+              width: double.infinity,
+              child: FloatingActionButton.extended(
+                onPressed: () => showRunShareSheet(
+                  context,
+                  ShareRunData(
+                    distanceKm: distance,
+                    averagePace: pace,
+                    durationSeconds: duration,
+                    date: date,
+                    workoutType: workoutType,
+                    gpsPoints: gpsPoints,
+                    useMiles: _useMiles,
+                  ),
+                  source: 'run_detail',
+                ),
+                backgroundColor: context.colors.accent,
+                foregroundColor: context.colors.onAccent,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                icon: const Icon(Icons.ios_share, size: 20),
+                label: const Text(
+                  'Share',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
             ),
-            source: 'run_detail',
-          ),
-          backgroundColor: context.colors.accent,
-          foregroundColor: context.colors.onAccent,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          icon: const Icon(Icons.ios_share, size: 20),
-          label: const Text(
-            'Share',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 54,
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _confirmDeleteWorkout,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: context.colors.surface,
+                  foregroundColor: context.colors.danger,
+                  side: BorderSide(color: context.colors.danger.withOpacity(0.5)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.delete_outline, size: 20),
+                label: const Text(
+                  'Delete workout',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       body: CustomScrollView(
@@ -156,13 +185,6 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.white),
-                onPressed: _confirmDeleteWorkout,
-                tooltip: 'Delete workout',
-              ),
-            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
@@ -308,8 +330,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       unit: 'kcal',
                     ),
                   ),
-                  // Clearance for the floating Share button.
-                  const SizedBox(height: 96),
+                  // Clearance for the floating Share + Delete buttons.
+                  const SizedBox(height: 156),
                 ],
               ),
             ),
