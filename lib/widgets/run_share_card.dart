@@ -728,15 +728,6 @@ class RunShareCard extends StatelessWidget {
           'ENDURA',
           style: _wordmarkStyle.copyWith(color: Colors.white),
         ),
-        const SizedBox(height: 8),
-        Text(
-          _formatDate(data.date),
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white54,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
         const Expanded(child: SizedBox()),
         _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
             UnitUtils.unitLabel(data.useMiles)),
@@ -867,24 +858,9 @@ class RunShareCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              'ENDURA',
-              style: _wordmarkStyle.copyWith(color: _posterInk),
-            ),
-            const Spacer(),
-            Text(
-              _formatDate(data.date),
-              style: const TextStyle(
-                fontSize: 11,
-                color: _posterInkMuted,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        Text(
+          'ENDURA',
+          style: _wordmarkStyle.copyWith(color: _posterInk),
         ),
         Expanded(
           child: _buildRouteBox(
