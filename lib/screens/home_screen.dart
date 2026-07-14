@@ -609,8 +609,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool _cloudRestoreAttempted = false;
 
-  Future<void> _restoreFromCloudIfNeeded() async {
-    if (_cloudRestoreAttempted) return;
+  Future<void> _restoreFromCloudIfNeeded({bool force = false}) async {
+    if (_cloudRestoreAttempted && !force) return;
     _cloudRestoreAttempted = true;
     try {
       await CloudSyncService.instance.downloadAndRestoreRuns();
@@ -621,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   @override
-  Future<void> loadData() async {
+  Future<void> loadData({bool forceCloudRestore = false}) async {
     debugPrint('HomeScreen loadData() started');
     if (_isFetching) {
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -638,7 +638,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     try {
       await EngineMemoryService().migrateFirstRunDateIfNeeded();
-      await Future.wait([_restoreFromCloudIfNeeded(), _loadSettings()]);
+      await Future.wait([_restoreFromCloudIfNeeded(force: forceCloudRestore), _loadSettings()]);
       await _restoreCloudCoachingState();
       await _hydrateLocalProfileFromCloud();
       CloudSyncService.instance.syncPendingRuns();
@@ -1268,7 +1268,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildDashboardContent() {
     return RefreshIndicator(
       color: context.colors.accent,
-      onRefresh: loadData,
+      onRefresh: () => loadData(forceCloudRestore: true),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Padding(
