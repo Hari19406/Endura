@@ -261,7 +261,7 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildChip('Opaque', _style == ShareCardStyle.classic,
+              _buildChip('Solid', _style == ShareCardStyle.classic,
                   () => setState(() => _style = ShareCardStyle.classic)),
               const SizedBox(width: 8),
               _buildChip('Transparent', _style == ShareCardStyle.transparent,
@@ -470,9 +470,10 @@ class RunShareCard extends StatelessWidget {
   static const Color _posterInk = Color(0xFF2A2620);
   static const Color _posterInkMuted = Color(0xFF8C8577);
 
-  /// The app's own blue (same as WorkoutTypeStyle's "long run" color) — used
-  /// for the route trace on every template, not just Poster.
-  static const Color _mapBlue = Color(0xFF1976D2);
+  /// Endura's actual brand color (same value as AppColors.chartAccent and
+  /// the paywall's brand accent) — used for the route trace on every
+  /// template, not just Poster.
+  static const Color _mapBlue = Color(0xFF00E5CC);
 
   /// Shared big/bold wordmark treatment used at the top of every template.
   static const TextStyle _wordmarkStyle = TextStyle(
