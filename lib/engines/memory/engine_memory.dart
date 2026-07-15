@@ -51,11 +51,15 @@ class RpeEntry {
 class EngineMemory {
   static const int maxRecentTemplateIds = 14;
 
-  /// Schema version — bumped to 7 for ladder position tracking.
-  static const int _schemaVersion = 7;
+  /// Schema version — bumped to 8 for vdotAtPlanStart drift anchor.
+  static const int _schemaVersion = 8;
 
   final int vdotScore;
   final bool vdotIsProvisional;
+  /// vDOT snapshotted whenever a new race plan is saved. Anchors the
+  /// per-plan drift cap in EngineRuntime so weekly nudges can't compound
+  /// into an unrealistic score over the life of one plan.
+  final int? vdotAtPlanStart;
   final WorkoutType lastCompletedType;
   final WorkoutType? lastNonRecoveryType;
   final List<RpeEntry> recentRpeEntries;
@@ -106,6 +110,7 @@ class EngineMemory {
   const EngineMemory({
     this.vdotScore = 40,
     this.vdotIsProvisional = true,
+    this.vdotAtPlanStart,
     this.lastCompletedType = WorkoutType.easy,
     this.lastNonRecoveryType,
     this.recentRpeEntries = const [],
@@ -220,6 +225,7 @@ class EngineMemory {
         '_schemaVersion': _schemaVersion,
         'vdotScore': vdotScore,
         'vdotIsProvisional': vdotIsProvisional,
+        'vdotAtPlanStart': vdotAtPlanStart,
         'lastCompletedType': lastCompletedType.name,
         'lastNonRecoveryType': lastNonRecoveryType?.name,
         'recentRpeValues': recentRpeEntries.map((e) => e.toJson()).toList(),
@@ -343,6 +349,7 @@ class EngineMemory {
       return EngineMemory(
         vdotScore: parsedVdot.clamp(30, 85),
         vdotIsProvisional: parsedProvisional,
+        vdotAtPlanStart: (json['vdotAtPlanStart'] as num?)?.toInt(),
         lastCompletedType: WorkoutTypeX.fromString(
           (json['lastCompletedType'] as String?) ?? 'easy',
         ),
@@ -395,6 +402,8 @@ class EngineMemory {
   EngineMemory copyWith({
     int? vdotScore,
     bool? vdotIsProvisional,
+    int? vdotAtPlanStart,
+    bool clearVdotAtPlanStart = false,
     WorkoutType? lastCompletedType,
     WorkoutType? lastNonRecoveryType,
     bool clearLastNonRecovery = false,
@@ -447,6 +456,9 @@ class EngineMemory {
     return EngineMemory(
       vdotScore: vdotScore ?? this.vdotScore,
       vdotIsProvisional: vdotIsProvisional ?? this.vdotIsProvisional,
+      vdotAtPlanStart: clearVdotAtPlanStart
+          ? null
+          : (vdotAtPlanStart ?? this.vdotAtPlanStart),
       lastCompletedType: lastCompletedType ?? this.lastCompletedType,
       lastNonRecoveryType: clearLastNonRecovery
           ? null

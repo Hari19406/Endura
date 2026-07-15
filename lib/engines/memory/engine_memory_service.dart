@@ -172,7 +172,12 @@ class EngineMemoryService {
 
   Future<void> saveRacePlan(RacePlan plan) async {
     final current = await load();
-    await save(current.copyWith(racePlan: plan));
+    // Snapshot vDOT at the moment a plan starts, so weekly nudges over the
+    // life of this plan can be capped to a realistic total drift.
+    await save(current.copyWith(
+      racePlan: plan,
+      vdotAtPlanStart: current.vdotScore,
+    ));
   }
 
   Future<void> clearRacePlan() async {

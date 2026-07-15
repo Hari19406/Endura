@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../memory/engine_memory_service.dart';
 import '../memory/engine_memory.dart';
@@ -75,20 +76,29 @@ class EngineRuntime {
         final resolvedDecision = weeklyProgressionDecision ??
             _computeDecisionFromMemory(updated);
 
-        // Fold the weekly training-adaptation signal into the pending nudge so
-        // vDOT drifts upward after sustained progress even when the runner hits
-        // prescribed paces exactly (pace-only calibration requires outrunning
-        // the prescription to fire).
-        final decisionNudge = resolvedDecision == ProgressionDecision.progress
-            ? 1
-            : resolvedDecision == ProgressionDecision.regress
-                ? -1
-                : 0;
-
+        // vDOT moves only on real pace evidence (pendingVdotNudge, banked by
+        // _calibrateVdot from actual-vs-expected pace). Adherence/consistency
+        // (resolvedDecision) still drives training-load progression elsewhere
+        // (volume scaling, template tier) but no longer inflates the fitness
+        // score by itself — showing up isn't proof of getting faster.
         final pacePending = updated.pendingVdotNudge;
-        final totalNudge = (pacePending + decisionNudge).clamp(-3, 3);
-        final appliedNudge = totalNudge.clamp(-1, 1);
-        final newVdot = (updated.vdotScore + appliedNudge).clamp(30, 85);
+        final appliedNudge = pacePending.clamp(-1, 1);
+
+        // Bound total drift within this plan to a physiologically realistic
+        // amount, scaled to how many weeks the plan actually spans, so small
+        // weekly nudges can't compound into an unrealistic pace prescription
+        // over a long plan.
+        final planWeeks = updated.racePlan?.weeks.length;
+        final anchor = updated.vdotAtPlanStart ?? updated.vdotScore;
+        final driftCap =
+            planWeeks != null ? math.max(3, (planWeeks / 2).ceil()) : null;
+
+        final vdotBeforeEval = updated.vdotScore;
+        var newVdot = vdotBeforeEval + appliedNudge;
+        if (driftCap != null) {
+          newVdot = newVdot.clamp(anchor - driftCap, anchor + driftCap);
+        }
+        newVdot = newVdot.clamp(30, 85);
 
         updated = updated.copyWith(
           lastProgressionEvaluationDate: runDate,
@@ -99,8 +109,8 @@ class EngineRuntime {
         );
 
         debugPrint(
-          '[EngineRuntime] Weekly eval: vDOT ${updated.vdotScore - appliedNudge} → $newVdot '
-          '(pacePending=$pacePending decisionNudge=$decisionNudge applied=$appliedNudge) '
+          '[EngineRuntime] Weekly eval: vDOT $vdotBeforeEval → $newVdot '
+          '(pacePending=$pacePending applied=$appliedNudge driftCap=$driftCap anchor=$anchor) '
           'progression=${resolvedDecision.name}',
         );
 
