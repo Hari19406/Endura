@@ -663,7 +663,9 @@ class _HomeScreenState extends State<HomeScreen>
 
       // ── Populate post-plan display fields ────────────────────────────────
       final prefs = await SharedPreferences.getInstance();
-      _vdotBeforePlan = prefs.getInt('vdot_before_plan') ?? memory.vdotScore;
+      _vdotBeforePlan = memory.vdotAtPlanStart ??
+          prefs.getInt('vdot_before_plan') ??
+          memory.vdotScore;
       _completedRaceLabel = _raceLabel(prefs.getString('goal_race') ?? '5k');
       _planTotalKm = runs.fold(0.0, (sum, r) => sum + r.distance);
 
