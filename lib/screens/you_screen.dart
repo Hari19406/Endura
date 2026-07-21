@@ -11,6 +11,8 @@ import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
+import '../widgets/achievement_tile.dart';
+import 'milestones_screen.dart';
 
 
 class YouScreen extends StatefulWidget {
@@ -680,16 +682,13 @@ class _YouScreenState extends State<YouScreen>
     );
   }
 
-  Widget _buildMilestonesCard() {
-    final List<achieve.Achievement> sortedAchievements =
-        List.from(_achievements)
-          ..sort((a, b) {
-            final int tierCompare = b.tier.compareTo(a.tier);
-            if (tierCompare != 0) return tierCompare;
-            return b.unlockedAt.compareTo(a.unlockedAt);
-          });
+  static const int _milestonesPreviewCount = 3;
 
+  Widget _buildMilestonesCard() {
+    final sortedAchievements = sortAchievements(_achievements);
+    final preview = sortedAchievements.take(_milestonesPreviewCount).toList();
     final c = context.colors;
+
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
@@ -700,112 +699,54 @@ class _YouScreenState extends State<YouScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'MILESTONES',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: c.textTertiary,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...sortedAchievements.asMap().entries.map((entry) {
-            final int index = entry.key;
-            final achievement = entry.value;
-            return Container(
-              margin: EdgeInsets.only(
-                  bottom: index < sortedAchievements.length - 1 ? 12 : 0),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: c.background,
-                border: Border.all(color: c.divider),
-                borderRadius: BorderRadius.circular(8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'MILESTONES',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: c.textTertiary,
+                  letterSpacing: 1.2,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+              if (sortedAchievements.length > _milestonesPreviewCount)
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MilestonesScreen(achievements: _achievements),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          achievement.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: c.textPrimary,
-                          ),
+                      Text(
+                        'See all',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: c.accent,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _buildTierBadge(achievement.tier),
+                      Icon(Icons.chevron_right, size: 16, color: c.accent),
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    achievement.description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textSecondary,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _formatAchievementDate(achievement.unlockedAt),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: c.textFaint,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...preview.asMap().entries.map((entry) {
+            final index = entry.key;
+            return AchievementTile(
+              achievement: entry.value,
+              margin: EdgeInsets.only(bottom: index < preview.length - 1 ? 12 : 0),
             );
           }),
         ],
       ),
     );
-  }
-
-  Widget _buildTierBadge(int tier) {
-    final (Color bg, Color text, String label) = switch (tier) {
-      1 => (const Color(0xFFF0997B), const Color(0xFF4A1B0C), 'Bronze'),
-      2 => (const Color(0xFFD3D1C7), const Color(0xFF444441), 'Silver'),
-      3 => (const Color(0xFFFAC775), const Color(0xFF412402), 'Gold'),
-      4 => (const Color(0xFFCECBF6), const Color(0xFF26215C), 'Platinum'),
-      _ => (const Color(0xFFE8E8E8), const Color(0xFF666666), 'Bronze'),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: text,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-
-  String _formatAchievementDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date).inDays;
-    if (diff == 0) return 'Earned today';
-    if (diff == 1) return 'Earned yesterday';
-    if (diff < 30) return 'Earned $diff days ago';
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return 'Earned ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   Widget _buildTrainingStatusCard() {
