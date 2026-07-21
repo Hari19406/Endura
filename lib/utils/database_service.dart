@@ -20,6 +20,13 @@ class RunRecord {
   final double? csValueAtTime;
   // ── RPE (1–10). Null until the user rates the run. ──────────────────────
   final int? rpe;
+  // ── Elevation gain in meters, accumulated from GPS altitude during the
+  // main-set phase only (matches distanceKm/durationSeconds scope). 0 for
+  // runs recorded before this field existed. ─────────────────────────────
+  final double elevationGain;
+  // ── Per-km splits as [{'km': 1, 'seconds': 320}, ...], main-set only.
+  // Empty for runs recorded before this field existed or under 1km. ──────
+  final List<Map<String, dynamic>> splits;
 
   const RunRecord({
     this.id,
@@ -32,6 +39,8 @@ class RunRecord {
     this.syncedToCloud = false,
     this.csValueAtTime,
     this.rpe,
+    this.elevationGain = 0,
+    this.splits = const [],
   });
 
   Map<String, dynamic> toMap() => {
@@ -47,6 +56,8 @@ class RunRecord {
         // rpe is intentionally omitted when null so SQLite keeps DEFAULT NULL
         // and existing rows are never accidentally zeroed out.
         if (rpe != null) 'rpe': rpe,
+        'elevation_gain': elevationGain,
+        'splits_json': jsonEncode(splits),
       };
 
   factory RunRecord.fromMap(Map<String, dynamic> map) => RunRecord(
@@ -63,7 +74,18 @@ class RunRecord {
             : null,
         // Safe cast: column may not exist on very old DB rows returned as null
         rpe: map['rpe'] as int?,
+        elevationGain: (map['elevation_gain'] as num?)?.toDouble() ?? 0,
+        splits: _decodeSplits(map['splits_json'] as String?),
       );
+
+  static List<Map<String, dynamic>> _decodeSplits(String? json) {
+    if (json == null || json.isEmpty) return [];
+    try {
+      return (jsonDecode(json) as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
 
   /// Converts to RunHistory for consumption by home / you screens.
   /// rpe and durationSeconds are now forwarded correctly.
@@ -163,8 +185,9 @@ class DatabaseService {
       // v3 → added rpe
       // v4 → added skip_counts
       // v5 → added achievements
+      // v6 → added elevation_gain, splits_json
       // ────────────────────────────────────────────────────────────────────
-      version: 5,
+      version: 6,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -178,7 +201,9 @@ class DatabaseService {
             workout_type      TEXT    NOT NULL DEFAULT 'easy',
             synced_to_cloud   INTEGER NOT NULL DEFAULT 0,
             cs_value_at_time  REAL,
-            rpe               INTEGER
+            rpe               INTEGER,
+            elevation_gain    REAL    NOT NULL DEFAULT 0,
+            splits_json       TEXT    NOT NULL DEFAULT '[]'
           )
         ''');
         await db.execute('''
@@ -262,6 +287,22 @@ class DatabaseService {
             ''');
           } catch (e) {
             debugPrint('[DB] achievements already exists, skipping: $e');
+          }
+        }
+
+        if (oldVersion < 6) {
+          // v5 → v6: elevation_gain, splits_json
+          try {
+            await db.execute(
+                'ALTER TABLE runs ADD COLUMN elevation_gain REAL NOT NULL DEFAULT 0');
+          } catch (e) {
+            debugPrint('[DB] elevation_gain already exists, skipping: $e');
+          }
+          try {
+            await db.execute(
+                "ALTER TABLE runs ADD COLUMN splits_json TEXT NOT NULL DEFAULT '[]'");
+          } catch (e) {
+            debugPrint('[DB] splits_json already exists, skipping: $e');
           }
         }
       },

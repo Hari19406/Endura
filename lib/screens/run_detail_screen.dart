@@ -52,7 +52,27 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         '${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
   }
 
-  int _estimateCalories(double distanceKm) => (distanceKm * 65).round();
+  // MET-based estimate (assumes 70kg — we don't collect user weight yet).
+  // Faster paces burn more per hour than the old flat distance*65 formula
+  // captured, since MET scales with speed, not just distance.
+  int _estimateCalories(double distanceKm, int durationSeconds) {
+    if (durationSeconds <= 0 || distanceKm <= 0) return 0;
+    final speedKmh = distanceKm / (durationSeconds / 3600);
+    final met = speedKmh >= 16
+        ? 16.0
+        : speedKmh >= 14
+            ? 14.5
+            : speedKmh >= 12
+                ? 12.8
+                : speedKmh >= 10
+                    ? 11.0
+                    : speedKmh >= 8
+                        ? 9.8
+                        : 7.0;
+    const assumedWeightKg = 70.0;
+    final hours = durationSeconds / 3600;
+    return (met * assumedWeightKg * hours).round();
+  }
 
   String _workoutLabel(String type) => WorkoutTypeStyle.label(type);
 
@@ -108,7 +128,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final date = widget.run.date as DateTime;
     final duration = widget.record?.durationSeconds as int? ?? 0;
     final workoutType = widget.record?.workoutType as String? ?? 'easy';
-    final calories = _estimateCalories(distance);
+    final calories = _estimateCalories(distance, duration);
+    final elevationGain = (widget.record?.elevationGain as num?)?.toDouble() ?? 0;
+    final splits = (widget.record?.splits as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final wColor = _workoutColor(workoutType);
     final gpsPoints = _getGpsPoints();
 
@@ -320,16 +342,37 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                   const SizedBox(height: 16),
 
                   // Secondary stats
-                  SizedBox(
-                    width: double.infinity,
-                    child: _buildSecondaryCard(
-                      context,
-                      icon: Icons.local_fire_department_outlined,
-                      label: 'CALORIES',
-                      value: '$calories',
-                      unit: 'kcal',
+                  Container(
+                    decoration: BoxDecoration(
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.colors.border),
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        _buildStat(
+                          context,
+                          label: 'CALORIES',
+                          value: '$calories',
+                          unit: 'kcal',
+                        ),
+                        _buildDivider(context),
+                        _buildStat(
+                          context,
+                          label: 'ELEVATION',
+                          value: elevationGain > 0
+                              ? elevationGain.round().toString()
+                              : '—',
+                          unit: elevationGain > 0 ? 'm gain' : '',
+                        ),
+                      ],
                     ),
                   ),
+                  if (splits.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildSplitsCard(context, splits),
+                  ],
                   // Clearance for the floating Share + Delete buttons.
                   const SizedBox(height: 156),
                 ],
@@ -394,36 +437,26 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     );
   }
 
-  Widget _buildSecondaryCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-    required String unit,
-  }) {
+  // Splits are always shown in km — capture happens in km increments
+  // regardless of the display unit toggle, so mixing units here would
+  // require re-deriving split boundaries we didn't record.
+  Widget _buildSplitsCard(BuildContext context, List<Map<String, dynamic>> splits) {
     final c = context.colors;
+    final secondsList = splits.map((s) => s['seconds'] as int).toList();
+    final minSec = secondsList.reduce(math.min);
+    final maxSec = secondsList.reduce(math.max);
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: c.divider,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 20, color: c.textTertiary),
-          ),
-          const SizedBox(width: 14),
           Text(
-            label,
+            'SPLITS (KM)',
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
@@ -431,30 +464,47 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               letterSpacing: 1.2,
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: c.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          if (unit.isNotEmpty) ...[
-            const SizedBox(width: 4),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 3),
-              child: Text(
-                unit,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: c.textTertiary,
-                  fontWeight: FontWeight.w500,
-                ),
+          const SizedBox(height: 14),
+          ...splits.map((s) {
+            final km = s['km'] as int;
+            final secs = s['seconds'] as int;
+            final frac = maxSec == minSec ? 1.0 : (maxSec - secs) / (maxSec - minSec);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Text(
+                      '$km',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: 0.15 + frac * 0.85,
+                        minHeight: 8,
+                        backgroundColor: c.divider,
+                        valueColor: AlwaysStoppedAnimation<Color>(c.accent),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            );
+          }),
         ],
       ),
     );

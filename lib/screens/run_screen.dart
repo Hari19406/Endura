@@ -95,6 +95,12 @@ class _RunScreenState extends State<RunScreen> with WidgetsBindingObserver, Tick
   bool _voiceCoachingEnabled = false;
   int _lastAnnouncedKm = 0;
 
+  // ── Elevation + splits (main-set phase only, matches saved distance/duration) ──
+  double _elevationGainM = 0.0;
+  double? _lastAltitudeForGain;
+  final List<Map<String, dynamic>> _splits = [];
+  int _lastSplitKm = 0;
+
   double _deviceHeading = 0.0;
 
   DateTime? _lastGPSUpdate;
@@ -606,6 +612,10 @@ bool get _hasCooldown =>
         _capturedMainSeconds = 0;
         _capturedMainPace = '--:--';
         _capturedMainRoute = [];
+        _elevationGainM = 0.0;
+        _lastAltitudeForGain = null;
+        _splits.clear();
+        _lastSplitKm = 0;
       });
     }
 
@@ -648,6 +658,15 @@ bool get _hasCooldown =>
           final smoothedLat = _kalmanLat.filter(position.latitude);
           final smoothedLng = _kalmanLng.filter(position.longitude);
           final LatLng newPoint = LatLng(smoothedLat, smoothedLng);
+
+          if (_currentPhase == RunMode.mainSet) {
+            if (_lastAltitudeForGain != null) {
+              final altDelta = position.altitude - _lastAltitudeForGain!;
+              // Ignore sub-noise deltas and improbable spikes from GPS jitter.
+              if (altDelta > 0.5 && altDelta < 15) _elevationGainM += altDelta;
+            }
+            _lastAltitudeForGain = position.altitude;
+          }
 
           if (_lastPosition != null) {
             final double distanceInMeters = Geolocator.distanceBetween(_lastPosition!.latitude, _lastPosition!.longitude, position.latitude, position.longitude);
@@ -693,6 +712,13 @@ bool get _hasCooldown =>
                 if (kmCompleted > _lastAnnouncedKm && kmCompleted > 0) {
                   _lastAnnouncedKm = kmCompleted;
                   AudioCueService.instance.announceKilometre(kmCompleted: kmCompleted, paceString: _paceSnapshot.formattedAverage, elapsedSeconds: _seconds);
+                }
+                if (_currentPhase == RunMode.mainSet) {
+                  final phaseKm = (_phaseDistanceM / 1000).floor();
+                  if (phaseKm > _lastSplitKm) {
+                    _lastSplitKm = phaseKm;
+                    _splits.add({'km': phaseKm, 'seconds': _phaseElapsedSeconds});
+                  }
                 }
                 _checkPhaseMilestone();
               } else {
@@ -867,6 +893,14 @@ bool get _hasCooldown =>
         final polyline = encodeRouteToPolyline(
           _capturedMainRoute.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
         );
+        // Convert cumulative km markers into per-split durations for storage.
+        final capturedSplits = <Map<String, dynamic>>[];
+        int prevSplitSeconds = 0;
+        for (final s in _splits) {
+          final cumSeconds = s['seconds'] as int;
+          capturedSplits.add({'km': s['km'], 'seconds': cumSeconds - prevSplitSeconds});
+          prevSplitSeconds = cumSeconds;
+        }
         final newRun = RunRecord(
           distanceKm: _capturedMainDistanceM / 1000,
           averagePace: _capturedMainPace,
@@ -874,6 +908,8 @@ bool get _hasCooldown =>
           date: runDate,
           routePolyline: polyline,
           workoutType: capturedWorkoutType,
+          elevationGain: _elevationGainM,
+          splits: capturedSplits,
         );
         await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then((r) => debugPrint('Sync: $r'));
@@ -958,6 +994,10 @@ bool get _hasCooldown =>
         _mainPhaseStartDistanceM = _distance;
         _currentPhase = RunMode.mainSet;
         _phaseMilestoneReached = false;
+        _elevationGainM = 0.0;
+        _lastAltitudeForGain = null;
+        _splits.clear();
+        _lastSplitKm = 0;
       });
       AudioCueService.instance.announceMainSetStart(targetPace: paceStr);
     } else if (_currentPhase == RunMode.mainSet) {
@@ -1336,6 +1376,10 @@ bool get _hasCooldown =>
       _capturedMainSeconds = 0;
       _capturedMainPace = '--:--';
       _capturedMainRoute = [];
+      _elevationGainM = 0.0;
+      _lastAltitudeForGain = null;
+      _splits.clear();
+      _lastSplitKm = 0;
       _isFreeRun = false;
       _showRunTypeChoice = false;
       _workoutReadyToStart = false;
