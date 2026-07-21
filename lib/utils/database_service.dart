@@ -186,8 +186,9 @@ class DatabaseService {
       // v4 → added skip_counts
       // v5 → added achievements
       // v6 → added elevation_gain, splits_json
+      // v7 → backfilled free-run rpe=0 rows to NULL (free runs never rate RPE)
       // ────────────────────────────────────────────────────────────────────
-      version: 6,
+      version: 7,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -303,6 +304,19 @@ class DatabaseService {
                 "ALTER TABLE runs ADD COLUMN splits_json TEXT NOT NULL DEFAULT '[]'");
           } catch (e) {
             debugPrint('[DB] splits_json already exists, skipping: $e');
+          }
+        }
+
+        if (oldVersion < 7) {
+          // v6 → v7: free runs used to be saved with rpe=0 (no real rating —
+          // the RPE picker is never shown for them). Null those out so they
+          // stop showing "RPE 0/10" in history and stop skewing the Training
+          // Status average, matching how new free runs behave going forward.
+          try {
+            await db.execute(
+                "UPDATE runs SET rpe = NULL WHERE workout_type = 'free' AND rpe = 0");
+          } catch (e) {
+            debugPrint('[DB] free-run rpe backfill failed: $e');
           }
         }
       },
