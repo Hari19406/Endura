@@ -1257,9 +1257,35 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final c = context.colors;
+    final greetingText = _userName.isNotEmpty ? '$_greeting, $_userName' : _greeting;
     return Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(
+        toolbarHeight: 76,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              greetingText,
+              style: TextStyle(
+                fontWeight: FontWeight.w800, color: c.textPrimary,
+                fontSize: 22, letterSpacing: -0.5,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              DateFormat('EEEE, MMM d').format(DateTime.now()),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: c.textTertiary,
+              ),
+            ),
+          ],
+        ),
+        centerTitle: false,
         elevation: 0,
         backgroundColor: c.surface,
         actions: [
@@ -1278,37 +1304,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildGreetingHeader() {
-    final c = context.colors;
-    final greetingText = _userName.isNotEmpty ? '$_greeting, $_userName' : _greeting;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            greetingText,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: c.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            DateFormat('EEEE, MMM d').format(DateTime.now()),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: c.textTertiary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildDashboardContent() {
     return RefreshIndicator(
       color: context.colors.accent,
@@ -1320,7 +1315,6 @@ class _HomeScreenState extends State<HomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildGreetingHeader(),
               if (_raceDate != null && _raceDate!.isAfter(DateTime.now())) ...[
                 _buildRaceCountdownChip(),
                 const SizedBox(height: 14),
