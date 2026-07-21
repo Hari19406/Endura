@@ -143,14 +143,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     if (_engineProcessed) return;
     _engineProcessed = true;
 
-    try {
-      final runs = await DatabaseService.instance.getRecentRuns(limit: 1);
-      if (runs.isNotEmpty && runs.first.id != null) {
-        await DatabaseService.instance.updateRunRpe(runs.first.id!, rpe);
-        await CloudSyncService.instance.updateRunRpe(runs.first.id!, rpe);
+    // Free runs never show the RPE picker, so there's no real rating to save —
+    // writing 0 here would falsely show as "RPE 0/10" in history and drag down
+    // the Training Status average, which both treat 0 as a valid low rating.
+    if (!widget.isFreeRun) {
+      try {
+        final runs = await DatabaseService.instance.getRecentRuns(limit: 1);
+        if (runs.isNotEmpty && runs.first.id != null) {
+          await DatabaseService.instance.updateRunRpe(runs.first.id!, rpe);
+          await CloudSyncService.instance.updateRunRpe(runs.first.id!, rpe);
+        }
+      } catch (e) {
+        debugPrint('Error saving RPE: $e');
       }
-    } catch (e) {
-      debugPrint('Error saving RPE: $e');
     }
 
     if (widget.isFreeRun) return;
