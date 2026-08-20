@@ -49,8 +49,8 @@ class RevenueCatService {
 
   /// Purchase a specific package. Returns true if the user is now pro.
   static Future<bool> purchasePackage(Package package) async {
-    final info = await Purchases.purchasePackage(package);
-    final nowPro = info.entitlements.active.containsKey('Endura Pro');
+    final result = await Purchases.purchasePackage(package);
+    final nowPro = result.customerInfo.entitlements.active.containsKey('Endura Pro');
     isProNotifier.value = nowPro;
     return nowPro;
   }
