@@ -31,6 +31,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
+import '../services/weather_service.dart';
 import '../utils/unit_utils.dart';
 
 // Import the shortened onboarding for post-plan re-onboarding.
@@ -538,6 +539,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _userName = '';
   DateTime? _raceDate;
   String _goalRaceName = '';
+  WeatherSnapshot? _weather;
 
   // ── Post-plan flow state ───────────────────────────────────────────────────
   /// True when plan is complete and the celebration card should show.
@@ -862,6 +864,11 @@ class _HomeScreenState extends State<HomeScreen>
       _isFetching = false;
       if (mounted) setState(() => _isLoading = false);
     }
+
+    // Fire-and-forget — never blocks initial paint, chip just appears late.
+    WeatherService.getCurrentWeather().then((weather) {
+      if (mounted && weather != null) setState(() => _weather = weather);
+    });
   }
 
   // ── Post-plan actions ──────────────────────────────────────────────────────
@@ -1319,7 +1326,13 @@ class _HomeScreenState extends State<HomeScreen>
                 _buildRaceCountdownChip(),
                 const SizedBox(height: 14),
               ],
-              _buildSectionLabel("TODAY'S WORKOUT"),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSectionLabel("TODAY'S WORKOUT"),
+                  if (_weather != null) _buildWeatherChip(),
+                ],
+              ),
               const SizedBox(height: 10),
 
               // ── Plan complete card OR no-plan CTA OR normal workout card ──
@@ -1357,6 +1370,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 showPreRunCheck(
                                   context: context,
                                   coachMessage: _coachMessage!,
+                                  weather: _weather,
                                   onProceed: (scaled) => Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -1456,6 +1470,32 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWeatherChip() {
+    final c = context.colors;
+    final weather = _weather!;
+    final icon = switch (weather.condition) {
+      WeatherCondition.clear => Icons.wb_sunny_outlined,
+      WeatherCondition.cloudy => Icons.cloud_outlined,
+      WeatherCondition.rain => Icons.water_drop_outlined,
+      WeatherCondition.snow => Icons.ac_unit,
+      WeatherCondition.fog => Icons.foggy,
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: c.textTertiary),
+        const SizedBox(width: 4),
+        Text(
+          '${weather.tempC.round()}°C',
+          style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600,
+            color: c.textTertiary, letterSpacing: 0.2,
+          ),
+        ),
+      ],
     );
   }
 

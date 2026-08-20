@@ -13,8 +13,10 @@ library;
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../engines/daily/pre_run_scaler.dart';
+import '../engines/daily/weather_scaler.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/coach_message_builder.dart' as message;
+import '../services/weather_service.dart';
 import '../engines/memory/engine_memory_service.dart';
 
 // ============================================================================
@@ -26,6 +28,7 @@ Future<void> showPreRunCheck({
   required message.CoachMessage coachMessage,
   required void Function(message.CoachMessage scaled) onProceed,
   required VoidCallback onSkip,
+  WeatherSnapshot? weather,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -35,6 +38,7 @@ Future<void> showPreRunCheck({
       coachMessage: coachMessage,
       onProceed: onProceed,
       onSkip: onSkip,
+      weather: weather,
     ),
   );
 }
@@ -49,11 +53,13 @@ class _PreRunCheckSheet extends StatefulWidget {
   final message.CoachMessage coachMessage;
   final void Function(message.CoachMessage scaled) onProceed;
   final VoidCallback onSkip;
+  final WeatherSnapshot? weather;
 
   const _PreRunCheckSheet({
     required this.coachMessage,
     required this.onProceed,
     required this.onSkip,
+    this.weather,
   });
 
   @override
@@ -88,7 +94,21 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
     );
     final scaler = const PreRunScaler();
     final result = scaler.scale(widget.coachMessage.resolvedWorkout, inputs);
-    final scaled = _rebuildMessage(result.workout, result.coachNote);
+
+    var finalWorkout = result.workout;
+    var finalNote = result.coachNote;
+    final weather = widget.weather;
+    if (weather != null) {
+      final weatherResult = const WeatherScaler().scale(finalWorkout, weather);
+      if (weatherResult.wasAdjusted) {
+        finalWorkout = weatherResult.workout;
+        finalNote = finalNote != null
+            ? '$finalNote ${weatherResult.coachNote}'
+            : weatherResult.coachNote;
+      }
+    }
+
+    final scaled = _rebuildMessage(finalWorkout, finalNote);
 
     // ── Record downgrade if workout was actually reduced ──────────────────
     // Poor sleep OR leg pain causes PreRunScaler to reduce the workout.
