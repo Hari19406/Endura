@@ -77,9 +77,9 @@ class WeatherSnapshot {
 class WeatherService {
   static const String _cacheKey = 'weather_snapshot';
 
-  static Future<WeatherSnapshot?> getCurrentWeather() async {
+  static Future<WeatherSnapshot?> getCurrentWeather({bool forceRefresh = false}) async {
     final cached = await _readCache();
-    if (cached != null && !cached.isStale) return cached;
+    if (!forceRefresh && cached != null && !cached.isStale) return cached;
 
     final position = await _getLocation();
     if (position == null) return cached; // stale cache is better than nothing

@@ -866,7 +866,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     // Fire-and-forget — never blocks initial paint, chip just appears late.
-    WeatherService.getCurrentWeather().then((weather) {
+    WeatherService.getCurrentWeather(forceRefresh: forceCloudRestore).then((weather) {
       if (mounted && weather != null) setState(() => _weather = weather);
     });
   }
