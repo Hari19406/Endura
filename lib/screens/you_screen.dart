@@ -943,7 +943,10 @@ class _YouScreenState extends State<YouScreen>
     final typeLabel = WorkoutTypeStyle.label(workoutType);
     final typeColor = WorkoutTypeStyle.color(workoutType);
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: '$typeLabel run',
+      child: GestureDetector(
       onTap: () => _openRunDetail(run, record: record),
       child: Container(
         decoration: BoxDecoration(
@@ -1063,6 +1066,7 @@ class _YouScreenState extends State<YouScreen>
             ],
           ],
         ),
+      ),
       ),
     );
   }

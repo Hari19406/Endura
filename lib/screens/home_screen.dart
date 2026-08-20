@@ -1376,7 +1376,10 @@ class _HomeScreenState extends State<HomeScreen>
 
               if (_engineMemory?.hasRacePlan == true) ...[
                 const SizedBox(height: 10),
-                GestureDetector(
+                Semantics(
+                  button: true,
+                  label: 'Manage plan',
+                  child: GestureDetector(
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -1406,6 +1409,7 @@ class _HomeScreenState extends State<HomeScreen>
                             color: context.colors.textTertiary, size: 20),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],
@@ -1729,7 +1733,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildStartPlanCard() {
     final c = context.colors;
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: 'Start a new training plan',
+      child: GestureDetector(
       onTap: _onStartNextPlan,
       child: Container(
         width: double.infinity,
@@ -1786,6 +1793,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ],
         ),
+      ),
       ),
     );
   }

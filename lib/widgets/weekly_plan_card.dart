@@ -252,7 +252,10 @@ class _DayCard extends StatelessWidget {
     final dimmed = day.status == DayStatus.rest || day.status == DayStatus.missed;
     final dateStr = DateFormat('MMM d').format(day.date);
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: '$dateStr, $_workoutName',
+      child: GestureDetector(
       onTap: day.hasWorkout ? onTap : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -357,6 +360,7 @@ class _DayCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
