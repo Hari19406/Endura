@@ -20,11 +20,13 @@ class RevenueCatService {
 
     // Seed the cache immediately
     final info = await Purchases.getCustomerInfo();
-    isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
+    // TEMP: skip overwrite to test past the paywall — REVERT before commit.
+    // isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
 
     // Keep cache live — fires when subscription status changes
     Purchases.addCustomerInfoUpdateListener((info) {
-      isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
+      // TEMP: skip overwrite to test past the paywall — REVERT before commit.
+      // isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
     });
   }
 
