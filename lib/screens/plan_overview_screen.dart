@@ -12,6 +12,7 @@ import '../engines/config/archetype_table.dart' show ExperienceLevel;
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart' show Analytics;
 import '../utils/unit_utils.dart';
+import '../utils/workout_type_style.dart';
 import 'paywall_screen.dart';
 
 /// Full multi-week plan overview (Runna/Endorphins-style).
@@ -286,12 +287,6 @@ class _WeekCard extends StatelessWidget {
 
 const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-const _colorEasy = Color(0xFF4CAF50);
-const _colorTempo = Color(0xFFF57C00);
-const _colorInterval = Color(0xFFD32F2F);
-const _colorLong = Color(0xFF1976D2);
-const _colorRest = Colors.white;
-
 String _intentLabel(WorkoutIntent? intent) => switch (intent) {
   WorkoutIntent.aerobicBase => 'EASY',
   WorkoutIntent.endurance => 'LONG',
@@ -302,16 +297,6 @@ String _intentLabel(WorkoutIntent? intent) => switch (intent) {
   null => 'REST',
 };
 
-Color _intentColor(WorkoutIntent? intent) => switch (intent) {
-  WorkoutIntent.aerobicBase => _colorEasy,
-  WorkoutIntent.endurance => _colorLong,
-  WorkoutIntent.threshold => _colorTempo,
-  WorkoutIntent.vo2max => _colorInterval,
-  WorkoutIntent.speed => _colorInterval,
-  WorkoutIntent.raceSpecific => _colorTempo,
-  null => _colorRest,
-};
-
 String _workoutTypeLabel(WorkoutType type) => switch (type) {
   WorkoutType.tempo => 'TEMPO',
   WorkoutType.interval => 'INT',
@@ -319,15 +304,6 @@ String _workoutTypeLabel(WorkoutType type) => switch (type) {
   WorkoutType.quality => 'QUALITY',
   WorkoutType.rest => 'REST',
   WorkoutType.easy => 'EASY',
-};
-
-Color _workoutTypeColor(WorkoutType type) => switch (type) {
-  WorkoutType.tempo => _colorTempo,
-  WorkoutType.interval => _colorInterval,
-  WorkoutType.long => _colorLong,
-  WorkoutType.quality => _colorTempo,
-  WorkoutType.rest => _colorRest,
-  WorkoutType.easy => _colorEasy,
 };
 
 class _DayCircle extends StatelessWidget {
@@ -419,7 +395,7 @@ class _ActiveDayStrip extends StatelessWidget {
           isToday: isToday,
           isCompleted: day.isCompleted,
           isSkipped: day.isSkipped,
-          color: _workoutTypeColor(day.workoutType),
+          color: dayColorForWorkoutType(day.workoutType),
           label: _workoutTypeLabel(day.workoutType),
         );
       }).toList(),
@@ -444,7 +420,7 @@ class _ProjectedDayStrip extends StatelessWidget {
         return _DayCircle(
           weekday: weekday,
           isRest: isRest,
-          color: isRest ? _colorRest : _intentColor(slot.intent),
+          color: dayColorForIntent(isRest ? null : slot.intent),
           label: isRest ? 'REST' : _intentLabel(slot.intent),
         );
       }),

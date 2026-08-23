@@ -605,6 +605,7 @@ class _RunScreenState extends State<RunScreen>
       _showCountdown = true;
       _countdownIndex = 0;
     });
+    HapticFeedback.lightImpact();
     _countdownTimer = Timer.periodic(const Duration(milliseconds: 800), (
       timer,
     ) {
@@ -612,15 +613,18 @@ class _RunScreenState extends State<RunScreen>
         _completeCountdown();
       } else if (mounted) {
         setState(() => _countdownIndex++);
+        HapticFeedback.lightImpact();
       }
     });
     return _countdownCompleter!.future;
   }
 
   void _completeCountdown() {
+    final wasCounting = _countdownTimer != null || _showCountdown;
     _countdownTimer?.cancel();
     _countdownTimer = null;
     if (mounted) setState(() => _showCountdown = false);
+    if (wasCounting) HapticFeedback.mediumImpact();
     if (_countdownCompleter != null && !_countdownCompleter!.isCompleted) {
       _countdownCompleter!.complete();
     }
@@ -890,6 +894,7 @@ class _RunScreenState extends State<RunScreen>
 
   void _pauseTracking() {
     if (_runState != RunState.running) return;
+    HapticFeedback.lightImpact();
     _timer?.cancel();
     _timer = null;
     _gpsMonitorTimer?.cancel();
@@ -906,6 +911,7 @@ class _RunScreenState extends State<RunScreen>
 
   void _resumeTracking() {
     if (_runState != RunState.paused) return;
+    HapticFeedback.lightImpact();
     if (mounted)
       setState(() {
         _runState = RunState.running;
@@ -2056,6 +2062,7 @@ class _RunScreenState extends State<RunScreen>
   }
 
   Future<void> _onFinishTapped() async {
+    HapticFeedback.mediumImpact();
     final mainDistanceM = _currentPhase == RunMode.mainSet
         ? _distance - _mainPhaseStartDistanceM
         : _capturedMainDistanceM;

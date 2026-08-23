@@ -30,6 +30,7 @@ import '../screens/manage_plan_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../screens/plan_overview_screen.dart';
+import '../utils/workout_type_style.dart';
 import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/weather_service.dart';
@@ -1639,6 +1640,11 @@ class _HomeScreenState extends State<HomeScreen>
                 final isToday = i == todayIndex;
                 final dayDate = weekMonday.add(Duration(days: i));
                 final hasRun = _dayHasRun(dayDate);
+                final plannedDay = _plannedDayFor(dayDate);
+                final dayColor = plannedDay != null
+                    ? dayColorForWorkoutType(plannedDay.workoutType)
+                    : Colors.white;
+                final showColor = hasRun || plannedDay != null;
                 return Column(
                   children: [
                     Text(
@@ -1655,14 +1661,19 @@ class _HomeScreenState extends State<HomeScreen>
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: hasRun ? c.accent : Colors.transparent,
-                        border: Border.all(
-                          color: hasRun ? Colors.transparent : c.border,
-                          width: 1.5,
-                        ),
+                        color: showColor ? dayColor : Colors.transparent,
+                        border: isToday
+                            ? Border.all(color: c.accent, width: 2)
+                            : showColor
+                            ? null
+                            : Border.all(color: c.border, width: 1.5),
                       ),
                       child: hasRun
-                          ? Icon(Icons.check, size: 15, color: c.onAccent)
+                          ? const Icon(
+                              Icons.check,
+                              size: 15,
+                              color: Colors.black,
+                            )
                           : null,
                     ),
                   ],
@@ -1728,6 +1739,19 @@ class _HomeScreenState extends State<HomeScreen>
         return true;
     }
     return false;
+  }
+
+  PlannedDay? _plannedDayFor(DateTime day) {
+    final days = _activePlan?.days;
+    if (days == null) return null;
+    for (final d in days) {
+      if (d.date.year == day.year &&
+          d.date.month == day.month &&
+          d.date.day == day.day) {
+        return d;
+      }
+    }
+    return null;
   }
 
   Widget _buildLastRunCarouselCard(double width) {
