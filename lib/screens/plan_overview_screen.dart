@@ -204,54 +204,66 @@ class _WeekCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isCurrent
-                      ? 'WEEK ${week.week} · THIS WEEK'
-                      : 'WEEK ${week.week}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: isCurrent ? c.accent : c.textTertiary,
-                    letterSpacing: 1.0,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isCurrent
+                            ? 'WEEK ${week.week} · THIS WEEK'
+                            : 'WEEK ${week.week}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isCurrent ? c.accent : c.textTertiary,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _dateRangeLabel(weekStart),
+                        style: TextStyle(fontSize: 12, color: c.textSecondary),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  week.phase.displayName,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: c.textTertiary,
-                    letterSpacing: 0.5,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      week.phase.displayName,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: c.textTertiary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (isLocked) ...[
+                          Icon(
+                            Icons.lock_outline,
+                            size: 14,
+                            color: c.textTertiary,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          '${volume.toStringAsFixed(1)} $unit',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: c.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _dateRangeLabel(weekStart),
-              style: TextStyle(fontSize: 12, color: c.textSecondary),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Text(
-                  '${volume.toStringAsFixed(1)} $unit',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: c.textPrimary,
-                  ),
-                ),
-                Text(
-                  ' planned',
-                  style: TextStyle(fontSize: 13, color: c.textTertiary),
-                ),
-                if (isLocked) ...[
-                  const Spacer(),
-                  Icon(Icons.lock_outline, size: 16, color: c.textTertiary),
-                ],
               ],
             ),
             if (!isLocked) ...[
@@ -267,9 +279,18 @@ class _WeekCard extends StatelessWidget {
   }
 }
 
-// ── Day strip — shared label/icon helpers ───────────────────────────────────
+// ── Day strip — shared label/color helpers ──────────────────────────────────
+//
+// Colors match WorkoutTypeStyle (lib/utils/workout_type_style.dart), used on
+// History and Run Detail, so a workout type reads the same color everywhere.
 
 const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+const _colorEasy = Color(0xFF4CAF50);
+const _colorTempo = Color(0xFFF57C00);
+const _colorInterval = Color(0xFFD32F2F);
+const _colorLong = Color(0xFF1976D2);
+const _colorRest = Colors.white;
 
 String _intentLabel(WorkoutIntent? intent) => switch (intent) {
   WorkoutIntent.aerobicBase => 'EASY',
@@ -281,13 +302,14 @@ String _intentLabel(WorkoutIntent? intent) => switch (intent) {
   null => 'REST',
 };
 
-IconData _intentIcon(WorkoutIntent? intent) => switch (intent) {
-  WorkoutIntent.endurance => Icons.landscape_outlined,
-  WorkoutIntent.threshold => Icons.bolt,
-  WorkoutIntent.vo2max => Icons.timer_outlined,
-  WorkoutIntent.speed => Icons.timer_outlined,
-  WorkoutIntent.raceSpecific => Icons.flag_outlined,
-  _ => Icons.directions_run,
+Color _intentColor(WorkoutIntent? intent) => switch (intent) {
+  WorkoutIntent.aerobicBase => _colorEasy,
+  WorkoutIntent.endurance => _colorLong,
+  WorkoutIntent.threshold => _colorTempo,
+  WorkoutIntent.vo2max => _colorInterval,
+  WorkoutIntent.speed => _colorInterval,
+  WorkoutIntent.raceSpecific => _colorTempo,
+  null => _colorRest,
 };
 
 String _workoutTypeLabel(WorkoutType type) => switch (type) {
@@ -299,11 +321,13 @@ String _workoutTypeLabel(WorkoutType type) => switch (type) {
   WorkoutType.easy => 'EASY',
 };
 
-IconData _workoutTypeIcon(WorkoutType type) => switch (type) {
-  WorkoutType.tempo => Icons.bolt,
-  WorkoutType.interval => Icons.timer_outlined,
-  WorkoutType.long => Icons.landscape_outlined,
-  _ => Icons.directions_run,
+Color _workoutTypeColor(WorkoutType type) => switch (type) {
+  WorkoutType.tempo => _colorTempo,
+  WorkoutType.interval => _colorInterval,
+  WorkoutType.long => _colorLong,
+  WorkoutType.quality => _colorTempo,
+  WorkoutType.rest => _colorRest,
+  WorkoutType.easy => _colorEasy,
 };
 
 class _DayCircle extends StatelessWidget {
@@ -312,42 +336,28 @@ class _DayCircle extends StatelessWidget {
   final bool isToday;
   final bool isCompleted;
   final bool isSkipped;
-  final IconData? icon;
+  final Color color;
   final String label;
 
   const _DayCircle({
     required this.weekday,
     required this.isRest,
     required this.label,
+    required this.color,
     this.isToday = false,
     this.isCompleted = false,
     this.isSkipped = false,
-    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
 
-    Color bg = Colors.transparent;
-    Color border = Colors.transparent;
     Widget? child;
-
     if (isCompleted) {
-      bg = c.accent;
-      child = Icon(Icons.check, size: 14, color: c.onAccent);
+      child = const Icon(Icons.check, size: 14, color: Colors.black);
     } else if (isSkipped) {
-      border = c.border;
-      child = Icon(Icons.close, size: 12, color: c.textTertiary);
-    } else if (isRest) {
-      border = Colors.transparent;
-    } else {
-      border = isToday ? c.accent : c.border;
-      child = Icon(
-        icon ?? Icons.directions_run,
-        size: 13,
-        color: isToday ? c.accent : c.textSecondary,
-      );
+      child = const Icon(Icons.close, size: 12, color: Colors.black45);
     }
 
     return Column(
@@ -366,10 +376,8 @@ class _DayCircle extends StatelessWidget {
           height: 30,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: bg,
-            border: border != Colors.transparent
-                ? Border.all(color: border, width: 1.5)
-                : null,
+            color: color,
+            border: isToday ? Border.all(color: c.accent, width: 2) : null,
           ),
           child: child != null ? Center(child: child) : null,
         ),
@@ -411,7 +419,7 @@ class _ActiveDayStrip extends StatelessWidget {
           isToday: isToday,
           isCompleted: day.isCompleted,
           isSkipped: day.isSkipped,
-          icon: _workoutTypeIcon(day.workoutType),
+          color: _workoutTypeColor(day.workoutType),
           label: _workoutTypeLabel(day.workoutType),
         );
       }).toList(),
@@ -436,7 +444,7 @@ class _ProjectedDayStrip extends StatelessWidget {
         return _DayCircle(
           weekday: weekday,
           isRest: isRest,
-          icon: isRest ? null : _intentIcon(slot.intent),
+          color: isRest ? _colorRest : _intentColor(slot.intent),
           label: isRest ? 'REST' : _intentLabel(slot.intent),
         );
       }),
