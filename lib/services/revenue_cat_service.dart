@@ -8,7 +8,8 @@ class RevenueCatService {
   static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
 
   // Cached pro status — updated by the listener set up in init()
-  static final ValueNotifier<bool> isProNotifier = ValueNotifier(false);
+  // TEMP: forced true to test the weather pace-adjustment flow past the paywall — REVERT before commit.
+  static final ValueNotifier<bool> isProNotifier = ValueNotifier(true);
 
   static Future<void> init(String supabaseUserId) async {
     if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
