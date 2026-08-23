@@ -1739,6 +1739,8 @@ class _HomeScreenState extends State<HomeScreen>
           racePlan: racePlan,
           activePlan: _activePlan,
           useMiles: UnitUtils.useMilesNotifier.value,
+          trainingDayIndices: _trainingDayIndices,
+          longRunDayIndex: _engineMemory?.longRunDayIndex,
         ),
       ),
     );
