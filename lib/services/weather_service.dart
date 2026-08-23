@@ -45,12 +45,12 @@ class WeatherSnapshot {
       DateTime.now().difference(fetchedAt) > const Duration(minutes: 45);
 
   Map<String, dynamic> toJson() => {
-        'tempC': tempC,
-        'apparentTempC': apparentTempC,
-        'humidityPercent': humidityPercent,
-        'condition': condition.name,
-        'fetchedAt': fetchedAt.toIso8601String(),
-      };
+    'tempC': tempC,
+    'apparentTempC': apparentTempC,
+    'humidityPercent': humidityPercent,
+    'condition': condition.name,
+    'fetchedAt': fetchedAt.toIso8601String(),
+  };
 
   factory WeatherSnapshot.fromJson(Map<String, dynamic> json) {
     return WeatherSnapshot(
@@ -77,7 +77,9 @@ class WeatherSnapshot {
 class WeatherService {
   static const String _cacheKey = 'weather_snapshot';
 
-  static Future<WeatherSnapshot?> getCurrentWeather({bool forceRefresh = false}) async {
+  static Future<WeatherSnapshot?> getCurrentWeather({
+    bool forceRefresh = false,
+  }) async {
     final cached = await _readCache();
     if (!forceRefresh && cached != null && !cached.isStale) return cached;
 
@@ -141,7 +143,9 @@ class WeatherService {
         tempC: (current['temperature_2m'] as num).toDouble(),
         apparentTempC: (current['apparent_temperature'] as num).toDouble(),
         humidityPercent: (current['relative_humidity_2m'] as num).round(),
-        condition: _conditionFromWmoCode((current['weather_code'] as num).round()),
+        condition: _conditionFromWmoCode(
+          (current['weather_code'] as num).round(),
+        ),
         fetchedAt: DateTime.now(),
       );
     } catch (_) {

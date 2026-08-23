@@ -44,8 +44,7 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
                 letterSpacing: 1.2,
               ),
             ),
-            if (_selected != null)
-              _RpeLabel(rpe: _selected!),
+            if (_selected != null) _RpeLabel(rpe: _selected!),
           ],
         ),
         const SizedBox(height: 12),
@@ -94,11 +93,17 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
           children: [
             Text(
               'Easy',
-              style: TextStyle(fontSize: 10, color: context.colors.textTertiary),
+              style: TextStyle(
+                fontSize: 10,
+                color: context.colors.textTertiary,
+              ),
             ),
             Text(
               'Max effort',
-              style: TextStyle(fontSize: 10, color: context.colors.textTertiary),
+              style: TextStyle(
+                fontSize: 10,
+                color: context.colors.textTertiary,
+              ),
             ),
           ],
         ),
@@ -109,7 +114,7 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
   Color _rpeColor(int rpe) {
     if (rpe <= 3) return const Color(0xFF388E3C); // green
     if (rpe <= 6) return const Color(0xFFF57C00); // orange
-    return const Color(0xFFD32F2F);               // red
+    return const Color(0xFFD32F2F); // red
   }
 }
 

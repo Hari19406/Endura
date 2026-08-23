@@ -73,8 +73,8 @@ class SkipService {
 
     final type = skippedDay.workoutType;
 
-    // Easy / Recovery: just drop it.
-    if (type == WorkoutType.easy || type == WorkoutType.recovery) {
+    // Easy: just drop it.
+    if (type == WorkoutType.easy) {
       final updated = _replaceDay(
         plan,
         skipIdx,
@@ -122,7 +122,9 @@ class SkipService {
           d.date.day == targetDate.day,
     );
 
-    final originalDayName = TrainingDaysServiceHelper.dayName(skippedWeekdayIdx);
+    final originalDayName = TrainingDaysServiceHelper.dayName(
+      skippedWeekdayIdx,
+    );
 
     // Mark skipped day as rest.
     var updated = _replaceDay(
@@ -214,14 +216,17 @@ class SkipService {
       // For quality: need rest before to allow recovery.
       if ((workoutType == WorkoutType.tempo ||
               workoutType == WorkoutType.interval) &&
-          !prevIsRest) continue;
+          !prevIsRest)
+        continue;
 
       // For long: prefer rest day after.
       if (workoutType == WorkoutType.long && !nextIsRest) continue;
 
       // Check: would this create consecutive hard days?
       final adjacentHard = _hasAdjacentHard(plan, dIdx);
-      if (adjacentHard) { continue; }
+      if (adjacentHard) {
+        continue;
+      }
 
       results.add(day.date);
     }
@@ -247,8 +252,13 @@ class SkipService {
 /// Tiny helper so SkipService doesn't depend on TrainingDaysService directly.
 class TrainingDaysServiceHelper {
   static const _names = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   static String dayName(int idx) => _names[idx.clamp(0, 6)];

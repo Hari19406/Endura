@@ -16,10 +16,7 @@ class ScalingSignals {
   final double? avgRpe;
   final bool lastEasyRunTooHard;
 
-  const ScalingSignals({
-    this.avgRpe,
-    this.lastEasyRunTooHard = false,
-  });
+  const ScalingSignals({this.avgRpe, this.lastEasyRunTooHard = false});
 }
 
 // ============================================================================
@@ -30,10 +27,7 @@ class ScalingResult {
   final ResolvedWorkout workout;
   final List<String> adjustments;
 
-  const ScalingResult({
-    required this.workout,
-    this.adjustments = const [],
-  });
+  const ScalingResult({required this.workout, this.adjustments = const []});
 }
 
 // ============================================================================
@@ -79,7 +73,9 @@ class DynamicScaler {
   // ========================================================================
 
   _ScaleFactors _calculateFactors(
-      ScalingSignals signals, WorkoutIntent intent) {
+    ScalingSignals signals,
+    WorkoutIntent intent,
+  ) {
     var repReduction = 0;
     var volumeScale = 1.0;
     var recoveryExtension = 1.0;
@@ -132,8 +128,8 @@ class DynamicScaler {
 
     final int? scaledRecoverySeconds =
         (block.recoverySeconds != null && factors.recoveryExtension > 1.0)
-            ? (block.recoverySeconds! * factors.recoveryExtension).round()
-            : block.recoverySeconds;
+        ? (block.recoverySeconds! * factors.recoveryExtension).round()
+        : block.recoverySeconds;
 
     return ResolvedBlock(
       type: block.type,
@@ -178,7 +174,5 @@ class _ScaleFactors {
   });
 
   bool get isNeutral =>
-      repReduction == 0 &&
-      volumeScale >= 1.0 &&
-      recoveryExtension <= 1.0;
+      repReduction == 0 && volumeScale >= 1.0 && recoveryExtension <= 1.0;
 }

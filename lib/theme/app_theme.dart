@@ -39,24 +39,25 @@ class AppTheme {
       ),
       dialogTheme: DialogThemeData(backgroundColor: c.surface),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-            (states) => Colors.white),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? (brightness == Brightness.dark
+        thumbColor: WidgetStateProperty.resolveWith((states) => Colors.white),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? (brightness == Brightness.dark
                     ? const Color(0xFF6E6E73)
                     : const Color(0xFF555555))
-                : (brightness == Brightness.dark
+              : (brightness == Brightness.dark
                     ? const Color(0xFF3A3A3C)
-                    : const Color(0xFFDDDDDD))),
-        trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? (brightness == Brightness.dark
+                    : const Color(0xFFDDDDDD)),
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? (brightness == Brightness.dark
                     ? const Color(0xFF6E6E73)
                     : const Color(0xFF555555))
-                : (brightness == Brightness.dark
+              : (brightness == Brightness.dark
                     ? const Color(0xFF3A3A3C)
-                    : const Color(0xFFCCCCCC))),
+                    : const Color(0xFFCCCCCC)),
+        ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent),
       textButtonTheme: TextButtonThemeData(

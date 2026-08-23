@@ -32,7 +32,7 @@ enum PaceZone {
   progressiveEnd,
 
   // ── Aerobic / moderate ───────────────────────────────────────────────────
-  steadyState,      // NEW: M-pace held continuously — HM/FM quality session
+  steadyState, // NEW: M-pace held continuously — HM/FM quality session
   marathonPace,
 
   // ── Threshold / tempo ───────────────────────────────────────────────────
@@ -42,7 +42,7 @@ enum PaceZone {
   cruiseIntervals,
 
   // ── VO2max / interval ────────────────────────────────────────────────────
-  tenKPace,         // NEW: between T and I — used for 1200m 10K-pace reps
+  tenKPace, // NEW: between T and I — used for 1200m 10K-pace reps
   vo2Intervals,
   shortShort,
   fourHundredRepeats,
@@ -53,9 +53,8 @@ enum PaceZone {
   speedReps,
 
   // ── RPE-only ─────────────────────────────────────────────────────────────
-  hillSprints,      // 8–12 sec max-effort
-  hillRepeats,      // NEW: 30–90 sec controlled uphill — RPE-only
-
+  hillSprints, // 8–12 sec max-effort
+  hillRepeats, // NEW: 30–90 sec controlled uphill — RPE-only
   // ── Goal-pace (require resolveGoalPace) ──────────────────────────────────
   goalPace,
   raceSimulation,
@@ -78,9 +77,9 @@ class ResolvedPace {
   });
 
   const ResolvedPace.rpeOnly()
-      : minSecondsPerKm = 0,
-        maxSecondsPerKm = 0,
-        isRpeOnly = true;
+    : minSecondsPerKm = 0,
+      maxSecondsPerKm = 0,
+      isRpeOnly = true;
 
   int get targetPace => ((minSecondsPerKm + maxSecondsPerKm) / 2).round();
 
@@ -122,73 +121,106 @@ class PaceTable {
 
     return switch (zone) {
       // ── Easy zones ──────────────────────────────────────────────────────
-      PaceZone.shakeout =>
-          ResolvedPace(minSecondsPerKm: e.$2, maxSecondsPerKm: e.$2 + 30),
-      PaceZone.easyRecovery =>
-          ResolvedPace(minSecondsPerKm: e.$2 - 10, maxSecondsPerKm: e.$2 + 10),
-      PaceZone.aerobicEasy =>
-          ResolvedPace(minSecondsPerKm: e.$1, maxSecondsPerKm: e.$2),
-      PaceZone.progressiveStart =>
-          ResolvedPace(minSecondsPerKm: e.$1 + 10, maxSecondsPerKm: e.$2 - 10),
-      PaceZone.progressiveEnd =>
-          ResolvedPace(minSecondsPerKm: m.$1 - 5, maxSecondsPerKm: m.$1 + 5),
+      PaceZone.shakeout => ResolvedPace(
+        minSecondsPerKm: e.$2,
+        maxSecondsPerKm: e.$2 + 30,
+      ),
+      PaceZone.easyRecovery => ResolvedPace(
+        minSecondsPerKm: e.$2 - 10,
+        maxSecondsPerKm: e.$2 + 10,
+      ),
+      PaceZone.aerobicEasy => ResolvedPace(
+        minSecondsPerKm: e.$1,
+        maxSecondsPerKm: e.$2,
+      ),
+      PaceZone.progressiveStart => ResolvedPace(
+        minSecondsPerKm: e.$1 + 10,
+        maxSecondsPerKm: e.$2 - 10,
+      ),
+      PaceZone.progressiveEnd => ResolvedPace(
+        minSecondsPerKm: m.$1 - 5,
+        maxSecondsPerKm: m.$1 + 5,
+      ),
 
       // ── Aerobic / moderate zones ─────────────────────────────────────────
       // steadyState and marathonPace share the M-pace band.
       // They are distinct enum values so the UI can label them differently.
-      PaceZone.steadyState =>
-          ResolvedPace(minSecondsPerKm: m.$1, maxSecondsPerKm: m.$2),
-      PaceZone.marathonPace =>
-          ResolvedPace(minSecondsPerKm: m.$1, maxSecondsPerKm: m.$2),
+      PaceZone.steadyState => ResolvedPace(
+        minSecondsPerKm: m.$1,
+        maxSecondsPerKm: m.$2,
+      ),
+      PaceZone.marathonPace => ResolvedPace(
+        minSecondsPerKm: m.$1,
+        maxSecondsPerKm: m.$2,
+      ),
 
       // ── Threshold / tempo zones ──────────────────────────────────────────
-      PaceZone.thresholdProgStart =>
-          ResolvedPace(minSecondsPerKm: t.$1 + 10, maxSecondsPerKm: t.$2 + 20),
-      PaceZone.tempo =>
-          ResolvedPace(minSecondsPerKm: t.$1, maxSecondsPerKm: t.$2),
-      PaceZone.cruiseIntervals =>
-          ResolvedPace(minSecondsPerKm: t.$1, maxSecondsPerKm: t.$2 + 10),
-      PaceZone.thresholdProgEnd =>
-          ResolvedPace(minSecondsPerKm: t.$1 - 5, maxSecondsPerKm: t.$1 + 3),
+      PaceZone.thresholdProgStart => ResolvedPace(
+        minSecondsPerKm: t.$1 + 10,
+        maxSecondsPerKm: t.$2 + 20,
+      ),
+      PaceZone.tempo => ResolvedPace(
+        minSecondsPerKm: t.$1,
+        maxSecondsPerKm: t.$2,
+      ),
+      PaceZone.cruiseIntervals => ResolvedPace(
+        minSecondsPerKm: t.$1,
+        maxSecondsPerKm: t.$2 + 10,
+      ),
+      PaceZone.thresholdProgEnd => ResolvedPace(
+        minSecondsPerKm: t.$1 - 5,
+        maxSecondsPerKm: t.$1 + 3,
+      ),
 
       // ── VO2max / interval zones ──────────────────────────────────────────
       // tenKPace: midpoint between T and I zones.
       // Harder than threshold cruise, easier than full I-pace.
       // Roughly: min = t.$1 - 8, max = i.$2 + 5.
-      PaceZone.tenKPace =>
-          ResolvedPace(
-            minSecondsPerKm: ((t.$1 + i.$1) ~/ 2) - 5,
-            maxSecondsPerKm: ((t.$2 + i.$2) ~/ 2) + 5,
-          ),
-      PaceZone.vo2Intervals =>
-          ResolvedPace(minSecondsPerKm: i.$1, maxSecondsPerKm: i.$2),
-      PaceZone.ladderPyramid =>
-          ResolvedPace(minSecondsPerKm: i.$1, maxSecondsPerKm: i.$2),
-      PaceZone.shortShort =>
-          ResolvedPace(minSecondsPerKm: r.$1, maxSecondsPerKm: i.$2),
-      PaceZone.fourHundredRepeats =>
-          ResolvedPace(minSecondsPerKm: r.$1, maxSecondsPerKm: r.$2),
+      PaceZone.tenKPace => ResolvedPace(
+        minSecondsPerKm: ((t.$1 + i.$1) ~/ 2) - 5,
+        maxSecondsPerKm: ((t.$2 + i.$2) ~/ 2) + 5,
+      ),
+      PaceZone.vo2Intervals => ResolvedPace(
+        minSecondsPerKm: i.$1,
+        maxSecondsPerKm: i.$2,
+      ),
+      PaceZone.ladderPyramid => ResolvedPace(
+        minSecondsPerKm: i.$1,
+        maxSecondsPerKm: i.$2,
+      ),
+      PaceZone.shortShort => ResolvedPace(
+        minSecondsPerKm: r.$1,
+        maxSecondsPerKm: i.$2,
+      ),
+      PaceZone.fourHundredRepeats => ResolvedPace(
+        minSecondsPerKm: r.$1,
+        maxSecondsPerKm: r.$2,
+      ),
 
       // ── Speed / rep zones ────────────────────────────────────────────────
-      PaceZone.strides =>
-          ResolvedPace(minSecondsPerKm: r.$1, maxSecondsPerKm: r.$2),
-      PaceZone.speedReps =>
-          ResolvedPace(minSecondsPerKm: r.$1 - 5, maxSecondsPerKm: r.$1 + 3),
+      PaceZone.strides => ResolvedPace(
+        minSecondsPerKm: r.$1,
+        maxSecondsPerKm: r.$2,
+      ),
+      PaceZone.speedReps => ResolvedPace(
+        minSecondsPerKm: r.$1 - 5,
+        maxSecondsPerKm: r.$1 + 3,
+      ),
 
       // ── RPE-only ─────────────────────────────────────────────────────────
-      PaceZone.hillSprints  => const ResolvedPace.rpeOnly(),
-      PaceZone.hillRepeats  => const ResolvedPace.rpeOnly(),
+      PaceZone.hillSprints => const ResolvedPace.rpeOnly(),
+      PaceZone.hillRepeats => const ResolvedPace.rpeOnly(),
 
       // ── Goal-pace zones — require resolveGoalPace() ───────────────────────
       PaceZone.goalPace => throw StateError(
-          'goalPace requires target finish time. Use resolveGoalPace() instead.',
-        ),
+        'goalPace requires target finish time. Use resolveGoalPace() instead.',
+      ),
       PaceZone.raceSimulation => throw StateError(
-          'raceSimulation uses goal pace effort. Use resolveGoalPace() instead.',
-        ),
+        'raceSimulation uses goal pace effort. Use resolveGoalPace() instead.',
+      ),
       PaceZone.dressRehearsal => throw StateError(
-          'dressRehearsal uses exact goal pace. Use resolveGoalPace() instead.',
-        ),
+        'dressRehearsal uses exact goal pace. Use resolveGoalPace() instead.',
+      ),
     };
   }
 

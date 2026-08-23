@@ -43,13 +43,32 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
-    final days = ['Monday','Tuesday','Wednesday','Thursday',
-                  'Friday','Saturday','Sunday'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     final day = days[date.weekday - 1];
     return '$day, ${months[date.month - 1]} ${date.day} · '
-        '${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   // MET-based estimate (assumes 70kg — we don't collect user weight yet).
@@ -61,14 +80,14 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final met = speedKmh >= 16
         ? 16.0
         : speedKmh >= 14
-            ? 14.5
-            : speedKmh >= 12
-                ? 12.8
-                : speedKmh >= 10
-                    ? 11.0
-                    : speedKmh >= 8
-                        ? 9.8
-                        : 7.0;
+        ? 14.5
+        : speedKmh >= 12
+        ? 12.8
+        : speedKmh >= 10
+        ? 11.0
+        : speedKmh >= 8
+        ? 9.8
+        : 7.0;
     const assumedWeightKg = 70.0;
     final hours = durationSeconds / 3600;
     return (met * assumedWeightKg * hours).round();
@@ -129,8 +148,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final duration = widget.record?.durationSeconds as int? ?? 0;
     final workoutType = widget.record?.workoutType as String? ?? 'easy';
     final calories = _estimateCalories(distance, duration);
-    final elevationGain = (widget.record?.elevationGain as num?)?.toDouble() ?? 0;
-    final splits = (widget.record?.splits as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final elevationGain =
+        (widget.record?.elevationGain as num?)?.toDouble() ?? 0;
+    final splits =
+        (widget.record?.splits as List?)?.cast<Map<String, dynamic>>() ??
+        const [];
     final wColor = _workoutColor(workoutType);
     final gpsPoints = _getGpsPoints();
 
@@ -181,7 +203,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                 style: OutlinedButton.styleFrom(
                   backgroundColor: context.colors.surface,
                   foregroundColor: context.colors.danger,
-                  side: BorderSide(color: context.colors.danger.withOpacity(0.5)),
+                  side: BorderSide(
+                    color: context.colors.danger.withOpacity(0.5),
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -267,7 +291,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: wColor.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
@@ -319,7 +345,10 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                         _buildStat(
                           context,
                           label: 'DISTANCE',
-                          value: UnitUtils.displayDistance(distance, _useMiles).toStringAsFixed(2),
+                          value: UnitUtils.displayDistance(
+                            distance,
+                            _useMiles,
+                          ).toStringAsFixed(2),
                           unit: UnitUtils.unitLabel(_useMiles),
                         ),
                         _buildDivider(context),
@@ -440,7 +469,10 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   // Splits are always shown in km — capture happens in km increments
   // regardless of the display unit toggle, so mixing units here would
   // require re-deriving split boundaries we didn't record.
-  Widget _buildSplitsCard(BuildContext context, List<Map<String, dynamic>> splits) {
+  Widget _buildSplitsCard(
+    BuildContext context,
+    List<Map<String, dynamic>> splits,
+  ) {
     final c = context.colors;
     final secondsList = splits.map((s) => s['seconds'] as int).toList();
     final minSec = secondsList.reduce(math.min);
@@ -468,7 +500,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ...splits.map((s) {
             final km = s['km'] as int;
             final secs = s['seconds'] as int;
-            final frac = maxSec == minSec ? 1.0 : (maxSec - secs) / (maxSec - minSec);
+            final frac = maxSec == minSec
+                ? 1.0
+                : (maxSec - secs) / (maxSec - minSec);
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
@@ -477,7 +511,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                     width: 24,
                     child: Text(
                       '$km',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -498,7 +536,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                     child: Text(
                       '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}',
                       textAlign: TextAlign.end,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -592,19 +634,11 @@ class _RoutePainter extends CustomPainter {
 
     // Start dot — green
     final startOffset = toOffset(points.first);
-    canvas.drawCircle(
-      startOffset,
-      5,
-      Paint()..color = const Color(0xFF4CAF50),
-    );
+    canvas.drawCircle(startOffset, 5, Paint()..color = const Color(0xFF4CAF50));
 
     // End dot — colored by workout type
     final endOffset = toOffset(points.last);
-    canvas.drawCircle(
-      endOffset,
-      5,
-      Paint()..color = lineColor,
-    );
+    canvas.drawCircle(endOffset, 5, Paint()..color = lineColor);
   }
 
   @override

@@ -37,7 +37,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
-  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+    !kDebugMode,
+  );
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
   PlatformDispatcher.instance.onError = (error, stack) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
@@ -51,10 +53,14 @@ void main() async {
   debugPrint('[Startup] SUPABASE_ANON_KEY length=${supabaseAnonKey.length}');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    const debugMessage = 'Supabase credentials missing.\n\n'
+    const debugMessage =
+        'Supabase credentials missing.\n\n'
         'Run with: flutter build/run --dart-define-from-file=dart_defines.env';
-    await FirebaseCrashlytics.instance
-        .recordError(Exception(debugMessage), null, fatal: true);
+    await FirebaseCrashlytics.instance.recordError(
+      Exception(debugMessage),
+      null,
+      fatal: true,
+    );
     runApp(_StartupErrorApp(debugMessage: debugMessage));
     return;
   }
@@ -86,8 +92,10 @@ void main() async {
     // but doing it here avoids a race for the very first app_opened event).
     final existingUser = Supabase.instance.client.auth.currentUser;
     if (existingUser != null) {
-      await Analytics.identify(existingUser.id,
-          properties: {'email': existingUser.email ?? ''});
+      await Analytics.identify(
+        existingUser.id,
+        properties: {'email': existingUser.email ?? ''},
+      );
     }
     await Analytics.appOpened();
   } else {
@@ -190,7 +198,11 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _savePushToken() async {
     final messaging = FirebaseMessaging.instance;
-    final settings = await messaging.requestPermission(alert: false, badge: false, sound: false);
+    final settings = await messaging.requestPermission(
+      alert: false,
+      badge: false,
+      sound: false,
+    );
     if (settings.authorizationStatus == AuthorizationStatus.denied) return;
     final token = await messaging.getToken();
     if (token != null) {
@@ -226,52 +238,57 @@ class _AppInitializerState extends State<AppInitializer> {
       }
     } catch (e, stack) {
       debugPrint('[AppInitializer] Init error: $e');
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'app_init_failed', fatal: true);
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        stack,
+        reason: 'app_init_failed',
+        fatal: true,
+      );
       if (mounted) setState(() => _initError = true);
     }
   }
 
   void _listenAuthEvents() {
-    _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen(
-      (data) async {
-        final event = data.event;
-        debugPrint('[Auth] Event: $event');
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) async {
+      final event = data.event;
+      debugPrint('[Auth] Event: $event');
 
-        if (event == AuthChangeEvent.passwordRecovery) {
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
-            );
-          }
-          return;
+      if (event == AuthChangeEvent.passwordRecovery) {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+          );
         }
+        return;
+      }
 
-        // AFTER
-        if (event == AuthChangeEvent.signedIn ||
-            event == AuthChangeEvent.initialSession) {
-          final user = Supabase.instance.client.auth.currentUser;
-          if (user != null) {
-            await RevenueCatService.init(user.id);
-            await Analytics.identify(user.id,
-                properties: {'email': user.email ?? ''});
-            FirebaseCrashlytics.instance.setUserIdentifier(user.id);
-            // Pull the account's saved theme preference (new-device restore).
-            final profile = await ProfileService.instance.fetchProfile();
-            await ThemeController.instance.applyFromRemote(profile?.themeMode);
-            _savePushToken().catchError(
-              (e) => debugPrint('[Auth] savePushToken error: $e'),
-            );
-          }
+      // AFTER
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.initialSession) {
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          await RevenueCatService.init(user.id);
+          await Analytics.identify(
+            user.id,
+            properties: {'email': user.email ?? ''},
+          );
+          FirebaseCrashlytics.instance.setUserIdentifier(user.id);
+          // Pull the account's saved theme preference (new-device restore).
+          final profile = await ProfileService.instance.fetchProfile();
+          await ThemeController.instance.applyFromRemote(profile?.themeMode);
+          _savePushToken().catchError(
+            (e) => debugPrint('[Auth] savePushToken error: $e'),
+          );
         }
+      }
 
-        if (event == AuthChangeEvent.signedOut) {
-          await Analytics.reset();
-        }
-        if (mounted) setState(() {});
-      },
-      onError: (e) => debugPrint('[Auth] Stream error: $e'),
-    );
+      if (event == AuthChangeEvent.signedOut) {
+        await Analytics.reset();
+      }
+      if (mounted) setState(() {});
+    }, onError: (e) => debugPrint('[Auth] Stream error: $e'));
   }
 
   @override
@@ -284,11 +301,7 @@ class _AppInitializerState extends State<AppInitializer> {
   Widget build(BuildContext context) {
     // Still initializing
     if (!_initDone && !_initError) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Init failed
@@ -303,12 +316,17 @@ class _AppInitializerState extends State<AppInitializer> {
               Text(
                 'Failed to initialize app',
                 style: TextStyle(
-                    fontSize: 16, color: context.colors.textSecondary),
+                  fontSize: 16,
+                  color: context.colors.textSecondary,
+                ),
               ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () {
-                  setState(() { _initError = false; _initDone = false; });
+                  setState(() {
+                    _initError = false;
+                    _initDone = false;
+                  });
                   _initialize();
                 },
                 child: const Text('Retry'),
@@ -321,7 +339,9 @@ class _AppInitializerState extends State<AppInitializer> {
 
     // ── STEP 1: Must have a session ──
     final session = Supabase.instance.client.auth.currentSession;
-    debugPrint('[AppInitializer] session=${session != null ? "active" : "null"}');
+    debugPrint(
+      '[AppInitializer] session=${session != null ? "active" : "null"}',
+    );
 
     if (session == null) {
       return AuthScreen(
@@ -334,12 +354,12 @@ class _AppInitializerState extends State<AppInitializer> {
     // ── STEP 2: Must complete onboarding ──
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-       return AuthScreen(
-         onAuthenticated: () {
+      return AuthScreen(
+        onAuthenticated: () {
           if (mounted) setState(() {});
         },
       );
-    } 
+    }
     final onboardingDone = _firstRunService?.isOnboardingCompleted() ?? false;
     debugPrint('[AppInitializer] onboardingDone=$onboardingDone');
 
@@ -401,14 +421,18 @@ class _MainNavigationState extends State<MainNavigation> {
             onNavigateToRun: _navigateToRun,
             onCoachMessageReady: _onCoachMessageReady,
           ),
-          RunScreenWrapper(onRunCompleted: _onRunCompleted, activeCoachMessage: _activeCoachMessage),
+          RunScreenWrapper(
+            onRunCompleted: _onRunCompleted,
+            activeCoachMessage: _activeCoachMessage,
+          ),
           YouScreenWrapper(key: _youKey),
         ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           border: Border(
-              top: BorderSide(color: context.colors.divider, width: 1)),
+            top: BorderSide(color: context.colors.divider, width: 1),
+          ),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
@@ -436,7 +460,7 @@ class _MainNavigationState extends State<MainNavigation> {
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'You',
-            ),  
+            ),
           ],
         ),
       ),
@@ -486,7 +510,11 @@ class RunScreenWrapper extends StatelessWidget {
   final VoidCallback onRunCompleted;
   final message.CoachMessage? activeCoachMessage;
 
-  const RunScreenWrapper({super.key, required this.onRunCompleted, this.activeCoachMessage});
+  const RunScreenWrapper({
+    super.key,
+    required this.onRunCompleted,
+    this.activeCoachMessage,
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -15,10 +15,10 @@ class FirstRunService {
   }
 
   String _onboardingKey() {
-  final user = Supabase.instance.client.auth.currentUser;
-  if (user == null) return 'onboarding_completed_unknown';
-  return 'onboarding_completed_${user.id}';
-}
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return 'onboarding_completed_unknown';
+    return 'onboarding_completed_${user.id}';
+  }
 
   bool isOnboardingCompleted() {
     final key = _onboardingKey();
@@ -42,14 +42,15 @@ class FirstRunService {
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
-      Supabase.instance.client.auth.updateUser(
-        UserAttributes(data: {'onboarding_complete': true}),
-      ).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw Exception('metadata update timed out'),
-      ).catchError((e) {
-        debugPrint('Failed to save onboarding flag to Supabase: $e');
-      });
+      Supabase.instance.client.auth
+          .updateUser(UserAttributes(data: {'onboarding_complete': true}))
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw Exception('metadata update timed out'),
+          )
+          .catchError((e) {
+            debugPrint('Failed to save onboarding flag to Supabase: $e');
+          });
     }
   }
 

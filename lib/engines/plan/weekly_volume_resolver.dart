@@ -5,10 +5,30 @@ import '../progression_decision.dart';
 class WeeklyVolumeResolver {
   // ── Volume range table ───────────────────────────────────────────────────
   static const Map<RaceDistance, _VolumeRange> _ranges = {
-    RaceDistance.fiveK:        _VolumeRange(min: 15, sweetLow: 25, sweetHigh: 40, safeCap: 50),
-    RaceDistance.tenK:         _VolumeRange(min: 20, sweetLow: 30, sweetHigh: 50, safeCap: 80),
-    RaceDistance.halfMarathon: _VolumeRange(min: 30, sweetLow: 40, sweetHigh: 70, safeCap: 100),
-    RaceDistance.marathon:     _VolumeRange(min: 40, sweetLow: 55, sweetHigh: 90, safeCap: 130),
+    RaceDistance.fiveK: _VolumeRange(
+      min: 15,
+      sweetLow: 25,
+      sweetHigh: 40,
+      safeCap: 50,
+    ),
+    RaceDistance.tenK: _VolumeRange(
+      min: 20,
+      sweetLow: 30,
+      sweetHigh: 50,
+      safeCap: 80,
+    ),
+    RaceDistance.halfMarathon: _VolumeRange(
+      min: 30,
+      sweetLow: 40,
+      sweetHigh: 70,
+      safeCap: 100,
+    ),
+    RaceDistance.marathon: _VolumeRange(
+      min: 40,
+      sweetLow: 55,
+      sweetHigh: 90,
+      safeCap: 130,
+    ),
   };
 
   /// Main entry point. Returns weekly target km rounded to nearest 0.5.
@@ -56,7 +76,7 @@ class WeeklyVolumeResolver {
     if (decision == ProgressionDecision.hold) return 1.0;
 
     // Progress — ramp rate by position vs sweet spot
-    if (prev < range.min)      return 1.10;
+    if (prev < range.min) return 1.10;
     if (prev < range.sweetLow) return 1.10;
     if (prev <= range.sweetHigh) {
       return prev < (range.sweetLow + range.sweetHigh) / 2 ? 1.08 : 1.05;

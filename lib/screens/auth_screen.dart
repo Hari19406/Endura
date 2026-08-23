@@ -11,10 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
 
-  const AuthScreen({
-    super.key,
-    required this.onAuthenticated,
-  });
+  const AuthScreen({super.key, required this.onAuthenticated});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -27,24 +24,26 @@ class _AuthScreenState extends State<AuthScreen> {
   String? _errorMessage;
   bool _submitLocked = false;
 
-  final _emailController    = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _formKey            = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
 
   // ── Legal URLs — replace with your actual hosted URLs ─────────────────────
-  static const _termsUrl   = 'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
-  static const _privacyUrl = 'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
+  static const _termsUrl =
+      'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
+  static const _privacyUrl =
+      'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
 
   // ── Theme tokens ──────────────────────────────────────────────────────────
-  static const _bg            = Color(0xFF000000);
-  static const _fieldFill     = Color(0xFF1A1A1A);
-  static const _fieldBorder   = Color(0xFF2A2A2A);
-  static const _fieldFocused  = Color(0xFFFFFFFF);
-  static const _hintColor     = Color(0xFF6B6B6B);
-  static const _subtleText    = Color(0xFF9A9A9A);
-  static const _errorRed      = Color(0xFFFF6B6B);
-  static const _errorBg       = Color(0xFF2A1414);
-  static const _errorBorder   = Color(0xFF4A2020);
+  static const _bg = Color(0xFF000000);
+  static const _fieldFill = Color(0xFF1A1A1A);
+  static const _fieldBorder = Color(0xFF2A2A2A);
+  static const _fieldFocused = Color(0xFFFFFFFF);
+  static const _hintColor = Color(0xFF6B6B6B);
+  static const _subtleText = Color(0xFF9A9A9A);
+  static const _errorRed = Color(0xFFFF6B6B);
+  static const _errorBg = Color(0xFF2A1414);
+  static const _errorBorder = Color(0xFF4A2020);
 
   @override
   void dispose() {
@@ -59,13 +58,16 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_submitLocked) return;
     if (!_formKey.currentState!.validate()) return;
     _submitLocked = true;
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       if (_isSignUp) {
         await Supabase.instance.client.auth.signUp(
-          email:           _emailController.text.trim(),
-          password:        _passwordController.text,
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
           emailRedirectTo: 'com.hari.endura://auth-callback',
         );
 
@@ -73,7 +75,7 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) _showEmailConfirmationDialog();
       } else {
         await Supabase.instance.client.auth.signInWithPassword(
-          email:    _emailController.text.trim(),
+          email: _emailController.text.trim(),
           password: _passwordController.text,
         );
         await Analytics.login('email');
@@ -83,13 +85,17 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         setState(() {
           _errorMessage = _friendlyError(e.message);
-          if (e.message.contains('already registered') || e.message.contains('already been registered')) {
+          if (e.message.contains('already registered') ||
+              e.message.contains('already been registered')) {
             _isSignUp = false;
           }
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _errorMessage = 'Something went wrong. Check your connection.');
+      if (mounted)
+        setState(
+          () => _errorMessage = 'Something went wrong. Check your connection.',
+        );
     } finally {
       _submitLocked = false;
       if (mounted) setState(() => _isLoading = false);
@@ -103,9 +109,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }) async {
     try {
       await Supabase.instance.client.from('profiles').upsert({
-        'id':         userId,
+        'id': userId,
         'first_name': firstName,
-        'last_name':  lastName,
+        'last_name': lastName,
       });
     } catch (_) {
       // Non-fatal: profile name will be missing but auth succeeded.
@@ -119,7 +125,10 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _errorMessage = 'Enter your email above first.');
       return;
     }
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
@@ -129,7 +138,8 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('If that email exists, we sent a reset link.')),
+            content: Text('If that email exists, we sent a reset link.'),
+          ),
         );
       }
     } finally {
@@ -143,8 +153,10 @@ class _AuthScreenState extends State<AuthScreen> {
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Check your email',
-            style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Check your email',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           'We sent a confirmation link to ${_emailController.text.trim()}. '
           'Click it to activate your account, then sign in.',
@@ -156,8 +168,10 @@ class _AuthScreenState extends State<AuthScreen> {
               Navigator.pop(context);
               setState(() => _isSignUp = false);
             },
-            child: const Text('OK, take me to sign in',
-                style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'OK, take me to sign in',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -165,12 +179,16 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   String _friendlyError(String message) {
-    if (message.contains('Invalid login'))       return 'Wrong email or password.';
-    if (message.contains('Email not confirmed')) return 'Please confirm your email before signing in.';
-    if (message.contains('already registered') || message.contains('already been registered'))
+    if (message.contains('Invalid login')) return 'Wrong email or password.';
+    if (message.contains('Email not confirmed'))
+      return 'Please confirm your email before signing in.';
+    if (message.contains('already registered') ||
+        message.contains('already been registered'))
       return 'An account with this email already exists. Switched to sign in.';
-    if (message.contains('Password should be'))  return 'Password must be at least 8 characters.';
-    if (message.toLowerCase().contains('rate limit') || message.toLowerCase().contains('too many requests'))
+    if (message.contains('Password should be'))
+      return 'Password must be at least 8 characters.';
+    if (message.toLowerCase().contains('rate limit') ||
+        message.toLowerCase().contains('too many requests'))
       return 'Too many attempts. Please wait a few minutes and try again.';
     return message;
   }
@@ -178,7 +196,10 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _signInWithGoogle() async {
     if (_submitLocked) return;
     _submitLocked = true;
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       const webClientId = String.fromEnvironment(
@@ -187,9 +208,11 @@ class _AuthScreenState extends State<AuthScreen> {
             '564529835415-5m1r3fknq90hkb547c1gi4an1u6gkps6.apps.googleusercontent.com',
       );
 
-      final GoogleSignIn googleSignIn =
-          GoogleSignIn(serverClientId: webClientId);
-      await googleSignIn.signOut(); // clear cached account so picker always shows
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: webClientId,
+      );
+      await googleSignIn
+          .signOut(); // clear cached account so picker always shows
       final googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
@@ -198,22 +221,23 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
 
-      final googleAuth  = await googleUser.authentication;
+      final googleAuth = await googleUser.authentication;
       final accessToken = googleAuth.accessToken;
-      final idToken     = googleAuth.idToken;
+      final idToken = googleAuth.idToken;
 
       if (idToken == null) {
         _submitLocked = false;
-        if (mounted) setState(() {
-          _isLoading    = false;
-          _errorMessage = 'Google sign in failed. Try again.';
-        });
+        if (mounted)
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Google sign in failed. Try again.';
+          });
         return;
       }
 
       final response = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken:     idToken,
+        idToken: idToken,
         accessToken: accessToken,
       );
 
@@ -223,8 +247,12 @@ class _AuthScreenState extends State<AuthScreen> {
       if (userId != null && displayName.isNotEmpty) {
         final parts = displayName.trim().split(RegExp(r'\s+'));
         final first = parts.isNotEmpty ? parts.first : '';
-        final last  = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-        await _saveNameToProfile(userId: userId, firstName: first, lastName: last);
+        final last = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+        await _saveNameToProfile(
+          userId: userId,
+          firstName: first,
+          lastName: last,
+        );
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('first_name', first);
       }
@@ -232,19 +260,20 @@ class _AuthScreenState extends State<AuthScreen> {
       _submitLocked = false;
       await Analytics.signup('google');
       if (mounted) widget.onAuthenticated();
-
     } on AuthException catch (e) {
       _submitLocked = false;
-      if (mounted) setState(() {
-        _isLoading    = false;
-        _errorMessage = _friendlyError(e.message);
-      });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _errorMessage = _friendlyError(e.message);
+        });
     } catch (e) {
       _submitLocked = false;
-      if (mounted) setState(() {
-        _isLoading    = false;
-        _errorMessage = 'Google sign in failed. Try again.';
-      });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Google sign in failed. Try again.';
+        });
     }
   }
 
@@ -306,7 +335,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       side: const BorderSide(color: _fieldBorder),
                       backgroundColor: _fieldFill,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -341,10 +371,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
                         'Or',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: _hintColor,
-                        ),
+                        style: TextStyle(fontSize: 13, color: _hintColor),
                       ),
                     ),
                     const Expanded(child: Divider(color: _fieldBorder)),
@@ -365,8 +392,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   decoration: _inputDecoration('eg. johnfrans@gmail.com'),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Email is required';
-                    final emailValid =
-                        RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
+                    final emailValid = RegExp(
+                      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                    ).hasMatch(v.trim());
                     if (!emailValid) return 'Enter a valid email';
                     return null;
                   },
@@ -384,11 +412,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   onFieldSubmitted: (_) => _submit(),
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: _isSignUp
-                        ? 'Enter your password'
-                        : '••••••••',
-                    hintStyle: const TextStyle(
-                        color: _hintColor, fontSize: 14),
+                    hintText: _isSignUp ? 'Enter your password' : '••••••••',
+                    hintStyle: const TextStyle(color: _hintColor, fontSize: 14),
                     filled: true,
                     fillColor: _fieldFill,
                     border: OutlineInputBorder(
@@ -402,7 +427,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(
-                          color: _fieldFocused, width: 1.5),
+                        color: _fieldFocused,
+                        width: 1.5,
+                      ),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -413,7 +440,9 @@ class _AuthScreenState extends State<AuthScreen> {
                       borderSide: const BorderSide(color: _errorRed),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -422,8 +451,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         color: _hintColor,
                         size: 20,
                       ),
-                      onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: (v) {
@@ -440,10 +469,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Must be at least 8 characters.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ] else ...[
                   const SizedBox(height: 8),
@@ -476,14 +502,19 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: _errorRed, size: 18),
+                        const Icon(
+                          Icons.error_outline,
+                          color: _errorRed,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMessage!,
                             style: const TextStyle(
-                                fontSize: 13, color: _errorRed),
+                              fontSize: 13,
+                              color: _errorRed,
+                            ),
                           ),
                         ),
                       ],
@@ -503,7 +534,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       foregroundColor: Colors.black,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       disabledBackgroundColor: Colors.grey.shade700,
                       disabledForegroundColor: Colors.grey.shade400,
                     ),
@@ -512,13 +544,16 @@ class _AuthScreenState extends State<AuthScreen> {
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.black),
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
                           )
                         : Text(
                             _isSignUp ? 'Sign Up' : 'Sign In',
                             style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                   ),
                 ),
@@ -535,11 +570,13 @@ class _AuthScreenState extends State<AuthScreen> {
                             ? 'Already have an account? '
                             : "Don't have an account? ",
                         style: const TextStyle(
-                            fontSize: 14, color: _subtleText),
+                          fontSize: 14,
+                          color: _subtleText,
+                        ),
                       ),
                       GestureDetector(
                         onTap: () => setState(() {
-                          _isSignUp     = !_isSignUp;
+                          _isSignUp = !_isSignUp;
                           _errorMessage = null;
                         }),
                         child: Text(
@@ -568,7 +605,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         height: 1.5,
                       ),
                       children: [
-                        const TextSpan(text: 'By continuing, you agree to our '),
+                        const TextSpan(
+                          text: 'By continuing, you agree to our ',
+                        ),
                         TextSpan(
                           text: 'Terms of Service',
                           style: const TextStyle(
@@ -606,39 +645,39 @@ class _AuthScreenState extends State<AuthScreen> {
   // ── Helpers ────────────────────────────────────────────────────
 
   Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Colors.white),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: Colors.white,
+    ),
+  );
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: _hintColor, fontSize: 14),
-        filled: true,
-        fillColor: _fieldFill,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _fieldBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _fieldBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _fieldFocused, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _errorRed),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _errorRed),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      );
+    hintText: hint,
+    hintStyle: const TextStyle(color: _hintColor, fontSize: 14),
+    filled: true,
+    fillColor: _fieldFill,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _fieldBorder),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _fieldBorder),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _fieldFocused, width: 1.5),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _errorRed),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _errorRed),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  );
 }

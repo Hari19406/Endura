@@ -58,20 +58,26 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     );
   }
 
-  List<ResolvedBlock> get _warmupBlocks =>
-      widget.coachMessage.resolvedWorkout.blocks
-          .where((b) => b.type == BlockType.warmup)
-          .toList();
+  List<ResolvedBlock> get _warmupBlocks => widget
+      .coachMessage
+      .resolvedWorkout
+      .blocks
+      .where((b) => b.type == BlockType.warmup)
+      .toList();
 
-  List<ResolvedBlock> get _workBlocks =>
-      widget.coachMessage.resolvedWorkout.blocks
-          .where((b) => b.type == BlockType.main || b.type == BlockType.recovery)
-          .toList();
+  List<ResolvedBlock> get _workBlocks => widget
+      .coachMessage
+      .resolvedWorkout
+      .blocks
+      .where((b) => b.type == BlockType.main || b.type == BlockType.recovery)
+      .toList();
 
-  List<ResolvedBlock> get _cooldownBlocks =>
-      widget.coachMessage.resolvedWorkout.blocks
-          .where((b) => b.type == BlockType.cooldown)
-          .toList();
+  List<ResolvedBlock> get _cooldownBlocks => widget
+      .coachMessage
+      .resolvedWorkout
+      .blocks
+      .where((b) => b.type == BlockType.cooldown)
+      .toList();
 
   bool get _hasWarmup =>
       widget.coachMessage.hasWarmupCooldown && _warmupBlocks.isNotEmpty;
@@ -82,7 +88,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   @override
   Widget build(BuildContext context) {
     final workout = widget.coachMessage.resolvedWorkout;
-    final hasCoachContent = widget.coachMessage.reflectionText.isNotEmpty ||
+    final hasCoachContent =
+        widget.coachMessage.reflectionText.isNotEmpty ||
         widget.coachMessage.goalText.isNotEmpty ||
         widget.coachMessage.feelText.isNotEmpty;
 
@@ -113,7 +120,6 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── Header card ──────────────────────────────────────────────────
             _Card(
               child: Column(
@@ -138,10 +144,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                     widget.coachMessage.hasWarmupCooldown
                         ? 'Warmup & cooldown included'
                         : 'Easy effort — no warmup needed',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textTertiary,
-                    ),
+                    style: TextStyle(fontSize: 12, color: c.textTertiary),
                   ),
                   const SizedBox(height: 14),
                   _buildHeroStats(workout),
@@ -375,7 +378,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
 
     final totalDist = workout.totalDistanceKm;
     if (totalDist > 0) {
-      values.add('${UnitUtils.displayDistance(totalDist, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}');
+      values.add(
+        '${UnitUtils.displayDistance(totalDist, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
+      );
       labels.add('DISTANCE');
     }
 
@@ -397,7 +402,6 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
             .reduce((a, b) => a > b ? a : b);
         final intent = widget.coachMessage.workoutIntent;
         if ((intent == WorkoutIntent.aerobicBase ||
-                intent == WorkoutIntent.recovery ||
                 intent == WorkoutIntent.endurance) &&
             (slowest - fastest) >= 30) {
           final ceiling = (fastest / 5).round() * 5;
@@ -405,9 +409,11 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         } else {
           final lo = (fastest / 5).round() * 5;
           final hi = (slowest / 5).round() * 5;
-          values.add(lo == hi
-              ? '${_fmt(lo)} ${UnitUtils.perUnitLabel(_useMiles)}'
-              : '${_fmt(lo)}–${_fmt(hi)} ${UnitUtils.perUnitLabel(_useMiles)}');
+          values.add(
+            lo == hi
+                ? '${_fmt(lo)} ${UnitUtils.perUnitLabel(_useMiles)}'
+                : '${_fmt(lo)}–${_fmt(hi)} ${UnitUtils.perUnitLabel(_useMiles)}',
+          );
         }
         labels.add('PACE');
       }
@@ -456,7 +462,10 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   }
 
   String _fmt(int secondsPerKm) {
-    final displaySeconds = UnitUtils.displayPaceSeconds(secondsPerKm.toDouble(), _useMiles);
+    final displaySeconds = UnitUtils.displayPaceSeconds(
+      secondsPerKm.toDouble(),
+      _useMiles,
+    );
     return UnitUtils.formatSeconds(displaySeconds.round());
   }
 }
@@ -549,14 +558,15 @@ class _WorkoutSection extends StatelessWidget {
   }
 
   Widget _buildBlockRow(ResolvedBlock block) {
-    final blockLabel = block.label ??
+    final blockLabel =
+        block.label ??
         (block.type == BlockType.recovery
             ? 'Recovery'
             : block.type == BlockType.warmup
-                ? 'Warmup'
-                : block.type == BlockType.cooldown
-                    ? 'Cooldown'
-                    : 'Run');
+            ? 'Warmup'
+            : block.type == BlockType.cooldown
+            ? 'Cooldown'
+            : 'Run');
 
     final String quantity;
     if (block.reps != null && block.reps! > 1) {
@@ -583,53 +593,55 @@ class _WorkoutSection extends StatelessWidget {
     final icon = block.type == BlockType.recovery
         ? Icons.pause_circle_outline
         : block.type == BlockType.warmup || block.type == BlockType.cooldown
-            ? Icons.timer_outlined
-            : block.reps != null && block.reps! > 1
-                ? Icons.repeat
-                : Icons.straighten;
+        ? Icons.timer_outlined
+        : block.reps != null && block.reps! > 1
+        ? Icons.repeat
+        : Icons.straighten;
 
     final detail = StringBuffer(quantity);
     detail.write(' · $pace');
     if (recovery != null) detail.write(' · $recovery');
 
-    return Builder(builder: (context) {
-    final c = context.colors;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Icon(icon, size: 14, color: c.textFaint),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                blockLabel,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: c.textPrimary,
-                ),
+    return Builder(
+      builder: (context) {
+        final c = context.colors;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Icon(icon, size: 14, color: c.textFaint),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    blockLabel,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: c.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail.toString(),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: c.textSecondary,
+                      height: 1.4,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                detail.toString(),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: c.textSecondary,
-                  height: 1.4,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
-    });
   }
 
   String _smartDistance(double km) {
@@ -640,8 +652,8 @@ class _WorkoutSection extends StatelessWidget {
 
   String _paceForIntent(ResolvedBlock block, WorkoutIntent intent) {
     if (block.isRpeOnly) return 'RPE effort';
-    final isEasy = (intent == WorkoutIntent.aerobicBase ||
-            intent == WorkoutIntent.recovery ||
+    final isEasy =
+        (intent == WorkoutIntent.aerobicBase ||
             intent == WorkoutIntent.endurance) &&
         block.paceMaxSecondsPerKm - block.paceMinSecondsPerKm >= 30;
     final unit = UnitUtils.perUnitLabel(useMiles);
@@ -657,7 +669,10 @@ class _WorkoutSection extends StatelessWidget {
   }
 
   String _formatDisplayPace(int secondsPerKm) {
-    final displaySeconds = UnitUtils.displayPaceSeconds(secondsPerKm.toDouble(), useMiles);
+    final displaySeconds = UnitUtils.displayPaceSeconds(
+      secondsPerKm.toDouble(),
+      useMiles,
+    );
     return UnitUtils.formatSeconds(displaySeconds.round());
   }
 }

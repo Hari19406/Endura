@@ -73,15 +73,15 @@ Future<void> main(List<String> args) async {
 }
 
 SimPersona _personaByNumber(int n) => switch (n) {
-      1 => SimPersona.persona1(),
-      2 => SimPersona.persona2(),
-      4 => SimPersona.persona4(),
-      5 => SimPersona.persona5(),
-      6 => SimPersona.persona6(),
-      7 => SimPersona.persona7(),
-      8 => SimPersona.persona8(),
-      _ => SimPersona.persona3(), // default to baseline
-    };
+  1 => SimPersona.persona1(),
+  2 => SimPersona.persona2(),
+  4 => SimPersona.persona4(),
+  5 => SimPersona.persona5(),
+  6 => SimPersona.persona6(),
+  7 => SimPersona.persona7(),
+  8 => SimPersona.persona8(),
+  _ => SimPersona.persona3(), // default to baseline
+};
 
 Future<void> _writeJson(String filename, String json) async {
   try {
@@ -105,9 +105,11 @@ Future<void> _writeSummaryReport(List<SimLog> logs) async {
     final warnCount = log.globalWarnings.length;
     totalWarnings += warnCount;
     final flag = warnCount > 0 ? '⚠️ ' : '✓  ';
-    print('║ $flag ${log.persona.id.padRight(38)} '
-        'vDOT ${log.initialVdot}→${log.finalVdot}  '
-        'W:$warnCount ║');
+    print(
+      '║ $flag ${log.persona.id.padRight(38)} '
+      'vDOT ${log.initialVdot}→${log.finalVdot}  '
+      'W:$warnCount ║',
+    );
   }
 
   print('╠══════════════════════════════════════════════════════════════╣');

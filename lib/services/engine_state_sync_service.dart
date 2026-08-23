@@ -19,7 +19,9 @@ class EngineStateSyncService {
     if (!isSignedIn) return;
 
     try {
-      final metadata = Map<String, dynamic>.from(_user?.userMetadata ?? const {});
+      final metadata = Map<String, dynamic>.from(
+        _user?.userMetadata ?? const {},
+      );
       metadata[_engineMemoryKey] = {
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
         'payload': memory.toJson(),
@@ -35,7 +37,9 @@ class EngineStateSyncService {
     if (!isSignedIn) return;
 
     try {
-      final metadata = Map<String, dynamic>.from(_user?.userMetadata ?? const {});
+      final metadata = Map<String, dynamic>.from(
+        _user?.userMetadata ?? const {},
+      );
       metadata[_trainingDaysKey] = {
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
         'payload': [...indices]..sort(),
@@ -49,12 +53,15 @@ class EngineStateSyncService {
 
   /// Refreshes the auth session once and returns both engine memory and
   /// training days — avoids two round-trips when both are needed together.
-  Future<({
-    EngineMemory? memory,
-    DateTime? memoryUpdatedAt,
-    List<int>? trainingDays,
-    DateTime? trainingDaysUpdatedAt,
-  })> fetchCloudCoachingState() async {
+  Future<
+    ({
+      EngineMemory? memory,
+      DateTime? memoryUpdatedAt,
+      List<int>? trainingDays,
+      DateTime? trainingDaysUpdatedAt,
+    })
+  >
+  fetchCloudCoachingState() async {
     try {
       await _client.auth.refreshSession();
     } catch (_) {}

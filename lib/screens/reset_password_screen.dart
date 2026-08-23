@@ -11,11 +11,11 @@ class ResetPasswordScreen extends StatefulWidget {
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _passwordController = TextEditingController();
-  final _confirmController  = TextEditingController();
-  final _formKey            = GlobalKey<FormState>();
-  bool _isLoading           = false;
-  bool _obscurePassword     = true;
-  bool _obscureConfirm      = true;
+  final _confirmController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   String? _errorMessage;
 
   @override
@@ -27,7 +27,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       await Supabase.instance.client.auth.updateUser(
@@ -47,7 +50,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     } on AuthException catch (e) {
       if (mounted) setState(() => _errorMessage = e.message);
     } catch (_) {
-      if (mounted) setState(() => _errorMessage = 'Something went wrong. Try again.');
+      if (mounted)
+        setState(() => _errorMessage = 'Something went wrong. Try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -86,33 +90,47 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Choose a strong password for your account.',
-                  style: TextStyle(fontSize: 14, color: c.textSecondary, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: c.textSecondary,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 36),
 
                 // Password field
                 Text(
                   'New password',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textPrimary),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: c.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.next,
-                  decoration: _inputDecoration(context, 'At least 8 characters').copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: c.textTertiary,
-                        size: 20,
+                  decoration: _inputDecoration(context, 'At least 8 characters')
+                      .copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: c.textTertiary,
+                            size: 20,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 8)           return 'Password must be at least 8 characters';
+                    if (v.length < 8)
+                      return 'Password must be at least 8 characters';
                     return null;
                   },
                 ),
@@ -122,7 +140,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 // Confirm password field
                 Text(
                   'Confirm password',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textPrimary),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: c.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -130,19 +152,26 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   obscureText: _obscureConfirm,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
-                  decoration: _inputDecoration(context, 'Repeat your password').copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: c.textTertiary,
-                        size: 20,
+                  decoration: _inputDecoration(context, 'Repeat your password')
+                      .copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirm
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: c.textTertiary,
+                            size: 20,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm,
+                          ),
+                        ),
                       ),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                  ),
                   validator: (v) {
-                    if (v == null || v.isEmpty)           return 'Please confirm your password';
-                    if (v != _passwordController.text)    return 'Passwords do not match';
+                    if (v == null || v.isEmpty)
+                      return 'Please confirm your password';
+                    if (v != _passwordController.text)
+                      return 'Passwords do not match';
                     return null;
                   },
                 ),
@@ -159,12 +188,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: Color(0xFFD32F2F), size: 18),
+                        const Icon(
+                          Icons.error_outline,
+                          color: Color(0xFFD32F2F),
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(fontSize: 13, color: Color(0xFFD32F2F)),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFFD32F2F),
+                            ),
                           ),
                         ),
                       ],
@@ -183,17 +219,26 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       backgroundColor: c.accent,
                       foregroundColor: c.onAccent,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       disabledBackgroundColor: c.textFaint,
                     ),
                     child: _isLoading
                         ? SizedBox(
-                            width: 22, height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: c.onAccent),
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: c.onAccent,
+                            ),
                           )
                         : const Text(
                             'Update password',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                   ),
                 ),
@@ -208,27 +253,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   InputDecoration _inputDecoration(BuildContext context, String hint) {
     final c = context.colors;
     return InputDecoration(
-    hintText: hint,
-    hintStyle: TextStyle(color: c.textTertiary, fontSize: 14),
-    filled: true,
-    fillColor: c.surface,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: c.border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: c.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: c.accent, width: 1.5),
-    ),
-    errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: Color(0xFFD32F2F)),
-    ),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  );
+      hintText: hint,
+      hintStyle: TextStyle(color: c.textTertiary, fontSize: 14),
+      filled: true,
+      fillColor: c.surface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: c.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: c.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: c.accent, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD32F2F)),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
   }
 }

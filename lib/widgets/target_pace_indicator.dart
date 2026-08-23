@@ -50,6 +50,7 @@ class PaceComparator {
     // Slower than max bound → TOO SLOW
     return PaceStatus.tooSlow;
   }
+
   /// Format int seconds/km → "M:SS"
   static String formatPace(int secondsPerKm) {
     if (secondsPerKm <= 0) return '--:--';
@@ -85,34 +86,46 @@ class TargetPaceIndicator extends StatelessWidget {
 
   // ── Visual config per status ─────────────────────────────────────────────
 
-  static const _onPaceColor  = Color(0xFF2E7D32); // green
+  static const _onPaceColor = Color(0xFF2E7D32); // green
   static const _tooSlowColor = Color(0xFFD32F2F); // red
   static const _tooFastColor = Color(0xFFF57C00); // amber
 
   Color _statusColor(PaceStatus s) {
     switch (s) {
-      case PaceStatus.onPace:  return _onPaceColor;
-      case PaceStatus.tooSlow: return _tooSlowColor;
-      case PaceStatus.tooFast: return _tooFastColor;
-      case PaceStatus.noData:  return const Color(0xFF999999);
+      case PaceStatus.onPace:
+        return _onPaceColor;
+      case PaceStatus.tooSlow:
+        return _tooSlowColor;
+      case PaceStatus.tooFast:
+        return _tooFastColor;
+      case PaceStatus.noData:
+        return const Color(0xFF999999);
     }
   }
 
   String _statusLabel(PaceStatus s) {
     switch (s) {
-      case PaceStatus.onPace:  return 'ON PACE';
-      case PaceStatus.tooSlow: return 'TOO SLOW';
-      case PaceStatus.tooFast: return 'TOO FAST';
-      case PaceStatus.noData:  return 'WAITING';
+      case PaceStatus.onPace:
+        return 'ON PACE';
+      case PaceStatus.tooSlow:
+        return 'TOO SLOW';
+      case PaceStatus.tooFast:
+        return 'TOO FAST';
+      case PaceStatus.noData:
+        return 'WAITING';
     }
   }
 
   IconData _statusIcon(PaceStatus s) {
     switch (s) {
-      case PaceStatus.onPace:  return Icons.check_circle_outline;
-      case PaceStatus.tooSlow: return Icons.arrow_downward_rounded;
-      case PaceStatus.tooFast: return Icons.arrow_upward_rounded;
-      case PaceStatus.noData:  return Icons.hourglass_empty_rounded;
+      case PaceStatus.onPace:
+        return Icons.check_circle_outline;
+      case PaceStatus.tooSlow:
+        return Icons.arrow_downward_rounded;
+      case PaceStatus.tooFast:
+        return Icons.arrow_upward_rounded;
+      case PaceStatus.noData:
+        return Icons.hourglass_empty_rounded;
     }
   }
 
@@ -128,10 +141,10 @@ class TargetPaceIndicator extends StatelessWidget {
       targetRange: targetRange!,
     );
 
-    final color  = _statusColor(status);
-    final label  = _statusLabel(status);
-    final icon   = _statusIcon(status);
-    final range  = PaceComparator.formatRange(targetRange!);
+    final color = _statusColor(status);
+    final label = _statusLabel(status);
+    final icon = _statusIcon(status);
+    final range = PaceComparator.formatRange(targetRange!);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -202,43 +215,38 @@ class TargetPaceIndicator extends StatelessWidget {
   }
 
   Widget _buildFreeRunBadge() {
-    return Builder(builder: (context) {
-      final c = context.colors;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: c.divider,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: c.border),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.directions_run,
-              size: 15,
-              color: c.textTertiary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'FREE RUN',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: c.textTertiary,
-                letterSpacing: 1,
+    return Builder(
+      builder: (context) {
+        final c = context.colors;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: c.divider,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.directions_run, size: 15, color: c.textTertiary),
+              const SizedBox(width: 8),
+              Text(
+                'FREE RUN',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: c.textTertiary,
+                  letterSpacing: 1,
+                ),
               ),
-            ),
-            const Spacer(),
-            Text(
-              'No target pace',
-              style: TextStyle(
-                fontSize: 11,
-                color: c.textFaint,
+              const Spacer(),
+              Text(
+                'No target pace',
+                style: TextStyle(fontSize: 11, color: c.textFaint),
               ),
-            ),
-          ],
-        ),
-      );
-    });
+            ],
+          ),
+        );
+      },
+    );
   }
 }

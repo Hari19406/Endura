@@ -44,39 +44,39 @@ class RunRecord {
   });
 
   Map<String, dynamic> toMap() => {
-        if (id != null) 'id': id,
-        'distance_km': distanceKm,
-        'average_pace': averagePace,
-        'duration_seconds': durationSeconds,
-        'date': date.toIso8601String(),
-        'route_polyline': routePolyline,
-        'workout_type': workoutType,
-        'synced_to_cloud': syncedToCloud ? 1 : 0,
-        'cs_value_at_time': csValueAtTime,
-        // rpe is intentionally omitted when null so SQLite keeps DEFAULT NULL
-        // and existing rows are never accidentally zeroed out.
-        if (rpe != null) 'rpe': rpe,
-        'elevation_gain': elevationGain,
-        'splits_json': jsonEncode(splits),
-      };
+    if (id != null) 'id': id,
+    'distance_km': distanceKm,
+    'average_pace': averagePace,
+    'duration_seconds': durationSeconds,
+    'date': date.toIso8601String(),
+    'route_polyline': routePolyline,
+    'workout_type': workoutType,
+    'synced_to_cloud': syncedToCloud ? 1 : 0,
+    'cs_value_at_time': csValueAtTime,
+    // rpe is intentionally omitted when null so SQLite keeps DEFAULT NULL
+    // and existing rows are never accidentally zeroed out.
+    if (rpe != null) 'rpe': rpe,
+    'elevation_gain': elevationGain,
+    'splits_json': jsonEncode(splits),
+  };
 
   factory RunRecord.fromMap(Map<String, dynamic> map) => RunRecord(
-        id: map['id'] as int?,
-        distanceKm: (map['distance_km'] as num).toDouble(),
-        averagePace: map['average_pace'] as String,
-        durationSeconds: map['duration_seconds'] as int,
-        date: DateTime.parse(map['date'] as String),
-        routePolyline: map['route_polyline'] as String? ?? '',
-        workoutType: map['workout_type'] as String? ?? 'easy',
-        syncedToCloud: (map['synced_to_cloud'] as int? ?? 0) == 1,
-        csValueAtTime: map['cs_value_at_time'] != null
-            ? (map['cs_value_at_time'] as num).toDouble()
-            : null,
-        // Safe cast: column may not exist on very old DB rows returned as null
-        rpe: map['rpe'] as int?,
-        elevationGain: (map['elevation_gain'] as num?)?.toDouble() ?? 0,
-        splits: _decodeSplits(map['splits_json'] as String?),
-      );
+    id: map['id'] as int?,
+    distanceKm: (map['distance_km'] as num).toDouble(),
+    averagePace: map['average_pace'] as String,
+    durationSeconds: map['duration_seconds'] as int,
+    date: DateTime.parse(map['date'] as String),
+    routePolyline: map['route_polyline'] as String? ?? '',
+    workoutType: map['workout_type'] as String? ?? 'easy',
+    syncedToCloud: (map['synced_to_cloud'] as int? ?? 0) == 1,
+    csValueAtTime: map['cs_value_at_time'] != null
+        ? (map['cs_value_at_time'] as num).toDouble()
+        : null,
+    // Safe cast: column may not exist on very old DB rows returned as null
+    rpe: map['rpe'] as int?,
+    elevationGain: (map['elevation_gain'] as num?)?.toDouble() ?? 0,
+    splits: _decodeSplits(map['splits_json'] as String?),
+  );
 
   static List<Map<String, dynamic>> _decodeSplits(String? json) {
     if (json == null || json.isEmpty) return [];
@@ -90,14 +90,14 @@ class RunRecord {
   /// Converts to RunHistory for consumption by home / you screens.
   /// rpe and durationSeconds are now forwarded correctly.
   RunHistory toRunHistory() => RunHistory(
-        distance: distanceKm,
-        averagePace: averagePace,
-        date: date,
-        gpsPoints: _decodePolyline(routePolyline),
-        durationSeconds: durationSeconds,
-        rpe: rpe,
-        workoutType: workoutType,
-      );
+    distance: distanceKm,
+    averagePace: averagePace,
+    date: date,
+    gpsPoints: _decodePolyline(routePolyline),
+    durationSeconds: durationSeconds,
+    rpe: rpe,
+    workoutType: workoutType,
+  );
 
   static List<Map<String, double>> _decodePolyline(String polyline) {
     if (polyline.isEmpty) return [];
@@ -117,6 +117,7 @@ class TrainingStateRecord {
   final DateTime date;
   final double acuteLoad;
   final double chronicLoad;
+
   /// Legacy DB column `critical_speed` preserved for backward compatibility.
   final double fitnessAnchorValue;
   final DateTime? lastQualityDate;
@@ -133,15 +134,15 @@ class TrainingStateRecord {
   });
 
   Map<String, dynamic> toMap() => {
-        if (id != null) 'id': id,
-        'date': date.toIso8601String(),
-        'acute_load': acuteLoad,
-        'chronic_load': chronicLoad,
-        'acwr': 1.0,
-        'critical_speed': fitnessAnchorValue,
-        'last_quality_date': lastQualityDate?.toIso8601String(),
-        'last_long_run_date': lastLongRunDate?.toIso8601String(),
-      };
+    if (id != null) 'id': id,
+    'date': date.toIso8601String(),
+    'acute_load': acuteLoad,
+    'chronic_load': chronicLoad,
+    'acwr': 1.0,
+    'critical_speed': fitnessAnchorValue,
+    'last_quality_date': lastQualityDate?.toIso8601String(),
+    'last_long_run_date': lastLongRunDate?.toIso8601String(),
+  };
 
   factory TrainingStateRecord.fromMap(Map<String, dynamic> map) =>
       TrainingStateRecord(
@@ -234,7 +235,8 @@ class DatabaseService {
         ''');
         await db.execute('CREATE INDEX idx_runs_date ON runs(date DESC)');
         await db.execute(
-            'CREATE INDEX idx_snap_date ON training_snapshots(date DESC)');
+          'CREATE INDEX idx_snap_date ON training_snapshots(date DESC)',
+        );
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         // Each migration block is additive and guarded by the old version so
@@ -247,7 +249,8 @@ class DatabaseService {
           // column already exists (e.g. manual testing, emulator reuse).
           try {
             await db.execute(
-                'ALTER TABLE runs ADD COLUMN cs_value_at_time REAL');
+              'ALTER TABLE runs ADD COLUMN cs_value_at_time REAL',
+            );
           } catch (e) {
             debugPrint('[DB] cs_value_at_time already exists, skipping: $e');
           }
@@ -295,13 +298,15 @@ class DatabaseService {
           // v5 → v6: elevation_gain, splits_json
           try {
             await db.execute(
-                'ALTER TABLE runs ADD COLUMN elevation_gain REAL NOT NULL DEFAULT 0');
+              'ALTER TABLE runs ADD COLUMN elevation_gain REAL NOT NULL DEFAULT 0',
+            );
           } catch (e) {
             debugPrint('[DB] elevation_gain already exists, skipping: $e');
           }
           try {
             await db.execute(
-                "ALTER TABLE runs ADD COLUMN splits_json TEXT NOT NULL DEFAULT '[]'");
+              "ALTER TABLE runs ADD COLUMN splits_json TEXT NOT NULL DEFAULT '[]'",
+            );
           } catch (e) {
             debugPrint('[DB] splits_json already exists, skipping: $e');
           }
@@ -314,7 +319,8 @@ class DatabaseService {
           // Status average, matching how new free runs behave going forward.
           try {
             await db.execute(
-                "UPDATE runs SET rpe = NULL WHERE workout_type = 'free' AND rpe = 0");
+              "UPDATE runs SET rpe = NULL WHERE workout_type = 'free' AND rpe = 0",
+            );
           } catch (e) {
             debugPrint('[DB] free-run rpe backfill failed: $e');
           }
@@ -328,8 +334,11 @@ class DatabaseService {
   Future<int> insertRun(RunRecord run) async {
     try {
       final db = await database;
-      return db.insert('runs', run.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      return db.insert(
+        'runs',
+        run.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     } catch (e, stack) {
       debugPrint('insertRun error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
@@ -357,8 +366,7 @@ class DatabaseService {
   Future<List<RunRecord>> getRecentRuns({int limit = 28}) async {
     try {
       final db = await database;
-      final rows =
-          await db.query('runs', orderBy: 'date DESC', limit: limit);
+      final rows = await db.query('runs', orderBy: 'date DESC', limit: limit);
       return rows.map(RunRecord.fromMap).toList();
     } catch (e, stack) {
       debugPrint('getRecentRuns error: $e');
@@ -380,15 +388,22 @@ class DatabaseService {
 
   Future<List<RunRecord>> getUnsyncedRuns() async {
     final db = await database;
-    final rows = await db.query('runs',
-        where: 'synced_to_cloud = 0', orderBy: 'date ASC');
+    final rows = await db.query(
+      'runs',
+      where: 'synced_to_cloud = 0',
+      orderBy: 'date ASC',
+    );
     return rows.map(RunRecord.fromMap).toList();
   }
 
   Future<void> markRunSynced(int runId) async {
     final db = await database;
-    await db.update('runs', {'synced_to_cloud': 1},
-        where: 'id = ?', whereArgs: [runId]);
+    await db.update(
+      'runs',
+      {'synced_to_cloud': 1},
+      where: 'id = ?',
+      whereArgs: [runId],
+    );
   }
 
   /// Writes the RPE value for a completed run.
@@ -425,23 +440,31 @@ class DatabaseService {
 
   Future<void> insertTrainingSnapshot(TrainingStateRecord snap) async {
     final db = await database;
-    await db.insert('training_snapshots', snap.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'training_snapshots',
+      snap.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<TrainingStateRecord?> getLatestTrainingState() async {
     final db = await database;
-    final rows = await db.query('training_snapshots',
-        orderBy: 'date DESC', limit: 1);
+    final rows = await db.query(
+      'training_snapshots',
+      orderBy: 'date DESC',
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     return TrainingStateRecord.fromMap(rows.first);
   }
 
-  Future<List<TrainingStateRecord>> getRecentSnapshots(
-      {int limit = 28}) async {
+  Future<List<TrainingStateRecord>> getRecentSnapshots({int limit = 28}) async {
     final db = await database;
-    final rows = await db.query('training_snapshots',
-        orderBy: 'date DESC', limit: limit);
+    final rows = await db.query(
+      'training_snapshots',
+      orderBy: 'date DESC',
+      limit: limit,
+    );
     return rows.map(TrainingStateRecord.fromMap).toList();
   }
 
@@ -473,8 +496,7 @@ class DatabaseService {
       final db = await database;
       final rows = await db.query('skip_counts');
       return {
-        for (final r in rows)
-          r['workout_type'] as String: r['count'] as int,
+        for (final r in rows) r['workout_type'] as String: r['count'] as int,
       };
     } catch (e, stack) {
       debugPrint('[DB] getSkipCounts error: $e');
@@ -490,7 +512,10 @@ class DatabaseService {
   /// for an already-earned achievement is a no-op.
   /// Returns true if the row was newly inserted (i.e. first time earning it).
   Future<bool> saveAchievementIfNew(
-      String type, DateTime unlockedAt, int tier) async {
+    String type,
+    DateTime unlockedAt,
+    int tier,
+  ) async {
     try {
       final db = await database;
       final affected = await db.rawInsert(
@@ -513,8 +538,7 @@ class DatabaseService {
       final rows = await db.query('achievements');
       return {
         for (final r in rows)
-          r['type'] as String:
-              DateTime.parse(r['unlocked_at'] as String),
+          r['type'] as String: DateTime.parse(r['unlocked_at'] as String),
       };
     } catch (e, stack) {
       debugPrint('[DB] getAchievementDates error: $e');
@@ -528,9 +552,7 @@ class DatabaseService {
     try {
       final db = await database;
       final rows = await db.query('runs', columns: ['date']);
-      return rows
-          .map((r) => DateTime.parse(r['date'] as String))
-          .toList();
+      return rows.map((r) => DateTime.parse(r['date'] as String)).toList();
     } catch (e) {
       debugPrint('[DB] getAllRunDates error: $e');
       return [];
@@ -567,8 +589,7 @@ class DatabaseService {
             'distance_km': distKm,
             'average_pace': pace,
             'duration_seconds': _estimateDuration(pace, distKm),
-            'date': item['date'] as String? ??
-                DateTime.now().toIso8601String(),
+            'date': item['date'] as String? ?? DateTime.now().toIso8601String(),
             'route_polyline': polyline,
             'workout_type': 'easy',
             'synced_to_cloud': 0,
@@ -591,15 +612,16 @@ class DatabaseService {
     try {
       final db = await database;
       final runDateUtc = run.date.toUtc();
-      final windowStart =
-          runDateUtc.subtract(const Duration(minutes: 1)).toIso8601String();
-      final windowEnd =
-          runDateUtc.add(const Duration(minutes: 1)).toIso8601String();
+      final windowStart = runDateUtc
+          .subtract(const Duration(minutes: 1))
+          .toIso8601String();
+      final windowEnd = runDateUtc
+          .add(const Duration(minutes: 1))
+          .toIso8601String();
 
       final existing = await db.query(
         'runs',
-        where:
-            'date BETWEEN ? AND ? AND ROUND(distance_km, 1) = ROUND(?, 1)',
+        where: 'date BETWEEN ? AND ? AND ROUND(distance_km, 1) = ROUND(?, 1)',
         whereArgs: [windowStart, windowEnd, run.distanceKm],
       );
       if (existing.isEmpty) {
@@ -607,7 +629,8 @@ class DatabaseService {
         debugPrint('[DB] Restored run: ${run.distanceKm}km on ${run.date}');
       } else {
         debugPrint(
-            '[DB] Skipped duplicate run: ${run.distanceKm}km on ${run.date}');
+          '[DB] Skipped duplicate run: ${run.distanceKm}km on ${run.date}',
+        );
       }
     } catch (e, stack) {
       debugPrint('insertRunIfNotExists error: $e');

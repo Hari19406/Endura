@@ -38,7 +38,7 @@ import '../utils/unit_utils.dart';
 // Import the shortened onboarding for post-plan re-onboarding.
 import '../onboarding/onboarding_screen.dart' show OnboardingScreen;
 
-enum WorkoutCategory { easy, tempo, interval, long, recovery, rest }
+enum WorkoutCategory { easy, tempo, interval, long, rest }
 
 class WorkoutDisplayStyle {
   final WorkoutCategory category;
@@ -91,12 +91,6 @@ WorkoutDisplayStyle _workoutDisplayStyle(WorkoutIntent intent) {
       accentColor: Color(0xFFBF360C),
       badgeLabel: 'RACE PACE',
       icon: Icons.flag_outlined,
-    ),
-    WorkoutIntent.recovery => const WorkoutDisplayStyle(
-      category: WorkoutCategory.recovery,
-      accentColor: Color(0xFF4A148C),
-      badgeLabel: 'RECOVERY',
-      icon: Icons.self_improvement,
     ),
   };
 }
@@ -158,7 +152,6 @@ class WorkoutDisplayModel {
             .map((b) => b.paceMaxSecondsPerKm)
             .reduce((a, b) => a > b ? a : b);
         if ((msg.workoutIntent == WorkoutIntent.aerobicBase ||
-                msg.workoutIntent == WorkoutIntent.recovery ||
                 msg.workoutIntent == WorkoutIntent.endurance) &&
             (slowest - fastest) >= 30) {
           final ceiling = (fastest / 5).round() * 5;
@@ -175,16 +168,6 @@ class WorkoutDisplayModel {
 
     final steps = List<String>.from(msg.workoutSteps);
 
-    if (steps.isEmpty && displayStyle.category == WorkoutCategory.recovery) {
-      steps.addAll([
-        'Run at a very easy, conversational pace for 20–30 min — '
-            'you should be able to hold a full conversation throughout.',
-        'Keep effort low (RPE 3–4 out of 10). '
-            'The goal is active recovery, not fitness gains.',
-        'Focus on relaxed form, light footfall, and easy breathing.',
-      ]);
-    }
-
     final feelHint = switch (msg.workoutIntent) {
       WorkoutIntent.aerobicBase => 'Conversational pace',
       WorkoutIntent.endurance => 'Easy and steady',
@@ -192,7 +175,6 @@ class WorkoutDisplayModel {
       WorkoutIntent.vo2max => 'Hard intervals',
       WorkoutIntent.speed => 'Short and snappy',
       WorkoutIntent.raceSpecific => 'Race pace',
-      WorkoutIntent.recovery => 'Very easy',
     };
 
     return WorkoutDisplayModel(
@@ -268,13 +250,6 @@ class WorkoutCard extends StatelessWidget {
           accentColor: Color(0xFF1B5E20),
           badgeLabel: 'ENDURANCE',
           icon: Icons.landscape_outlined,
-        );
-      case WorkoutCategory.recovery:
-        return const WorkoutDisplayStyle(
-          category: WorkoutCategory.recovery,
-          accentColor: Color(0xFF4A148C),
-          badgeLabel: 'RECOVERY',
-          icon: Icons.self_improvement,
         );
       case WorkoutCategory.rest:
         return const WorkoutDisplayStyle(
@@ -731,7 +706,6 @@ class _HomeScreenState extends State<HomeScreen>
         final newPlan = WeeklyGenerator.generate(
           startDate: DateTime.now(),
           lastCompletedType: memory.lastCompletedType,
-          lastNonRecoveryType: memory.lastNonRecoveryType,
           phase: memory.currentPhase,
           totalRunsCompleted: memory.totalRunsCompleted,
           trainingDayIndices: _trainingDayIndices,
@@ -1291,8 +1265,8 @@ class _HomeScreenState extends State<HomeScreen>
         return selector.WorkoutId.intervalWorkout;
       case 'long':
         return selector.WorkoutId.longEasy;
-      case 'recovery':
-        return selector.WorkoutId.recoveryRun;
+      case 'recovery': // legacy data from before recovery was folded into easy
+        return selector.WorkoutId.easyRun;
       case 'easy':
         return selector.WorkoutId.easyRun;
       default:

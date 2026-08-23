@@ -70,16 +70,16 @@ class WeeklyBudget {
   }
 
   static WeeklyBudget empty() => const WeeklyBudget(
-        volumeDoneKm: 0,
-        volumeTargetKm: 30,
-        qualityDone: 0,
-        qualityBudget: 1,
-        longRunDone: false,
-        longRunPlanned: true,
-        longRunTargetKm: 8,
-        runsCompleted: 0,
-        daysRemaining: 7,
-      );
+    volumeDoneKm: 0,
+    volumeTargetKm: 30,
+    qualityDone: 0,
+    qualityBudget: 1,
+    longRunDone: false,
+    longRunPlanned: true,
+    longRunTargetKm: 8,
+    runsCompleted: 0,
+    daysRemaining: 7,
+  );
 }
 
 class RunSummary {

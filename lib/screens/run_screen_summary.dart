@@ -108,16 +108,34 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Discard activity?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        content: Text('This run will be deleted and won\'t count toward your training.', style: TextStyle(fontSize: 14, color: context.colors.textSecondary)),
+        title: const Text(
+          'Discard activity?',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'This run will be deleted and won\'t count toward your training.',
+          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Keep', style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Keep',
+              style: TextStyle(
+                color: context.colors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Discard', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Discard',
+              style: TextStyle(
+                color: Color(0xFFD32F2F),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -207,13 +225,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   String _resolveWorkoutType(WorkoutIntent? intent) {
     if (intent == null) return 'easy';
     return switch (intent) {
-      WorkoutIntent.threshold    => 'tempo',
-      WorkoutIntent.vo2max       => 'interval',
-      WorkoutIntent.speed        => 'interval',
+      WorkoutIntent.threshold => 'tempo',
+      WorkoutIntent.vo2max => 'interval',
+      WorkoutIntent.speed => 'interval',
       WorkoutIntent.raceSpecific => 'tempo',
-      WorkoutIntent.endurance    => 'long',
-      WorkoutIntent.recovery     => 'recovery',
-      WorkoutIntent.aerobicBase  => 'easy',
+      WorkoutIntent.endurance => 'long',
+      WorkoutIntent.aerobicBase => 'easy',
     };
   }
 
@@ -243,14 +260,15 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                       children: [
                         _buildMap(),
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
                                 padding: const EdgeInsets.only(
-                                    top: 18, bottom: 14),
+                                  top: 18,
+                                  bottom: 14,
+                                ),
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -259,7 +277,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            widget.isFreeRun ? 'Run complete' : 'Workout complete',
+                                            widget.isFreeRun
+                                                ? 'Run complete'
+                                                : 'Workout complete',
                                             style: TextStyle(
                                               fontSize: 24,
                                               fontWeight: FontWeight.w800,
@@ -272,7 +292,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                             _formatDate(widget.runDate),
                                             style: TextStyle(
                                               fontSize: 13,
-                                              color: context.colors.textTertiary,
+                                              color:
+                                                  context.colors.textTertiary,
                                             ),
                                           ),
                                         ],
@@ -321,7 +342,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                           ? () async {
                               await _finaliseRun(widget.isFreeRun ? 0 : _rpe!);
                               await Future.delayed(
-                                  const Duration(milliseconds: 200));
+                                const Duration(milliseconds: 200),
+                              );
                               widget.onDone();
                             }
                           : null,
@@ -340,7 +362,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                             ? 'Done'
                             : 'Rate your effort to continue',
                         style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -353,7 +377,11 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                       onPressed: _discardRun,
                       child: const Text(
                         'Discard activity',
-                        style: TextStyle(fontSize: 14, color: Color(0xFFD32F2F), fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFD32F2F),
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
@@ -376,14 +404,24 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             child: Row(
               children: [
                 _buildStatCell(
-                    _formatDistance(UnitUtils.displayDistance(widget.distanceKm, _useMiles)),
-                    UnitUtils.unitLabel(_useMiles), 'Distance'),
+                  _formatDistance(
+                    UnitUtils.displayDistance(widget.distanceKm, _useMiles),
+                  ),
+                  UnitUtils.unitLabel(_useMiles),
+                  'Distance',
+                ),
                 _buildCellDivider(),
                 _buildStatCell(
-                    _formatDuration(widget.durationSeconds), '', 'Duration'),
+                  _formatDuration(widget.durationSeconds),
+                  '',
+                  'Duration',
+                ),
                 _buildCellDivider(),
-                _buildStatCell(UnitUtils.formatPaceString(widget.averagePace, _useMiles),
-                    UnitUtils.perUnitLabel(_useMiles), 'Avg pace'),
+                _buildStatCell(
+                  UnitUtils.formatPaceString(widget.averagePace, _useMiles),
+                  UnitUtils.perUnitLabel(_useMiles),
+                  'Avg pace',
+                ),
               ],
             ),
           ),
@@ -392,14 +430,23 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             child: Row(
               children: [
                 _buildStatCell(
-                    _formatDuration(_totalWorkoutSeconds), '', 'Total time'),
+                  _formatDuration(_totalWorkoutSeconds),
+                  '',
+                  'Total time',
+                ),
                 _buildCellDivider(),
                 _buildStatCell(
-                    _summaryFutureWeeklyKm == '—'
-                        ? _summaryFutureWeeklyKm
-                        : _formatDistance(UnitUtils.displayDistance(
-                            double.parse(_summaryFutureWeeklyKm), _useMiles)),
-                    UnitUtils.unitLabel(_useMiles), 'This week'),
+                  _summaryFutureWeeklyKm == '—'
+                      ? _summaryFutureWeeklyKm
+                      : _formatDistance(
+                          UnitUtils.displayDistance(
+                            double.parse(_summaryFutureWeeklyKm),
+                            _useMiles,
+                          ),
+                        ),
+                  UnitUtils.unitLabel(_useMiles),
+                  'This week',
+                ),
                 _buildCellDivider(),
                 _buildStatCellRaw(_buildPaceTrendWidget(), 'Pace trend'),
               ],
@@ -419,9 +466,13 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style:
-                    TextStyle(fontSize: 10, color: context.colors.textTertiary)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: context.colors.textTertiary,
+              ),
+            ),
             const SizedBox(height: 4),
             RichText(
               text: TextSpan(
@@ -459,9 +510,13 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style:
-                    TextStyle(fontSize: 10, color: context.colors.textTertiary)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: context.colors.textTertiary,
+              ),
+            ),
             const SizedBox(height: 4),
             valueWidget,
           ],
@@ -476,11 +531,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     final color = trend == 'improving'
         ? const Color(0xFF388E3C)
         : trend == 'declining'
-            ? const Color(0xFFD32F2F)
-            : const Color(0xFF888888);
-    return Text(label,
-        style:
-            TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color));
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFF888888);
+    return Text(
+      label,
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+    );
   }
 
   Widget _buildCellDivider() =>
@@ -500,8 +556,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       badgeBg = context.colors.divider;
       badgeText = context.colors.textTertiary;
     } else {
-      final inRange = avgSec >= target.minSecondsPerKm &&
-          avgSec <= target.maxSecondsPerKm;
+      final inRange =
+          avgSec >= target.minSecondsPerKm && avgSec <= target.maxSecondsPerKm;
       final faster = avgSec < target.minSecondsPerKm;
       if (inRange) {
         badgeLabel = 'On target ✓';
@@ -524,24 +580,32 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5EE),
-                  borderRadius: BorderRadius.circular(7),
+            Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5EE),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: const Icon(
+                    Icons.trending_up,
+                    color: Color(0xFF2A9D4E),
+                    size: 15,
+                  ),
                 ),
-                child: const Icon(Icons.trending_up,
-                    color: Color(0xFF2A9D4E), size: 15),
-              ),
-              const SizedBox(width: 8),
-              Text('Pace & performance',
+                const SizedBox(width: 8),
+                Text(
+                  'Pace & performance',
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.textPrimary)),
-            ]),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 14),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,45 +614,61 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Average pace',
-                          style: TextStyle(
-                              fontSize: 10, color: context.colors.textTertiary)),
+                      Text(
+                        'Average pace',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: context.colors.textTertiary,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Builder(builder: (context) {
-                        return RichText(
-                          text: TextSpan(children: [
-                            TextSpan(
-                              text: UnitUtils.formatPaceString(widget.averagePace, _useMiles),
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF2A9D4E),
-                              ),
+                      Builder(
+                        builder: (context) {
+                          return RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: UnitUtils.formatPaceString(
+                                    widget.averagePace,
+                                    _useMiles,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF2A9D4E),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' ${UnitUtils.perUnitLabel(_useMiles)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
+                                    color: Color(0xFF2A9D4E),
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextSpan(
-                              text: ' ${UnitUtils.perUnitLabel(_useMiles)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                color: Color(0xFF2A9D4E),
-                              ),
-                            ),
-                          ]),
-                        );
-                      }),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 4),
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: badgeBg,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(badgeLabel,
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: badgeText)),
+                        child: Text(
+                          badgeLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: badgeText,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -599,9 +679,13 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Target range',
-                            style: TextStyle(
-                                fontSize: 10, color: context.colors.textTertiary)),
+                        Text(
+                          'Target range',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: context.colors.textTertiary,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           '${_formatDisplayPaceSecs(target.minSecondsPerKm)} – ${_formatDisplayPaceSecs(target.maxSecondsPerKm)} ${UnitUtils.perUnitLabel(_useMiles)}',
@@ -626,66 +710,121 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
   Widget _buildRangeTrack(int avgSec, message.PaceRange target) {
     final rangeSec = target.maxSecondsPerKm - target.minSecondsPerKm;
-    final raw =
-        rangeSec > 0 ? (avgSec - target.minSecondsPerKm) / rangeSec : 0.5;
+    final raw = rangeSec > 0
+        ? (avgSec - target.minSecondsPerKm) / rangeSec
+        : 0.5;
     final frac = raw.clamp(0.0, 1.0);
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final trackW = constraints.maxWidth;
-      const dotR = 7.0;
-      final dotLeft =
-          (frac * (trackW - dotR * 2)).clamp(0.0, trackW - dotR * 2);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackW = constraints.maxWidth;
+        const dotR = 7.0;
+        final dotLeft = (frac * (trackW - dotR * 2)).clamp(
+          0.0,
+          trackW - dotR * 2,
+        );
 
-      return SizedBox(
-        height: 14,
-        child: Stack(
-          alignment: Alignment.centerLeft,
-          children: [
-            Container(
-              height: 6,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5EE),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Container(
-              height: 6,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A9D4E),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Positioned(
-              left: dotLeft,
-              child: Container(
-                width: dotR * 2,
-                height: dotR * 2,
+        return SizedBox(
+          height: 14,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Container(
+                height: 6,
                 decoration: BoxDecoration(
-                  color: Colors.black,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+                  color: const Color(0xFFE8F5EE),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-            ),
-          ],
-        ),
-      );
-    });
+              Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A9D4E),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Positioned(
+                left: dotLeft,
+                child: Container(
+                  width: dotR * 2,
+                  height: dotR * 2,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // ── RPE card ──────────────────────────────────────────────────────────────
 
   static const List<_RpeLevel> _rpeLevels = [
-    _RpeLevel(value: 1,  name: 'Very easy',     desc: 'Almost no effort, barely moving',                 color: Color(0xFF2DB87A)),
-    _RpeLevel(value: 2,  name: 'Easy',           desc: 'Light and comfortable, breathing barely changes', color: Color(0xFF3DC882)),
-    _RpeLevel(value: 3,  name: 'Light',          desc: 'Comfortable pace, easy conversation',             color: Color(0xFF72C226)),
-    _RpeLevel(value: 4,  name: 'Somewhat easy',  desc: 'Slightly elevated breathing, relaxed',            color: Color(0xFF9DC91A)),
-    _RpeLevel(value: 5,  name: 'Moderate',       desc: 'Steady effort, short sentences possible',         color: Color(0xFFD4960E)),
-    _RpeLevel(value: 6,  name: 'Somewhat hard',  desc: 'Noticeably harder, breathing heavier',            color: Color(0xFFD4730E)),
-    _RpeLevel(value: 7,  name: 'Hard',           desc: 'Pushing it, few words possible',                  color: Color(0xFFCC5410)),
-    _RpeLevel(value: 8,  name: 'Very hard',      desc: 'Very tough, focused on form and breathing',       color: Color(0xFFC43612)),
-    _RpeLevel(value: 9,  name: 'Extremely hard', desc: 'Near limit, barely holding pace',                 color: Color(0xFFB82014)),
-    _RpeLevel(value: 10, name: 'Max effort',     desc: 'All out — could not go harder',                   color: Color(0xFF9E1016)),
+    _RpeLevel(
+      value: 1,
+      name: 'Very easy',
+      desc: 'Almost no effort, barely moving',
+      color: Color(0xFF2DB87A),
+    ),
+    _RpeLevel(
+      value: 2,
+      name: 'Easy',
+      desc: 'Light and comfortable, breathing barely changes',
+      color: Color(0xFF3DC882),
+    ),
+    _RpeLevel(
+      value: 3,
+      name: 'Light',
+      desc: 'Comfortable pace, easy conversation',
+      color: Color(0xFF72C226),
+    ),
+    _RpeLevel(
+      value: 4,
+      name: 'Somewhat easy',
+      desc: 'Slightly elevated breathing, relaxed',
+      color: Color(0xFF9DC91A),
+    ),
+    _RpeLevel(
+      value: 5,
+      name: 'Moderate',
+      desc: 'Steady effort, short sentences possible',
+      color: Color(0xFFD4960E),
+    ),
+    _RpeLevel(
+      value: 6,
+      name: 'Somewhat hard',
+      desc: 'Noticeably harder, breathing heavier',
+      color: Color(0xFFD4730E),
+    ),
+    _RpeLevel(
+      value: 7,
+      name: 'Hard',
+      desc: 'Pushing it, few words possible',
+      color: Color(0xFFCC5410),
+    ),
+    _RpeLevel(
+      value: 8,
+      name: 'Very hard',
+      desc: 'Very tough, focused on form and breathing',
+      color: Color(0xFFC43612),
+    ),
+    _RpeLevel(
+      value: 9,
+      name: 'Extremely hard',
+      desc: 'Near limit, barely holding pace',
+      color: Color(0xFFB82014),
+    ),
+    _RpeLevel(
+      value: 10,
+      name: 'Max effort',
+      desc: 'All out — could not go harder',
+      color: Color(0xFF9E1016),
+    ),
   ];
 
   Widget _buildRpeCard() {
@@ -698,39 +837,46 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Text(
-                'HOW DID IT FEEL?',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: context.colors.textTertiary,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(width: 7),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1C1E),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'REQUIRED',
+            Row(
+              children: [
+                Text(
+                  'HOW DID IT FEEL?',
                   style: TextStyle(
-                    fontSize: 8,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
+                    color: context.colors.textTertiary,
+                    letterSpacing: 1.1,
                   ),
                 ),
-              ),
-            ]),
+                const SizedBox(width: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1E),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'REQUIRED',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 5),
             Text(
               'Max uses this to decide your next workout.',
-              style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
+              style: TextStyle(
+                fontSize: 11,
+                color: context.colors.textTertiary,
+              ),
             ),
             const SizedBox(height: 14),
             Row(
@@ -752,17 +898,23 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   Text(
                     '${level.value}',
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: level.color),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: level.color,
+                    ),
                   ),
               ],
             ),
             if (level != null) ...[
               const SizedBox(height: 3),
-              Text(level.desc,
-                  style: TextStyle(
-                      fontSize: 11, color: context.colors.textTertiary, height: 1.4)),
+              Text(
+                level.desc,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: context.colors.textTertiary,
+                  height: 1.4,
+                ),
+              ),
             ],
             const SizedBox(height: 11),
             ClipRRect(
@@ -837,8 +989,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     bool? isOnTarget;
     bool ranTooFast = false;
     if (target != null) {
-      isOnTarget = avgSec >= target.minSecondsPerKm &&
-          avgSec <= target.maxSecondsPerKm;
+      isOnTarget =
+          avgSec >= target.minSecondsPerKm && avgSec <= target.maxSecondsPerKm;
       ranTooFast = avgSec < target.minSecondsPerKm;
     }
 
@@ -889,7 +1041,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 2),
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE6FAF7),
                           borderRadius: BorderRadius.circular(4),
@@ -936,24 +1090,32 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8EAF6),
-                  borderRadius: BorderRadius.circular(7),
+            Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EAF6),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today_outlined,
+                    color: Color(0xFF3949AB),
+                    size: 14,
+                  ),
                 ),
-                child: const Icon(Icons.calendar_today_outlined,
-                    color: Color(0xFF3949AB), size: 14),
-              ),
-              const SizedBox(width: 8),
-              Text('Next up',
+                const SizedBox(width: 8),
+                Text(
+                  'Next up',
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.textPrimary)),
-            ]),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 14),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1008,8 +1170,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   _SummaryData? _latestData;
 
   Future<_SummaryData> _buildSummaryData() async {
-    final recentRuns =
-        await DatabaseService.instance.getRecentRuns(limit: 10);
+    final recentRuns = await DatabaseService.instance.getRecentRuns(limit: 10);
     final paceTrend = PaceTrendCalculator.calculate(
       recentRuns.map((r) => _paceToSeconds(r.averagePace)).toList(),
     );
@@ -1040,14 +1201,16 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
       final runHistory = await loadSavedRuns();
       final runHistoryTyped = runHistory
-          .map((r) => RunHistory(
-                distance: r.distance,
-                averagePace: r.averagePace,
-                date: r.date,
-                gpsPoints: r.gpsPoints,
-                rpe: r.rpe,
-                workoutType: r.workoutType,
-              ))
+          .map(
+            (r) => RunHistory(
+              distance: r.distance,
+              averagePace: r.averagePace,
+              date: r.date,
+              gpsPoints: r.gpsPoints,
+              rpe: r.rpe,
+              workoutType: r.workoutType,
+            ),
+          )
           .toList();
 
       final weekNum = memory.hasRacePlan
@@ -1056,13 +1219,13 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
       final phase = memory.hasRacePlan
           ? (memory.racePlan!.currentWeek(DateTime.now())?.phase ??
-              memory.currentPhase)
+                memory.currentPhase)
           : memory.currentPhase;
 
       final recentAvg = runHistory.isEmpty
           ? 5.0
           : runHistory.take(5).fold(0.0, (s, r) => s + r.distance) /
-              runHistory.take(5).length;
+                runHistory.take(5).length;
       final weeklyTargetKm = recentAvg * runsPerWeek;
 
       final weekTarget = WeekTarget(
@@ -1099,15 +1262,16 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
       final maxPreviousDist = runHistoryTyped.isEmpty
           ? 0.0
-          : runHistoryTyped.map((r) => r.distance).reduce((a, b) => a > b ? a : b);
+          : runHistoryTyped
+                .map((r) => r.distance)
+                .reduce((a, b) => a > b ? a : b);
       final isLongestRun = widget.distanceKm > maxPreviousDist;
 
       final now = DateTime.now();
       final monday = now.subtract(Duration(days: now.weekday - 1));
       final mondayMidnight = DateTime(monday.year, monday.month, monday.day);
-      final runsThisWeek = runHistoryTyped
-              .where((r) => r.date.isAfter(mondayMidnight))
-              .length +
+      final runsThisWeek =
+          runHistoryTyped.where((r) => r.date.isAfter(mondayMidnight)).length +
           1;
 
       int? daysUntilRace;
@@ -1120,8 +1284,11 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
       ProjectedDay? nextDay;
       for (final day in projection.days) {
-        final dayMidnight =
-            DateTime(day.date.year, day.date.month, day.date.day);
+        final dayMidnight = DateTime(
+          day.date.year,
+          day.date.month,
+          day.date.day,
+        );
         if (dayMidnight.isAfter(todayMidnight) &&
             day.status == DayStatus.projected &&
             day.intent != null) {
@@ -1133,8 +1300,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       if (nextDay != null) {
         final intent = nextDay.intent!;
         final daysAhead = nextDay.date.difference(todayMidnight).inDays;
-        final dayLabel =
-            daysAhead == 1 ? 'Tomorrow' : _weekdayName(nextDay.weekday);
+        final dayLabel = daysAhead == 1
+            ? 'Tomorrow'
+            : _weekdayName(nextDay.weekday);
         final distStr = nextDay.distanceKm > 0
             ? ' · ${UnitUtils.displayDistance(nextDay.distanceKm, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}'
             : '';
@@ -1175,10 +1343,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   ExperienceLevel _toExperienceLevel(String level) => switch (level) {
-        'intermediate' => ExperienceLevel.intermediate,
-        'advanced'     => ExperienceLevel.advanced,
-        _              => ExperienceLevel.beginner,
-      };
+    'intermediate' => ExperienceLevel.intermediate,
+    'advanced' => ExperienceLevel.advanced,
+    _ => ExperienceLevel.beginner,
+  };
 
   double _calcWeeklyDistance(List<RunRecord> runs) {
     final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
@@ -1198,7 +1366,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   String _formatDisplayPaceSecs(int secondsPerKm) {
-    final displaySeconds = UnitUtils.displayPaceSeconds(secondsPerKm.toDouble(), _useMiles);
+    final displaySeconds = UnitUtils.displayPaceSeconds(
+      secondsPerKm.toDouble(),
+      _useMiles,
+    );
     return UnitUtils.formatSeconds(displaySeconds.round());
   }
 
@@ -1208,27 +1379,37 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         height: 220,
         color: context.colors.divider,
         child: Center(
-          child: Icon(Icons.map_outlined,
-              size: 48, color: context.colors.textFaint),
+          child: Icon(
+            Icons.map_outlined,
+            size: 48,
+            color: context.colors.textFaint,
+          ),
         ),
       );
     }
     final lats = widget.routePoints.map((p) => p.latitude).toList();
     final lngs = widget.routePoints.map((p) => p.longitude).toList();
     final bounds = LatLngBounds(
-      LatLng(lats.reduce((a, b) => a < b ? a : b),
-          lngs.reduce((a, b) => a < b ? a : b)),
-      LatLng(lats.reduce((a, b) => a > b ? a : b),
-          lngs.reduce((a, b) => a > b ? a : b)),
+      LatLng(
+        lats.reduce((a, b) => a < b ? a : b),
+        lngs.reduce((a, b) => a < b ? a : b),
+      ),
+      LatLng(
+        lats.reduce((a, b) => a > b ? a : b),
+        lngs.reduce((a, b) => a > b ? a : b),
+      ),
     );
     return SizedBox(
       height: 240,
       child: FlutterMap(
         options: MapOptions(
           initialCameraFit: CameraFit.bounds(
-              bounds: bounds, padding: const EdgeInsets.all(40)),
-          interactionOptions:
-              const InteractionOptions(flags: InteractiveFlag.none),
+            bounds: bounds,
+            padding: const EdgeInsets.all(40),
+          ),
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.none,
+          ),
         ),
         children: [
           TileLayer(
@@ -1238,38 +1419,51 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             subdomains: const ['a', 'b', 'c'],
             tileProvider: NetworkTileProvider(),
             errorTileCallback: (tile, error, stack) {
-              FirebaseCrashlytics.instance.recordError(error, stack, reason: 'maptiler_tile_load_failed', fatal: false);
+              FirebaseCrashlytics.instance.recordError(
+                error,
+                stack,
+                reason: 'maptiler_tile_load_failed',
+                fatal: false,
+              );
             },
           ),
-          PolylineLayer(polylines: [
-            Polyline(
-              points: widget.routePoints,
-              strokeWidth: 4,
-              color: Colors.black,
-              borderStrokeWidth: 2,
-              borderColor: Colors.white,
-            )
-          ]),
-          MarkerLayer(markers: [
-            Marker(
-              point: widget.routePoints.first,
-              width: 14,
-              height: 14,
-              child: Container(
-                decoration: const BoxDecoration(
-                    color: Color(0xFF388E3C), shape: BoxShape.circle),
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: widget.routePoints,
+                strokeWidth: 4,
+                color: Colors.black,
+                borderStrokeWidth: 2,
+                borderColor: Colors.white,
               ),
-            ),
-            Marker(
-              point: widget.routePoints.last,
-              width: 14,
-              height: 14,
-              child: Container(
-                decoration: const BoxDecoration(
-                    color: Color(0xFFD32F2F), shape: BoxShape.circle),
+            ],
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: widget.routePoints.first,
+                width: 14,
+                height: 14,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF388E3C),
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ),
-            ),
-          ]),
+              Marker(
+                point: widget.routePoints.last,
+                width: 14,
+                height: 14,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFD32F2F),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1290,65 +1484,70 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
   }
 
   String _paceTrendLabel(String trend) => switch (trend) {
-        'improving'         => '↑ Better',
-        'declining'         => '↓ Declining',
-        'insufficient_data' => '— No data',
-        _                   => '→ Stable',
-      };
+    'improving' => '↑ Better',
+    'declining' => '↓ Declining',
+    'insufficient_data' => '— No data',
+    _ => '→ Stable',
+  };
 
   String _intentName(WorkoutIntent intent) => switch (intent) {
-        WorkoutIntent.aerobicBase  => 'Easy Run',
-        WorkoutIntent.endurance    => 'Long Run',
-        WorkoutIntent.threshold    => 'Threshold Run',
-        WorkoutIntent.vo2max       => 'Interval Session',
-        WorkoutIntent.speed        => 'Speed Session',
-        WorkoutIntent.raceSpecific => 'Race Pace Run',
-        WorkoutIntent.recovery     => 'Recovery Run',
-      };
+    WorkoutIntent.aerobicBase => 'Easy Run',
+    WorkoutIntent.endurance => 'Long Run',
+    WorkoutIntent.threshold => 'Threshold Run',
+    WorkoutIntent.vo2max => 'Interval Session',
+    WorkoutIntent.speed => 'Speed Session',
+    WorkoutIntent.raceSpecific => 'Race Pace Run',
+  };
 
   String _intentSubtext(WorkoutIntent intent) => switch (intent) {
-        WorkoutIntent.aerobicBase  =>
-          'Easy effort — conversational pace, keep it comfortable.',
-        WorkoutIntent.endurance    => 'Long run — building your endurance base.',
-        WorkoutIntent.threshold    =>
-          'Comfortably hard — raises your lactate threshold.',
-        WorkoutIntent.vo2max       =>
-          'High-intensity intervals — develops raw speed and VO₂ max.',
-        WorkoutIntent.speed        =>
-          'Short, fast reps — improves running economy and turnover.',
-        WorkoutIntent.raceSpecific =>
-          'Race pace work — confidence and rhythm at goal pace.',
-        WorkoutIntent.recovery     =>
-          'Very easy — flushing fatigue, no fitness pressure.',
-      };
+    WorkoutIntent.aerobicBase =>
+      'Easy effort — conversational pace, keep it comfortable.',
+    WorkoutIntent.endurance => 'Long run — building your endurance base.',
+    WorkoutIntent.threshold =>
+      'Comfortably hard — raises your lactate threshold.',
+    WorkoutIntent.vo2max =>
+      'High-intensity intervals — develops raw speed and VO₂ max.',
+    WorkoutIntent.speed =>
+      'Short, fast reps — improves running economy and turnover.',
+    WorkoutIntent.raceSpecific =>
+      'Race pace work — confidence and rhythm at goal pace.',
+  };
 
   Color _intentAccentColor(WorkoutIntent? intent) => switch (intent) {
-        WorkoutIntent.threshold    => const Color(0xFFBF360C),
-        WorkoutIntent.vo2max       => const Color(0xFF0D47A1),
-        WorkoutIntent.speed        => const Color(0xFF0D47A1),
-        WorkoutIntent.endurance    => const Color(0xFF1B5E20),
-        WorkoutIntent.recovery     => const Color(0xFF4A148C),
-        WorkoutIntent.raceSpecific => const Color(0xFFBF360C),
-        _                          => Colors.black,
-      };
+    WorkoutIntent.threshold => const Color(0xFFBF360C),
+    WorkoutIntent.vo2max => const Color(0xFF0D47A1),
+    WorkoutIntent.speed => const Color(0xFF0D47A1),
+    WorkoutIntent.endurance => const Color(0xFF1B5E20),
+    WorkoutIntent.raceSpecific => const Color(0xFFBF360C),
+    _ => Colors.black,
+  };
 
   IconData _intentIcon(WorkoutIntent? intent) => switch (intent) {
-        WorkoutIntent.threshold    => Icons.bolt,
-        WorkoutIntent.vo2max       => Icons.repeat_rounded,
-        WorkoutIntent.speed        => Icons.flash_on,
-        WorkoutIntent.endurance    => Icons.landscape_outlined,
-        WorkoutIntent.recovery     => Icons.self_improvement,
-        WorkoutIntent.raceSpecific => Icons.flag_outlined,
-        _                          => Icons.directions_run,
-      };
+    WorkoutIntent.threshold => Icons.bolt,
+    WorkoutIntent.vo2max => Icons.repeat_rounded,
+    WorkoutIntent.speed => Icons.flash_on,
+    WorkoutIntent.endurance => Icons.landscape_outlined,
+    WorkoutIntent.raceSpecific => Icons.flag_outlined,
+    _ => Icons.directions_run,
+  };
 
   String _weekdayName(int dayIndex) {
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1356,19 +1555,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   RaceDistance _goalRaceToDistance(String goalRace) => switch (goalRace) {
-        '5k'            => RaceDistance.fiveK,
-        '10k'           => RaceDistance.tenK,
-        'half_marathon' => RaceDistance.halfMarathon,
-        'marathon'      => RaceDistance.marathon,
-        _               => RaceDistance.fiveK,
-      };
+    '5k' => RaceDistance.fiveK,
+    '10k' => RaceDistance.tenK,
+    'half_marathon' => RaceDistance.halfMarathon,
+    'marathon' => RaceDistance.marathon,
+    _ => RaceDistance.fiveK,
+  };
 
   PRDistance? _raceDistanceToPR(RaceDistance race) => switch (race) {
-        RaceDistance.fiveK        => PRDistance.fiveK,
-        RaceDistance.tenK         => PRDistance.tenK,
-        RaceDistance.halfMarathon => PRDistance.halfMarathon,
-        RaceDistance.marathon     => PRDistance.marathon,
-      };
+    RaceDistance.fiveK => PRDistance.fiveK,
+    RaceDistance.tenK => PRDistance.tenK,
+    RaceDistance.halfMarathon => PRDistance.halfMarathon,
+    RaceDistance.marathon => PRDistance.marathon,
+  };
 }
 
 // ── Shared card wrapper ───────────────────────────────────────────────────────
@@ -1423,12 +1622,12 @@ class _SummaryData {
   });
 
   factory _SummaryData.empty() => const _SummaryData(
-        paceTrend: 'neutral',
-        weeklyDistance: 0.0,
-        nextIntent: null,
-        nextWorkoutLabel: 'Easy run — keep building your base.',
-        nextWorkoutSubtext: '',
-      );
+    paceTrend: 'neutral',
+    weeklyDistance: 0.0,
+    nextIntent: null,
+    nextWorkoutLabel: 'Easy run — keep building your base.',
+    nextWorkoutSubtext: '',
+  );
 }
 
 // ── RPE level model ───────────────────────────────────────────────────────────

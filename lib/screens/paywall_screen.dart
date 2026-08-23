@@ -7,8 +7,10 @@ import '../theme/app_colors.dart';
 
 // Endura teal — brand color, intentionally not a theme token (fixed across light/dark)
 const _kBrand = Color(0xFF00E5CC);
-const _kTermsUrl = 'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
-const _kPrivacyUrl = 'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
+const _kTermsUrl =
+    'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
+const _kPrivacyUrl =
+    'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -55,9 +57,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
     } on PurchasesErrorCode catch (e) {
       if (e == PurchasesErrorCode.purchaseCancelledError) return;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_friendlyError(e))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
       }
     } catch (e) {
       debugPrint('[Paywall] purchase error: $e');
@@ -122,8 +124,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   String _monthlyEquivalent(Package pkg) {
     final price = pkg.storeProduct.price;
-    final symbol =
-        pkg.storeProduct.priceString.replaceAll(RegExp(r'[\d.,\s]'), '').trim();
+    final symbol = pkg.storeProduct.priceString
+        .replaceAll(RegExp(r'[\d.,\s]'), '')
+        .trim();
     final monthly = price / 12;
     return '$symbol${monthly.toStringAsFixed(2)}';
   }
@@ -197,160 +200,178 @@ class _PaywallScreenState extends State<PaywallScreen> {
           ),
           SafeArea(
             child: Column(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 8, 8, 0),
-                child: IconButton(
-                  icon: Icon(Icons.close, color: c.textTertiary),
-                  onPressed: () => Navigator.pop(context, false),
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 8, 8, 0),
+                    child: IconButton(
+                      icon: Icon(Icons.close, color: c.textTertiary),
+                      onPressed: () => Navigator.pop(context, false),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Expanded(
-              child: _loadingOffering
-                  ? const Center(
-                      child: CircularProgressIndicator(color: _kBrand),
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Endura Pro',
-                            style: TextStyle(
-                              color: _kBrand,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            hasTrial
-                                ? 'How your ${_trialDays(intro)}-day\nfree trial works'
-                                : 'Coached running.\nBuilt around you.',
-                            style: TextStyle(
-                              color: c.textPrimary,
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              height: 1.1,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          if (hasTrial)
-                            _TrialTimeline(
-                              colors: c,
-                              trialDays: _trialDays(intro),
-                            )
-                          else
-                            _FeatureList(colors: c),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
-                    ),
-            ),
-            // ---- Footer: price summary + CTA --------------------------------
-            if (!_loadingOffering && _selected != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: Column(
-                  children: [
-                    _PriceSummary(
-                      colors: c,
-                      selected: _selected!,
-                      isAnnual: _selectedIsAnnual,
-                      hasTrial: hasTrial,
-                      trialDays: hasTrial ? _trialDays(intro) : 0,
-                      monthlyEquivalent: _selectedIsAnnual
-                          ? _monthlyEquivalent(_selected!)
-                          : null,
-                      savingsPercent:
-                          _selectedIsAnnual ? _savingsPercent() : null,
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed:
-                            busy ? null : () => _purchase(_selected!),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _kBrand,
-                          foregroundColor: Colors.black,
-                          disabledBackgroundColor: _kBrand.withValues(alpha: 0.5),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                        ),
-                        child: _purchasingId == _selected!.identifier
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.black45),
-                              )
-                            : Text(
-                                hasTrial ? 'Continue' : 'Subscribe',
-                                style: const TextStyle(
-                                  fontSize: 17,
+                Expanded(
+                  child: _loadingOffering
+                      ? const Center(
+                          child: CircularProgressIndicator(color: _kBrand),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Endura Pro',
+                                style: TextStyle(
+                                  color: _kBrand,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    if (_monthlyPackage != null && _annualPackage != null)
-                      TextButton(
-                        onPressed: busy ? null : _openPlanPicker,
-                        child: Text(
-                          'See all plans',
-                          style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                              const SizedBox(height: 8),
+                              Text(
+                                hasTrial
+                                    ? 'How your ${_trialDays(intro)}-day\nfree trial works'
+                                    : 'Coached running.\nBuilt around you.',
+                                style: TextStyle(
+                                  color: c.textPrimary,
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.1,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              if (hasTrial)
+                                _TrialTimeline(
+                                  colors: c,
+                                  trialDays: _trialDays(intro),
+                                )
+                              else
+                                _FeatureList(colors: c),
+                              const SizedBox(height: 24),
+                            ],
                           ),
                         ),
-                      ),
-                    TextButton(
-                      onPressed: busy ? null : _restore,
-                      child: _purchasingId == 'restore'
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white38),
-                            )
-                          : Text(
-                              'Restore purchases',
-                              style: TextStyle(
-                                  color: c.textTertiary, fontSize: 13),
-                            ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                ),
+                // ---- Footer: price summary + CTA --------------------------------
+                if (!_loadingOffering && _selected != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                    child: Column(
                       children: [
-                        _LegalLink('Terms of Use', _kTermsUrl, c.textFaint),
-                        Text('  ·  ',
-                            style: TextStyle(
-                                color: c.textFaint, fontSize: 11)),
-                        _LegalLink('Privacy Policy', _kPrivacyUrl, c.textFaint),
+                        _PriceSummary(
+                          colors: c,
+                          selected: _selected!,
+                          isAnnual: _selectedIsAnnual,
+                          hasTrial: hasTrial,
+                          trialDays: hasTrial ? _trialDays(intro) : 0,
+                          monthlyEquivalent: _selectedIsAnnual
+                              ? _monthlyEquivalent(_selected!)
+                              : null,
+                          savingsPercent: _selectedIsAnnual
+                              ? _savingsPercent()
+                              : null,
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: busy
+                                ? null
+                                : () => _purchase(_selected!),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kBrand,
+                              foregroundColor: Colors.black,
+                              disabledBackgroundColor: _kBrand.withValues(
+                                alpha: 0.5,
+                              ),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            child: _purchasingId == _selected!.identifier
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.black45,
+                                    ),
+                                  )
+                                : Text(
+                                    hasTrial ? 'Continue' : 'Subscribe',
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (_monthlyPackage != null && _annualPackage != null)
+                          TextButton(
+                            onPressed: busy ? null : _openPlanPicker,
+                            child: Text(
+                              'See all plans',
+                              style: TextStyle(
+                                color: c.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        TextButton(
+                          onPressed: busy ? null : _restore,
+                          child: _purchasingId == 'restore'
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white38,
+                                  ),
+                                )
+                              : Text(
+                                  'Restore purchases',
+                                  style: TextStyle(
+                                    color: c.textTertiary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _LegalLink('Terms of Use', _kTermsUrl, c.textFaint),
+                            Text(
+                              '  ·  ',
+                              style: TextStyle(
+                                color: c.textFaint,
+                                fontSize: 11,
+                              ),
+                            ),
+                            _LegalLink(
+                              'Privacy Policy',
+                              _kPrivacyUrl,
+                              c.textFaint,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Auto-renews. Cancel anytime in settings.',
+                          style: TextStyle(color: c.textFaint, fontSize: 11),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Auto-renews. Cancel anytime in settings.',
-                      style: TextStyle(color: c.textFaint, fontSize: 11),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
+                  ),
               ],
             ),
           ),
@@ -395,8 +416,7 @@ class _TrialTimeline extends StatelessWidget {
             colors: c,
             icon: Icons.notifications_none_rounded,
             title: 'Day $reminderDay',
-            body:
-                "We'll send a reminder that your free trial is ending soon.",
+            body: "We'll send a reminder that your free trial is ending soon.",
             isFirst: false,
             isLast: false,
           ),
@@ -450,10 +470,7 @@ class _TimelineStep extends StatelessWidget {
                     ? LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          _kBrand,
-                          _kBrand.withValues(alpha: 0.0),
-                        ],
+                        colors: [_kBrand, _kBrand.withValues(alpha: 0.0)],
                       )
                     : null,
                 borderRadius: isFirst
@@ -522,27 +539,31 @@ class _FeatureList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: features
-          .map((f) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 1),
-                      child: Icon(Icons.check_circle_rounded,
-                          color: _kBrand, size: 20),
+          .map(
+            (f) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1),
+                    child: Icon(
+                      Icons.check_circle_rounded,
+                      color: _kBrand,
+                      size: 20,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        f,
-                        style:
-                            TextStyle(color: c.textPrimary, fontSize: 15),
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      f,
+                      style: TextStyle(color: c.textPrimary, fontSize: 15),
                     ),
-                  ],
-                ),
-              ))
+                  ),
+                ],
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -581,8 +602,8 @@ class _PriceSummary extends StatelessWidget {
 
     final sub = isAnnual
         ? (monthlyEquivalent != null
-            ? "That's just $monthlyEquivalent/mo, billed annually"
-            : 'Billed annually')
+              ? "That's just $monthlyEquivalent/mo, billed annually"
+              : 'Billed annually')
         : 'Billed monthly';
 
     return Column(
@@ -604,8 +625,7 @@ class _PriceSummary extends StatelessWidget {
             if (savingsPercent != null) ...[
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: _kBrand.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -623,10 +643,7 @@ class _PriceSummary extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 3),
-        Text(
-          sub,
-          style: TextStyle(color: c.textTertiary, fontSize: 13),
-        ),
+        Text(sub, style: TextStyle(color: c.textTertiary, fontSize: 13)),
       ],
     );
   }
@@ -660,7 +677,11 @@ class _PlanPickerSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
-          20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
+        20,
+        12,
+        20,
+        20 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,9 +772,7 @@ class _PlanRow extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              isSelected
-                  ? Icons.check_circle_rounded
-                  : Icons.circle_outlined,
+              isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
               color: isSelected ? _kBrand : c.textTertiary,
               size: 24,
             ),
@@ -776,7 +795,9 @@ class _PlanRow extends StatelessWidget {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: _kBrand.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
@@ -826,8 +847,8 @@ class _LegalLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => launchUrl(Uri.parse(url),
-          mode: LaunchMode.externalApplication),
+      onTap: () =>
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
       child: Text(
         label,
         style: TextStyle(

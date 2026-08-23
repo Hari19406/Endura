@@ -16,7 +16,9 @@ class AudioCueService {
 
     try {
       await _tts.setLanguage('en-US');
-      await _tts.setSpeechRate(0.45); // slightly slower than default — clear outdoors
+      await _tts.setSpeechRate(
+        0.45,
+      ); // slightly slower than default — clear outdoors
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
       _isInitialized = true;
@@ -56,7 +58,9 @@ class AudioCueService {
   /// Called when transitioning from warmup to main set
   Future<void> announceMainSetStart({String? targetPace}) async {
     if (targetPace != null) {
-      await _speak('Warmup complete. Main set starting. Target pace $targetPace per kilometre.');
+      await _speak(
+        'Warmup complete. Main set starting. Target pace $targetPace per kilometre.',
+      );
     } else {
       await _speak('Warmup complete. Main set starting.');
     }
@@ -140,7 +144,7 @@ class AudioCueService {
 
   /// 3661 seconds → "1 hour 1 minute" / 330 → "5 minutes 30 seconds"
   String _formatTimeForSpeech(int totalSeconds) {
-    final hours   = totalSeconds ~/ 3600;
+    final hours = totalSeconds ~/ 3600;
     final minutes = (totalSeconds % 3600) ~/ 60;
     final seconds = totalSeconds % 60;
 

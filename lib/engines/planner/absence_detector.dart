@@ -19,10 +19,7 @@ class AbsenceResult {
 }
 
 class AbsenceDetector {
-  static AbsenceResult assess({
-    required DateTime? lastRunDate,
-    DateTime? now,
-  }) {
+  static AbsenceResult assess({required DateTime? lastRunDate, DateTime? now}) {
     final today = now ?? DateTime.now();
 
     if (lastRunDate == null) {

@@ -197,27 +197,31 @@ class CoachMessageBuilder {
     }
 
     return switch (ctx.progression) {
-      ProgressionSignal.progressing  => _progressOpener(intent),
-      ProgressionSignal.holding      => _holdOpener(intent),
+      ProgressionSignal.progressing => _progressOpener(intent),
+      ProgressionSignal.holding => _holdOpener(intent),
       ProgressionSignal.steppingBack =>
-          "Pulling back intentionally today — a lighter session now means a much stronger one next time.",
+        "Pulling back intentionally today — a lighter session now means a much stronger one next time.",
     };
   }
 
   String _progressOpener(WorkoutIntent intent) {
     return switch (intent) {
-      WorkoutIntent.endurance  => "You've earned a longer run. Max is adding a little more distance today.",
-      WorkoutIntent.threshold  => "Your aerobic base is holding up well — time to ask a bit more from your threshold work.",
-      WorkoutIntent.vo2max     => "Intervals have been landing well. One more rep in the set today — you're ready for it.",
-      _                        => "The trend is positive — Max is nudging the load forward.",
+      WorkoutIntent.endurance =>
+        "You've earned a longer run. Max is adding a little more distance today.",
+      WorkoutIntent.threshold =>
+        "Your aerobic base is holding up well — time to ask a bit more from your threshold work.",
+      WorkoutIntent.vo2max =>
+        "Intervals have been landing well. One more rep in the set today — you're ready for it.",
+      _ => "The trend is positive — Max is nudging the load forward.",
     };
   }
 
   String _holdOpener(WorkoutIntent intent) {
     return switch (intent) {
-      WorkoutIntent.recovery    => "Recovery run. The pace you choose here matters as much as the pace you run on hard days.",
-      WorkoutIntent.aerobicBase => "Another easy day. Easy running is the engine of improvement — not just filler between hard sessions.",
-      _                         => "Holding the load steady. Fitness is built in the rest between sessions as much as the sessions themselves.",
+      WorkoutIntent.aerobicBase =>
+        "Another easy day. Easy running is the engine of improvement — not just filler between hard sessions.",
+      _ =>
+        "Holding the load steady. Fitness is built in the rest between sessions as much as the sessions themselves.",
     };
   }
 
@@ -225,9 +229,10 @@ class CoachMessageBuilder {
 
   String _buildGoalText(WorkoutIntent intent, TrainingPhase phase) {
     return switch (intent) {
-      WorkoutIntent.aerobicBase => phase == TrainingPhase.base
-          ? "Easy runs don't feel like much — but they're quietly expanding your aerobic engine. Every kilometre at this effort counts."
-          : "This easy run sits between your harder sessions. It keeps the legs moving without taking anything away from the next quality day.",
+      WorkoutIntent.aerobicBase =>
+        phase == TrainingPhase.base
+            ? "Easy runs don't feel like much — but they're quietly expanding your aerobic engine. Every kilometre at this effort counts."
+            : "This easy run sits between your harder sessions. It keeps the legs moving without taking anything away from the next quality day.",
       WorkoutIntent.endurance =>
         "The long run teaches your body to burn fat as fuel and builds the durability that races actually demand. It's the most important run of your week.",
       WorkoutIntent.threshold =>
@@ -238,8 +243,6 @@ class CoachMessageBuilder {
         "Short fast efforts improve your form and leg turnover. You're training your legs to move quickly — not just far.",
       WorkoutIntent.raceSpecific =>
         "Race pace runs build the confidence that comes from knowing exactly what the pace feels like. Rehearsal, not a test.",
-      WorkoutIntent.recovery =>
-        "Active recovery doesn't make you fitter — it lets the hard sessions actually do their job. Slow is the entire point.",
     };
   }
 
@@ -259,8 +262,6 @@ class CoachMessageBuilder {
         "Light and snappy, not a sprint. Fast enough to feel your legs turn over quickly, with full recovery between reps so each one feels fresh.",
       WorkoutIntent.raceSpecific =>
         "This should feel like a pace you could hold for the full race — controlled and rhythmic. Not comfortable, but not desperate either.",
-      WorkoutIntent.recovery =>
-        "Deliberately, almost embarrassingly slow. If it feels too easy, you've got it exactly right. This only works if the pace genuinely lets you recover.",
     };
   }
 
@@ -295,7 +296,9 @@ class CoachMessageBuilder {
       if (block.recoverySeconds != null) {
         final m = block.recoverySeconds! ~/ 60;
         final s = block.recoverySeconds! % 60;
-        final label = m > 0 ? '$m:${s.toString().padLeft(2,'0')} recovery' : '${block.recoverySeconds}s recovery';
+        final label = m > 0
+            ? '$m:${s.toString().padLeft(2, '0')} recovery'
+            : '${block.recoverySeconds}s recovery';
         buf.write(' ($label)');
       } else if (block.recoveryMeters != null) {
         buf.write(' (${_fmtMeters(block.recoveryMeters!)} jog recovery)');
@@ -306,59 +309,54 @@ class CoachMessageBuilder {
   }
 
   String _blockTypeLabel(BlockType type) => switch (type) {
-    BlockType.warmup   => 'Warmup',
-    BlockType.main     => 'Run',
+    BlockType.warmup => 'Warmup',
+    BlockType.main => 'Run',
     BlockType.recovery => 'Recovery',
     BlockType.cooldown => 'Cooldown',
   };
 
   String _phaseDisplayName(TrainingPhase phase) => switch (phase) {
-      TrainingPhase.base        => 'Base Phase',
-      TrainingPhase.build       => 'Build Phase',
-      TrainingPhase.peak        => 'Peak Phase',
-      TrainingPhase.taper       => 'Taper Phase',
-      TrainingPhase.maintenance => 'Maintenance',
-    };
+    TrainingPhase.base => 'Base Phase',
+    TrainingPhase.build => 'Build Phase',
+    TrainingPhase.peak => 'Peak Phase',
+    TrainingPhase.taper => 'Taper Phase',
+    TrainingPhase.maintenance => 'Maintenance',
+  };
 
   // ── Fallback steps ────────────────────────────────────────────────────────
 
   List<String> _fallbackSteps(WorkoutIntent intent) {
     return switch (intent) {
       WorkoutIntent.aerobicBase => [
-          'Start with 5 minutes of easy walking or very slow jogging to warm up.',
-          'Run easy for 20–30 minutes. Conversational pace — no effort, no heroics.',
-          'Finish with 5 minutes of walking and some light stretching.',
-        ],
+        'Start with 5 minutes of easy walking or very slow jogging to warm up.',
+        'Run easy for 20–30 minutes. Conversational pace — no effort, no heroics.',
+        'Finish with 5 minutes of walking and some light stretching.',
+      ],
       WorkoutIntent.endurance => [
-          'Start slower than feels necessary — your body needs time to warm into a long effort.',
-          'Hold a conversational pace throughout. If it gets hard before halfway, you went out too fast.',
-          'Walk for 5 minutes to cool down. Drink before you feel thirsty, not after.',
-        ],
+        'Start slower than feels necessary — your body needs time to warm into a long effort.',
+        'Hold a conversational pace throughout. If it gets hard before halfway, you went out too fast.',
+        'Walk for 5 minutes to cool down. Drink before you feel thirsty, not after.',
+      ],
       WorkoutIntent.threshold => [
-          'Ease in for 10 minutes — this run earns its hardness only if you arrive at the tempo section fresh.',
-          'Run at tempo pace for 20 minutes — comfortably hard, words but not sentences.',
-          "Cool down with 10 easy minutes. Don't skip this — clearing lactate is part of the session.",
-        ],
+        'Ease in for 10 minutes — this run earns its hardness only if you arrive at the tempo section fresh.',
+        'Run at tempo pace for 20 minutes — comfortably hard, words but not sentences.',
+        "Cool down with 10 easy minutes. Don't skip this — clearing lactate is part of the session.",
+      ],
       WorkoutIntent.vo2max => [
-          'Warm up for 10 minutes — you need to arrive at intervals ready, not already tired.',
-          'Run each rep hard. Recover fully between efforts — the next rep should feel like a fresh start.',
-          'Cool down 10 minutes easy. Resist the urge to skip it after a hard set.',
-        ],
+        'Warm up for 10 minutes — you need to arrive at intervals ready, not already tired.',
+        'Run each rep hard. Recover fully between efforts — the next rep should feel like a fresh start.',
+        'Cool down 10 minutes easy. Resist the urge to skip it after a hard set.',
+      ],
       WorkoutIntent.speed => [
-          'Warm up 10 minutes easy, then some leg swings and dynamic stretches before the reps begin.',
-          'Run each rep feeling light and quick — snappy, not sprinting. Full recovery between every rep.',
-          'Cool down 10 minutes easy.',
-        ],
+        'Warm up 10 minutes easy, then some leg swings and dynamic stretches before the reps begin.',
+        'Run each rep feeling light and quick — snappy, not sprinting. Full recovery between every rep.',
+        'Cool down 10 minutes easy.',
+      ],
       WorkoutIntent.raceSpecific => [
-          'Warm up for 10 minutes easy — get the blood moving before asking for race pace.',
-          'Hold race pace. Controlled and rhythmic — the feeling you want on race day.',
-          'Cool down 10 minutes easy.',
-        ],
-      WorkoutIntent.recovery => [
-          "Run for 20–30 minutes at whatever pace lets you breathe freely. A brisk walk counts if that's what it takes.",
-          'The whole run should feel easy enough that you could repeat it immediately. If not, slow down.',
-          "This run doesn't build fitness — it helps you absorb the runs that do. Slow is the point.",
-        ],
+        'Warm up for 10 minutes easy — get the blood moving before asking for race pace.',
+        'Hold race pace. Controlled and rhythmic — the feeling you want on race day.',
+        'Cool down 10 minutes easy.',
+      ],
     };
   }
 
@@ -451,13 +449,21 @@ class CoachMessageBuilder {
 
     // ── Layer 1: Base message pools (3 variants, rotated by run count) ──────
     return switch (intent) {
-      WorkoutIntent.aerobicBase  => _postRunEasy(rpe, totalRunsCompleted),
-      WorkoutIntent.endurance    => _postRunLong(rpe, distanceKm, totalRunsCompleted),
-      WorkoutIntent.threshold    => _postRunThreshold(rpe, totalRunsCompleted),
-      WorkoutIntent.vo2max       => _postRunIntervals(rpe, totalRunsCompleted),
-      WorkoutIntent.speed        => _postRunSpeed(rpe, totalRunsCompleted),
-      WorkoutIntent.raceSpecific => _postRunRaceSpecific(rpe, isOnTargetPace, ranTooFast, totalRunsCompleted),
-      WorkoutIntent.recovery     => _postRunRecovery(rpe, totalRunsCompleted),
+      WorkoutIntent.aerobicBase => _postRunEasy(rpe, totalRunsCompleted),
+      WorkoutIntent.endurance => _postRunLong(
+        rpe,
+        distanceKm,
+        totalRunsCompleted,
+      ),
+      WorkoutIntent.threshold => _postRunThreshold(rpe, totalRunsCompleted),
+      WorkoutIntent.vo2max => _postRunIntervals(rpe, totalRunsCompleted),
+      WorkoutIntent.speed => _postRunSpeed(rpe, totalRunsCompleted),
+      WorkoutIntent.raceSpecific => _postRunRaceSpecific(
+        rpe,
+        isOnTargetPace,
+        ranTooFast,
+        totalRunsCompleted,
+      ),
     };
   }
 
@@ -565,7 +571,12 @@ class CoachMessageBuilder {
     ], runs);
   }
 
-  String _postRunRaceSpecific(int rpe, bool? isOnTargetPace, bool ranTooFast, int runs) {
+  String _postRunRaceSpecific(
+    int rpe,
+    bool? isOnTargetPace,
+    bool ranTooFast,
+    int runs,
+  ) {
     if (isOnTargetPace == true) {
       return _pick([
         "Race pace locked in. You know exactly what it feels like now — hold onto that feeling for race day.",
@@ -594,31 +605,9 @@ class CoachMessageBuilder {
     ], runs);
   }
 
-  String _postRunRecovery(int rpe, int runs) {
-    if (rpe <= 3) {
-      return _pick([
-        "Recovery run done exactly right. Keeping it genuinely easy is harder than it sounds — and just as important as the hard sessions.",
-        "That's a proper recovery run. The pace that feels almost embarrassingly slow is the pace that actually helps.",
-        "Easy enough? Good. Recovery runs only work when they're this easy — you nailed it.",
-      ], runs);
-    }
-    if (rpe <= 5) {
-      return _pick([
-        "A bit more effort than a recovery run ideally needs, but the legs are moving and that's what counts today.",
-        "Slightly above recovery effort — not a problem. The main thing is you avoided the temptation to push on a recovery day.",
-        "A notch above pure recovery, but close enough. The goal was to keep the legs loose — done.",
-      ], runs);
-    }
-    return _pick([
-      "That felt heavier than a recovery run should. Your body might be asking for proper rest — Max will factor it in.",
-      "Recovery run felt hard. If this keeps happening, prioritise sleep and nutrition before the next hard session.",
-      "Heavy legs on a recovery day. When easy feels hard, rest is often the better answer — consider making tomorrow optional.",
-    ], runs);
-  }
-
   //HELPER FUNCTIONS
   String _fmtMeters(double meters) {
-  if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)} km';
-  return '${meters.round()}m';
-}
+    if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)} km';
+    return '${meters.round()}m';
+  }
 }

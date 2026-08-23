@@ -40,10 +40,7 @@ class RevenueCatService {
     try {
       final offerings = await Purchases.getOfferings();
       final current = offerings.current;
-      return (
-        annual: current?.annual,
-        monthly: current?.monthly,
-      );
+      return (annual: current?.annual, monthly: current?.monthly);
     } catch (e) {
       debugPrint('[RevenueCat] getOffering error: $e');
       return (annual: null, monthly: null);
@@ -53,7 +50,9 @@ class RevenueCatService {
   /// Purchase a specific package. Returns true if the user is now pro.
   static Future<bool> purchasePackage(Package package) async {
     final result = await Purchases.purchasePackage(package);
-    final nowPro = result.customerInfo.entitlements.active.containsKey('Endura Pro');
+    final nowPro = result.customerInfo.entitlements.active.containsKey(
+      'Endura Pro',
+    );
     isProNotifier.value = nowPro;
     return nowPro;
   }

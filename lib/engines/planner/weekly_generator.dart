@@ -18,7 +18,6 @@ class WeeklyGenerator {
   static WeeklyPlan generate({
     required DateTime startDate,
     WorkoutType lastCompletedType = WorkoutType.easy,
-    WorkoutType? lastNonRecoveryType,
     TrainingPhase phase = TrainingPhase.base,
     int totalRunsCompleted = 0,
     List<int>? trainingDayIndices,
@@ -29,7 +28,7 @@ class WeeklyGenerator {
         : _fallbackDays;
 
     // Build the workout type pattern for the user's chosen days.
-    final pattern = _buildPattern(activeDays, phase, lastNonRecoveryType);
+    final pattern = _buildPattern(activeDays, phase, lastCompletedType);
 
     final days = <PlannedDay>[];
     int patternIdx = 0;
@@ -38,20 +37,20 @@ class WeeklyGenerator {
       final date = monday.add(Duration(days: i));
 
       if (!activeDays.contains(i)) {
-        days.add(PlannedDay(
-          date: date,
-          workoutType: WorkoutType.rest,
-          isRestDay: true,
-        ));
+        days.add(
+          PlannedDay(
+            date: date,
+            workoutType: WorkoutType.rest,
+            isRestDay: true,
+          ),
+        );
         continue;
       }
 
       final workoutType = pattern[patternIdx++];
-      days.add(PlannedDay(
-        date: date,
-        workoutType: workoutType,
-        isRestDay: false,
-      ));
+      days.add(
+        PlannedDay(date: date, workoutType: workoutType, isRestDay: false),
+      );
     }
 
     return WeeklyPlan(weekStartDate: monday, days: days);
@@ -85,12 +84,12 @@ class WeeklyGenerator {
   //   • Long run → must have a rest day AFTER it when possible.
   //   • Quality (tempo/interval) → must have a rest day BEFORE it.
   //   • No two hard days (quality/long) on consecutive training days.
-  //   • Easy/recovery fills remaining slots.
+  //   • Easy fills remaining slots.
 
   static List<WorkoutType> _buildPattern(
     List<int> sortedDays,
     TrainingPhase phase,
-    WorkoutType? lastNonRecovery,
+    WorkoutType? lastCompletedType,
   ) {
     final n = sortedDays.length;
     if (n == 0) return [];
@@ -117,14 +116,20 @@ class WeeklyGenerator {
         final maxQ = phase.maxQualityPerWeek;
         final qualityCount = targetQ.clamp(0, maxQ);
 
-        var lastNR = lastNonRecovery;
+        var lastNR = lastCompletedType;
         int placed = 0;
 
         // First pass: only days with rest before them (ideal).
         for (int i = 0; i < n && placed < qualityCount; i++) {
-          if (result[i] != WorkoutType.easy) { continue; }
-          if (!_hasRestBefore(sortedDays, i)) { continue; }
-          if (_isAdjacentToHard(result, i)) { continue; }
+          if (result[i] != WorkoutType.easy) {
+            continue;
+          }
+          if (!_hasRestBefore(sortedDays, i)) {
+            continue;
+          }
+          if (_isAdjacentToHard(result, i)) {
+            continue;
+          }
 
           result[i] = _pickQualityType(lastNR);
           lastNR = result[i];
@@ -133,8 +138,12 @@ class WeeklyGenerator {
 
         // Second pass: relax the "rest before" constraint if still needed.
         for (int i = 0; i < n && placed < qualityCount; i++) {
-          if (result[i] != WorkoutType.easy) { continue; }
-          if (_isAdjacentToHard(result, i)) { continue; }
+          if (result[i] != WorkoutType.easy) {
+            continue;
+          }
+          if (_isAdjacentToHard(result, i)) {
+            continue;
+          }
 
           result[i] = _pickQualityType(lastNR);
           lastNR = result[i];
@@ -173,15 +182,18 @@ class WeeklyGenerator {
     return false;
   }
 
-  static WorkoutType _pickQualityType(WorkoutType? lastNonRecovery) {
+  static WorkoutType _pickQualityType(WorkoutType? lastCompletedType) {
     // Alternate: if last quality was tempo → give interval, and vice versa.
-    if (lastNonRecovery == WorkoutType.tempo) return WorkoutType.interval;
+    if (lastCompletedType == WorkoutType.tempo) return WorkoutType.interval;
     return WorkoutType.tempo;
   }
 
   static DateTime _toMonday(DateTime date) {
     final weekday = date.weekday;
-    return DateTime(date.year, date.month, date.day)
-        .subtract(Duration(days: weekday - 1));
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(Duration(days: weekday - 1));
   }
 }

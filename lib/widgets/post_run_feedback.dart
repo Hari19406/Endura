@@ -58,7 +58,10 @@ class PostRunFeedback extends StatelessWidget {
   // ── Pace comparison card ─────────────────────────────────────────────────
 
   Widget _buildPaceFeedback(
-      BuildContext context, int avgPaceSeconds, PaceStatus status) {
+    BuildContext context,
+    int avgPaceSeconds,
+    PaceStatus status,
+  ) {
     final _FeedbackConfig cfg = _configForStatus(status);
 
     return Column(
@@ -205,11 +208,7 @@ class PostRunFeedback extends StatelessWidget {
                   color: c.accent,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(
-                  Icons.directions_run,
-                  color: c.onAccent,
-                  size: 18,
-                ),
+                child: Icon(Icons.directions_run, color: c.onAccent, size: 18),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -263,7 +262,8 @@ class PostRunFeedback extends StatelessWidget {
           accentColor: const Color(0xFFF57C00),
           bgColor: const Color(0xFFFFF8F0),
           borderColor: const Color(0xFFFFE0B2),
-          note: 'Consider backing off next time — '
+          note:
+              'Consider backing off next time — '
               'saving energy helps later in the run.',
         );
       case PaceStatus.tooSlow:
@@ -273,7 +273,8 @@ class PostRunFeedback extends StatelessWidget {
           accentColor: const Color(0xFF666666),
           bgColor: const Color(0xFFF5F5F5),
           borderColor: const Color(0xFFE0E0E0),
-          note: 'Try to push the effort next time — '
+          note:
+              'Try to push the effort next time — '
               'aim for the lower end of the target.',
         );
       case PaceStatus.noData:

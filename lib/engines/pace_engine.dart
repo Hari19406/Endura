@@ -41,7 +41,8 @@ class PaceSnapshot {
   static String _format(double paceSecondsPerKm) {
     if (paceSecondsPerKm <= 0 ||
         paceSecondsPerKm.isInfinite ||
-        paceSecondsPerKm.isNaN) return '--:--';
+        paceSecondsPerKm.isNaN)
+      return '--:--';
     if (paceSecondsPerKm > 5999) return '99:59';
     int minutes = paceSecondsPerKm ~/ 60;
     int seconds = (paceSecondsPerKm % 60).round();
@@ -99,7 +100,11 @@ class PaceEngine {
     _rollingWindowActive = false;
   }
 
-  PaceSnapshot addPoint(GpsPoint point, double currentTotalDistance, int currentTotalSeconds) {
+  PaceSnapshot addPoint(
+    GpsPoint point,
+    double currentTotalDistance,
+    int currentTotalSeconds,
+  ) {
     _totalDistance = currentTotalDistance;
     _totalSeconds = currentTotalSeconds;
     _lastGpsTimestamp = point.timestamp;
@@ -117,11 +122,17 @@ class PaceEngine {
 
     // ── Impossible speed check ───────────────────────────────────────────
     if (_lastAcceptedPoint != null) {
-      final dt = point.timestamp.difference(_lastAcceptedPoint!.timestamp).inMilliseconds / 1000.0;
+      final dt =
+          point.timestamp
+              .difference(_lastAcceptedPoint!.timestamp)
+              .inMilliseconds /
+          1000.0;
       if (dt > 0) {
         final dist = _haversineMeters(
-          _lastAcceptedPoint!.lat, _lastAcceptedPoint!.lng,
-          point.lat, point.lng,
+          _lastAcceptedPoint!.lat,
+          _lastAcceptedPoint!.lng,
+          point.lat,
+          point.lng,
         );
         if (dist / dt > _maxSpeedMs) {
           return _buildSnapshot();
@@ -162,7 +173,10 @@ class PaceEngine {
 
     // Convert m/s to seconds/km
     double paceFromSpeed = 1000.0 / speedMs;
-    paceFromSpeed = paceFromSpeed.clamp(_minPaceSecondsPerKm, _maxPaceSecondsPerKm);
+    paceFromSpeed = paceFromSpeed.clamp(
+      _minPaceSecondsPerKm,
+      _maxPaceSecondsPerKm,
+    );
 
     _gpsSpeedBuffer.add(paceFromSpeed);
     if (_gpsSpeedBuffer.length > _gpsSpeedSmoothingSize) {
@@ -197,15 +211,22 @@ class PaceEngine {
 
     for (int i = 1; i < points.length; i++) {
       final segDist = _haversineMeters(
-        points[i - 1].lat, points[i - 1].lng,
-        points[i].lat, points[i].lng,
+        points[i - 1].lat,
+        points[i - 1].lng,
+        points[i].lat,
+        points[i].lng,
       );
-      final segTime = points[i - 1].timestamp.difference(points[i].timestamp).inMilliseconds / 1000.0;
+      final segTime =
+          points[i - 1].timestamp
+              .difference(points[i].timestamp)
+              .inMilliseconds /
+          1000.0;
 
       windowDistance += segDist;
       windowTime += segTime;
 
-      if (windowTime >= _rollingWindowSeconds && windowDistance >= _rollingWindowMeters) {
+      if (windowTime >= _rollingWindowSeconds &&
+          windowDistance >= _rollingWindowMeters) {
         break;
       }
     }
@@ -250,7 +271,8 @@ class PaceEngine {
     final last = points.last;
     final prev = points[points.length - 2];
     final dist = _haversineMeters(prev.lat, prev.lng, last.lat, last.lng);
-    final dt = last.timestamp.difference(prev.timestamp).inMilliseconds / 1000.0;
+    final dt =
+        last.timestamp.difference(prev.timestamp).inMilliseconds / 1000.0;
     if (dt <= 0) return 0.0;
     return dist / dt;
   }
@@ -280,11 +302,17 @@ class PaceEngine {
     );
   }
 
-  static double _haversineMeters(double lat1, double lng1, double lat2, double lng2) {
+  static double _haversineMeters(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) {
     const R = 6371000.0;
     final dLat = _toRad(lat2 - lat1);
     final dLng = _toRad(lng2 - lng1);
-    final a = sin(dLat / 2) * sin(dLat / 2) +
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(_toRad(lat1)) * cos(_toRad(lat2)) * sin(dLng / 2) * sin(dLng / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return R * c;

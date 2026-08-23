@@ -278,7 +278,6 @@ String _intentLabel(WorkoutIntent? intent) => switch (intent) {
   WorkoutIntent.vo2max => 'INT',
   WorkoutIntent.speed => 'SPEED',
   WorkoutIntent.raceSpecific => 'RACE',
-  WorkoutIntent.recovery => 'REC',
   null => 'REST',
 };
 
@@ -288,7 +287,6 @@ IconData _intentIcon(WorkoutIntent? intent) => switch (intent) {
   WorkoutIntent.vo2max => Icons.timer_outlined,
   WorkoutIntent.speed => Icons.timer_outlined,
   WorkoutIntent.raceSpecific => Icons.flag_outlined,
-  WorkoutIntent.recovery => Icons.favorite_border,
   _ => Icons.directions_run,
 };
 
@@ -296,7 +294,6 @@ String _workoutTypeLabel(WorkoutType type) => switch (type) {
   WorkoutType.tempo => 'TEMPO',
   WorkoutType.interval => 'INT',
   WorkoutType.long => 'LONG',
-  WorkoutType.recovery => 'REC',
   WorkoutType.quality => 'QUALITY',
   WorkoutType.rest => 'REST',
   WorkoutType.easy => 'EASY',
@@ -306,7 +303,6 @@ IconData _workoutTypeIcon(WorkoutType type) => switch (type) {
   WorkoutType.tempo => Icons.bolt,
   WorkoutType.interval => Icons.timer_outlined,
   WorkoutType.long => Icons.landscape_outlined,
-  WorkoutType.recovery => Icons.favorite_border,
   _ => Icons.directions_run,
 };
 

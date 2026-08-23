@@ -26,13 +26,7 @@ import '../../models/training_phase.dart';
 // DAY ROLE — what role this workout plays in the weekly structure
 // ============================================================================
 
-enum DayRole {
-  longRun,
-  primaryQuality,
-  secondaryQuality,
-  easyRun,
-  recovery,
-}
+enum DayRole { longRun, primaryQuality, secondaryQuality, easyRun }
 
 // ============================================================================
 // VOLUME CALCULATOR
@@ -102,11 +96,10 @@ class VolumeCalculator {
     } else {
       // Absolute last resort — shouldn't happen with a well-formed template.
       distance = switch (dayRole) {
-        DayRole.longRun          => weeklyTargetKm * 0.32,
-        DayRole.primaryQuality   => weeklyTargetKm * 0.18,
+        DayRole.longRun => weeklyTargetKm * 0.32,
+        DayRole.primaryQuality => weeklyTargetKm * 0.18,
         DayRole.secondaryQuality => weeklyTargetKm * 0.15,
-        DayRole.easyRun          => weeklyTargetKm * 0.18,
-        DayRole.recovery         => weeklyTargetKm * 0.10,
+        DayRole.easyRun => weeklyTargetKm * 0.18,
       };
     }
 
@@ -140,16 +133,12 @@ class VolumeCalculator {
     return distance.clamp(min, range.maxKm);
   }
 
-  double _applyMinimums({
-    required double distance,
-    required DayRole dayRole,
-  }) {
+  double _applyMinimums({required double distance, required DayRole dayRole}) {
     final minimum = switch (dayRole) {
-      DayRole.longRun          => 5.0,
-      DayRole.primaryQuality   => 5.0,
+      DayRole.longRun => 5.0,
+      DayRole.primaryQuality => 5.0,
       DayRole.secondaryQuality => 4.0,
-      DayRole.easyRun          => 3.0,
-      DayRole.recovery         => 2.0,
+      DayRole.easyRun => 3.0,
     };
     return distance < minimum ? minimum : distance;
   }

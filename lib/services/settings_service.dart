@@ -51,10 +51,10 @@ class SettingsService {
 
   // Default settings values
   static Settings get defaultSettings => Settings(
-        useMetric: true,
-        targetPaceSecPerKm: null,
-        notificationsEnabled: true,
-      );
+    useMetric: true,
+    targetPaceSecPerKm: null,
+    notificationsEnabled: true,
+  );
 
   /// Load settings from SharedPreferences
   /// Returns default settings if none are saved or if there's an error

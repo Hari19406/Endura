@@ -73,8 +73,8 @@ class EngineRuntime {
       if (_shouldEvaluateProgression(updated, runDate)) {
         // Use caller-supplied decision if provided, otherwise derive from
         // the 3-signal spec stored in memory.
-        final resolvedDecision = weeklyProgressionDecision ??
-            _computeDecisionFromMemory(updated);
+        final resolvedDecision =
+            weeklyProgressionDecision ?? _computeDecisionFromMemory(updated);
 
         // vDOT moves only on real pace evidence (pendingVdotNudge, banked by
         // _calibrateVdot from actual-vs-expected pace). Adherence/consistency
@@ -90,8 +90,9 @@ class EngineRuntime {
         // over a long plan.
         final planWeeks = updated.racePlan?.weeks.length;
         final anchor = updated.vdotAtPlanStart ?? updated.vdotScore;
-        final driftCap =
-            planWeeks != null ? math.max(3, (planWeeks / 2).ceil()) : null;
+        final driftCap = planWeeks != null
+            ? math.max(3, (planWeeks / 2).ceil())
+            : null;
 
         final vdotBeforeEval = updated.vdotScore;
         var newVdot = vdotBeforeEval + appliedNudge;
@@ -178,8 +179,9 @@ class EngineRuntime {
     if (memory.lastProgressionEvaluationDate == null) {
       return memory.totalRunsCompleted >= 3;
     }
-    final daysSinceLast =
-        today.difference(memory.lastProgressionEvaluationDate!).inDays;
+    final daysSinceLast = today
+        .difference(memory.lastProgressionEvaluationDate!)
+        .inDays;
     return daysSinceLast >= 7;
   }
 
@@ -193,8 +195,8 @@ class EngineRuntime {
   static ProgressionDecision _computeDecisionFromMemory(EngineMemory memory) {
     // ── Signal 1: RPE trend ──────────────────────────────────────────────
     final rpeIncreasing = _isRpeTrendIncreasing(memory);
-    final rpeStableOrDecreasing = !rpeIncreasing &&
-        memory.recentRpeEntries.length >= 2;
+    final rpeStableOrDecreasing =
+        !rpeIncreasing && memory.recentRpeEntries.length >= 2;
 
     // ── Signal 2: Completion % ───────────────────────────────────────────
     final completionRate = memory.weeklyCompletionRate ?? 1.0;
@@ -225,7 +227,9 @@ class EngineRuntime {
     final entries = memory.recentRpeEntries;
     if (entries.length < 2) return false;
     final sorted = [...entries]..sort((a, b) => a.date.compareTo(b.date));
-    final recent = sorted.length > 3 ? sorted.sublist(sorted.length - 3) : sorted;
+    final recent = sorted.length > 3
+        ? sorted.sublist(sorted.length - 3)
+        : sorted;
     if (recent.length < 2) return false;
     // Simple: last value strictly greater than first value in the window
     return recent.last.value > recent.first.value;

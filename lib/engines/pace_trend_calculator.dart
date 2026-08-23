@@ -45,8 +45,9 @@ class PaceTrendCalculator {
 
     // Discard any pace that deviates more than 30 % from the median.
     // A 6 min/km runner won't jump to 9 min/km under normal conditions.
-    final cleanPaces =
-        window.where((p) => (p - median).abs() / median <= 0.30).toList();
+    final cleanPaces = window
+        .where((p) => (p - median).abs() / median <= 0.30)
+        .toList();
 
     // Not enough clean data — honest "unknown" rather than a false stable.
     if (cleanPaces.length < 3) return 'insufficient_data';

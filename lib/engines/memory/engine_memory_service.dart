@@ -38,7 +38,10 @@ class EngineMemoryService {
   Future<void> save(EngineMemory memory, {bool syncToCloud = true}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(memory.toJson()));
-    await prefs.setString(_updatedAtKey, DateTime.now().toUtc().toIso8601String());
+    await prefs.setString(
+      _updatedAtKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
     if (syncToCloud) {
       await EngineStateSyncService.instance.syncEngineMemory(memory);
     }
@@ -65,13 +68,6 @@ class EngineMemoryService {
       ].take(5).toList();
     }
 
-    // ── Last non-recovery type ────────────────────────────────────────────
-    WorkoutType lastNonRecovery =
-        current.lastNonRecoveryType ?? current.lastCompletedType;
-    if (workoutType != WorkoutType.recovery) {
-      lastNonRecovery = workoutType;
-    }
-
     // ── Weekly reset check: if today is a new week, reset counters ────────
     // A new week starts on Monday. If lastRunDate was in a previous week,
     // reset weeklyCompletedKm so stale km don't carry over.
@@ -88,14 +84,15 @@ class EngineMemoryService {
           weeklyCompletedKm: 0.0,
           weeklyDowngradeCount: 0,
         );
-        debugPrint('[EngineMemoryService] New week detected — resetting weekly counters');
+        debugPrint(
+          '[EngineMemoryService] New week detected — resetting weekly counters',
+        );
       }
     }
 
     // ── Accumulate completed km ───────────────────────────────────────────
     final updated = base.copyWith(
       lastCompletedType: workoutType,
-      lastNonRecoveryType: lastNonRecovery,
       recentRpeEntries: updatedRpe,
       totalRunsCompleted: totalRunCount,
       currentPhase: PhaseEngine.fromRunCount(totalRunCount),
@@ -123,7 +120,9 @@ class EngineMemoryService {
       weeklyDowngradeCount: current.weeklyDowngradeCount + 1,
     );
     await save(updated);
-    debugPrint('[EngineMemoryService] Pre-run downgrade recorded (total: ${updated.weeklyDowngradeCount})');
+    debugPrint(
+      '[EngineMemoryService] Pre-run downgrade recorded (total: ${updated.weeklyDowngradeCount})',
+    );
   }
 
   /// Call every Monday (or on first run of the week after a week boundary)
@@ -146,7 +145,9 @@ class EngineMemoryService {
       lastProgressionEvaluationDate: DateTime.now(),
     );
     await save(updated);
-    debugPrint('[EngineMemoryService] Week rollover applied — nextWeekPlannedKm: $nextWeekPlannedKm');
+    debugPrint(
+      '[EngineMemoryService] Week rollover applied — nextWeekPlannedKm: $nextWeekPlannedKm',
+    );
     return updated;
   }
 
@@ -174,10 +175,9 @@ class EngineMemoryService {
     final current = await load();
     // Snapshot vDOT at the moment a plan starts, so weekly nudges over the
     // life of this plan can be capped to a realistic total drift.
-    await save(current.copyWith(
-      racePlan: plan,
-      vdotAtPlanStart: current.vdotScore,
-    ));
+    await save(
+      current.copyWith(racePlan: plan, vdotAtPlanStart: current.vdotScore),
+    );
   }
 
   Future<void> clearRacePlan() async {
@@ -190,9 +190,7 @@ class EngineMemoryService {
     if (current.firstRunDate != null) return;
     if (current.lastRunDate == null) return;
 
-    final migrated = current.copyWith(
-      firstRunDate: current.lastRunDate,
-    );
+    final migrated = current.copyWith(firstRunDate: current.lastRunDate);
     await save(migrated, syncToCloud: true);
     debugPrint('[EngineMemoryService] Migrated firstRunDate from lastRunDate');
   }

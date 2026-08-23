@@ -38,9 +38,9 @@ class PreRunInputs {
   });
 
   const PreRunInputs.allGood()
-      : feeling = PreRunFeeling.great,
-        sleep = PreRunSleep.good,
-        pain = PainLocation.none;
+    : feeling = PreRunFeeling.great,
+      sleep = PreRunSleep.good,
+      pain = PainLocation.none;
 
   bool get feelingOff => feeling == PreRunFeeling.tired;
   bool get sleepPoor => sleep == PreRunSleep.poor;
@@ -48,11 +48,9 @@ class PreRunInputs {
   bool get hasChestPain => pain == PainLocation.chest;
   bool get hasUpperBodyPain => pain == PainLocation.upperBody;
 
-  bool get needsReduction =>
-      feelingOff || sleepPoor || hasLegPain;
+  bool get needsReduction => feelingOff || sleepPoor || hasLegPain;
 
-  bool get isFullGo =>
-      !feelingOff && !sleepPoor && pain != PainLocation.leg;
+  bool get isFullGo => !feelingOff && !sleepPoor && pain != PainLocation.leg;
 }
 
 // ============================================================================
@@ -85,7 +83,9 @@ class PreRunScaler {
     }
 
     final factors = _resolveFactors(inputs);
-    final scaledBlocks = workout.blocks.map((b) => _scaleBlock(b, factors)).toList();
+    final scaledBlocks = workout.blocks
+        .map((b) => _scaleBlock(b, factors))
+        .toList();
     final note = _buildNote(inputs);
 
     return PreRunScaleResult(
@@ -108,7 +108,8 @@ class PreRunScaler {
 
   _Factors _resolveFactors(PreRunInputs inputs) {
     final bothOffAndSleep = inputs.feelingOff && inputs.sleepPoor;
-    final legPainWithOther = inputs.hasLegPain && (inputs.feelingOff || inputs.sleepPoor);
+    final legPainWithOther =
+        inputs.hasLegPain && (inputs.feelingOff || inputs.sleepPoor);
 
     // Worst applicable case wins (lowest multiplier).
     if (bothOffAndSleep || legPainWithOther) {
@@ -128,7 +129,10 @@ class PreRunScaler {
   ResolvedBlock _scaleBlock(ResolvedBlock block, _Factors factors) {
     if (block.reps != null) {
       // Interval block — reduce reps, preserve rep distance.
-      final newReps = (block.reps! * factors.repScale).round().clamp(2, block.reps!);
+      final newReps = (block.reps! * factors.repScale).round().clamp(
+        2,
+        block.reps!,
+      );
       return ResolvedBlock(
         type: block.type,
         distanceKm: block.distanceKm,
@@ -152,7 +156,7 @@ class PreRunScaler {
       isRpeOnly: block.isRpeOnly,
       reps: block.reps,
       recoverySeconds: block.recoverySeconds,
-      recoveryMeters: block.recoveryMeters,   
+      recoveryMeters: block.recoveryMeters,
       label: block.label,
     );
   }

@@ -36,8 +36,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final storedValue = prefs.getInt('runs_per_week');
     final storedRunsPerWeek = (storedValue ?? 4).clamp(1, 7);
-    final storedDays =
-        await TrainingDaysService.loadOrDefault(storedRunsPerWeek);
+    final storedDays = await TrainingDaysService.loadOrDefault(
+      storedRunsPerWeek,
+    );
     if (mounted) {
       setState(() {
         _useMetric = prefs.getString('distance_unit') != 'miles';
@@ -48,7 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     }
   }
-
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
@@ -84,11 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         content: Text(
           'Your runs are safely backed up to the cloud. Sign back in anytime to restore them.',
-          style: TextStyle(
-            fontSize: 14,
-            color: c.textSecondary,
-            height: 1.5,
-          ),
+          style: TextStyle(fontSize: 14, color: c.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -98,8 +94,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: c.textPrimary),
-            child: const Text('Sign out',
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Sign out',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -136,11 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         content: Text(
           'This permanently deletes all your runs, training history, and account. This cannot be undone.',
-          style: TextStyle(
-            fontSize: 14,
-            color: c.textSecondary,
-            height: 1.5,
-          ),
+          style: TextStyle(fontSize: 14, color: c.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -150,8 +144,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: c.danger),
-            child: const Text('Delete everything',
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Delete everything',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -169,8 +165,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const CircularProgressIndicator(),
               const SizedBox(width: 16),
-              Text('Deleting your account...',
-                  style: TextStyle(color: c.textPrimary)),
+              Text(
+                'Deleting your account...',
+                style: TextStyle(color: c.textPrimary),
+              ),
             ],
           ),
         ),
@@ -188,16 +186,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             builder: (_) => AlertDialog(
               backgroundColor: c.surface,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              title: Text('Delete failed',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: c.textPrimary)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Text(
+                'Delete failed',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: c.textPrimary,
+                ),
+              ),
               content: Text(
                 'Could not delete your cloud data. Check your connection and try again.',
                 style: TextStyle(
-                    fontSize: 14, color: c.textSecondary, height: 1.5),
+                  fontSize: 14,
+                  color: c.textSecondary,
+                  height: 1.5,
+                ),
               ),
               actions: [
                 TextButton(
@@ -312,9 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // ACCOUNT
                     _buildSectionHeader('ACCOUNT'),
                     const SizedBox(height: 12),
-                    _buildCard(
-                      child: _buildSignOutRow(),
-                    ),
+                    _buildCard(child: _buildSignOutRow()),
                     const SizedBox(height: 24),
 
                     // DATA
@@ -422,9 +425,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: selected ? c.accent : Colors.transparent,
-            border: Border.all(
-              color: selected ? c.accent : c.border,
-            ),
+            border: Border.all(color: selected ? c.accent : c.border),
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
@@ -466,19 +467,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: c.textTertiary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: c.textTertiary),
                 ),
               ],
             ],
           ),
         ),
-        Switch(
-          value: value,
-          onChanged: onChanged,
-        ),
+        Switch(value: value, onChanged: onChanged),
       ],
     );
   }
@@ -511,10 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     currentUser?.email ??
                         currentUser?.userMetadata?['full_name'] as String? ??
                         '',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textTertiary,
-                    ),
+                    style: TextStyle(fontSize: 12, color: c.textTertiary),
                   ),
                 ],
               ),
@@ -554,23 +546,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textTertiary,
-                    ),
+                    style: TextStyle(fontSize: 12, color: c.textTertiary),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: c.textTertiary,
-              size: 20,
-            ),
+            Icon(Icons.chevron_right, color: c.textTertiary, size: 20),
           ],
         ),
       ),
     );
   }
-
 }

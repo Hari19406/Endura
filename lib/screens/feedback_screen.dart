@@ -160,10 +160,7 @@ class _FeedbackTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: c.textTertiary,
-                        ),
+                        style: TextStyle(fontSize: 12, color: c.textTertiary),
                       ),
                     ],
                   ),

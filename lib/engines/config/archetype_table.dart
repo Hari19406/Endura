@@ -31,9 +31,8 @@
 ///   2 easy slots → recoveryEasy + easyMedium
 ///   3 easy slots → recoveryEasy + easy + easyMedium
 ///
-///   All three flavours map to WorkoutIntent.aerobicBase.
-///   WorkoutIntent.recovery is reserved for pre-run downgrade substitutions only
-///   (recovery_shakeout, recovery_walk_jog, rest_day selected at runtime).
+///   All three flavours map to WorkoutIntent.aerobicBase — there is no
+///   separate "recovery" intent; a lighter day is still a workout.
 ///
 /// WEEK 1 (WeekResolver responsibility):
 ///   Apply 0.60 multiplier on top of km values. Floors still apply.
@@ -83,15 +82,15 @@ extension ArchetypeSessionTypeX on ArchetypeSessionType {
   bool get isLong => this == ArchetypeSessionType.longRun;
 
   WorkoutIntent get intent => switch (this) {
-        // All three easy flavours are aerobicBase.
-        // WorkoutIntent.recovery is reserved for pre-run downgrade substitutions.
-        ArchetypeSessionType.recoveryEasy => WorkoutIntent.aerobicBase,
-        ArchetypeSessionType.easy        => WorkoutIntent.aerobicBase,
-        ArchetypeSessionType.easyMedium  => WorkoutIntent.aerobicBase,
-        ArchetypeSessionType.tempo       => WorkoutIntent.threshold,
-        ArchetypeSessionType.interval    => WorkoutIntent.vo2max,
-        ArchetypeSessionType.longRun     => WorkoutIntent.endurance,
-      };
+    // All three easy flavours are aerobicBase — this is just a naming
+    // variant for session variety, not a distinct intent.
+    ArchetypeSessionType.recoveryEasy => WorkoutIntent.aerobicBase,
+    ArchetypeSessionType.easy => WorkoutIntent.aerobicBase,
+    ArchetypeSessionType.easyMedium => WorkoutIntent.aerobicBase,
+    ArchetypeSessionType.tempo => WorkoutIntent.threshold,
+    ArchetypeSessionType.interval => WorkoutIntent.vo2max,
+    ArchetypeSessionType.longRun => WorkoutIntent.endurance,
+  };
 }
 
 enum ExperienceLevel { beginner, intermediate, advanced }
@@ -102,13 +101,13 @@ enum ExperienceLevel { beginner, intermediate, advanced }
 
 class _Floors {
   static double forType(ArchetypeSessionType type) => switch (type) {
-        ArchetypeSessionType.recoveryEasy => 3.0,
-        ArchetypeSessionType.easy        => 4.0,
-        ArchetypeSessionType.easyMedium  => 5.0,
-        ArchetypeSessionType.tempo       => 5.0,
-        ArchetypeSessionType.interval    => 5.0,
-        ArchetypeSessionType.longRun     => 8.0,
-      };
+    ArchetypeSessionType.recoveryEasy => 3.0,
+    ArchetypeSessionType.easy => 4.0,
+    ArchetypeSessionType.easyMedium => 5.0,
+    ArchetypeSessionType.tempo => 5.0,
+    ArchetypeSessionType.interval => 5.0,
+    ArchetypeSessionType.longRun => 8.0,
+  };
 }
 
 // ============================================================================
@@ -147,8 +146,8 @@ class ArchetypeWeek {
 
   int get sessionCount => sessions.length;
   int get qualityCount => sessions.where((s) => s.type.isQuality).length;
-  bool get hasLongRun  => sessions.any((s) => s.type.isLong);
-  double get totalKm   => sessions.fold(0.0, (sum, s) => sum + s.effectiveKm);
+  bool get hasLongRun => sessions.any((s) => s.type.isLong);
+  double get totalKm => sessions.fold(0.0, (sum, s) => sum + s.effectiveKm);
 }
 
 // ============================================================================
@@ -159,22 +158,21 @@ class PeakWeeklyKm {
   static double lookup({
     required RaceDistance race,
     required ExperienceLevel experience,
-  }) =>
-      switch ((race, experience)) {
-        (RaceDistance.fiveK,        ExperienceLevel.beginner)     => 35,
-        (RaceDistance.fiveK,        ExperienceLevel.intermediate) => 45,
-        (RaceDistance.fiveK,        ExperienceLevel.advanced)     => 55,
-        (RaceDistance.tenK,         ExperienceLevel.beginner)     => 40,
-        (RaceDistance.tenK,         ExperienceLevel.intermediate) => 55,
-        (RaceDistance.tenK,         ExperienceLevel.advanced)     => 65,
-        (RaceDistance.halfMarathon, ExperienceLevel.beginner)     => 50,
-        (RaceDistance.halfMarathon, ExperienceLevel.intermediate) => 65,
-        (RaceDistance.halfMarathon, ExperienceLevel.advanced)     => 75,
-        (RaceDistance.marathon,     ExperienceLevel.beginner)     => 60,
-        (RaceDistance.marathon,     ExperienceLevel.intermediate) => 75,
-        (RaceDistance.marathon,     ExperienceLevel.advanced)     => 90,
-        _ => 50,
-      };
+  }) => switch ((race, experience)) {
+    (RaceDistance.fiveK, ExperienceLevel.beginner) => 35,
+    (RaceDistance.fiveK, ExperienceLevel.intermediate) => 45,
+    (RaceDistance.fiveK, ExperienceLevel.advanced) => 55,
+    (RaceDistance.tenK, ExperienceLevel.beginner) => 40,
+    (RaceDistance.tenK, ExperienceLevel.intermediate) => 55,
+    (RaceDistance.tenK, ExperienceLevel.advanced) => 65,
+    (RaceDistance.halfMarathon, ExperienceLevel.beginner) => 50,
+    (RaceDistance.halfMarathon, ExperienceLevel.intermediate) => 65,
+    (RaceDistance.halfMarathon, ExperienceLevel.advanced) => 75,
+    (RaceDistance.marathon, ExperienceLevel.beginner) => 60,
+    (RaceDistance.marathon, ExperienceLevel.intermediate) => 75,
+    (RaceDistance.marathon, ExperienceLevel.advanced) => 90,
+    _ => 50,
+  };
 }
 
 // ============================================================================
@@ -258,7 +256,7 @@ class ArchetypeTable {
     // same 0.5km rounding as always; the template resolver owns their actual
     // distance. Long run absorbs the remainder so the weekly total stays
     // consistent across 3/4/5/6-day plans.
-    final sessions  = <ArchetypeSession>[];
+    final sessions = <ArchetypeSession>[];
     var allocatedKm = 0.0;
 
     for (final slot in slots) {
@@ -276,13 +274,15 @@ class ArchetypeTable {
     }
 
     // Long run absorbs whatever the weekly km minus all other sessions.
-    final longKm    = _round((weeklyKm - allocatedKm).clamp(0.0, double.infinity));
+    final longKm = _round((weeklyKm - allocatedKm).clamp(0.0, double.infinity));
     final longFloor = _Floors.forType(ArchetypeSessionType.longRun);
-    sessions.add(ArchetypeSession(
-      type: ArchetypeSessionType.longRun,
-      km: longKm,
-      floorKm: longFloor,
-    ));
+    sessions.add(
+      ArchetypeSession(
+        type: ArchetypeSessionType.longRun,
+        km: longKm,
+        floorKm: longFloor,
+      ),
+    );
 
     return ArchetypeWeek(sessions);
   }
@@ -299,45 +299,45 @@ class ArchetypeTable {
 
     return switch (days) {
       3 => [
-          const _Slot(ArchetypeSessionType.easy,    0.22),
-          _Slot(q1,                                 0.28),
-          const _Slot(ArchetypeSessionType.longRun, 0.50),
-        ],
+        const _Slot(ArchetypeSessionType.easy, 0.22),
+        _Slot(q1, 0.28),
+        const _Slot(ArchetypeSessionType.longRun, 0.50),
+      ],
 
       4 => [
-          const _Slot(ArchetypeSessionType.recoveryEasy, 0.12),
-          const _Slot(ArchetypeSessionType.easyMedium,   0.18),
-          _Slot(q1,                                      0.25),
-          const _Slot(ArchetypeSessionType.longRun,      0.45),
-        ],
+        const _Slot(ArchetypeSessionType.recoveryEasy, 0.12),
+        const _Slot(ArchetypeSessionType.easyMedium, 0.18),
+        _Slot(q1, 0.25),
+        const _Slot(ArchetypeSessionType.longRun, 0.45),
+      ],
 
       // 5 days advanced: 2E + 2Q + 1L
       5 when experience == ExperienceLevel.advanced => [
-          const _Slot(ArchetypeSessionType.recoveryEasy, 0.10),
-          const _Slot(ArchetypeSessionType.easyMedium,   0.16),
-          _Slot(q1,                                      0.18),
-          _Slot(q2,                                      0.18),
-          const _Slot(ArchetypeSessionType.longRun,      0.38),
-        ],
+        const _Slot(ArchetypeSessionType.recoveryEasy, 0.10),
+        const _Slot(ArchetypeSessionType.easyMedium, 0.16),
+        _Slot(q1, 0.18),
+        _Slot(q2, 0.18),
+        const _Slot(ArchetypeSessionType.longRun, 0.38),
+      ],
 
       // 5 days beginner/intermediate: 3E + 1Q + 1L
       5 => [
-          const _Slot(ArchetypeSessionType.recoveryEasy, 0.10),
-          const _Slot(ArchetypeSessionType.easy,         0.14),
-          const _Slot(ArchetypeSessionType.easyMedium,   0.16),
-          _Slot(q1,                                      0.22),
-          const _Slot(ArchetypeSessionType.longRun,      0.38),
-        ],
+        const _Slot(ArchetypeSessionType.recoveryEasy, 0.10),
+        const _Slot(ArchetypeSessionType.easy, 0.14),
+        const _Slot(ArchetypeSessionType.easyMedium, 0.16),
+        _Slot(q1, 0.22),
+        const _Slot(ArchetypeSessionType.longRun, 0.38),
+      ],
 
       // 6 days: 3E + 2Q + 1L
       _ => [
-          const _Slot(ArchetypeSessionType.recoveryEasy, 0.08),
-          const _Slot(ArchetypeSessionType.easy,         0.12),
-          const _Slot(ArchetypeSessionType.easyMedium,   0.14),
-          _Slot(q1,                                      0.16),
-          _Slot(q2,                                      0.16),
-          const _Slot(ArchetypeSessionType.longRun,      0.34),
-        ],
+        const _Slot(ArchetypeSessionType.recoveryEasy, 0.08),
+        const _Slot(ArchetypeSessionType.easy, 0.12),
+        const _Slot(ArchetypeSessionType.easyMedium, 0.14),
+        _Slot(q1, 0.16),
+        _Slot(q2, 0.16),
+        const _Slot(ArchetypeSessionType.longRun, 0.34),
+      ],
     };
   }
 
@@ -346,33 +346,33 @@ class ArchetypeTable {
   // Always 1 quality slot (tempo). Volume handled by WeekResolver multiplier.
 
   static List<_Slot> _taperSlots({required int days}) => switch (days) {
-        3 => [
-            const _Slot(ArchetypeSessionType.easy,    0.25),
-            const _Slot(ArchetypeSessionType.tempo,   0.25),
-            const _Slot(ArchetypeSessionType.longRun, 0.50),
-          ],
-        4 => [
-            const _Slot(ArchetypeSessionType.recoveryEasy, 0.12),
-            const _Slot(ArchetypeSessionType.easy,         0.18),
-            const _Slot(ArchetypeSessionType.tempo,        0.22),
-            const _Slot(ArchetypeSessionType.longRun,      0.48),
-          ],
-        5 => [
-            const _Slot(ArchetypeSessionType.recoveryEasy, 0.10),
-            const _Slot(ArchetypeSessionType.easy,         0.14),
-            const _Slot(ArchetypeSessionType.easyMedium,   0.16),
-            const _Slot(ArchetypeSessionType.tempo,        0.22),
-            const _Slot(ArchetypeSessionType.longRun,      0.38),
-          ],
-        _ => [
-            const _Slot(ArchetypeSessionType.recoveryEasy, 0.08),
-            const _Slot(ArchetypeSessionType.easy,         0.12),
-            const _Slot(ArchetypeSessionType.easyMedium,   0.14),
-            const _Slot(ArchetypeSessionType.easy,         0.12),
-            const _Slot(ArchetypeSessionType.tempo,        0.20),
-            const _Slot(ArchetypeSessionType.longRun,      0.34),
-          ],
-      };
+    3 => [
+      const _Slot(ArchetypeSessionType.easy, 0.25),
+      const _Slot(ArchetypeSessionType.tempo, 0.25),
+      const _Slot(ArchetypeSessionType.longRun, 0.50),
+    ],
+    4 => [
+      const _Slot(ArchetypeSessionType.recoveryEasy, 0.12),
+      const _Slot(ArchetypeSessionType.easy, 0.18),
+      const _Slot(ArchetypeSessionType.tempo, 0.22),
+      const _Slot(ArchetypeSessionType.longRun, 0.48),
+    ],
+    5 => [
+      const _Slot(ArchetypeSessionType.recoveryEasy, 0.10),
+      const _Slot(ArchetypeSessionType.easy, 0.14),
+      const _Slot(ArchetypeSessionType.easyMedium, 0.16),
+      const _Slot(ArchetypeSessionType.tempo, 0.22),
+      const _Slot(ArchetypeSessionType.longRun, 0.38),
+    ],
+    _ => [
+      const _Slot(ArchetypeSessionType.recoveryEasy, 0.08),
+      const _Slot(ArchetypeSessionType.easy, 0.12),
+      const _Slot(ArchetypeSessionType.easyMedium, 0.14),
+      const _Slot(ArchetypeSessionType.easy, 0.12),
+      const _Slot(ArchetypeSessionType.tempo, 0.20),
+      const _Slot(ArchetypeSessionType.longRun, 0.34),
+    ],
+  };
 
   // ── Quality slot resolution ───────────────────────────────────────────────
 
@@ -384,11 +384,12 @@ class ArchetypeTable {
     required TrainingPhase phase,
     required ExperienceLevel experience,
   }) {
-    if (experience == ExperienceLevel.beginner) return ArchetypeSessionType.tempo;
+    if (experience == ExperienceLevel.beginner)
+      return ArchetypeSessionType.tempo;
     if (phase == TrainingPhase.base) return ArchetypeSessionType.tempo;
     return ArchetypeSessionType.interval;
   }
 
-  static double _round(double v)   => (v * 2).round() / 2;  // nearest 0.5km
-  static double _roundKm(double v) => v.round().toDouble();  // nearest 1km
+  static double _round(double v) => (v * 2).round() / 2; // nearest 0.5km
+  static double _roundKm(double v) => v.round().toDouble(); // nearest 1km
 }

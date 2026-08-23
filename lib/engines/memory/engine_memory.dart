@@ -11,34 +11,34 @@ EngineMemory defaultSafeMemory() => const EngineMemory();
 List<RpeEntry> parseRpeList(dynamic data) {
   if (data is! List) return [];
 
-  return data.map((entry) {
-    if (entry is int) {
-      return RpeEntry(value: entry, date: DateTime.now());
-    } else if (entry is Map) {
-      final map = Map<String, dynamic>.from(entry);
-      return RpeEntry(
-        value: (map['value'] as num?)?.toInt() ?? 0,
-        date: DateTime.tryParse('${map['date'] ?? ''}') ?? DateTime.now(),
-      );
-    } else {
-      return null;
-    }
-  }).whereType<RpeEntry>().toList();
+  return data
+      .map((entry) {
+        if (entry is int) {
+          return RpeEntry(value: entry, date: DateTime.now());
+        } else if (entry is Map) {
+          final map = Map<String, dynamic>.from(entry);
+          return RpeEntry(
+            value: (map['value'] as num?)?.toInt() ?? 0,
+            date: DateTime.tryParse('${map['date'] ?? ''}') ?? DateTime.now(),
+          );
+        } else {
+          return null;
+        }
+      })
+      .whereType<RpeEntry>()
+      .toList();
 }
 
 class RpeEntry {
   final int value;
   final DateTime date;
 
-  const RpeEntry({
-    required this.value,
-    required this.date,
-  });
+  const RpeEntry({required this.value, required this.date});
 
   Map<String, dynamic> toJson() => {
-        'value': value,
-        'date': date.toIso8601String(),
-      };
+    'value': value,
+    'date': date.toIso8601String(),
+  };
 
   factory RpeEntry.fromJson(Map<String, dynamic> json) {
     return RpeEntry(
@@ -56,12 +56,12 @@ class EngineMemory {
 
   final int vdotScore;
   final bool vdotIsProvisional;
+
   /// vDOT snapshotted whenever a new race plan is saved. Anchors the
   /// per-plan drift cap in EngineRuntime so weekly nudges can't compound
   /// into an unrealistic score over the life of one plan.
   final int? vdotAtPlanStart;
   final WorkoutType lastCompletedType;
-  final WorkoutType? lastNonRecoveryType;
   final List<RpeEntry> recentRpeEntries;
   final int totalRunsCompleted;
   final TrainingPhase currentPhase;
@@ -112,7 +112,6 @@ class EngineMemory {
     this.vdotIsProvisional = true,
     this.vdotAtPlanStart,
     this.lastCompletedType = WorkoutType.easy,
-    this.lastNonRecoveryType,
     this.recentRpeEntries = const [],
     this.totalRunsCompleted = 0,
     this.currentPhase = TrainingPhase.base,
@@ -167,8 +166,7 @@ class EngineMemory {
   }
 
   /// Returns the current ladder index for [intent], defaulting to 0.
-  int ladderIndexFor(WorkoutIntent intent) =>
-      ladderPositions[intent.name] ?? 0;
+  int ladderIndexFor(WorkoutIntent intent) => ladderPositions[intent.name] ?? 0;
 
   /// Returns a new [ladderPositions] map with [intent] moved up one rung,
   /// clamped to [maxIndex].
@@ -201,8 +199,10 @@ class EngineMemory {
   }) {
     final reference = now ?? DateTime.now();
     return _sortedRecentRpeEntries()
-        .where((entry) =>
-            reference.difference(entry.date).inHours <= withinDays * 24)
+        .where(
+          (entry) =>
+              reference.difference(entry.date).inHours <= withinDays * 24,
+        )
         .take(n)
         .any((entry) => entry.value >= threshold);
   }
@@ -222,43 +222,42 @@ class EngineMemory {
   }
 
   Map<String, dynamic> toJson() => {
-        '_schemaVersion': _schemaVersion,
-        'vdotScore': vdotScore,
-        'vdotIsProvisional': vdotIsProvisional,
-        'vdotAtPlanStart': vdotAtPlanStart,
-        'lastCompletedType': lastCompletedType.name,
-        'lastNonRecoveryType': lastNonRecoveryType?.name,
-        'recentRpeValues': recentRpeEntries.map((e) => e.toJson()).toList(),
-        'totalRunsCompleted': totalRunsCompleted,
-        'currentPhase': currentPhase.name,
-        'currentWeek': currentWeek,
-        'activePlan': activePlan?.toJson(),
-        'racePlan': racePlan?.toJson(),
-        'firstRunDate': firstRunDate?.toIso8601String(),
-        'lastRunDate': lastRunDate?.toIso8601String(),
-        'lastReadinessScore': lastReadinessScore,
-        'lastCompletedTemplateId': lastCompletedTemplateId,
-        'plannedIntent': plannedIntent?.name,
-        'lastCompletedWorkoutIntent': lastCompletedWorkoutIntent?.name,
-        'plannedIntentPreviewLabel': plannedIntentPreviewLabel,
-        'recentTemplateIds': recentTemplateIds,
-        'weeklyProgressionDecision': weeklyProgressionDecision?.name,
-        'lastProgressionEvaluationDate':
-            lastProgressionEvaluationDate?.toIso8601String(),
-        'pendingVdotNudge': pendingVdotNudge,
-        'longRunDayIndex': longRunDayIndex,
-        'baselineWeeklyKm': baselineWeeklyKm,
-        'previousWeekTargetKm': previousWeekTargetKm,
-        // v5
-        'planCompletedAt': planCompletedAt?.toIso8601String(),
-        'isInMaintenance': isInMaintenance,
-        // v6
-        'weeklyCompletedKm': weeklyCompletedKm,
-        'weeklyPlannedKm': weeklyPlannedKm,
-        'weeklyDowngradeCount': weeklyDowngradeCount,
-        // v7
-        'ladderPositions': ladderPositions,
-      };
+    '_schemaVersion': _schemaVersion,
+    'vdotScore': vdotScore,
+    'vdotIsProvisional': vdotIsProvisional,
+    'vdotAtPlanStart': vdotAtPlanStart,
+    'lastCompletedType': lastCompletedType.name,
+    'recentRpeValues': recentRpeEntries.map((e) => e.toJson()).toList(),
+    'totalRunsCompleted': totalRunsCompleted,
+    'currentPhase': currentPhase.name,
+    'currentWeek': currentWeek,
+    'activePlan': activePlan?.toJson(),
+    'racePlan': racePlan?.toJson(),
+    'firstRunDate': firstRunDate?.toIso8601String(),
+    'lastRunDate': lastRunDate?.toIso8601String(),
+    'lastReadinessScore': lastReadinessScore,
+    'lastCompletedTemplateId': lastCompletedTemplateId,
+    'plannedIntent': plannedIntent?.name,
+    'lastCompletedWorkoutIntent': lastCompletedWorkoutIntent?.name,
+    'plannedIntentPreviewLabel': plannedIntentPreviewLabel,
+    'recentTemplateIds': recentTemplateIds,
+    'weeklyProgressionDecision': weeklyProgressionDecision?.name,
+    'lastProgressionEvaluationDate': lastProgressionEvaluationDate
+        ?.toIso8601String(),
+    'pendingVdotNudge': pendingVdotNudge,
+    'longRunDayIndex': longRunDayIndex,
+    'baselineWeeklyKm': baselineWeeklyKm,
+    'previousWeekTargetKm': previousWeekTargetKm,
+    // v5
+    'planCompletedAt': planCompletedAt?.toIso8601String(),
+    'isInMaintenance': isInMaintenance,
+    // v6
+    'weeklyCompletedKm': weeklyCompletedKm,
+    'weeklyPlannedKm': weeklyPlannedKm,
+    'weeklyDowngradeCount': weeklyDowngradeCount,
+    // v7
+    'ladderPositions': ladderPositions,
+  };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
     try {
@@ -269,10 +268,9 @@ class EngineMemory {
 
       Map<String, int> parseLadderPositions(dynamic raw) {
         if (raw is! Map) return {};
-        return raw.map((k, v) => MapEntry(
-              k.toString(),
-              (v as num?)?.toInt() ?? 0,
-            ));
+        return raw.map(
+          (k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 0),
+        );
       }
 
       TrainingPhase parsePhase(dynamic raw) {
@@ -328,9 +326,7 @@ class EngineMemory {
 
       if (!json.containsKey('vdotScore') && json.containsKey('criticalSpeed')) {
         final storedCs = (json['criticalSpeed'] as num?)?.toDouble() ?? 4.0;
-        final easyPaceEstimate = storedCs > 0
-            ? (1000 / storedCs) * 1.2
-            : 360.0;
+        final easyPaceEstimate = storedCs > 0 ? (1000 / storedCs) * 1.2 : 360.0;
         parsedVdot = vdotFromEasyPace(easyPaceEstimate).clamp(30, 85);
         parsedProvisional = true;
       } else {
@@ -353,9 +349,6 @@ class EngineMemory {
         lastCompletedType: WorkoutTypeX.fromString(
           (json['lastCompletedType'] as String?) ?? 'easy',
         ),
-        lastNonRecoveryType: json['lastNonRecoveryType'] is String
-            ? WorkoutTypeX.fromString(json['lastNonRecoveryType'] as String)
-            : null,
         recentRpeEntries: parseRpeList(json['recentRpeValues']),
         totalRunsCompleted: totalRuns,
         currentPhase: parsePhase(json['currentPhase']),
@@ -367,28 +360,28 @@ class EngineMemory {
         lastReadinessScore: (json['lastReadinessScore'] as num?)?.toDouble(),
         lastCompletedTemplateId: json['lastCompletedTemplateId'] as String?,
         plannedIntent: parseWorkoutIntent(json['plannedIntent']),
-        lastCompletedWorkoutIntent:
-            parseWorkoutIntent(json['lastCompletedWorkoutIntent']),
-        plannedIntentPreviewLabel:
-            json['plannedIntentPreviewLabel'] as String?,
+        lastCompletedWorkoutIntent: parseWorkoutIntent(
+          json['lastCompletedWorkoutIntent'],
+        ),
+        plannedIntentPreviewLabel: json['plannedIntentPreviewLabel'] as String?,
         recentTemplateIds: parseStringList(json['recentTemplateIds']),
-        weeklyProgressionDecision:
-            parseProgressionDecision(json['weeklyProgressionDecision']),
+        weeklyProgressionDecision: parseProgressionDecision(
+          json['weeklyProgressionDecision'],
+        ),
         lastProgressionEvaluationDate: DateTime.tryParse(
-            '${json['lastProgressionEvaluationDate'] ?? ''}'),
+          '${json['lastProgressionEvaluationDate'] ?? ''}',
+        ),
         pendingVdotNudge: (json['pendingVdotNudge'] as num?)?.toInt() ?? 0,
         longRunDayIndex: (json['longRunDayIndex'] as num?)?.toInt(),
         baselineWeeklyKm: (json['baselineWeeklyKm'] as num?)?.toDouble(),
-        previousWeekTargetKm:
-            (json['previousWeekTargetKm'] as num?)?.toDouble(),
-        planCompletedAt:
-            DateTime.tryParse('${json['planCompletedAt'] ?? ''}'),
+        previousWeekTargetKm: (json['previousWeekTargetKm'] as num?)
+            ?.toDouble(),
+        planCompletedAt: DateTime.tryParse('${json['planCompletedAt'] ?? ''}'),
         isInMaintenance: (json['isInMaintenance'] as bool?) ?? false,
         // v6 — null-safe for users migrating from v5
         weeklyCompletedKm:
             (json['weeklyCompletedKm'] as num?)?.toDouble() ?? 0.0,
-        weeklyPlannedKm:
-            (json['weeklyPlannedKm'] as num?)?.toDouble() ?? 0.0,
+        weeklyPlannedKm: (json['weeklyPlannedKm'] as num?)?.toDouble() ?? 0.0,
         weeklyDowngradeCount:
             (json['weeklyDowngradeCount'] as num?)?.toInt() ?? 0,
         // v7 — null-safe for users migrating from v6
@@ -405,8 +398,6 @@ class EngineMemory {
     int? vdotAtPlanStart,
     bool clearVdotAtPlanStart = false,
     WorkoutType? lastCompletedType,
-    WorkoutType? lastNonRecoveryType,
-    bool clearLastNonRecovery = false,
     List<RpeEntry>? recentRpeEntries,
     int? totalRunsCompleted,
     TrainingPhase? currentPhase,
@@ -448,7 +439,8 @@ class EngineMemory {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
 
-    final newCurrentWeek = currentWeek ??
+    final newCurrentWeek =
+        currentWeek ??
         (newFirstRunDate != null
             ? PhaseEngine.weekNumberFromDate(newFirstRunDate)
             : PhaseEngine.weekNumber(newTotalRuns));
@@ -460,9 +452,6 @@ class EngineMemory {
           ? null
           : (vdotAtPlanStart ?? this.vdotAtPlanStart),
       lastCompletedType: lastCompletedType ?? this.lastCompletedType,
-      lastNonRecoveryType: clearLastNonRecovery
-          ? null
-          : (lastNonRecoveryType ?? this.lastNonRecoveryType),
       recentRpeEntries: recentRpeEntries ?? this.recentRpeEntries,
       totalRunsCompleted: newTotalRuns,
       currentPhase: currentPhase ?? this.currentPhase,
@@ -475,8 +464,9 @@ class EngineMemory {
       lastCompletedTemplateId: clearLastCompletedTemplateId
           ? null
           : (lastCompletedTemplateId ?? this.lastCompletedTemplateId),
-      plannedIntent:
-          clearPlannedIntent ? null : (plannedIntent ?? this.plannedIntent),
+      plannedIntent: clearPlannedIntent
+          ? null
+          : (plannedIntent ?? this.plannedIntent),
       lastCompletedWorkoutIntent: clearLastCompletedWorkoutIntent
           ? null
           : (lastCompletedWorkoutIntent ?? this.lastCompletedWorkoutIntent),

@@ -49,53 +49,95 @@ class SimPersona {
   });
 
   static SimPersona persona1() => const SimPersona(
-        id: 'P1_5K_3day_15km_beginner',
-        goalRace: '5k', daysPerWeek: 3, weeklyKm: 15,
-        experience: 'beginner', goalIntent: 'finish', planWeeks: 8, longRunDayIndex: 5,
-      );
+    id: 'P1_5K_3day_15km_beginner',
+    goalRace: '5k',
+    daysPerWeek: 3,
+    weeklyKm: 15,
+    experience: 'beginner',
+    goalIntent: 'finish',
+    planWeeks: 8,
+    longRunDayIndex: 5,
+  );
   static SimPersona persona2() => const SimPersona(
-        id: 'P2_5K_4day_25km_intermediate_highRpe',
-        goalRace: '5k', daysPerWeek: 4, weeklyKm: 25,
-        experience: 'intermediate', goalIntent: 'improve', planWeeks: 8,
-      );
+    id: 'P2_5K_4day_25km_intermediate_highRpe',
+    goalRace: '5k',
+    daysPerWeek: 4,
+    weeklyKm: 25,
+    experience: 'intermediate',
+    goalIntent: 'improve',
+    planWeeks: 8,
+  );
   static SimPersona persona3() => const SimPersona(
-        id: 'P3_10K_5day_40km_intermediate',
-        goalRace: '10k', daysPerWeek: 5, weeklyKm: 40,
-        experience: 'intermediate', goalIntent: 'improve', planWeeks: 10,
-      );
+    id: 'P3_10K_5day_40km_intermediate',
+    goalRace: '10k',
+    daysPerWeek: 5,
+    weeklyKm: 40,
+    experience: 'intermediate',
+    goalIntent: 'improve',
+    planWeeks: 10,
+  );
   static SimPersona persona4() => const SimPersona(
-        id: 'P4_10K_6day_80km_advanced',
-        goalRace: '10k', daysPerWeek: 6, weeklyKm: 80,
-        experience: 'advanced', goalIntent: 'peak',
-        prTimeSeconds: 2280, prDistance: '10k', planWeeks: 10,
-      );
+    id: 'P4_10K_6day_80km_advanced',
+    goalRace: '10k',
+    daysPerWeek: 6,
+    weeklyKm: 80,
+    experience: 'advanced',
+    goalIntent: 'peak',
+    prTimeSeconds: 2280,
+    prDistance: '10k',
+    planWeeks: 10,
+  );
   static SimPersona persona5() => const SimPersona(
-        id: 'P5_HM_4day_25km_belowMinViable',
-        goalRace: 'half_marathon', daysPerWeek: 4, weeklyKm: 25,
-        experience: 'intermediate', goalIntent: 'finish', planWeeks: 12,
-      );
+    id: 'P5_HM_4day_25km_belowMinViable',
+    goalRace: 'half_marathon',
+    daysPerWeek: 4,
+    weeklyKm: 25,
+    experience: 'intermediate',
+    goalIntent: 'finish',
+    planWeeks: 12,
+  );
   static SimPersona persona6() => const SimPersona(
-        id: 'P6_HM_5day_60km_advanced',
-        goalRace: 'half_marathon', daysPerWeek: 5, weeklyKm: 60,
-        experience: 'advanced', goalIntent: 'peak',
-        prTimeSeconds: 5400, prDistance: 'half', planWeeks: 12,
-      );
+    id: 'P6_HM_5day_60km_advanced',
+    goalRace: 'half_marathon',
+    daysPerWeek: 5,
+    weeklyKm: 60,
+    experience: 'advanced',
+    goalIntent: 'peak',
+    prTimeSeconds: 5400,
+    prDistance: 'half',
+    planWeeks: 12,
+  );
   static SimPersona persona7() => const SimPersona(
-        id: 'P7_FM_5day_35km_belowMinViable',
-        goalRace: 'marathon', daysPerWeek: 5, weeklyKm: 35,
-        experience: 'intermediate', goalIntent: 'finish', planWeeks: 12,
-      );
+    id: 'P7_FM_5day_35km_belowMinViable',
+    goalRace: 'marathon',
+    daysPerWeek: 5,
+    weeklyKm: 35,
+    experience: 'intermediate',
+    goalIntent: 'finish',
+    planWeeks: 12,
+  );
   static SimPersona persona8() => const SimPersona(
-        id: 'P8_FM_6day_70km_advanced',
-        goalRace: 'marathon', daysPerWeek: 6, weeklyKm: 70,
-        experience: 'advanced', goalIntent: 'peak',
-        prTimeSeconds: 10800, prDistance: 'marathon', planWeeks: 16,
-      );
+    id: 'P8_FM_6day_70km_advanced',
+    goalRace: 'marathon',
+    daysPerWeek: 6,
+    weeklyKm: 70,
+    experience: 'advanced',
+    goalIntent: 'peak',
+    prTimeSeconds: 10800,
+    prDistance: 'marathon',
+    planWeeks: 16,
+  );
 
   static List<SimPersona> allPersonas() => [
-        persona1(), persona2(), persona3(), persona4(),
-        persona5(), persona6(), persona7(), persona8(),
-      ];
+    persona1(),
+    persona2(),
+    persona3(),
+    persona4(),
+    persona5(),
+    persona6(),
+    persona7(),
+    persona8(),
+  ];
 }
 
 // ============================================================================
@@ -116,38 +158,38 @@ class SimBehavior {
   });
 
   static SimBehavior compliant() => SimBehavior(
-        id: 'compliant',
-        rpeProvider: (w, i) => 5.0,
-        paceMultiplier: (w, i) => 1.0,
-        skipProbability: (w, i) => 0.0,
-      );
+    id: 'compliant',
+    rpeProvider: (w, i) => 5.0,
+    paceMultiplier: (w, i) => 1.0,
+    skipProbability: (w, i) => 0.0,
+  );
   static SimBehavior highRpe() => SimBehavior(
-        id: 'high_rpe',
-        rpeProvider: (w, i) {
-          final isQ = i == 'threshold' || i == 'vo2max' || i == 'speed';
-          return isQ ? 8.5 : 6.0;
-        },
-        paceMultiplier: (w, i) => 1.0,
-        skipProbability: (w, i) => 0.0,
-      );
+    id: 'high_rpe',
+    rpeProvider: (w, i) {
+      final isQ = i == 'threshold' || i == 'vo2max' || i == 'speed';
+      return isQ ? 8.5 : 6.0;
+    },
+    paceMultiplier: (w, i) => 1.0,
+    skipProbability: (w, i) => 0.0,
+  );
   static SimBehavior skipper() => SimBehavior(
-        id: 'skipper',
-        rpeProvider: (w, i) => 5.0,
-        paceMultiplier: (w, i) => 1.0,
-        skipProbability: (w, i) => 0.30,
-      );
+    id: 'skipper',
+    rpeProvider: (w, i) => 5.0,
+    paceMultiplier: (w, i) => 1.0,
+    skipProbability: (w, i) => 0.30,
+  );
   static SimBehavior sandbagger() => SimBehavior(
-        id: 'sandbagger',
-        rpeProvider: (w, i) => 3.5,
-        paceMultiplier: (w, i) => 1.15,
-        skipProbability: (w, i) => 0.0,
-      );
+    id: 'sandbagger',
+    rpeProvider: (w, i) => 3.5,
+    paceMultiplier: (w, i) => 1.15,
+    skipProbability: (w, i) => 0.0,
+  );
   static SimBehavior overAchiever() => SimBehavior(
-        id: 'over_achiever',
-        rpeProvider: (w, i) => 6.5,
-        paceMultiplier: (w, i) => 0.88,
-        skipProbability: (w, i) => 0.0,
-      );
+    id: 'over_achiever',
+    rpeProvider: (w, i) => 6.5,
+    paceMultiplier: (w, i) => 0.88,
+    skipProbability: (w, i) => 0.0,
+  );
 }
 
 // ============================================================================
@@ -188,21 +230,21 @@ class SimSessionLog {
   });
 
   Map<String, dynamic> toJson() => {
-        'week': weekNumber,
-        'day': _dayName(dayOfWeek),
-        'phase': phase.name,
-        'templateId': templateId,
-        'intent': intent,
-        'slot': slotRole,
-        'targetKm': _fmt(targetKm),
-        'actualKm': _fmt(actualKm),
-        'prescribedPace': _fmtPace(prescribedPaceSecPerKm),
-        'actualPace': _fmtPace(actualPaceSecPerKm),
-        'rpe': rpe,
-        'skipped': wasSkipped,
-        'vdotBefore': vdotBefore,
-        'vdotAfter': vdotAfter,
-      };
+    'week': weekNumber,
+    'day': _dayName(dayOfWeek),
+    'phase': phase.name,
+    'templateId': templateId,
+    'intent': intent,
+    'slot': slotRole,
+    'targetKm': _fmt(targetKm),
+    'actualKm': _fmt(actualKm),
+    'prescribedPace': _fmtPace(prescribedPaceSecPerKm),
+    'actualPace': _fmtPace(actualPaceSecPerKm),
+    'rpe': rpe,
+    'skipped': wasSkipped,
+    'vdotBefore': vdotBefore,
+    'vdotAfter': vdotAfter,
+  };
 }
 
 class SimWeekLog {
@@ -237,20 +279,21 @@ class SimWeekLog {
   }
 
   Map<String, dynamic> toJson() => {
-        'week': weekNumber,
-        'phase': phase.name,
-        'isCutback': isCutbackWeek,
-        'targetKm': _fmt(targetKm),
-        'actualKm': _fmt(actualKm),
-        'deviation%': _fmt(
-            (actualKm - targetKm) / (targetKm == 0 ? 1 : targetKm) * 100),
-        'qualityFraction': _fmt(qualityFraction),
-        'qualityCount': qualityCount,
-        'hasLongRun': hasLongRun,
-        'progressionDecision': progressionDecision.name,
-        'warnings': warnings,
-        'sessions': sessions.map((s) => s.toJson()).toList(),
-      };
+    'week': weekNumber,
+    'phase': phase.name,
+    'isCutback': isCutbackWeek,
+    'targetKm': _fmt(targetKm),
+    'actualKm': _fmt(actualKm),
+    'deviation%': _fmt(
+      (actualKm - targetKm) / (targetKm == 0 ? 1 : targetKm) * 100,
+    ),
+    'qualityFraction': _fmt(qualityFraction),
+    'qualityCount': qualityCount,
+    'hasLongRun': hasLongRun,
+    'progressionDecision': progressionDecision.name,
+    'warnings': warnings,
+    'sessions': sessions.map((s) => s.toJson()).toList(),
+  };
 }
 
 class SimLog {
@@ -290,11 +333,13 @@ class SimLog {
       'maintenanceFallbackTriggered': maintenanceFallbackTriggered,
       'globalWarnings': globalWarnings,
       'mileageCurve': weeks
-          .map((w) => {
-                'week': w.weekNumber,
-                'target': _fmt(w.targetKm),
-                'actual': _fmt(w.actualKm)
-              })
+          .map(
+            (w) => {
+              'week': w.weekNumber,
+              'target': _fmt(w.targetKm),
+              'actual': _fmt(w.actualKm),
+            },
+          )
           .toList(),
       'weeks': weeks.map((w) => w.toJson()).toList(),
     };
@@ -308,7 +353,9 @@ class SimLog {
     print('  SIM: ${persona.id}  ×  ${behavior.id}');
     print('══════════════════════════════════════════════════════');
     print('  vDOT: $initialVdot → $finalVdot');
-    print('  Weeks: ${weeks.length}  |  post-plan: $postPlanTriggered  |  maintenance: $maintenanceFallbackTriggered');
+    print(
+      '  Weeks: ${weeks.length}  |  post-plan: $postPlanTriggered  |  maintenance: $maintenanceFallbackTriggered',
+    );
     if (globalWarnings.isNotEmpty) {
       print('\n  ⚠️  WARNINGS (${globalWarnings.length}):');
       for (final w in globalWarnings) {
@@ -320,9 +367,11 @@ class SimLog {
       final bar = '█' * (w.actualKm / 5).round();
       final tag = w.isCutbackWeek ? ' [CUTBACK]' : '';
       final warn = w.warnings.isNotEmpty ? ' ⚠' : '';
-      print('  W${w.weekNumber.toString().padLeft(2)} '
-          '${w.phase.name.padRight(12)} '
-          '${_fmt(w.actualKm).padLeft(5)}km$tag$warn');
+      print(
+        '  W${w.weekNumber.toString().padLeft(2)} '
+        '${w.phase.name.padRight(12)} '
+        '${_fmt(w.actualKm).padLeft(5)}km$tag$warn',
+      );
       print('       $bar');
     }
     print('══════════════════════════════════════════════════════\n');
@@ -342,7 +391,8 @@ class PlanSimulator {
     required SimBehavior behavior,
   }) async {
     final simStart = _nearestMonday(DateTime(2025, 3, 3));
-    final trainingDays = persona.trainingDays ??
+    final trainingDays =
+        persona.trainingDays ??
         _defaultTrainingDays(persona.daysPerWeek, persona.longRunDayIndex);
 
     final raceDate = simStart.add(Duration(days: persona.planWeeks * 7));
@@ -387,7 +437,13 @@ class PlanSimulator {
       if (weekNum > persona.planWeeks + 1 && memory.isInMaintenance) break;
 
       final isCutback = weekNum % 4 == 0;
-      final (targetKm, phase, slots, updatedLadder, resolvedEffectiveKm) = _resolveWeek(
+      final (
+        targetKm,
+        phase,
+        slots,
+        updatedLadder,
+        resolvedEffectiveKm,
+      ) = _resolveWeek(
         memory: memory,
         trainingDays: trainingDays,
         weekNum: weekNum,
@@ -413,21 +469,23 @@ class PlanSimulator {
         final vdotBefore = memory.vdotScore;
 
         if (skipped) {
-          sessionLogs.add(SimSessionLog(
-            weekNumber: weekNum,
-            dayOfWeek: slot.dayOfWeek,
-            phase: phase,
-            templateId: slot.templateId,
-            intent: slot.intent,
-            slotRole: slot.slotRole,
-            targetKm: slot.targetKm,
-            actualKm: 0,
-            prescribedPaceSecPerKm: slot.prescribedPace,
-            actualPaceSecPerKm: 0,
-            vdotBefore: vdotBefore,
-            vdotAfter: vdotBefore,
-            wasSkipped: true,
-          ));
+          sessionLogs.add(
+            SimSessionLog(
+              weekNumber: weekNum,
+              dayOfWeek: slot.dayOfWeek,
+              phase: phase,
+              templateId: slot.templateId,
+              intent: slot.intent,
+              slotRole: slot.slotRole,
+              targetKm: slot.targetKm,
+              actualKm: 0,
+              prescribedPaceSecPerKm: slot.prescribedPace,
+              actualPaceSecPerKm: 0,
+              vdotBefore: vdotBefore,
+              vdotAfter: vdotBefore,
+              wasSkipped: true,
+            ),
+          );
           continue;
         }
 
@@ -458,28 +516,29 @@ class PlanSimulator {
           lastCompletedTemplateId: slot.templateId,
           totalRunsCompleted: memory.totalRunsCompleted + 1,
           recentTemplateIds: _updateRecentTemplates(
-              memory.recentTemplateIds, slot.templateId),
-          recentRpeEntries: [
-            newRpeEntry,
-            ...memory.recentRpeEntries.take(9)
-          ],
+            memory.recentTemplateIds,
+            slot.templateId,
+          ),
+          recentRpeEntries: [newRpeEntry, ...memory.recentRpeEntries.take(9)],
         );
 
-        sessionLogs.add(SimSessionLog(
-          weekNumber: weekNum,
-          dayOfWeek: slot.dayOfWeek,
-          phase: phase,
-          templateId: slot.templateId,
-          intent: slot.intent,
-          slotRole: slot.slotRole,
-          targetKm: slot.targetKm,
-          actualKm: actualKm,
-          prescribedPaceSecPerKm: slot.prescribedPace,
-          actualPaceSecPerKm: actualPace,
-          rpe: rpe,
-          vdotBefore: vdotBefore,
-          vdotAfter: vdotAfter,
-        ));
+        sessionLogs.add(
+          SimSessionLog(
+            weekNumber: weekNum,
+            dayOfWeek: slot.dayOfWeek,
+            phase: phase,
+            templateId: slot.templateId,
+            intent: slot.intent,
+            slotRole: slot.slotRole,
+            targetKm: slot.targetKm,
+            actualKm: actualKm,
+            prescribedPaceSecPerKm: slot.prescribedPace,
+            actualPaceSecPerKm: actualPace,
+            rpe: rpe,
+            vdotBefore: vdotBefore,
+            vdotAfter: vdotAfter,
+          ),
+        );
       }
 
       memory = memory.copyWith(
@@ -497,28 +556,34 @@ class PlanSimulator {
         templateIds: weekTemplateIds,
         persona: persona,
         priorTemplateIds: priorTemplateIds,
-        previousWeekActualKm:
-            weekLogs.isNotEmpty ? weekLogs.last.actualKm : null,
+        previousWeekActualKm: weekLogs.isNotEmpty
+            ? weekLogs.last.actualKm
+            : null,
         trainingDays: trainingDays,
         resolvedEffectiveKm: resolvedEffectiveKm,
       );
       globalWarnings.addAll(weekWarnings.map((w) => 'W$weekNum: $w'));
 
       final decision = _deriveProgressionDecision(recentRpes);
-      weekLogs.add(SimWeekLog(
-        weekNumber: weekNum,
-        phase: phase,
-        targetKm: targetKm,
-        actualKm: weekActualKm,
-        sessions: sessionLogs,
-        progressionDecision: decision,
-        isCutbackWeek: isCutback,
-        warnings: weekWarnings,
-      ));
+      weekLogs.add(
+        SimWeekLog(
+          weekNumber: weekNum,
+          phase: phase,
+          targetKm: targetKm,
+          actualKm: weekActualKm,
+          sessions: sessionLogs,
+          progressionDecision: decision,
+          isCutbackWeek: isCutback,
+          warnings: weekWarnings,
+        ),
+      );
     }
 
     _auditGlobal(
-        weeks: weekLogs, persona: persona, globalWarnings: globalWarnings);
+      weeks: weekLogs,
+      persona: persona,
+      globalWarnings: globalWarnings,
+    );
 
     return SimLog(
       persona: persona,
@@ -539,12 +604,14 @@ class PlanSimulator {
     List<SimBehavior>? behaviors,
   }) async {
     final ps = personas ?? SimPersona.allPersonas();
-    final bs = behaviors ?? [
-      SimBehavior.compliant(),
-      SimBehavior.skipper(),
-      SimBehavior.sandbagger(),
-      SimBehavior.overAchiever(),
-    ];
+    final bs =
+        behaviors ??
+        [
+          SimBehavior.compliant(),
+          SimBehavior.skipper(),
+          SimBehavior.sandbagger(),
+          SimBehavior.overAchiever(),
+        ];
     final logs = <SimLog>[];
     for (final p in ps) {
       for (final b in bs) {
@@ -572,9 +639,9 @@ class PlanSimulator {
       ).clamp(30, 85);
     } else {
       vdot = switch (persona.experience) {
-        'advanced'     => 52,
+        'advanced' => 52,
         'intermediate' => 42,
-        _              => 32,
+        _ => 32,
       };
     }
 
@@ -593,7 +660,8 @@ class PlanSimulator {
     );
   }
 
-  (double, TrainingPhase, List<_SimSlot>, Map<String, int>, double) _resolveWeek({
+  (double, TrainingPhase, List<_SimSlot>, Map<String, int>, double)
+  _resolveWeek({
     required EngineMemory memory,
     required List<int> trainingDays,
     required int weekNum,
@@ -628,9 +696,9 @@ class PlanSimulator {
         : 1;
 
     final experienceLevel = switch (persona.experience) {
-      'advanced'     => ExperienceLevel.advanced,
+      'advanced' => ExperienceLevel.advanced,
       'intermediate' => ExperienceLevel.intermediate,
-      _              => ExperienceLevel.beginner,
+      _ => ExperienceLevel.beginner,
     };
 
     final resolution = const WeekResolver().resolve(
@@ -663,29 +731,39 @@ class PlanSimulator {
 
     for (final day in trainingSlots) {
       final slotKm = day.distanceKm ?? (effectiveKm / trainingSlots.length);
-      final prescribedPace =
-          _paceForIntent(day.intent?.name ?? 'aerobicBase', memory.vdotScore);
+      final prescribedPace = _paceForIntent(
+        day.intent?.name ?? 'aerobicBase',
+        memory.vdotScore,
+      );
 
-      slots.add(_SimSlot(
-        dayOfWeek: day.weekday,
-        intent: day.intent?.name ?? 'aerobicBase',
-        slotRole: day.slotType.name,
-        templateId: day.templateId,
-        targetKm: _fmt2(slotKm),
-        prescribedPace: prescribedPace,
-      ));
+      slots.add(
+        _SimSlot(
+          dayOfWeek: day.weekday,
+          intent: day.intent?.name ?? 'aerobicBase',
+          slotRole: day.slotType.name,
+          templateId: day.templateId,
+          targetKm: _fmt2(slotKm),
+          prescribedPace: prescribedPace,
+        ),
+      );
     }
 
-    return (targetKm, phase, slots, resolution.updatedLadderPositions, effectiveKm);
+    return (
+      targetKm,
+      phase,
+      slots,
+      resolution.updatedLadderPositions,
+      effectiveKm,
+    );
   }
 
   ({EngineMemory memory, bool justCompleted, bool justEnteredMaintenance})
-      _checkPostPlan(EngineMemory memory, DateTime weekStart) {
+  _checkPostPlan(EngineMemory memory, DateTime weekStart) {
     if (memory.isInMaintenance) {
       return (
         memory: memory,
         justCompleted: false,
-        justEnteredMaintenance: false
+        justEnteredMaintenance: false,
       );
     }
     if (memory.hasRacePlan && memory.planCompletedAt == null) {
@@ -704,7 +782,7 @@ class PlanSimulator {
     if (memory.shouldAutoEnterMaintenance) {
       final km =
           (memory.previousWeekTargetKm ?? memory.baselineWeeklyKm ?? 20.0) *
-              0.85;
+          0.85;
       return (
         memory: memory.copyWith(
           isInMaintenance: true,
@@ -719,7 +797,7 @@ class PlanSimulator {
     return (
       memory: memory,
       justCompleted: false,
-      justEnteredMaintenance: false
+      justEnteredMaintenance: false,
     );
   }
 
@@ -734,7 +812,8 @@ class PlanSimulator {
     required double rpe,
     required String intent,
   }) {
-    final calibrating = intent == 'threshold' ||
+    final calibrating =
+        intent == 'threshold' ||
         intent == 'vo2max' ||
         intent == 'endurance' ||
         intent == 'aerobicBase';
@@ -747,8 +826,8 @@ class PlanSimulator {
 
   ProgressionDecision _deriveProgressionDecision(List<double> recentRpes) {
     if (recentRpes.length < 3) return ProgressionDecision.hold;
-    final avg = recentRpes.take(5).reduce((a, b) => a + b) /
-        recentRpes.take(5).length;
+    final avg =
+        recentRpes.take(5).reduce((a, b) => a + b) / recentRpes.take(5).length;
     if (avg >= 7.5) return ProgressionDecision.regress;
     if (avg <= 5.0) return ProgressionDecision.progress;
     return ProgressionDecision.hold;
@@ -762,44 +841,50 @@ class PlanSimulator {
   double _paceForIntent(String intent, int vdot) {
     final table = PaceTable(vdot.clamp(30, 85));
     final zone = switch (intent) {
-      'threshold'    => PaceZone.tempo,
-      'vo2max'       => PaceZone.vo2Intervals,
-      'speed'        => PaceZone.speedReps,
+      'threshold' => PaceZone.tempo,
+      'vo2max' => PaceZone.vo2Intervals,
+      'speed' => PaceZone.speedReps,
       'raceSpecific' => PaceZone.marathonPace,
-      'endurance'    => PaceZone.aerobicEasy,
-      'recovery'     => PaceZone.easyRecovery,
-      _              => PaceZone.aerobicEasy,
+      'endurance' => PaceZone.aerobicEasy,
+      'recovery' => PaceZone.easyRecovery,
+      _ => PaceZone.aerobicEasy,
     };
     return table.resolve(zone).targetPace.toDouble();
   }
 
   List<int> _defaultTrainingDays(int count, int longRunDay) {
     final result = <int>[longRunDay];
-    final remaining =
-        [0, 1, 2, 3, 4, 5, 6].where((d) => d != longRunDay).toList();
+    final remaining = [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+    ].where((d) => d != longRunDay).toList();
     final step = remaining.length / (count - 1);
     for (int i = 0; i < count - 1; i++) {
-      result.add(
-          remaining[(i * step).round().clamp(0, remaining.length - 1)]);
+      result.add(remaining[(i * step).round().clamp(0, remaining.length - 1)]);
     }
     return result..sort();
   }
 
   RaceDistance _mapGoalRace(String goalRace) => switch (goalRace) {
-        '5k'            => RaceDistance.fiveK,
-        '10k'           => RaceDistance.tenK,
-        'half_marathon' => RaceDistance.halfMarathon,
-        'marathon'      => RaceDistance.marathon,
-        _               => RaceDistance.fiveK,
-      };
+    '5k' => RaceDistance.fiveK,
+    '10k' => RaceDistance.tenK,
+    'half_marathon' => RaceDistance.halfMarathon,
+    'marathon' => RaceDistance.marathon,
+    _ => RaceDistance.fiveK,
+  };
 
   double _prDistanceToKm(String d) => switch (d) {
-        '5k'      => 5.0,
-        '10k'     => 10.0,
-        'half'    => 21.0975,
-        'marathon' => 42.195,
-        _          => 5.0,
-      };
+    '5k' => 5.0,
+    '10k' => 10.0,
+    'half' => 21.0975,
+    'marathon' => 42.195,
+    _ => 5.0,
+  };
 
   DateTime _nearestMonday(DateTime date) =>
       date.subtract(Duration(days: date.weekday - 1));
@@ -852,11 +937,10 @@ class PlanSimulator {
     if (weekNum == 1 &&
         (actualKm - persona.weeklyKm).abs() > persona.weeklyKm * 0.20) {
       warnings.add(
-          'VOLUME: Week 1 ${_fmt(actualKm)}km deviates >20% from baseline ${_fmt(persona.weeklyKm)}km');
+        'VOLUME: Week 1 ${_fmt(actualKm)}km deviates >20% from baseline ${_fmt(persona.weeklyKm)}km',
+      );
     }
-    if (isCutback &&
-        previousWeekActualKm != null &&
-        previousWeekActualKm > 0) {
+    if (isCutback && previousWeekActualKm != null && previousWeekActualKm > 0) {
       // Use the engine's resolved effective km (post-0.70 multiplier) rather
       // than the floor-inflated actual total. Session floors (LR ≥ 8km) can
       // push actual above the cutback target even when the engine applied the
@@ -864,7 +948,8 @@ class PlanSimulator {
       final volumeToCheck = resolvedEffectiveKm ?? actualKm;
       if (volumeToCheck > previousWeekActualKm * 0.80) {
         warnings.add(
-            'CUTBACK: Volume ${_fmt(actualKm)}km not reduced enough vs prev week ${_fmt(previousWeekActualKm)}km (should be ≤80%)');
+          'CUTBACK: Volume ${_fmt(actualKm)}km not reduced enough vs prev week ${_fmt(previousWeekActualKm)}km (should be ≤80%)',
+        );
       }
     }
 
@@ -875,7 +960,8 @@ class PlanSimulator {
         : completed.where((s) => _isQuality(s.intent)).length / total;
     if (qFrac > 0.40) {
       warnings.add(
-          'DISTRIBUTION: Quality fraction ${_fmt(qFrac * 100)}% > 40%');
+        'DISTRIBUTION: Quality fraction ${_fmt(qFrac * 100)}% > 40%',
+      );
     }
     if (!completed.any((s) => s.intent == 'endurance') &&
         total >= 3 &&
@@ -887,8 +973,7 @@ class PlanSimulator {
     for (final id in templateIds) {
       final template = WorkoutLibrary.byId(id);
       if (template == null) continue;
-      if (template.intent == WorkoutIntent.aerobicBase ||
-          template.intent == WorkoutIntent.recovery) continue;
+      if (template.intent == WorkoutIntent.aerobicBase) continue;
       // Ladder intents cycle by design — repeat within 2 weeks is expected.
       if (_ladderIntents.contains(template.intent.name)) continue;
       final poolSize = WorkoutLibrary.forSlot(
@@ -904,10 +989,13 @@ class PlanSimulator {
     // ── Volume hog — exempt taper (long run naturally >40% of reduced week) ──
     if (actualKm > 0 && phase != TrainingPhase.taper) {
       for (final s in completed) {
-        final volThreshold = persona.daysPerWeek <= 3 ? 0.55 : (persona.daysPerWeek <= 4 ? 0.50 : 0.40);
+        final volThreshold = persona.daysPerWeek <= 3
+            ? 0.55
+            : (persona.daysPerWeek <= 4 ? 0.50 : 0.40);
         if (s.actualKm / actualKm > volThreshold) {
           warnings.add(
-              'DISTRIBUTION: ${s.intent} on ${_dayName(s.dayOfWeek)} is ${_fmt(s.actualKm / actualKm * 100)}% of week');
+            'DISTRIBUTION: ${s.intent} on ${_dayName(s.dayOfWeek)} is ${_fmt(s.actualKm / actualKm * 100)}% of week',
+          );
         }
       }
     }
@@ -921,13 +1009,16 @@ class PlanSimulator {
     // ── Structure checks ──────────────────────────────────────────────────
 
     // 1. L lands on the correct day
-    final longRunSessions =
-        completed.where((s) => s.intent == 'endurance').toList();
+    final longRunSessions = completed
+        .where((s) => s.intent == 'endurance')
+        .toList();
     if (longRunSessions.isNotEmpty) {
       final lrActualDay = longRunSessions.first.dayOfWeek;
       if (lrActualDay != persona.longRunDayIndex) {
-        warnings.add('STRUCTURE: Long run on ${_dayName(lrActualDay)} '
-            'but expected ${_dayName(persona.longRunDayIndex)} (longRunDayIndex=${persona.longRunDayIndex})');
+        warnings.add(
+          'STRUCTURE: Long run on ${_dayName(lrActualDay)} '
+          'but expected ${_dayName(persona.longRunDayIndex)} (longRunDayIndex=${persona.longRunDayIndex})',
+        );
       }
     }
 
@@ -938,43 +1029,44 @@ class PlanSimulator {
       final diff = (s.dayOfWeek - lrDay).abs();
       if (diff == 1) {
         warnings.add(
-            'STRUCTURE: Quality ${s.intent} on ${_dayName(s.dayOfWeek)} '
-            'is adjacent to long run day ${_dayName(lrDay)}');
+          'STRUCTURE: Quality ${s.intent} on ${_dayName(s.dayOfWeek)} '
+          'is adjacent to long run day ${_dayName(lrDay)}',
+        );
       }
     }
 
     // 3. No Q adjacent to Q
-    final qualitySessions = completed
-        .where((s) => _isQuality(s.intent))
-        .toList()
-      ..sort((a, b) => a.dayOfWeek.compareTo(b.dayOfWeek));
+    final qualitySessions =
+        completed.where((s) => _isQuality(s.intent)).toList()
+          ..sort((a, b) => a.dayOfWeek.compareTo(b.dayOfWeek));
     for (int i = 1; i < qualitySessions.length; i++) {
       final diff =
           qualitySessions[i].dayOfWeek - qualitySessions[i - 1].dayOfWeek;
       if (diff == 1) {
-        warnings.add('STRUCTURE: Quality sessions on '
-            '${_dayName(qualitySessions[i - 1].dayOfWeek)} and '
-            '${_dayName(qualitySessions[i].dayOfWeek)} are adjacent — no E buffer');
+        warnings.add(
+          'STRUCTURE: Quality sessions on '
+          '${_dayName(qualitySessions[i - 1].dayOfWeek)} and '
+          '${_dayName(qualitySessions[i].dayOfWeek)} are adjacent — no E buffer',
+        );
       }
     }
 
     // 4. Composition correct — skip cutback and taper weeks
-    if (!isCutback && phase != TrainingPhase.taper && longRunSessions.isNotEmpty) {
-      final eCount =
-          completed.where((s) => s.intent == 'aerobicBase').length;
-      final qCount =
-          completed.where((s) => _isQuality(s.intent)).length;
-      final lCount =
-          completed.where((s) => s.intent == 'endurance').length;
+    if (!isCutback &&
+        phase != TrainingPhase.taper &&
+        longRunSessions.isNotEmpty) {
+      final eCount = completed.where((s) => s.intent == 'aerobicBase').length;
+      final qCount = completed.where((s) => _isQuality(s.intent)).length;
+      final lCount = completed.where((s) => s.intent == 'endurance').length;
 
       final expected = switch (persona.daysPerWeek) {
         3 => (e: 1, q: 1, l: 1),
         4 => (e: 2, q: 1, l: 1),
         5 => (
-            e: _expectedEasyCount5Day(persona, trainingDays),
-            q: _expectedQualityCount5Day(persona, trainingDays),
-            l: 1,
-          ),
+          e: _expectedEasyCount5Day(persona, trainingDays),
+          q: _expectedQualityCount5Day(persona, trainingDays),
+          l: 1,
+        ),
         6 => (e: 3, q: 2, l: 1),
         7 => (e: 4, q: 2, l: 1),
         _ => (e: 0, q: 0, l: 0),
@@ -983,23 +1075,26 @@ class PlanSimulator {
       if (eCount != expected.e ||
           qCount != expected.q ||
           lCount != expected.l) {
-        warnings.add('STRUCTURE: Composition E:$eCount Q:$qCount L:$lCount '
-            '— expected E:${expected.e} Q:${expected.q} L:${expected.l} '
-            'for ${persona.daysPerWeek}-day runner');
+        warnings.add(
+          'STRUCTURE: Composition E:$eCount Q:$qCount L:$lCount '
+          '— expected E:${expected.e} Q:${expected.q} L:${expected.l} '
+          'for ${persona.daysPerWeek}-day runner',
+        );
       }
     }
 
     // 5. Cutback: Q1 retained, Q2 dropped
     if (isCutback && longRunSessions.isNotEmpty) {
-      final qCount =
-          completed.where((s) => _isQuality(s.intent)).length;
+      final qCount = completed.where((s) => _isQuality(s.intent)).length;
       if (qCount > 1) {
         warnings.add(
-            'STRUCTURE: Cutback week has $qCount quality sessions — expected max 1');
+          'STRUCTURE: Cutback week has $qCount quality sessions — expected max 1',
+        );
       }
       if (qCount == 0 && persona.daysPerWeek >= 3) {
         warnings.add(
-            'STRUCTURE: Cutback week has 0 quality sessions — Q1 should be retained');
+          'STRUCTURE: Cutback week has 0 quality sessions — Q1 should be retained',
+        );
       }
     }
 
@@ -1020,20 +1115,23 @@ class PlanSimulator {
       final inc = (curr.targetKm - prev.targetKm) / prev.targetKm;
       if (inc > 0.12) {
         globalWarnings.add(
-            'VOLUME: W${curr.weekNumber} jumped ${_fmt(inc * 100)}% — potential 10% rule violation');
+          'VOLUME: W${curr.weekNumber} jumped ${_fmt(inc * 100)}% — potential 10% rule violation',
+        );
       }
     }
     for (final w in weeks) {
       if (w.weekNumber % 4 == 0 && !w.isCutbackWeek) {
         globalWarnings.add(
-            'PROGRESSION: W${w.weekNumber} should be cutback (3:1 cycle)');
+          'PROGRESSION: W${w.weekNumber} should be cutback (3:1 cycle)',
+        );
       }
     }
     for (final w in weeks) {
       for (final s in w.sessions) {
         if ((s.vdotAfter - s.vdotBefore).abs() > 2) {
           globalWarnings.add(
-              'VDOT: W${w.weekNumber} ${s.intent} jumped vDOT ${s.vdotBefore}→${s.vdotAfter}');
+            'VDOT: W${w.weekNumber} ${s.intent} jumped vDOT ${s.vdotBefore}→${s.vdotAfter}',
+          );
         }
       }
     }

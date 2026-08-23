@@ -102,11 +102,11 @@ class WeekProjectionService {
     WorkoutResolver? resolver,
     DynamicScaler? scaler,
     WeekResolver? weekResolver,
-  })  : _selector = selector ?? const SessionSelector(),
-        _volumeCalculator = volumeCalculator ?? const VolumeCalculator(),
-        _resolver = resolver ?? const WorkoutResolver(),
-        _scaler = scaler ?? const DynamicScaler(),
-        _weekResolver = weekResolver ?? const WeekResolver();
+  }) : _selector = selector ?? const SessionSelector(),
+       _volumeCalculator = volumeCalculator ?? const VolumeCalculator(),
+       _resolver = resolver ?? const WorkoutResolver(),
+       _scaler = scaler ?? const DynamicScaler(),
+       _weekResolver = weekResolver ?? const WeekResolver();
 
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -180,31 +180,37 @@ class WeekProjectionService {
         final run = _findRunOnDate(completedRuns, dayDate);
         if (run != null) {
           final intent = _intentFromWorkoutType(run.workoutType);
-          projectedDays.add(ProjectedDay(
-            date: dayDate,
-            weekday: dayIdx,
-            status: DayStatus.completed,
-            intent: intent,
-            dayLabel: _dayLabels[dayIdx],
-            completedDistanceKm: run.distance,
-            completedPace: run.averagePace,
-            completedRpe: run.rpe,
-          ));
+          projectedDays.add(
+            ProjectedDay(
+              date: dayDate,
+              weekday: dayIdx,
+              status: DayStatus.completed,
+              intent: intent,
+              dayLabel: _dayLabels[dayIdx],
+              completedDistanceKm: run.distance,
+              completedPace: run.averagePace,
+              completedRpe: run.rpe,
+            ),
+          );
           totalVolume += run.distance;
           sessions++;
           if (_isQualityIntent(intent)) quality++;
           if (intent != null) runningLastIntent = intent;
-          runningDaysSinceQuality =
-              _isQualityIntent(intent) ? 0 : runningDaysSinceQuality + 1;
-          runningDaysSinceLong =
-              intent == WorkoutIntent.endurance ? 0 : runningDaysSinceLong + 1;
+          runningDaysSinceQuality = _isQualityIntent(intent)
+              ? 0
+              : runningDaysSinceQuality + 1;
+          runningDaysSinceLong = intent == WorkoutIntent.endurance
+              ? 0
+              : runningDaysSinceLong + 1;
         } else {
-          projectedDays.add(ProjectedDay(
-            date: dayDate,
-            weekday: dayIdx,
-            status: isTrainingDay ? DayStatus.missed : DayStatus.rest,
-            dayLabel: _dayLabels[dayIdx],
-          ));
+          projectedDays.add(
+            ProjectedDay(
+              date: dayDate,
+              weekday: dayIdx,
+              status: isTrainingDay ? DayStatus.missed : DayStatus.rest,
+              dayLabel: _dayLabels[dayIdx],
+            ),
+          );
           runningDaysSinceQuality++;
           runningDaysSinceLong++;
         }
@@ -213,21 +219,23 @@ class WeekProjectionService {
 
       // ── REST DAY ──────────────────────────────────────────────────────
       if (!isTrainingDay) {
-        projectedDays.add(ProjectedDay(
-          date: dayDate,
-          weekday: dayIdx,
-          status: DayStatus.rest,
-          dayLabel: _dayLabels[dayIdx],
-        ));
+        projectedDays.add(
+          ProjectedDay(
+            date: dayDate,
+            weekday: dayIdx,
+            status: DayStatus.rest,
+            dayLabel: _dayLabels[dayIdx],
+          ),
+        );
         runningDaysSinceQuality++;
         runningDaysSinceLong++;
         continue;
       }
 
       // ── TODAY or FUTURE ───────────────────────────────────────────────
-      final archetypeSlot  = weekResolution.slotFor(dayIdx);
+      final archetypeSlot = weekResolution.slotFor(dayIdx);
       final slotDistanceKm = archetypeSlot?.distanceKm;
-      final plannedIntent  = archetypeSlot?.intent;
+      final plannedIntent = archetypeSlot?.intent;
 
       final selectionContext = SelectionContext(
         raceDistance: raceDistance,
@@ -252,12 +260,14 @@ class WeekProjectionService {
       final selection = _selector.select(selectionContext);
 
       if (selection == null) {
-        projectedDays.add(ProjectedDay(
-          date: dayDate,
-          weekday: dayIdx,
-          status: DayStatus.rest,
-          dayLabel: _dayLabels[dayIdx],
-        ));
+        projectedDays.add(
+          ProjectedDay(
+            date: dayDate,
+            weekday: dayIdx,
+            status: DayStatus.rest,
+            dayLabel: _dayLabels[dayIdx],
+          ),
+        );
         runningDaysSinceQuality++;
         runningDaysSinceLong++;
         continue;
@@ -292,15 +302,17 @@ class WeekProjectionService {
           ? _scaler.scale(resolvedWorkout, scalingSignals).workout
           : resolvedWorkout;
 
-      projectedDays.add(ProjectedDay(
-        date: dayDate,
-        weekday: dayIdx,
-        status: isToday ? DayStatus.today : DayStatus.projected,
-        workout: finalWorkout,
-        intent: selection.intent,
-        templateName: selection.template.name,
-        dayLabel: _dayLabels[dayIdx],
-      ));
+      projectedDays.add(
+        ProjectedDay(
+          date: dayDate,
+          weekday: dayIdx,
+          status: isToday ? DayStatus.today : DayStatus.projected,
+          workout: finalWorkout,
+          intent: selection.intent,
+          templateName: selection.template.name,
+          dayLabel: _dayLabels[dayIdx],
+        ),
+      );
 
       totalVolume += finalWorkout.totalDistanceKm;
       sessions++;
@@ -308,8 +320,9 @@ class WeekProjectionService {
 
       runningLastIntent = selection.intent;
       runningLastTemplateId = selection.template.id;
-      runningDaysSinceQuality =
-          _isQualityIntent(selection.intent) ? 0 : runningDaysSinceQuality + 1;
+      runningDaysSinceQuality = _isQualityIntent(selection.intent)
+          ? 0
+          : runningDaysSinceQuality + 1;
       runningDaysSinceLong = selection.intent == WorkoutIntent.endurance
           ? 0
           : runningDaysSinceLong + 1;
@@ -341,14 +354,15 @@ class WeekProjectionService {
   }
 
   WorkoutIntent? _intentFromWorkoutType(String? type) => switch (type) {
-        'easy'      => WorkoutIntent.aerobicBase,
-        'tempo'     => WorkoutIntent.threshold,
-        'threshold' => WorkoutIntent.threshold,
-        'interval'  => WorkoutIntent.vo2max,
-        'long'      => WorkoutIntent.endurance,
-        'recovery'  => WorkoutIntent.recovery,
-        _           => null,
-      };
+    'easy' => WorkoutIntent.aerobicBase,
+    'tempo' => WorkoutIntent.threshold,
+    'threshold' => WorkoutIntent.threshold,
+    'interval' => WorkoutIntent.vo2max,
+    'long' => WorkoutIntent.endurance,
+    // 'recovery' is legacy data from before recovery was folded into easy.
+    'recovery' => WorkoutIntent.aerobicBase,
+    _ => null,
+  };
 }
 
 bool _isQualityIntent(WorkoutIntent? intent) {

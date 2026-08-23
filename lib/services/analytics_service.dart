@@ -20,10 +20,7 @@ class Analytics {
     Map<String, Object>? properties,
   }) async {
     try {
-      await Posthog().identify(
-        userId: userId,
-        userProperties: properties,
-      );
+      await Posthog().identify(userId: userId, userProperties: properties);
     } catch (e) {
       debugPrint('[Analytics] identify failed: $e');
     }
@@ -62,29 +59,31 @@ class Analytics {
       capture('login', properties: {'method': method});
 
   // ── Onboarding funnel ────────────────────────────────────────────────────
-  static Future<void> onboardingStepViewed(String step, int index) =>
-      capture('onboarding_step_viewed',
-          properties: {'step': step, 'step_index': index});
+  static Future<void> onboardingStepViewed(String step, int index) => capture(
+    'onboarding_step_viewed',
+    properties: {'step': step, 'step_index': index},
+  );
 
   static Future<void> onboardingCompleted({
     required String goal,
     required String level,
     required int runsPerWeek,
     required int planWeeks,
-  }) =>
-      capture('onboarding_completed', properties: {
-        'goal': goal,
-        'level': level,
-        'runs_per_week': runsPerWeek,
-        'plan_weeks': planWeeks,
-      });
+  }) => capture(
+    'onboarding_completed',
+    properties: {
+      'goal': goal,
+      'level': level,
+      'runs_per_week': runsPerWeek,
+      'plan_weeks': planWeeks,
+    },
+  );
 
   // ── Plan ─────────────────────────────────────────────────────────────────
   static Future<void> planCreated({
     required String goal,
     required String level,
-  }) =>
-      capture('plan_created', properties: {'goal': goal, 'level': level});
+  }) => capture('plan_created', properties: {'goal': goal, 'level': level});
 
   static Future<void> planDaySkipped() => capture('plan_day_skipped');
 
@@ -102,14 +101,16 @@ class Analytics {
     required String workoutType,
     required bool isFreeRun,
     String? averagePace,
-  }) =>
-      capture('workout_completed', properties: {
-        'duration': durationSeconds,
-        'distance': distanceKm,
-        'workout_type': workoutType,
-        'is_free_run': isFreeRun,
-        if (averagePace != null) 'average_pace': averagePace,
-      });
+  }) => capture(
+    'workout_completed',
+    properties: {
+      'duration': durationSeconds,
+      'distance': distanceKm,
+      'workout_type': workoutType,
+      'is_free_run': isFreeRun,
+      if (averagePace != null) 'average_pace': averagePace,
+    },
+  );
 
   static Future<void> runShared({
     required String workoutType,
@@ -117,14 +118,16 @@ class Analytics {
     String style = 'classic',
     String template = 'full',
     String action = 'share',
-  }) =>
-      capture('run_shared', properties: {
-        'workout_type': workoutType,
-        'source': source,
-        'style': style,
-        'template': template,
-        'action': action,
-      });
+  }) => capture(
+    'run_shared',
+    properties: {
+      'workout_type': workoutType,
+      'source': source,
+      'style': style,
+      'template': template,
+      'action': action,
+    },
+  );
 
   // ── Revenue ────────────────────────────────────────────────────────────────
   static Future<void> paywallViewed() => capture('paywall_viewed');

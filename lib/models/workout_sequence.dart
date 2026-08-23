@@ -17,9 +17,8 @@ class WorkoutSequence {
   }
 
   static WorkoutType _canonicalize(WorkoutType t) => switch (t) {
-        WorkoutType.tempo => WorkoutType.quality,
-        WorkoutType.interval => WorkoutType.quality,
-        WorkoutType.recovery => WorkoutType.easy,
-        _ => t,
-      };
+    WorkoutType.tempo => WorkoutType.quality,
+    WorkoutType.interval => WorkoutType.quality,
+    _ => t,
+  };
 }

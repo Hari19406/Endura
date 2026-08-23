@@ -11,7 +11,9 @@ class UnitUtils {
   /// updated by [setMiles] whenever the user flips the Settings toggle, so
   /// any screen listening to this notifier updates immediately without
   /// needing a manual refresh.
-  static final ValueNotifier<bool> useMilesNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> useMilesNotifier = ValueNotifier<bool>(
+    false,
+  );
 
   /// Loads the stored preference into [useMilesNotifier]. Call once at app
   /// startup.
@@ -54,7 +56,10 @@ class UnitUtils {
     final mins = int.tryParse(parts[0]);
     final secs = int.tryParse(parts[1]);
     if (mins == null || secs == null) return paceMinSec;
-    final totalSeconds = displayPaceSeconds((mins * 60 + secs).toDouble(), true);
+    final totalSeconds = displayPaceSeconds(
+      (mins * 60 + secs).toDouble(),
+      true,
+    );
     return formatSeconds(totalSeconds.round());
   }
 

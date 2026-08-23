@@ -37,25 +37,88 @@ class _LadderStep {
 class _LadderConfig {
   final List<_LadderStep> steps;
   const _LadderConfig(this.steps);
-  double get workKm =>
-      steps.fold(0.0, (sum, s) => sum + s.meters / 1000.0);
+  double get workKm => steps.fold(0.0, (sum, s) => sum + s.meters / 1000.0);
 }
 
 // Ascending ladders — small to large
 const _ladderConfigs = [
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150)]),
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180)]),
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(1200, 210)]),
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(1200, 210), _LadderStep(1600, 270)]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+  ]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(1000, 180),
+  ]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(1000, 180),
+    _LadderStep(1200, 210),
+  ]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(1000, 180),
+    _LadderStep(1200, 210),
+    _LadderStep(1600, 270),
+  ]),
 ];
 
 // Pyramids — up then back down
 const _pyramidConfigs = [
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90)]),
-  _LadderConfig([_LadderStep(200, 60), _LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90), _LadderStep(200, 60)]),
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90)]),
-  _LadderConfig([_LadderStep(200, 60), _LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90), _LadderStep(200, 60)]),
-  _LadderConfig([_LadderStep(400, 90), _LadderStep(600, 120), _LadderStep(800, 150), _LadderStep(1000, 180), _LadderStep(1200, 210), _LadderStep(1000, 180), _LadderStep(800, 150), _LadderStep(600, 120), _LadderStep(400, 90)]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(600, 120),
+    _LadderStep(400, 90),
+  ]),
+  _LadderConfig([
+    _LadderStep(200, 60),
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(600, 120),
+    _LadderStep(400, 90),
+    _LadderStep(200, 60),
+  ]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(1000, 180),
+    _LadderStep(800, 150),
+    _LadderStep(600, 120),
+    _LadderStep(400, 90),
+  ]),
+  _LadderConfig([
+    _LadderStep(200, 60),
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(1000, 180),
+    _LadderStep(800, 150),
+    _LadderStep(600, 120),
+    _LadderStep(400, 90),
+    _LadderStep(200, 60),
+  ]),
+  _LadderConfig([
+    _LadderStep(400, 90),
+    _LadderStep(600, 120),
+    _LadderStep(800, 150),
+    _LadderStep(1000, 180),
+    _LadderStep(1200, 210),
+    _LadderStep(1000, 180),
+    _LadderStep(800, 150),
+    _LadderStep(600, 120),
+    _LadderStep(400, 90),
+  ]),
 ];
 
 // ============================================================================
@@ -63,9 +126,9 @@ const _pyramidConfigs = [
 // ============================================================================
 
 enum ScalingTier {
-  full,     // green  — run as prescribed
-  reduced,  // yellow — ~80% volume, same intent
-  minimum,  // red    — ~60-65% volume, same intent
+  full, // green  — run as prescribed
+  reduced, // yellow — ~80% volume, same intent
+  minimum, // red    — ~60-65% volume, same intent
 }
 
 // ============================================================================
@@ -111,11 +174,11 @@ class ResolverResult {
   });
 
   const ResolverResult.rest()
-      : workout = null,
-        dayRole = null,
-        wasDowngraded = false,
-        scalingAdjustments = const [],
-        selectionReason = 'Rest day';
+    : workout = null,
+      dayRole = null,
+      wasDowngraded = false,
+      scalingAdjustments = const [],
+      selectionReason = 'Rest day';
 }
 
 // ============================================================================
@@ -139,9 +202,9 @@ class WorkoutResolver {
     SessionSelector? selector,
     VolumeCalculator? volumeCalculator,
     DynamicScaler? scaler,
-  })  : _selector = selector ?? const SessionSelector(),
-        _volumeCalculator = volumeCalculator ?? const VolumeCalculator(),
-        _scaler = scaler ?? const DynamicScaler();
+  }) : _selector = selector ?? const SessionSelector(),
+       _volumeCalculator = volumeCalculator ?? const VolumeCalculator(),
+       _scaler = scaler ?? const DynamicScaler();
 
   ResolverResult resolve({
     required SelectionContext selectionContext,
@@ -166,7 +229,10 @@ class WorkoutResolver {
         );
         selection = SessionSelection(
           template: substitute,
-          variant: WorkoutLibrary.getVariant(substitute, selectionContext.phase),
+          variant: WorkoutLibrary.getVariant(
+            substitute,
+            selectionContext.phase,
+          ),
           dayRole: selection.dayRole,
           intent: selection.intent,
           wasDowngraded: true,
@@ -176,8 +242,8 @@ class WorkoutResolver {
       }
     }
 
-    final usePlanned = !selection.wasDowngraded &&
-        selectionContext.plannedDistanceKm != null;
+    final usePlanned =
+        !selection.wasDowngraded && selectionContext.plannedDistanceKm != null;
     var totalDistanceKm = usePlanned
         ? selectionContext.plannedDistanceKm!
         : _volumeCalculator.calculateWorkoutDistance(
@@ -191,7 +257,8 @@ class WorkoutResolver {
             weekPercentageSum: selectionContext.weekPercentageSum,
           );
 
-    if (selection.intent == WorkoutIntent.endurance && tier != ScalingTier.full) {
+    if (selection.intent == WorkoutIntent.endurance &&
+        tier != ScalingTier.full) {
       final scaled = _scaleLongRunDistance(totalDistanceKm, tier);
       if (scaled != totalDistanceKm) {
         adjustments.add(
@@ -248,8 +315,10 @@ class WorkoutResolver {
     }
 
     final fixedDistanceKm = _calculateFixedDistance(template.blocks, variant);
-    final flexibleBudgetKm =
-        (totalDistanceKm - fixedDistanceKm).clamp(1.0, double.infinity);
+    final flexibleBudgetKm = (totalDistanceKm - fixedDistanceKm).clamp(
+      1.0,
+      double.infinity,
+    );
 
     final percentSum = template.blocks
         .where((b) => b.durationType == DurationType.percentage)
@@ -267,21 +336,24 @@ class WorkoutResolver {
 
     final resolvedBlocks = <ResolvedBlock>[];
     for (final block in template.blocks) {
-      final isRepBlock = block.type == BlockType.main &&
+      final isRepBlock =
+          block.type == BlockType.main &&
           block.reps != null &&
           block.durationType == DurationType.fixedKm;
-      resolvedBlocks.add(_resolveBlock(
-        block: block,
-        variant: variant,
-        flexibleBudgetKm: flexibleBudgetKm,
-        percentSum: percentSum,
-        resolverContext: resolverContext,
-        experienceLevel: experienceLevel,
-        intent: intent,
-        scalingTier: scalingTier,
-        scalingAdjustments: scalingAdjustments,
-        overrideReps: isRepBlock ? dynamicReps : null,
-      ));
+      resolvedBlocks.add(
+        _resolveBlock(
+          block: block,
+          variant: variant,
+          flexibleBudgetKm: flexibleBudgetKm,
+          percentSum: percentSum,
+          resolverContext: resolverContext,
+          experienceLevel: experienceLevel,
+          intent: intent,
+          scalingTier: scalingTier,
+          scalingAdjustments: scalingAdjustments,
+          overrideReps: isRepBlock ? dynamicReps : null,
+        ),
+      );
     }
 
     _enforceQualityCap(resolvedBlocks, totalDistanceKm);
@@ -302,14 +374,14 @@ class WorkoutResolver {
 
   ScalingTier _tierFromReadiness(SelectorReadiness readiness) =>
       switch (readiness) {
-        SelectorReadiness.green  => ScalingTier.full,
+        SelectorReadiness.green => ScalingTier.full,
         SelectorReadiness.yellow => ScalingTier.reduced,
-        SelectorReadiness.red    => ScalingTier.minimum,
+        SelectorReadiness.red => ScalingTier.minimum,
       };
 
   int _scaleReps(int reps, ScalingTier tier) {
     final scaled = switch (tier) {
-      ScalingTier.full    => reps,
+      ScalingTier.full => reps,
       ScalingTier.reduced => (reps * 0.80).round(),
       ScalingTier.minimum => (reps * 0.62).round(),
     };
@@ -319,7 +391,7 @@ class WorkoutResolver {
   double _scaleContinuousDistance(double km, ScalingTier tier) {
     if (tier == ScalingTier.full) return km;
     final scaled = switch (tier) {
-      ScalingTier.full    => km,
+      ScalingTier.full => km,
       ScalingTier.reduced => km * 0.80,
       ScalingTier.minimum => km * 0.60,
     };
@@ -329,7 +401,7 @@ class WorkoutResolver {
   double _scaleLongRunDistance(double km, ScalingTier tier) {
     if (tier == ScalingTier.full) return km;
     final scaled = switch (tier) {
-      ScalingTier.full    => km,
+      ScalingTier.full => km,
       ScalingTier.reduced => km * 0.85,
       ScalingTier.minimum => km * 0.70,
     };
@@ -349,12 +421,12 @@ class WorkoutResolver {
     required SelectionContext selectionContext,
   }) {
     final preferredIds = switch (original.id) {
-      'vo2_ladder'           => ['vo2_classic', 'vo2_600'],
-      'vo2_pyramid'          => ['vo2_classic', 'vo2_600'],
-      'race_simulation'      => ['race_gp_intervals'],
+      'vo2_ladder' => ['vo2_classic', 'vo2_600'],
+      'vo2_pyramid' => ['vo2_classic', 'vo2_600'],
+      'race_simulation' => ['race_gp_intervals'],
       'race_dress_rehearsal' => ['race_gp_intervals'],
-      'race_time_trial'      => ['race_gp_intervals'],
-      _                      => <String>[],
+      'race_time_trial' => ['race_gp_intervals'],
+      _ => <String>[],
     };
 
     for (final id in preferredIds) {
@@ -381,7 +453,10 @@ class WorkoutResolver {
   // ========================================================================
 
   ResolvedPace _resolvePaceZone(
-      PaceZone zone, ResolverContext context, WorkoutIntent intent) {
+    PaceZone zone,
+    ResolverContext context,
+    WorkoutIntent intent,
+  ) {
     if (_isGoalPaceZone(zone)) {
       if (context.hasGoalPace) {
         return context.paceTable.resolveGoalPace(
@@ -466,7 +541,9 @@ class WorkoutResolver {
   // ========================================================================
 
   double _calculateFixedDistance(
-      List<BlockTemplate> blocks, PhaseVariant? variant) {
+    List<BlockTemplate> blocks,
+    PhaseVariant? variant,
+  ) {
     var total = 0.0;
 
     for (final block in blocks) {
@@ -539,14 +616,18 @@ class WorkoutResolver {
         distanceKm = seconds / _hillPaceSecPerKm;
 
       case DurationType.percentage:
-        final normalizedFraction =
-            percentSum > 0 ? block.value / percentSum : 1.0;
+        final normalizedFraction = percentSum > 0
+            ? block.value / percentSum
+            : 1.0;
         distanceKm = flexibleBudgetKm * normalizedFraction;
     }
 
     // ── Pace ─────────────────────────────────────────────────────────────
-    final resolvedPace =
-        _resolvePaceZone(block.paceZone, resolverContext, intent);
+    final resolvedPace = _resolvePaceZone(
+      block.paceZone,
+      resolverContext,
+      intent,
+    );
 
     // ── Reps ─────────────────────────────────────────────────────────────
     int? reps;
@@ -621,7 +702,7 @@ class WorkoutResolver {
     final isPyramid = template.id == 'vo2_pyramid';
     final configs = isPyramid ? _pyramidConfigs : _ladderConfigs;
 
-    const wuKm    = 2.0;
+    const wuKm = 2.0;
     const minCdKm = 1.0;
     final availableForWork = totalDistanceKm - wuKm - minCdKm;
 
@@ -631,41 +712,49 @@ class WorkoutResolver {
       orElse: () => configs.first,
     );
 
-    final cdKm = (totalDistanceKm - wuKm - chosen.workKm)
-        .clamp(minCdKm, double.infinity);
+    final cdKm = (totalDistanceKm - wuKm - chosen.workKm).clamp(
+      minCdKm,
+      double.infinity,
+    );
 
-    final easyPace  = resolverContext.paceTable.resolve(PaceZone.aerobicEasy);
-    final workPace  = resolverContext.paceTable.resolve(PaceZone.ladderPyramid);
+    final easyPace = resolverContext.paceTable.resolve(PaceZone.aerobicEasy);
+    final workPace = resolverContext.paceTable.resolve(PaceZone.ladderPyramid);
 
     final blocks = <ResolvedBlock>[];
 
     // Warmup
-    blocks.add(ResolvedBlock(
-      type: BlockType.warmup,
-      distanceKm: wuKm,
-      paceMinSecondsPerKm: easyPace.minSecondsPerKm,
-      paceMaxSecondsPerKm: easyPace.maxSecondsPerKm,
-    ));
+    blocks.add(
+      ResolvedBlock(
+        type: BlockType.warmup,
+        distanceKm: wuKm,
+        paceMinSecondsPerKm: easyPace.minSecondsPerKm,
+        paceMaxSecondsPerKm: easyPace.maxSecondsPerKm,
+      ),
+    );
 
     // Work steps — each gets its own distance, pace, and recovery seconds
     for (final step in chosen.steps) {
-      blocks.add(ResolvedBlock(
-        type: BlockType.main,
-        distanceKm: step.meters / 1000.0,
-        paceMinSecondsPerKm: workPace.minSecondsPerKm,
-        paceMaxSecondsPerKm: workPace.maxSecondsPerKm,
-        recoverySeconds: step.recoverySeconds,
-        label: '${step.meters}m',
-      ));
+      blocks.add(
+        ResolvedBlock(
+          type: BlockType.main,
+          distanceKm: step.meters / 1000.0,
+          paceMinSecondsPerKm: workPace.minSecondsPerKm,
+          paceMaxSecondsPerKm: workPace.maxSecondsPerKm,
+          recoverySeconds: step.recoverySeconds,
+          label: '${step.meters}m',
+        ),
+      );
     }
 
     // Cooldown — absorbs remaining budget
-    blocks.add(ResolvedBlock(
-      type: BlockType.cooldown,
-      distanceKm: _roundSmart(cdKm),
-      paceMinSecondsPerKm: easyPace.minSecondsPerKm,
-      paceMaxSecondsPerKm: easyPace.maxSecondsPerKm,
-    ));
+    blocks.add(
+      ResolvedBlock(
+        type: BlockType.cooldown,
+        distanceKm: _roundSmart(cdKm),
+        paceMinSecondsPerKm: easyPace.minSecondsPerKm,
+        paceMaxSecondsPerKm: easyPace.maxSecondsPerKm,
+      ),
+    );
 
     return ResolvedWorkout(
       templateId: template.id,
@@ -691,20 +780,24 @@ class WorkoutResolver {
     if (template.intent != WorkoutIntent.threshold &&
         template.intent != WorkoutIntent.vo2max &&
         template.intent != WorkoutIntent.speed &&
-        template.intent != WorkoutIntent.raceSpecific) return null;
+        template.intent != WorkoutIntent.raceSpecific)
+      return null;
 
     // Only applies to templates with exactly one fixedKm main block with reps.
     final repBlocks = template.blocks
-        .where((b) =>
-            b.type == BlockType.main &&
-            b.reps != null &&
-            b.durationType == DurationType.fixedKm)
+        .where(
+          (b) =>
+              b.type == BlockType.main &&
+              b.reps != null &&
+              b.durationType == DurationType.fixedKm,
+        )
         .toList();
     if (repBlocks.length != 1) return null;
 
     final mainBlock = repBlocks.first;
 
-    final repKm = variant?.repDistanceKm ??
+    final repKm =
+        variant?.repDistanceKm ??
         (variant?.repDistanceMeters != null
             ? variant!.repDistanceMeters! / 1000.0
             : null) ??
@@ -756,10 +849,10 @@ class WorkoutResolver {
 
   int _clampRepsForExperience(int reps, String level) {
     return switch (level) {
-      'beginner'     => (reps * 0.65).round().clamp(2, reps).toInt(),
+      'beginner' => (reps * 0.65).round().clamp(2, reps).toInt(),
       'intermediate' => (reps * 0.85).round().clamp(2, reps).toInt(),
-      'advanced'     => reps,
-      _              => (reps * 0.85).round().clamp(2, reps).toInt(),
+      'advanced' => reps,
+      _ => (reps * 0.85).round().clamp(2, reps).toInt(),
     };
   }
 }

@@ -38,7 +38,9 @@ class RunTrackingTaskHandler extends TaskHandler {
     final distanceMeters = prefs.getDouble('run_distance_meters') ?? 0.0;
     final useMiles = prefs.getString('distance_unit') == 'miles';
 
-    print('[ForegroundTask] Elapsed: $backgroundSeconds seconds, distance: $distanceMeters m');
+    print(
+      '[ForegroundTask] Elapsed: $backgroundSeconds seconds, distance: $distanceMeters m',
+    );
 
     // Update notification
     FlutterForegroundTask.updateService(
@@ -51,7 +53,7 @@ class RunTrackingTaskHandler extends TaskHandler {
   @override
   Future<void> onDestroy(DateTime timestamp) async {
     print('[ForegroundTask] Stopped at $timestamp');
-    
+
     // Clean up preferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('run_start_time');

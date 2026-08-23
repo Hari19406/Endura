@@ -23,13 +23,13 @@ class CloudSyncService {
 
     try {
       await _client.from('runs').upsert({
-        'user_id':          _userId,
-        'distance_km':      run.distanceKm,
-        'average_pace':     run.averagePace,
+        'user_id': _userId,
+        'distance_km': run.distanceKm,
+        'average_pace': run.averagePace,
         'duration_seconds': run.durationSeconds,
-        'date':             run.date.toUtc().toIso8601String(),
-        'route_polyline':   run.routePolyline,
-        'workout_type':     run.workoutType,
+        'date': run.date.toUtc().toIso8601String(),
+        'route_polyline': run.routePolyline,
+        'workout_type': run.workoutType,
         'cs_value_at_time': run.csValueAtTime,
         // Only include rpe when it has a value — avoids overwriting a
         // server-side rpe with NULL if the user rates after sync.
@@ -60,7 +60,7 @@ class CloudSyncService {
       }
 
       int uploaded = 0;
-      int failed   = 0;
+      int failed = 0;
 
       for (final run in unsynced) {
         if (await uploadRun(run)) {
@@ -106,9 +106,13 @@ class CloudSyncService {
       }
 
       // Use a 60-second window around the run date to tolerate UTC/local drift
-      final utcDate    = localRun.date.toUtc();
-      final windowStart = utcDate.subtract(const Duration(minutes: 1)).toIso8601String();
-      final windowEnd   = utcDate.add(const Duration(minutes: 1)).toIso8601String();
+      final utcDate = localRun.date.toUtc();
+      final windowStart = utcDate
+          .subtract(const Duration(minutes: 1))
+          .toIso8601String();
+      final windowEnd = utcDate
+          .add(const Duration(minutes: 1))
+          .toIso8601String();
 
       await _client
           .from('runs')
@@ -148,8 +152,7 @@ class CloudSyncService {
       int skipped = 0;
       for (final row in cloudRuns) {
         try {
-          final cloudDate =
-              DateTime.parse(row['date'] as String).toLocal();
+          final cloudDate = DateTime.parse(row['date'] as String).toLocal();
 
           // Skip if we already have a run within 60s of this timestamp
           final isDuplicate = localDates.any(
@@ -181,8 +184,7 @@ class CloudSyncService {
         }
       }
 
-      debugPrint(
-          'CloudSync: restored $restored, skipped $skipped duplicates');
+      debugPrint('CloudSync: restored $restored, skipped $skipped duplicates');
       return true;
     } catch (e, stack) {
       debugPrint('CloudSync downloadAndRestoreRuns error: $e');
@@ -238,7 +240,7 @@ class SyncResult {
     required this.skipped,
   });
 
-  bool get hasFailures  => failed > 0;
+  bool get hasFailures => failed > 0;
   bool get allSucceeded => !skipped && failed == 0;
 
   @override

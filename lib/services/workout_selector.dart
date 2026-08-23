@@ -14,11 +14,10 @@ enum WorkoutId {
   tempoRun,
   intervalWorkout,
   longEasy,
-  recoveryRun,
   restDay,
 }
 
-enum _FatigueDecision { none, downgrade, recovery }
+enum _FatigueDecision { none, downgrade }
 
 class WorkoutSelector {
   static const double _minimumLongRunCapKm = 6.0;
@@ -35,7 +34,6 @@ class WorkoutSelector {
     String goalRace = 'fitness',
     WorkoutType? lastCompletedType,
     DateTime? lastRunDate,
-    WorkoutType? lastNonRecoveryType,
     TrainingPhase phase = TrainingPhase.base,
     List<RpeEntry> recentRpeEntries = const [],
     WeeklyBudget? budget,
@@ -57,15 +55,12 @@ class WorkoutSelector {
       return WorkoutId.easyRun;
     }
 
-    if (readiness == Readiness.red) return WorkoutId.recoveryRun;
+    if (readiness == Readiness.red) return WorkoutId.easyRun;
     final highRpeOverride = _postHighRpeOverride(
       recentRpeEntries,
       readiness: readiness,
     );
     if (highRpeOverride != null) return highRpeOverride;
-    if (fatigueDecision == _FatigueDecision.recovery) {
-      return WorkoutId.recoveryRun;
-    }
 
     final lastType = lastCompletedType ?? _toWorkoutType(lastWorkoutType);
     final nextSequenceType = WorkoutSequence.next(last: lastType);
@@ -131,14 +126,17 @@ class WorkoutSelector {
         phase: phase,
         readiness: readiness,
         daysSinceLastQuality: daysSinceLastQuality,
-        lastNonRecoveryType: lastNonRecoveryType,
+        lastCompletedType: lastType,
         goalRace: goalRace,
       );
       return _applyFatigueAdjustment(workout, fatigueDecision);
     }
 
     if (nextSequenceType == WorkoutType.easy) {
-      final workout = _resolveEasySlot(readiness: readiness, lastType: lastType);
+      final workout = _resolveEasySlot(
+        readiness: readiness,
+        lastType: lastType,
+      );
       return _applyFatigueAdjustment(workout, fatigueDecision);
     }
 
@@ -162,9 +160,7 @@ class WorkoutSelector {
     if (!_isHardWorkoutId(workoutId)) return null;
     if (lastCompletedType == null || !lastCompletedType.isQuality) return null;
     if (!_wasRunYesterday(lastRunDate, now: now)) return null;
-    return readiness == Readiness.green
-        ? WorkoutId.easyRun
-        : WorkoutId.recoveryRun;
+    return WorkoutId.easyRun;
   }
 
   bool _isHardWorkoutId(WorkoutId workoutId) {
@@ -210,12 +206,7 @@ class WorkoutSelector {
     final daysSinceHighRpe = today.difference(highRpeDay).inDays;
 
     if (daysSinceHighRpe < 0) return null;
-    if (daysSinceHighRpe <= 1) return WorkoutId.recoveryRun;
-    if (daysSinceHighRpe == 2) {
-      return readiness == Readiness.green
-          ? WorkoutId.easyRun
-          : WorkoutId.recoveryRun;
-    }
+    if (daysSinceHighRpe <= 2) return WorkoutId.easyRun;
     return null;
   }
 
@@ -239,15 +230,12 @@ class WorkoutSelector {
     _FatigueDecision decision,
   ) {
     switch (decision) {
-      case _FatigueDecision.recovery:
-        return WorkoutId.recoveryRun;
       case _FatigueDecision.downgrade:
         return switch (workoutId) {
           WorkoutId.tempoRun ||
           WorkoutId.intervalWorkout ||
           WorkoutId.longEasy ||
-          WorkoutId.easyStrides =>
-            WorkoutId.easyRun,
+          WorkoutId.easyStrides => WorkoutId.easyRun,
           _ => workoutId,
         };
       case _FatigueDecision.none:
@@ -259,7 +247,7 @@ class WorkoutSelector {
     required TrainingPhase phase,
     required Readiness readiness,
     required int daysSinceLastQuality,
-    required WorkoutType? lastNonRecoveryType,
+    required WorkoutType? lastCompletedType,
     required String goalRace,
   }) {
     if (!phase.allowsQualitySessions) {
@@ -272,13 +260,13 @@ class WorkoutSelector {
     if (daysSinceLastQuality < 2) return WorkoutId.easyRun;
 
     if (phase == TrainingPhase.peak) {
-      if (lastNonRecoveryType == WorkoutType.tempo) {
+      if (lastCompletedType == WorkoutType.tempo) {
         return WorkoutId.intervalWorkout;
       }
       return WorkoutId.tempoRun;
     }
 
-    if (lastNonRecoveryType == WorkoutType.tempo) {
+    if (lastCompletedType == WorkoutType.tempo) {
       return WorkoutId.intervalWorkout;
     }
     return switch (goalRace) {
@@ -335,10 +323,10 @@ class WorkoutSelector {
   }
 
   int _longRunThreshold(String goalRace) => switch (goalRace) {
-        'marathon' => 5,
-        'half_marathon' => 6,
-        _ => 7,
-      };
+    'marathon' => 5,
+    'half_marathon' => 6,
+    _ => 7,
+  };
 
   WorkoutType? _toWorkoutType(WorkoutId? id) {
     if (id == null) return null;
@@ -347,7 +335,6 @@ class WorkoutSelector {
       WorkoutId.tempoRun => WorkoutType.tempo,
       WorkoutId.intervalWorkout => WorkoutType.interval,
       WorkoutId.longEasy => WorkoutType.long,
-      WorkoutId.recoveryRun => WorkoutType.recovery,
       WorkoutId.restDay => WorkoutType.rest,
     };
   }
@@ -358,7 +345,6 @@ class WorkoutSelector {
       WorkoutType.tempo => WorkoutId.tempoRun,
       WorkoutType.interval => WorkoutId.intervalWorkout,
       WorkoutType.long => WorkoutId.longEasy,
-      WorkoutType.recovery => WorkoutId.recoveryRun,
       WorkoutType.rest => WorkoutId.restDay,
     };
   }

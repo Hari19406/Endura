@@ -25,9 +25,11 @@ Future<void> main() async {
     final warnCount = log.globalWarnings.length;
     totalWarnings += warnCount;
     final flag = warnCount > 0 ? '⚠️ ' : '✓  ';
-    print('║ $flag ${log.persona.id.padRight(38)} '
-        'vDOT ${log.initialVdot}→${log.finalVdot}  '
-        'W:$warnCount ║');
+    print(
+      '║ $flag ${log.persona.id.padRight(38)} '
+      'vDOT ${log.initialVdot}→${log.finalVdot}  '
+      'W:$warnCount ║',
+    );
   }
 
   print('╠══════════════════════════════════════════════════════════════╣');

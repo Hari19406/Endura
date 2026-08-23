@@ -9,11 +9,10 @@
 ///   6. Return selection with debug log
 ///
 /// Intent boundaries are STRICT:
-///   aerobicBase → easy/recovery templates ONLY
+///   aerobicBase → easy templates ONLY
 ///   endurance   → long run templates ONLY
 ///   threshold   → tempo/cruise interval templates ONLY
 ///   vo2max      → interval templates ONLY
-///   recovery    → recovery templates ONLY
 ///
 /// Readiness gating (V1 Adaptation System):
 ///   Readiness is NO LONGER handled here via intent swapping.
@@ -246,7 +245,10 @@ class SessionSelector {
     final isSecondToLast = todayPosition == totalDays - 2;
 
     final qualityBudget = _qualityBudgetForWeek(
-        totalDays, context.phase, context.experienceLevel);
+      totalDays,
+      context.phase,
+      context.experienceLevel,
+    );
     final qualityDone = context.qualitySessionsDoneThisWeek;
     final qualityRemaining = (qualityBudget - qualityDone).clamp(0, 2);
 
@@ -266,7 +268,7 @@ class SessionSelector {
     }
 
     if (totalDays >= 6 && isSecondToLast) {
-      return DayRole.recovery;
+      return DayRole.easyRun;
     }
 
     if (qualityRemaining > 0 && context.daysSinceLastQuality >= 2) {
@@ -292,13 +294,16 @@ class SessionSelector {
   }
 
   int _qualityBudgetForWeek(
-      int daysPerWeek, TrainingPhase phase, String experienceLevel) {
+    int daysPerWeek,
+    TrainingPhase phase,
+    String experienceLevel,
+  ) {
     final isBeginner = experienceLevel == 'beginner';
     return switch (phase) {
-      TrainingPhase.base        => daysPerWeek >= 4 ? 1 : (isBeginner ? 0 : 1),
-      TrainingPhase.taper       => 1,
-      TrainingPhase.build       => daysPerWeek >= 5 ? 2 : 1,
-      TrainingPhase.peak        => daysPerWeek >= 4 ? 2 : 1,
+      TrainingPhase.base => daysPerWeek >= 4 ? 1 : (isBeginner ? 0 : 1),
+      TrainingPhase.taper => 1,
+      TrainingPhase.build => daysPerWeek >= 5 ? 2 : 1,
+      TrainingPhase.peak => daysPerWeek >= 4 ? 2 : 1,
       TrainingPhase.maintenance => 1,
     };
   }
@@ -318,16 +323,17 @@ class SessionSelector {
         }
         if (context.goalIntent == 'steady') return WorkoutIntent.threshold;
 
-        final isBeginnerEarlyBuild = context.phase == TrainingPhase.build &&
+        final isBeginnerEarlyBuild =
+            context.phase == TrainingPhase.build &&
             context.weekNumber == 1 &&
             context.experienceLevel == 'beginner';
         if (isBeginnerEarlyBuild) return WorkoutIntent.threshold;
 
         return switch (context.raceDistance) {
-          RaceDistance.fiveK        => WorkoutIntent.vo2max,
-          RaceDistance.tenK         => WorkoutIntent.vo2max,
+          RaceDistance.fiveK => WorkoutIntent.vo2max,
+          RaceDistance.tenK => WorkoutIntent.vo2max,
           RaceDistance.halfMarathon => WorkoutIntent.threshold,
-          RaceDistance.marathon     => WorkoutIntent.threshold,
+          RaceDistance.marathon => WorkoutIntent.threshold,
         };
 
       case DayRole.secondaryQuality:
@@ -335,17 +341,14 @@ class SessionSelector {
           return WorkoutIntent.speed;
         }
         return switch (context.raceDistance) {
-          RaceDistance.fiveK        => WorkoutIntent.threshold,
-          RaceDistance.tenK         => WorkoutIntent.threshold,
+          RaceDistance.fiveK => WorkoutIntent.threshold,
+          RaceDistance.tenK => WorkoutIntent.threshold,
           RaceDistance.halfMarathon => WorkoutIntent.vo2max,
-          RaceDistance.marathon     => WorkoutIntent.vo2max,
+          RaceDistance.marathon => WorkoutIntent.vo2max,
         };
 
       case DayRole.easyRun:
         return WorkoutIntent.aerobicBase;
-
-      case DayRole.recovery:
-        return WorkoutIntent.recovery;
     }
   }
 
@@ -390,8 +393,13 @@ class SessionSelector {
     String intentSource,
   ) {
     final dayName = [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-      'Friday', 'Saturday', 'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
     ][context.todayDayIndex];
     final phaseName = context.phase.name;
     return '$dayName · ${role.name} · ${intent.name} '
@@ -401,8 +409,9 @@ class SessionSelector {
 
   void _log(String tag, Map<String, dynamic> data) {
     assert(() {
-      final entries =
-          data.entries.map((e) => '  ${e.key}: ${e.value}').join('\n');
+      final entries = data.entries
+          .map((e) => '  ${e.key}: ${e.value}')
+          .join('\n');
       // ignore: avoid_print
       print('[SessionSelector] $tag\n$entries');
       return true;

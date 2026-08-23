@@ -20,14 +20,14 @@ class RunHistory {
   });
 
   Map<String, dynamic> toJson() => {
-        'distance': distance,
-        'averagePace': averagePace,
-        'date': date.toIso8601String(),
-        'gpsPoints': gpsPoints,
-        'durationSeconds': durationSeconds,
-        'rpe': rpe,
-        'workoutType': workoutType,
-      };
+    'distance': distance,
+    'averagePace': averagePace,
+    'date': date.toIso8601String(),
+    'gpsPoints': gpsPoints,
+    'durationSeconds': durationSeconds,
+    'rpe': rpe,
+    'workoutType': workoutType,
+  };
 
   factory RunHistory.fromJson(Map<String, dynamic> json) {
     List<Map<String, double>> points = [];
@@ -146,10 +146,11 @@ List<String> calculateDailyAveragePaces(List<RunHistory> runs) {
     final dayKey = getStartOfDay(run.date);
     runsByDay.putIfAbsent(dayKey, () => []).add(run);
   }
-  final dailyPaces = runsByDay.entries
-      .map((e) => MapEntry(e.key, calculateAveragePace(e.value)))
-      .toList()
-    ..sort((a, b) => b.key.compareTo(a.key));
+  final dailyPaces =
+      runsByDay.entries
+          .map((e) => MapEntry(e.key, calculateAveragePace(e.value)))
+          .toList()
+        ..sort((a, b) => b.key.compareTo(a.key));
   return dailyPaces.map((e) => e.value).toList();
 }
 

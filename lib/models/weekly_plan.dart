@@ -29,33 +29,32 @@ class PlannedDay {
     WorkoutType? workoutType,
     bool? isRestDay,
     String? movedFromDay,
-  }) =>
-      PlannedDay(
-        date: date,
-        workoutType: workoutType ?? this.workoutType,
-        isRestDay: isRestDay ?? this.isRestDay,
-        isCompleted: isCompleted ?? this.isCompleted,
-        isSkipped: isSkipped ?? this.isSkipped,
-        movedFromDay: movedFromDay ?? this.movedFromDay,
-      );
+  }) => PlannedDay(
+    date: date,
+    workoutType: workoutType ?? this.workoutType,
+    isRestDay: isRestDay ?? this.isRestDay,
+    isCompleted: isCompleted ?? this.isCompleted,
+    isSkipped: isSkipped ?? this.isSkipped,
+    movedFromDay: movedFromDay ?? this.movedFromDay,
+  );
 
   Map<String, dynamic> toJson() => {
-        'date': date.toIso8601String(),
-        'workoutType': workoutType.name,
-        'isRestDay': isRestDay,
-        'isCompleted': isCompleted,
-        'isSkipped': isSkipped,
-        if (movedFromDay != null) 'movedFromDay': movedFromDay,
-      };
+    'date': date.toIso8601String(),
+    'workoutType': workoutType.name,
+    'isRestDay': isRestDay,
+    'isCompleted': isCompleted,
+    'isSkipped': isSkipped,
+    if (movedFromDay != null) 'movedFromDay': movedFromDay,
+  };
 
   factory PlannedDay.fromJson(Map<String, dynamic> j) => PlannedDay(
-        date: DateTime.parse(j['date'] as String),
-        workoutType: WorkoutTypeX.fromString(j['workoutType'] as String),
-        isRestDay: j['isRestDay'] as bool? ?? false,
-        isCompleted: j['isCompleted'] as bool? ?? false,
-        isSkipped: j['isSkipped'] as bool? ?? false,
-        movedFromDay: j['movedFromDay'] as String?,
-      );
+    date: DateTime.parse(j['date'] as String),
+    workoutType: WorkoutTypeX.fromString(j['workoutType'] as String),
+    isRestDay: j['isRestDay'] as bool? ?? false,
+    isCompleted: j['isCompleted'] as bool? ?? false,
+    isSkipped: j['isSkipped'] as bool? ?? false,
+    movedFromDay: j['movedFromDay'] as String?,
+  );
 }
 
 class WeeklyPlan {
@@ -127,25 +126,27 @@ class WeeklyPlan {
   List<PlannedDay> get pendingDays => days.where((d) => d.isPending).toList();
 
   /// Skipped quality sessions this week (tempo/interval not completed).
-  int get skippedQualityCount => days
-      .where((d) => d.isSkipped && d.workoutType.isQuality)
-      .length;
+  int get skippedQualityCount =>
+      days.where((d) => d.isSkipped && d.workoutType.isQuality).length;
 
   Map<String, dynamic> toJson() => {
-        'weekStartDate': weekStartDate.toIso8601String(),
-        'days': days.map((d) => d.toJson()).toList(),
-      };
+    'weekStartDate': weekStartDate.toIso8601String(),
+    'days': days.map((d) => d.toJson()).toList(),
+  };
 
   factory WeeklyPlan.fromJson(Map<String, dynamic> j) => WeeklyPlan(
-        weekStartDate:
-            DateTime.tryParse('${j['weekStartDate'] ?? ''}') ?? DateTime.now(),
-        days: (j['days'] is List)
-            ? (j['days'] as List).map((d) {
+    weekStartDate:
+        DateTime.tryParse('${j['weekStartDate'] ?? ''}') ?? DateTime.now(),
+    days: (j['days'] is List)
+        ? (j['days'] as List)
+              .map((d) {
                 if (d is Map) {
                   return PlannedDay.fromJson(Map<String, dynamic>.from(d));
                 }
                 return null;
-              }).whereType<PlannedDay>().toList()
-            : const [],
-      );
+              })
+              .whereType<PlannedDay>()
+              .toList()
+        : const [],
+  );
 }

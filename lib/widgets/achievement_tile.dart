@@ -48,11 +48,7 @@ class AchievementTile extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             achievement.description,
-            style: TextStyle(
-              fontSize: 12,
-              color: c.textSecondary,
-              height: 1.3,
-            ),
+            style: TextStyle(fontSize: 12, color: c.textSecondary, height: 1.3),
           ),
           const SizedBox(height: 5),
           Text(
@@ -102,15 +98,27 @@ String formatAchievementDate(DateTime date) {
   if (diff == 1) return 'Earned yesterday';
   if (diff < 30) return 'Earned $diff days ago';
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return 'Earned ${date.day} ${months[date.month - 1]} ${date.year}';
 }
 
 /// Sorts achievements the same way everywhere they're listed: highest tier
 /// first, then most recently unlocked.
-List<achieve.Achievement> sortAchievements(List<achieve.Achievement> achievements) {
+List<achieve.Achievement> sortAchievements(
+  List<achieve.Achievement> achievements,
+) {
   final sorted = List<achieve.Achievement>.from(achievements);
   sorted.sort((a, b) {
     final tierCompare = b.tier.compareTo(a.tier);

@@ -14,13 +14,14 @@ class _Label extends StatelessWidget {
   const _Label(this.text);
   @override
   Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
-        style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: EC.teal,
-            letterSpacing: 0.8),
-      );
+    text.toUpperCase(),
+    style: const TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      color: EC.teal,
+      letterSpacing: 0.8,
+    ),
+  );
 }
 
 class _Title extends StatelessWidget {
@@ -28,14 +29,15 @@ class _Title extends StatelessWidget {
   const _Title(this.text);
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w700,
-            color: EC.textPrimary,
-            height: 1.25,
-            letterSpacing: -0.3),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 26,
+      fontWeight: FontWeight.w700,
+      color: EC.textPrimary,
+      height: 1.25,
+      letterSpacing: -0.3,
+    ),
+  );
 }
 
 class _Sub extends StatelessWidget {
@@ -43,12 +45,9 @@ class _Sub extends StatelessWidget {
   const _Sub(this.text);
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-            fontSize: 14,
-            color: EC.textSecondary,
-            height: 1.55),
-      );
+    text,
+    style: const TextStyle(fontSize: 14, color: EC.textSecondary, height: 1.55),
+  );
 }
 
 class _Row extends StatelessWidget {
@@ -83,54 +82,64 @@ class _Row extends StatelessWidget {
             width: selected ? 1.5 : ET.borderWidth,
           ),
         ),
-        child: Row(children: [
-          leading,
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
+        child: Row(
+          children: [
+            leading,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
                     style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: EC.textPrimary)),
-                if (sub != null) ...[
-                  const SizedBox(height: 3),
-                  Text(sub!,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: EC.textPrimary,
+                    ),
+                  ),
+                  if (sub != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      sub!,
                       style: const TextStyle(
-                          fontSize: 12.5, color: EC.textSecondary)),
+                        fontSize: 12.5,
+                        color: EC.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: selected ? EC.teal : Colors.transparent,
-              border: Border.all(
-                  color: selected ? EC.teal : EC.border, width: 1.5),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? EC.teal : Colors.transparent,
+                border: Border.all(
+                  color: selected ? EC.teal : EC.border,
+                  width: 1.5,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, size: 13, color: EC.black)
+                  : null,
             ),
-            child: selected
-                ? const Icon(Icons.check, size: 13, color: EC.black)
-                : null,
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }
 }
 
 Widget _iconBox(Color bg, IconData icon, Color fg) => Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Icon(icon, size: 22, color: fg),
-    );
+  width: 44,
+  height: 44,
+  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+  child: Icon(icon, size: 22, color: fg),
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE 1 — INTRO
@@ -157,33 +166,45 @@ class OPageIntro extends StatelessWidget {
                 color: EC.surface,
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: EC.teal.withOpacity(
-                        0.3 + 0.3 * sin(loopCtrl.value * 2 * pi)),
-                    width: 1.5),
+                  color: EC.teal.withOpacity(
+                    0.3 + 0.3 * sin(loopCtrl.value * 2 * pi),
+                  ),
+                  width: 1.5,
+                ),
               ),
-              child: const Icon(Icons.directions_run_rounded,
-                  size: 36, color: EC.teal),
+              child: const Icon(
+                Icons.directions_run_rounded,
+                size: 36,
+                color: EC.teal,
+              ),
             ),
           ),
           const SizedBox(height: 32),
-          const Text('Endura',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: EC.teal,
-                  letterSpacing: 2)),
+          const Text(
+            'Endura',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: EC.teal,
+              letterSpacing: 2,
+            ),
+          ),
           const SizedBox(height: 10),
           RichText(
             text: const TextSpan(
               style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: EC.textPrimary,
-                  height: 1.2,
-                  letterSpacing: -0.5),
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                color: EC.textPrimary,
+                height: 1.2,
+                letterSpacing: -0.5,
+              ),
               children: [
                 TextSpan(text: "Meet "),
-                TextSpan(text: 'Max', style: TextStyle(color: EC.teal)),
+                TextSpan(
+                  text: 'Max',
+                  style: TextStyle(color: EC.teal),
+                ),
                 TextSpan(text: ".\nYour personal\nrunning coach."),
               ],
             ),
@@ -191,11 +212,17 @@ class OPageIntro extends StatelessWidget {
           const SizedBox(height: 20),
           const Text(
             "Max learns how you run, adapts every week,\nand builds a plan that actually fits your life.",
-            style: TextStyle(fontSize: 15, color: EC.textSecondary, height: 1.6),
+            style: TextStyle(
+              fontSize: 15,
+              color: EC.textSecondary,
+              height: 1.6,
+            ),
           ),
           const SizedBox(height: 12),
-          const Text('Takes about 2 minutes',
-              style: TextStyle(fontSize: 12, color: EC.muted)),
+          const Text(
+            'Takes about 2 minutes',
+            style: TextStyle(fontSize: 12, color: EC.muted),
+          ),
         ],
       ),
     );
@@ -223,23 +250,47 @@ class OPageGoal extends StatelessWidget {
           const SizedBox(height: 8),
           const _Title('What are you\ntraining for?'),
           const SizedBox(height: 6),
-          const _Sub('Pick your race. Max builds everything backwards from here.'),
+          const _Sub(
+            'Pick your race. Max builds everything backwards from here.',
+          ),
           const SizedBox(height: 28),
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _g('5k', '5K', 'The perfect starting race',
-                    const Color(0xFF003D35), EC.teal),
+                _g(
+                  '5k',
+                  '5K',
+                  'The perfect starting race',
+                  const Color(0xFF003D35),
+                  EC.teal,
+                ),
                 const SizedBox(height: 10),
-                _g('10k', '10K', 'Step up the challenge',
-                    const Color(0xFF1E1040), EC.violet),
+                _g(
+                  '10k',
+                  '10K',
+                  'Step up the challenge',
+                  const Color(0xFF1E1040),
+                  EC.violet,
+                ),
                 const SizedBox(height: 10),
-                _g('half_marathon', 'Half Marathon', "The runner's milestone",
-                    const Color(0xFF3D1A00), EC.orange, boxText: '21.1K'),
+                _g(
+                  'half_marathon',
+                  'Half Marathon',
+                  "The runner's milestone",
+                  const Color(0xFF3D1A00),
+                  EC.orange,
+                  boxText: '21.1K',
+                ),
                 const SizedBox(height: 10),
-                _g('marathon', 'Marathon', 'The ultimate test',
-                    const Color(0xFF3D0000), EC.red, boxText: '42.2K'),
+                _g(
+                  'marathon',
+                  'Marathon',
+                  'The ultimate test',
+                  const Color(0xFF3D0000),
+                  EC.red,
+                  boxText: '42.2K',
+                ),
               ],
             ),
           ),
@@ -248,28 +299,38 @@ class OPageGoal extends StatelessWidget {
     );
   }
 
-  Widget _g(String key, String label, String sub, Color bg, Color fg,
-      {String? boxText}) =>
-      _Row(
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration:
-              BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-          child: Center(
-            child: Text(boxText ?? label,
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
-                    letterSpacing: 0.3)),
+  Widget _g(
+    String key,
+    String label,
+    String sub,
+    Color bg,
+    Color fg, {
+    String? boxText,
+  }) => _Row(
+    leading: Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Center(
+        child: Text(
+          boxText ?? label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: fg,
+            letterSpacing: 0.3,
           ),
         ),
-        label: label,
-        sub: sub,
-        selected: selected == key,
-        onTap: () => onSelect(key),
-      );
+      ),
+    ),
+    label: label,
+    sub: sub,
+    selected: selected == key,
+    onTap: () => onSelect(key),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,8 +340,11 @@ class OPageGoal extends StatelessWidget {
 class OPageExperience extends StatelessWidget {
   final String? selected;
   final ValueChanged<String> onSelect;
-  const OPageExperience(
-      {super.key, required this.selected, required this.onSelect});
+  const OPageExperience({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -295,18 +359,26 @@ class OPageExperience extends StatelessWidget {
           const _Title('How would you\ndescribe yourself?'),
           const SizedBox(height: 6),
           const _Sub(
-              'Be honest — Max uses this to set the right intensity from day one.'),
+            'Be honest — Max uses this to set the right intensity from day one.',
+          ),
           const SizedBox(height: 28),
           _Row(
             leading: Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                  color: const Color(0xFF003D35),
-                  borderRadius: BorderRadius.circular(10)),
+                color: const Color(0xFF003D35),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Center(
-                child: Text('B',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700, color: EC.teal)),
+                child: Text(
+                  'B',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.teal,
+                  ),
+                ),
               ),
             ),
             label: 'Beginner',
@@ -317,14 +389,21 @@ class OPageExperience extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                  color: const Color(0xFF1E1040),
-                  borderRadius: BorderRadius.circular(10)),
+                color: const Color(0xFF1E1040),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Center(
-                child: Text('I',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700, color: EC.violet)),
+                child: Text(
+                  'I',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.violet,
+                  ),
+                ),
               ),
             ),
             label: 'Intermediate',
@@ -335,14 +414,21 @@ class OPageExperience extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                  color: const Color(0xFF3D1A00),
-                  borderRadius: BorderRadius.circular(10)),
+                color: const Color(0xFF3D1A00),
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Center(
-                child: Text('A',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700, color: EC.orange)),
+                child: Text(
+                  'A',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.orange,
+                  ),
+                ),
               ),
             ),
             label: 'Advanced',
@@ -381,11 +467,11 @@ class OPageBestTime extends StatelessWidget {
   });
 
   String get _distLabel => switch (distance) {
-        '10k'      => '10K',
-        'half'     => 'Half Marathon',
-        'marathon' => 'Marathon',
-        _          => '5K',
-      };
+    '10k' => '10K',
+    'half' => 'Half Marathon',
+    'marathon' => 'Marathon',
+    _ => '5K',
+  };
 
   String _pad(int v) => v.toString().padLeft(2, '0');
 
@@ -402,17 +488,18 @@ class OPageBestTime extends StatelessWidget {
           const _Title("What's your\ncurrent race time?"),
           const SizedBox(height: 6),
           const _Sub(
-              'Use your most recent time — not your goal. Max needs your current fitness, not your dream.'),
+            'Use your most recent time — not your goal. Max needs your current fitness, not your dream.',
+          ),
           const SizedBox(height: 20),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: ['5k', '10k', 'half', 'marathon'].map((d) {
                 final lbl = switch (d) {
-                  '10k'      => '10K',
-                  'half'     => 'Half',
+                  '10k' => '10K',
+                  'half' => 'Half',
                   'marathon' => 'Marathon',
-                  _          => '5K',
+                  _ => '5K',
                 };
                 final sel = distance == d;
                 return Padding(
@@ -422,19 +509,25 @@ class OPageBestTime extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 9),
+                        horizontal: 18,
+                        vertical: 9,
+                      ),
                       decoration: BoxDecoration(
                         color: sel ? EC.teal : EC.surface,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: sel ? EC.teal : EC.border,
-                            width: ET.borderWidth),
+                          color: sel ? EC.teal : EC.border,
+                          width: ET.borderWidth,
+                        ),
                       ),
-                      child: Text(lbl,
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: sel ? EC.black : EC.textSecondary)),
+                      child: Text(
+                        lbl,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: sel ? EC.black : EC.textSecondary,
+                        ),
+                      ),
                     ),
                   ),
                 );
@@ -446,20 +539,28 @@ class OPageBestTime extends StatelessWidget {
             child: RichText(
               text: TextSpan(
                 style: const TextStyle(
-                    fontSize: 14, color: EC.textSecondary, height: 1.5),
+                  fontSize: 14,
+                  color: EC.textSecondary,
+                  height: 1.5,
+                ),
                 children: [
                   const TextSpan(text: 'I can currently run a '),
                   TextSpan(
-                      text: _distLabel,
-                      style: const TextStyle(
-                          color: EC.teal, fontWeight: FontWeight.w600)),
+                    text: _distLabel,
+                    style: const TextStyle(
+                      color: EC.teal,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const TextSpan(text: ' in '),
                   TextSpan(
-                      text: '${_pad(hours)}h ${_pad(minutes)}m ${_pad(seconds)}s',
-                      style: const TextStyle(
-                          color: EC.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16)),
+                    text: '${_pad(hours)}h ${_pad(minutes)}m ${_pad(seconds)}s',
+                    style: const TextStyle(
+                      color: EC.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -468,11 +569,32 @@ class OPageBestTime extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                Expanded(child: _drum(label: 'HH', count: 6, selected: hours, onChanged: onHoursChanged)),
+                Expanded(
+                  child: _drum(
+                    label: 'HH',
+                    count: 6,
+                    selected: hours,
+                    onChanged: onHoursChanged,
+                  ),
+                ),
                 _colon(),
-                Expanded(child: _drum(label: 'MM', count: 60, selected: minutes, onChanged: onMinsChanged)),
+                Expanded(
+                  child: _drum(
+                    label: 'MM',
+                    count: 60,
+                    selected: minutes,
+                    onChanged: onMinsChanged,
+                  ),
+                ),
                 _colon(),
-                Expanded(child: _drum(label: 'SS', count: 60, selected: seconds, onChanged: onSecsChanged)),
+                Expanded(
+                  child: _drum(
+                    label: 'SS',
+                    count: 60,
+                    selected: seconds,
+                    onChanged: onSecsChanged,
+                  ),
+                ),
               ],
             ),
           ),
@@ -482,11 +604,16 @@ class OPageBestTime extends StatelessWidget {
   }
 
   Widget _colon() => const Padding(
-        padding: EdgeInsets.only(bottom: 24),
-        child: Text(':',
-            style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w300, color: EC.muted)),
-      );
+    padding: EdgeInsets.only(bottom: 24),
+    child: Text(
+      ':',
+      style: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.w300,
+        color: EC.muted,
+      ),
+    ),
+  );
 
   Widget _drum({
     required String label,
@@ -496,12 +623,15 @@ class OPageBestTime extends StatelessWidget {
   }) {
     return Column(
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: EC.muted,
-                letterSpacing: 1)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: EC.muted,
+            letterSpacing: 1,
+          ),
+        ),
         const SizedBox(height: 6),
         Expanded(
           child: Container(
@@ -511,15 +641,18 @@ class OPageBestTime extends StatelessWidget {
               border: Border.all(color: EC.border, width: ET.borderWidth),
             ),
             child: CupertinoPicker(
-              scrollController:
-                  FixedExtentScrollController(initialItem: selected),
+              scrollController: FixedExtentScrollController(
+                initialItem: selected,
+              ),
               itemExtent: 44,
               onSelectedItemChanged: onChanged,
               selectionOverlay: Container(
                 decoration: BoxDecoration(
                   border: Border.symmetric(
                     horizontal: BorderSide(
-                        color: EC.teal.withOpacity(0.5), width: 1),
+                      color: EC.teal.withOpacity(0.5),
+                      width: 1,
+                    ),
                   ),
                 ),
               ),
@@ -529,9 +662,10 @@ class OPageBestTime extends StatelessWidget {
                   child: Text(
                     i.toString().padLeft(2, '0'),
                     style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
-                        color: EC.textPrimary),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w500,
+                      color: EC.textPrimary,
+                    ),
                   ),
                 ),
               ),
@@ -550,8 +684,11 @@ class OPageBestTime extends StatelessWidget {
 class OPageDaysCount extends StatelessWidget {
   final int runsPerWeek;
   final ValueChanged<int> onChanged;
-  const OPageDaysCount(
-      {super.key, required this.runsPerWeek, required this.onChanged});
+  const OPageDaysCount({
+    super.key,
+    required this.runsPerWeek,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -566,7 +703,8 @@ class OPageDaysCount extends StatelessWidget {
           const _Title('How many days a\nweek can you run?'),
           const SizedBox(height: 6),
           const _Sub(
-              'Keep it realistic. Max will push you within what you can commit to.'),
+            'Keep it realistic. Max will push you within what you can commit to.',
+          ),
           const SizedBox(height: 28),
           Expanded(
             child: ListView(
@@ -583,7 +721,9 @@ class OPageDaysCount extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 16),
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: sel ? EC.surface2 : EC.surface,
                         borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -592,19 +732,25 @@ class OPageDaysCount extends StatelessWidget {
                           width: sel ? 1.5 : ET.borderWidth,
                         ),
                       ),
-                      child: Row(children: [
-                        Text(
-                          '$n ${n == 1 ? 'Day' : 'Days'}',
-                          style: const TextStyle(
+                      child: Row(
+                        children: [
+                          Text(
+                            '$n ${n == 1 ? 'Day' : 'Days'}',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: EC.textPrimary),
-                        ),
-                        const Spacer(),
-                        if (sel)
-                          const Icon(Icons.check_circle_rounded,
-                              size: 20, color: EC.teal),
-                      ]),
+                              color: EC.textPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (sel)
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 20,
+                              color: EC.teal,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -628,8 +774,13 @@ class OPageDayPicker extends StatelessWidget {
   final ValueChanged<List<int>> onChanged;
 
   static const _days = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   const OPageDayPicker({
@@ -665,7 +816,8 @@ class OPageDayPicker extends StatelessWidget {
           const _Title('Which days\nwork for you?'),
           const SizedBox(height: 6),
           const _Sub(
-              'Select every day you\'re free to run. Max picks the best ones.'),
+            'Select every day you\'re free to run. Max picks the best ones.',
+          ),
           const SizedBox(height: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
@@ -674,17 +826,18 @@ class OPageDayPicker extends StatelessWidget {
                     'Select $remaining more day${remaining == 1 ? '' : 's'} to continue',
                     key: ValueKey(remaining),
                     style: const TextStyle(
-                        fontSize: 13,
-                        color: EC.teal,
-                        fontWeight: FontWeight.w500),
+                      fontSize: 13,
+                      color: EC.teal,
+                      fontWeight: FontWeight.w500,
+                    ),
                   )
                 : remaining < 0
-                    ? Text(
-                        'Deselect ${-remaining} day${-remaining == 1 ? '' : 's'}',
-                        key: ValueKey(remaining),
-                        style: const TextStyle(fontSize: 13, color: EC.amber),
-                      )
-                    : const Text('', key: ValueKey(0)),
+                ? Text(
+                    'Deselect ${-remaining} day${-remaining == 1 ? '' : 's'}',
+                    key: ValueKey(remaining),
+                    style: const TextStyle(fontSize: 13, color: EC.amber),
+                  )
+                : const Text('', key: ValueKey(0)),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -702,7 +855,9 @@ class OPageDayPicker extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 15),
+                      horizontal: 18,
+                      vertical: 15,
+                    ),
                     decoration: BoxDecoration(
                       color: sel ? EC.surface2 : EC.surface,
                       borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -711,27 +866,39 @@ class OPageDayPicker extends StatelessWidget {
                         width: sel ? 1.5 : ET.borderWidth,
                       ),
                     ),
-                    child: Row(children: [
-                      Text(_days[i],
+                    child: Row(
+                      children: [
+                        Text(
+                          _days[i],
                           style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              color: EC.textPrimary)),
-                      const Spacer(),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        width: 24, height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: sel ? EC.teal : Colors.transparent,
-                          border: Border.all(
-                              color: sel ? EC.teal : EC.border, width: 1.5),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: EC.textPrimary,
+                          ),
                         ),
-                        child: sel
-                            ? const Icon(Icons.check, size: 14, color: EC.black)
-                            : null,
-                      ),
-                    ]),
+                        const Spacer(),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: sel ? EC.teal : Colors.transparent,
+                            border: Border.all(
+                              color: sel ? EC.teal : EC.border,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: sel
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: EC.black,
+                                )
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -754,8 +921,13 @@ class OPageLongRunDay extends StatelessWidget {
   final ValueChanged<int> onSelect;
 
   static const _days = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   const OPageLongRunDay({
@@ -778,7 +950,8 @@ class OPageLongRunDay extends StatelessWidget {
           const _Title('Which day for\nyour long run?'),
           const SizedBox(height: 6),
           const _Sub(
-              'The long run is the cornerstone of your week. Pick a day when you have the most time.'),
+            'The long run is the cornerstone of your week. Pick a day when you have the most time.',
+          ),
           const SizedBox(height: 28),
           Expanded(
             child: ListView.separated(
@@ -796,7 +969,9 @@ class OPageLongRunDay extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 16),
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
                     decoration: BoxDecoration(
                       color: sel ? EC.surface2 : EC.surface,
                       borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -805,17 +980,25 @@ class OPageLongRunDay extends StatelessWidget {
                         width: sel ? 1.5 : ET.borderWidth,
                       ),
                     ),
-                    child: Row(children: [
-                      Text(_days[dayIdx],
+                    child: Row(
+                      children: [
+                        Text(
+                          _days[dayIdx],
                           style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: EC.textPrimary)),
-                      const Spacer(),
-                      if (sel)
-                        const Icon(Icons.check_circle_rounded,
-                            size: 20, color: EC.teal),
-                    ]),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: EC.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (sel)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 20,
+                            color: EC.teal,
+                          ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -834,8 +1017,11 @@ class OPageLongRunDay extends StatelessWidget {
 class OPageIntensity extends StatelessWidget {
   final String? selected;
   final ValueChanged<String> onSelect;
-  const OPageIntensity(
-      {super.key, required this.selected, required this.onSelect});
+  const OPageIntensity({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -849,11 +1035,16 @@ class OPageIntensity extends StatelessWidget {
           const SizedBox(height: 8),
           const _Title('How hard do you\nwant to push?'),
           const SizedBox(height: 6),
-          const _Sub('Max builds your plan around this. You can adjust it anytime.'),
+          const _Sub(
+            'Max builds your plan around this. You can adjust it anytime.',
+          ),
           const SizedBox(height: 28),
           _Row(
-            leading: _iconBox(const Color(0xFF003D35),
-                Icons.sentiment_satisfied_rounded, EC.teal),
+            leading: _iconBox(
+              const Color(0xFF003D35),
+              Icons.sentiment_satisfied_rounded,
+              EC.teal,
+            ),
             label: 'Finish comfortably',
             sub: 'Cross the line feeling strong',
             selected: selected == 'steady',
@@ -862,7 +1053,10 @@ class OPageIntensity extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: _iconBox(
-                const Color(0xFF1E1040), Icons.trending_up_rounded, EC.violet),
+              const Color(0xFF1E1040),
+              Icons.trending_up_rounded,
+              EC.violet,
+            ),
             label: 'Improve steadily',
             sub: 'Get faster week over week',
             selected: selected == 'structured',
@@ -871,7 +1065,10 @@ class OPageIntensity extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: _iconBox(
-                const Color(0xFF3D1A00), Icons.bolt_rounded, EC.orange),
+              const Color(0xFF3D1A00),
+              Icons.bolt_rounded,
+              EC.orange,
+            ),
             label: 'Peak performance',
             sub: 'Push limits and hit a PR',
             selected: selected == 'performance',
@@ -921,8 +1118,18 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
     if (diff == 1) return 'Tomorrow';
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}';
   }
@@ -979,66 +1186,75 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_startLabel(widget.startDate),
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: EC.textPrimary)),
+                Text(
+                  _startLabel(widget.startDate),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 12),
-                Row(children: [
-                  _startChip('Today', today),
-                  const SizedBox(width: 8),
-                  _startChip('Tomorrow', tomorrow),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: widget.startDate,
-                        firstDate: today,
-                        lastDate: today.add(const Duration(days: 60)),
-                        builder: (ctx, child) => Theme(
-                          data: Theme.of(ctx).copyWith(
-                            colorScheme: const ColorScheme.dark(
-                              primary: EC.teal,
-                              onPrimary: EC.black,
-                              surface: EC.surface,
-                              onSurface: EC.textPrimary,
+                Row(
+                  children: [
+                    _startChip('Today', today),
+                    const SizedBox(width: 8),
+                    _startChip('Tomorrow', tomorrow),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: widget.startDate,
+                          firstDate: today,
+                          lastDate: today.add(const Duration(days: 60)),
+                          builder: (ctx, child) => Theme(
+                            data: Theme.of(ctx).copyWith(
+                              colorScheme: const ColorScheme.dark(
+                                primary: EC.teal,
+                                onPrimary: EC.black,
+                                surface: EC.surface,
+                                onSurface: EC.textPrimary,
+                              ),
                             ),
+                            child: child!,
                           ),
-                          child: child!,
+                        );
+                        if (picked != null) widget.onStartChanged(picked);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
                         ),
-                      );
-                      if (picked != null) widget.onStartChanged(picked);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: (!_sameDay(widget.startDate, today) &&
-                                !_sameDay(widget.startDate, tomorrow))
-                            ? EC.teal
-                            : EC.surface2,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        (!_sameDay(widget.startDate, today) &&
-                                !_sameDay(widget.startDate, tomorrow))
-                            ? _startLabel(widget.startDate)
-                            : 'Custom',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: (!_sameDay(widget.startDate, today) &&
+                        decoration: BoxDecoration(
+                          color:
+                              (!_sameDay(widget.startDate, today) &&
                                   !_sameDay(widget.startDate, tomorrow))
-                              ? EC.black
-                              : EC.textSecondary,
+                              ? EC.teal
+                              : EC.surface2,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          (!_sameDay(widget.startDate, today) &&
+                                  !_sameDay(widget.startDate, tomorrow))
+                              ? _startLabel(widget.startDate)
+                              : 'Custom',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color:
+                                (!_sameDay(widget.startDate, today) &&
+                                    !_sameDay(widget.startDate, tomorrow))
+                                ? EC.black
+                                : EC.textSecondary,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1048,8 +1264,18 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
           ..._weekOptions.map((w) {
             final endDate = widget.startDate.add(Duration(days: w * 7));
             const months = [
-              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+              'Jan',
+              'Feb',
+              'Mar',
+              'Apr',
+              'May',
+              'Jun',
+              'Jul',
+              'Aug',
+              'Sep',
+              'Oct',
+              'Nov',
+              'Dec',
             ];
             final endLabel =
                 '${endDate.day} ${months[endDate.month - 1]} ${endDate.year}';
@@ -1064,7 +1290,9 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 14),
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: sel ? EC.surface2 : EC.surface,
                     borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -1073,26 +1301,38 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
                       width: sel ? 1.5 : ET.borderWidth,
                     ),
                   ),
-                  child: Row(children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('$w Weeks',
+                  child: Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$w Weeks',
                             style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: EC.textPrimary)),
-                        const SizedBox(height: 2),
-                        Text(endLabel,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: EC.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            endLabel,
                             style: const TextStyle(
-                                fontSize: 12, color: EC.textSecondary)),
-                      ],
-                    ),
-                    const Spacer(),
-                    if (sel)
-                      const Icon(Icons.check_circle_rounded,
-                          size: 20, color: EC.teal),
-                  ]),
+                              fontSize: 12,
+                              color: EC.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      if (sel)
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 20,
+                          color: EC.teal,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -1113,34 +1353,45 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
                   width: widget.raceDate != null ? 1.5 : ET.borderWidth,
                 ),
               ),
-              child: Row(children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('I have a race date',
+              child: Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'I have a race date',
                         style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: EC.textPrimary)),
-                    if (widget.raceDate != null) ...[
-                      const SizedBox(height: 2),
-                      Text(_raceLabel(widget.raceDate!),
-                          style: const TextStyle(fontSize: 12, color: EC.teal)),
-                    ] else
-                      const Text('Tap to pick your race date',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: EC.textPrimary,
+                        ),
+                      ),
+                      if (widget.raceDate != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          _raceLabel(widget.raceDate!),
+                          style: const TextStyle(fontSize: 12, color: EC.teal),
+                        ),
+                      ] else
+                        const Text(
+                          'Tap to pick your race date',
                           style: TextStyle(
-                              fontSize: 12, color: EC.textSecondary)),
-                  ],
-                ),
-                const Spacer(),
-                Icon(
-                  widget.raceDate != null
-                      ? Icons.check_circle_rounded
-                      : Icons.chevron_right_rounded,
-                  size: 20,
-                  color: widget.raceDate != null ? EC.teal : EC.muted,
-                ),
-              ]),
+                            fontSize: 12,
+                            color: EC.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Icon(
+                    widget.raceDate != null
+                        ? Icons.check_circle_rounded
+                        : Icons.chevron_right_rounded,
+                    size: 20,
+                    color: widget.raceDate != null ? EC.teal : EC.muted,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -1149,12 +1400,15 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
     );
   }
 
-  Widget _sectionHead(String t) => Text(t,
-      style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: EC.muted,
-          letterSpacing: 1.2));
+  Widget _sectionHead(String t) => Text(
+    t,
+    style: const TextStyle(
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      color: EC.muted,
+      letterSpacing: 1.2,
+    ),
+  );
 
   Widget _startChip(String label, DateTime date) {
     final sel = _sameDay(widget.startDate, date);
@@ -1167,11 +1421,14 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
           color: sel ? EC.teal : EC.surface2,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: sel ? EC.black : EC.textSecondary)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: sel ? EC.black : EC.textSecondary,
+          ),
+        ),
       ),
     );
   }
@@ -1181,8 +1438,18 @@ class _OPagePlanTimelineState extends State<OPagePlanTimeline> {
 
   String _raceLabel(DateTime d) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final weeks = d.difference(DateTime.now()).inDays ~/ 7;
     return '${d.day} ${months[d.month - 1]} ${d.year} · $weeks weeks away';
@@ -1229,8 +1496,11 @@ class _OPageDobState extends State<OPageDob> {
     final d = int.tryParse(_day.text);
     final m = int.tryParse(_month.text);
     final y = int.tryParse(_year.text);
-    if (d != null && m != null && y != null &&
-        y > 1900 && y < DateTime.now().year) {
+    if (d != null &&
+        m != null &&
+        y != null &&
+        y > 1900 &&
+        y < DateTime.now().year) {
       try {
         widget.onChanged(DateTime(y, m, d));
       } catch (_) {}
@@ -1250,7 +1520,8 @@ class _OPageDobState extends State<OPageDob> {
           const _Title('When were\nyou born?'),
           const SizedBox(height: 6),
           const _Sub(
-              'Max uses your age to personalise recovery, load, and intensity. Nothing else.'),
+            'Max uses your age to personalise recovery, load, and intensity. Nothing else.',
+          ),
           const SizedBox(height: 40),
           Stack(
             alignment: Alignment.center,
@@ -1258,33 +1529,40 @@ class _OPageDobState extends State<OPageDob> {
               Text(
                 '14 / 08 / 1993',
                 style: TextStyle(
-                    fontSize: 38,
-                    fontWeight: FontWeight.w700,
-                    color: EC.muted.withValues(alpha: 0.15),
-                    letterSpacing: 2),
+                  fontSize: 38,
+                  fontWeight: FontWeight.w700,
+                  color: EC.muted.withValues(alpha: 0.15),
+                  letterSpacing: 2,
+                ),
               ),
-              Row(children: [
-                _dobField('DD', _day, 2),
-                _sep(),
-                _dobField('MM', _month, 2),
-                _sep(),
-                _dobField('YYYY', _year, 4),
-              ]),
+              Row(
+                children: [
+                  _dobField('DD', _day, 2),
+                  _sep(),
+                  _dobField('MM', _month, 2),
+                  _sep(),
+                  _dobField('YYYY', _year, 4),
+                ],
+              ),
             ],
           ),
           if (widget.dob != null) ...[
             const SizedBox(height: 16),
-            Builder(builder: (_) {
-              final now = DateTime.now();
-              final dob = widget.dob!;
-              int age = now.year - dob.year;
-              if (now.month < dob.month ||
-                  (now.month == dob.month && now.day < dob.day)) {
-                age--;
-              }
-              return Text('Age: $age',
-                  style: const TextStyle(fontSize: 13, color: EC.teal));
-            }),
+            Builder(
+              builder: (_) {
+                final now = DateTime.now();
+                final dob = widget.dob!;
+                int age = now.year - dob.year;
+                if (now.month < dob.month ||
+                    (now.month == dob.month && now.day < dob.day)) {
+                  age--;
+                }
+                return Text(
+                  'Age: $age',
+                  style: const TextStyle(fontSize: 13, color: EC.teal),
+                );
+              },
+            ),
           ],
         ],
       ),
@@ -1292,11 +1570,16 @@ class _OPageDobState extends State<OPageDob> {
   }
 
   Widget _sep() => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10),
-        child: Text('/',
-            style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w200, color: EC.muted)),
-      );
+    padding: EdgeInsets.symmetric(horizontal: 10),
+    child: Text(
+      '/',
+      style: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.w200,
+        color: EC.muted,
+      ),
+    ),
+  );
 
   Widget _dobField(String hint, TextEditingController ctrl, int max) =>
       Expanded(
@@ -1315,11 +1598,17 @@ class _OPageDobState extends State<OPageDob> {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 22, fontWeight: FontWeight.w600, color: EC.textPrimary),
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: EC.textPrimary,
+            ),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(
-                  fontSize: 14, color: EC.muted, fontWeight: FontWeight.w400),
+                fontSize: 14,
+                color: EC.muted,
+                fontWeight: FontWeight.w400,
+              ),
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
             ),
@@ -1340,8 +1629,11 @@ class _OPageDobState extends State<OPageDob> {
 class OPageGender extends StatelessWidget {
   final String? selected;
   final ValueChanged<String> onSelect;
-  const OPageGender(
-      {super.key, required this.selected, required this.onSelect});
+  const OPageGender({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1355,17 +1647,27 @@ class OPageGender extends StatelessWidget {
           const SizedBox(height: 8),
           const _Title('How do you\nidentify?'),
           const SizedBox(height: 6),
-          const _Sub('Used only to personalise your training load calculations.'),
+          const _Sub(
+            'Used only to personalise your training load calculations.',
+          ),
           const SizedBox(height: 32),
           _Row(
             leading: Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                  color: EC.surface2, borderRadius: BorderRadius.circular(10)),
+                color: EC.surface2,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Center(
-                child: Text('M',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700, color: EC.teal)),
+                child: Text(
+                  'M',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.teal,
+                  ),
+                ),
               ),
             ),
             label: 'Male',
@@ -1375,13 +1677,21 @@ class OPageGender extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                  color: EC.surface2, borderRadius: BorderRadius.circular(10)),
+                color: EC.surface2,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Center(
-                child: Text('F',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700, color: EC.violet)),
+                child: Text(
+                  'F',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.violet,
+                  ),
+                ),
               ),
             ),
             label: 'Female',
@@ -1391,15 +1701,21 @@ class OPageGender extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                  color: EC.surface2, borderRadius: BorderRadius.circular(10)),
+                color: EC.surface2,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Center(
-                child: Text('O',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: EC.textSecondary)),
+                child: Text(
+                  'O',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: EC.textSecondary,
+                  ),
+                ),
               ),
             ),
             label: 'Prefer not to say',
@@ -1438,7 +1754,9 @@ class OPageName extends StatelessWidget {
           const SizedBox(height: 8),
           const _Title("What should\nMax call you?"),
           const SizedBox(height: 6),
-          const _Sub("We'll use your name to make every interaction feel personal."),
+          const _Sub(
+            "We'll use your name to make every interaction feel personal.",
+          ),
           const SizedBox(height: 40),
           _field('First name', firstName, onFirstChanged, TextInputAction.done),
           const Spacer(),
@@ -1450,11 +1768,13 @@ class OPageName extends StatelessWidget {
                   children: [
                     const TextSpan(text: "Max will call you "),
                     TextSpan(
-                        text: firstName.trim(),
-                        style: const TextStyle(
-                            color: EC.teal,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15)),
+                      text: firstName.trim(),
+                      style: const TextStyle(
+                        color: EC.teal,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1465,8 +1785,12 @@ class OPageName extends StatelessWidget {
     );
   }
 
-  Widget _field(String hint, String value, ValueChanged<String> onChanged,
-      TextInputAction action) {
+  Widget _field(
+    String hint,
+    String value,
+    ValueChanged<String> onChanged,
+    TextInputAction action,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: EC.surface,
@@ -1480,13 +1804,18 @@ class OPageName extends StatelessWidget {
         textInputAction: action,
         textCapitalization: TextCapitalization.words,
         style: const TextStyle(
-            fontSize: 16, fontWeight: FontWeight.w500, color: EC.textPrimary),
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: EC.textPrimary,
+        ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(fontSize: 15, color: EC.muted),
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 16,
+          ),
         ),
         onChanged: onChanged,
       ),
@@ -1506,8 +1835,18 @@ class OPageRaceDay extends StatelessWidget {
 
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   const OPageRaceDay({
@@ -1536,7 +1875,9 @@ class OPageRaceDay extends StatelessWidget {
           const SizedBox(height: 8),
           const _Title('Which day is\nyour race?'),
           const SizedBox(height: 6),
-          const _Sub('Pick the day in your final training week. Sunday is the most common race day.'),
+          const _Sub(
+            'Pick the day in your final training week. Sunday is the most common race day.',
+          ),
           const SizedBox(height: 24),
           Expanded(
             child: ListView.separated(
@@ -1555,7 +1896,9 @@ class OPageRaceDay extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 15),
+                      horizontal: 18,
+                      vertical: 15,
+                    ),
                     decoration: BoxDecoration(
                       color: sel ? EC.surface2 : EC.surface,
                       borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -1564,43 +1907,60 @@ class OPageRaceDay extends StatelessWidget {
                         width: sel ? 1.5 : ET.borderWidth,
                       ),
                     ),
-                    child: Row(children: [
-                      SizedBox(
-                        width: 36,
-                        child: Text(_dayLabels[i],
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 36,
+                          child: Text(
+                            _dayLabels[i],
                             style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: EC.textPrimary)),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(dateLabel,
-                          style: const TextStyle(
-                              fontSize: 13, color: EC.textSecondary)),
-                      const Spacer(),
-                      if (i == 6)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: EC.teal.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: EC.textPrimary,
                             ),
-                            child: const Text('Most common',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: EC.teal,
-                                    fontWeight: FontWeight.w600)),
                           ),
                         ),
-                      if (sel)
-                        const Icon(Icons.check_circle_rounded,
-                            size: 20, color: EC.teal)
-                      else
-                        const SizedBox(width: 20),
-                    ]),
+                        const SizedBox(width: 10),
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: EC.textSecondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (i == 6)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: EC.teal.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Most common',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: EC.teal,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (sel)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 20,
+                            color: EC.teal,
+                          )
+                        else
+                          const SizedBox(width: 20),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -1630,8 +1990,18 @@ class OPageGeneratePlan extends StatelessWidget {
 
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   const OPageGeneratePlan({
@@ -1650,17 +2020,17 @@ class OPageGeneratePlan extends StatelessWidget {
   });
 
   String get _goalLabel => switch (goal) {
-        '10k'          => '10K',
-        'half_marathon' => 'Half Marathon',
-        'marathon'     => 'Marathon',
-        _              => '5K',
-      };
+    '10k' => '10K',
+    'half_marathon' => 'Half Marathon',
+    'marathon' => 'Marathon',
+    _ => '5K',
+  };
 
   String get _intensityLabel => switch (intensity) {
-        'structured'  => 'Improve steadily',
-        'performance' => 'Peak performance',
-        _             => 'Finish comfortably',
-      };
+    'structured' => 'Improve steadily',
+    'performance' => 'Peak performance',
+    _ => 'Finish comfortably',
+  };
 
   int get _weeks {
     if (planWeeks != null) return planWeeks!;
@@ -1676,7 +2046,9 @@ class OPageGeneratePlan extends StatelessWidget {
       return '${d.day} ${_months[d.month - 1]} ${d.year}';
     }
     final endOfPlan = startDate.add(Duration(days: _weeks * 7));
-    final lastWeekMonday = endOfPlan.subtract(Duration(days: endOfPlan.weekday - 1));
+    final lastWeekMonday = endOfPlan.subtract(
+      Duration(days: endOfPlan.weekday - 1),
+    );
     final d = lastWeekMonday.add(Duration(days: raceDayIndex));
     return '${d.day} ${_months[d.month - 1]} ${d.year}';
   }
@@ -1692,22 +2064,25 @@ class OPageGeneratePlan extends StatelessWidget {
           RichText(
             text: TextSpan(
               style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: EC.textPrimary,
-                  height: 1.25,
-                  letterSpacing: -0.3),
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: EC.textPrimary,
+                height: 1.25,
+                letterSpacing: -0.3,
+              ),
               children: [
                 const TextSpan(text: "Your plan is\nalmost ready, "),
                 TextSpan(
-                    text: '$firstName.',
-                    style: const TextStyle(color: EC.teal)),
+                  text: '$firstName.',
+                  style: const TextStyle(color: EC.teal),
+                ),
               ],
             ),
           ),
           const SizedBox(height: 6),
           const _Sub(
-              'Here\'s what Max has built for you. Review before we lock it in.'),
+            'Here\'s what Max has built for you. Review before we lock it in.',
+          ),
           const SizedBox(height: 24),
           Container(
             width: double.infinity,
@@ -1721,33 +2096,43 @@ class OPageGeneratePlan extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: EC.teal.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(_goalLabel,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: EC.teal,
-                          letterSpacing: 0.5)),
+                  child: Text(
+                    _goalLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: EC.teal,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
-                _summaryRow(Icons.calendar_today_rounded,
-                    '$_weeks weeks · ending $_endDateLabel'),
+                _summaryRow(
+                  Icons.calendar_today_rounded,
+                  '$_weeks weeks · ending $_endDateLabel',
+                ),
                 const SizedBox(height: 10),
                 _summaryRow(Icons.bolt_rounded, _intensityLabel),
                 const SizedBox(height: 10),
                 _summaryRow(Icons.analytics_outlined, 'vDOT $vdotScore'),
                 const SizedBox(height: 16),
-                const Text('TRAINING DAYS',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: EC.muted,
-                        letterSpacing: 1.2)),
+                const Text(
+                  'TRAINING DAYS',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: EC.muted,
+                    letterSpacing: 1.2,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: List.generate(7, (i) {
@@ -1755,19 +2140,25 @@ class OPageGeneratePlan extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: Container(
-                        width: 34, height: 34,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: active ? EC.teal : EC.surface2,
                           border: Border.all(
-                              color: active ? EC.teal : EC.border, width: 1),
+                            color: active ? EC.teal : EC.border,
+                            width: 1,
+                          ),
                         ),
                         child: Center(
-                          child: Text(_dayLabels[i],
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: active ? EC.black : EC.muted)),
+                          child: Text(
+                            _dayLabels[i],
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: active ? EC.black : EC.muted,
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -1790,10 +2181,13 @@ class OPageGeneratePlan extends StatelessWidget {
                 foregroundColor: EC.black,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(ET.radius)),
+                  borderRadius: BorderRadius.circular(ET.radius),
+                ),
               ),
-              child: const Text('Generate my plan',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              child: const Text(
+                'Generate my plan',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
             ),
           ),
           const SizedBox(height: 32),
@@ -1802,14 +2196,18 @@ class OPageGeneratePlan extends StatelessWidget {
     );
   }
 
-  Widget _summaryRow(IconData icon, String text) => Row(children: [
-        Icon(icon, size: 16, color: EC.teal),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(text,
-              style: const TextStyle(fontSize: 14, color: EC.textSecondary)),
+  Widget _summaryRow(IconData icon, String text) => Row(
+    children: [
+      Icon(icon, size: 16, color: EC.teal),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 14, color: EC.textSecondary),
         ),
-      ]);
+      ),
+    ],
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1847,15 +2245,19 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
   void initState() {
     super.initState();
     _ring = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 3600))
-      ..forward();
+      vsync: this,
+      duration: const Duration(milliseconds: 3600),
+    )..forward();
 
-    Future.delayed(const Duration(milliseconds: 700),
-        () { if (mounted) setState(() => _stage = 1); });
-    Future.delayed(const Duration(milliseconds: 1600),
-        () { if (mounted) setState(() => _stage = 2); });
-    Future.delayed(const Duration(milliseconds: 2500),
-        () { if (mounted) setState(() => _stage = 3); });
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _stage = 1);
+    });
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _stage = 2);
+    });
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted) setState(() => _stage = 3);
+    });
     Future.delayed(const Duration(milliseconds: 3400), () async {
       if (mounted) setState(() => _stage = 4);
       await widget.onComplete();
@@ -1879,7 +2281,8 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
         children: [
           SizedBox(height: topPad),
           SizedBox(
-            width: 110, height: 110,
+            width: 110,
+            height: 110,
             child: AnimatedBuilder(
               animation: _ring,
               builder: (_, __) => Stack(
@@ -1892,9 +2295,10 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
                   Text(
                     '${(_ring.value * 100).round()}%',
                     style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: EC.textPrimary),
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: EC.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -1909,34 +2313,42 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
               opacity: _stage >= i ? 1.0 : 0.2,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: Row(children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: 24, height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: done
-                          ? EC.teal
-                          : active ? EC.surface2 : EC.surface,
-                      border: Border.all(
+                child: Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: done
                             ? EC.teal
                             : active
-                                ? EC.teal.withOpacity(0.5)
-                                : EC.border,
-                        width: 1.5,
+                            ? EC.surface2
+                            : EC.surface,
+                        border: Border.all(
+                          color: done
+                              ? EC.teal
+                              : active
+                              ? EC.teal.withOpacity(0.5)
+                              : EC.border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: done
+                          ? const Icon(Icons.check, size: 13, color: EC.black)
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _steps[i],
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: done ? EC.textPrimary : EC.textSecondary,
                       ),
                     ),
-                    child: done
-                        ? const Icon(Icons.check, size: 13, color: EC.black)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(_steps[i],
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: done ? EC.textPrimary : EC.textSecondary)),
-                ]),
+                  ],
+                ),
               ),
             );
           }),
@@ -1955,19 +2367,24 @@ class _RingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 6;
     canvas.drawCircle(
-        center, radius,
-        Paint()
-          ..color = EC.surface2
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 6);
+      center,
+      radius,
+      Paint()
+        ..color = EC.surface2
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6,
+    );
     canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -pi / 2, 2 * pi * progress, false,
-        Paint()
-          ..color = EC.teal
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 6
-          ..strokeCap = StrokeCap.round);
+      Rect.fromCircle(center: center, radius: radius),
+      -pi / 2,
+      2 * pi * progress,
+      false,
+      Paint()
+        ..color = EC.teal
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   @override
@@ -1981,14 +2398,14 @@ class _RingPainter extends CustomPainter {
 class OPageWeeklyMileage extends StatefulWidget {
   final double weeklyKm;
   final String? goalRace;
-  final int runsPerWeek;           // ← NEW: used to gate slider bounds
+  final int runsPerWeek; // ← NEW: used to gate slider bounds
   final ValueChanged<double> onChanged;
 
   const OPageWeeklyMileage({
     super.key,
     required this.weeklyKm,
     required this.onChanged,
-    required this.runsPerWeek,     // ← NEW: required
+    required this.runsPerWeek, // ← NEW: required
     this.goalRace,
   });
 
@@ -2002,17 +2419,15 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
 
   /// Get range from ArchetypeTable based on race + days.
   WeeklyKmRange get _range => WeeklyKmRange.forRaceAndDays(
-        race: widget.goalRace ?? '10k',
-        days: widget.runsPerWeek,
-      );
+    race: widget.goalRace ?? '10k',
+    days: widget.runsPerWeek,
+  );
 
   @override
   void initState() {
     super.initState();
     // Prefill with default from table if user hasn't set a value yet.
-    final initial = widget.weeklyKm > 0
-        ? widget.weeklyKm
-        : _range.defaultKm;
+    final initial = widget.weeklyKm > 0 ? widget.weeklyKm : _range.defaultKm;
     _ctrl = TextEditingController(text: initial.round().toString());
     if (widget.weeklyKm == 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2046,9 +2461,7 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
 
   void _onTyped(String raw) {
     final parsed = double.tryParse(raw);
-    if (parsed != null &&
-        parsed >= _range.min &&
-        parsed <= _range.max) {
+    if (parsed != null && parsed >= _range.min && parsed <= _range.max) {
       widget.onChanged(parsed);
     }
   }
@@ -2056,15 +2469,17 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
   String _hint(double km) {
     if (km < _range.min) {
       final raceName = switch (widget.goalRace) {
-        '10k'           => '10K',
+        '10k' => '10K',
         'half_marathon' => 'half marathon',
-        'marathon'      => 'marathon',
-        _               => '5K',
+        'marathon' => 'marathon',
+        _ => '5K',
       };
       return 'Below the recommended base for a $raceName with ${widget.runsPerWeek} days';
     }
-    if (km > _range.max * 0.9) return 'High volume — Max will manage load carefully';
-    if (km <= 25) return 'Just getting started — Max will build you up gradually';
+    if (km > _range.max * 0.9)
+      return 'High volume — Max will manage load carefully';
+    if (km <= 25)
+      return 'Just getting started — Max will build you up gradually';
     if (km <= 40) return 'Building a base — good foundation to work from';
     if (km <= 60) return 'Solid volume — Max can push with real structure';
     return 'High mileage — Max will train you seriously';
@@ -2088,7 +2503,9 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
           const SizedBox(height: 8),
           const _Title('How far do you\nrun each week?'),
           const SizedBox(height: 6),
-          const _Sub('Average over the last 2–4 weeks. Be honest — not your best week.'),
+          const _Sub(
+            'Average over the last 2–4 weeks. Be honest — not your best week.',
+          ),
           const SizedBox(height: 8),
           // Range hint
           Text(
@@ -2112,7 +2529,9 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
                     border: Border.all(
                       color: belowMin
                           ? EC.amber
-                          : hasValue ? EC.teal : EC.border,
+                          : hasValue
+                          ? EC.teal
+                          : EC.border,
                       width: hasValue ? 1.5 : ET.borderWidth,
                     ),
                   ),
@@ -2174,8 +2593,10 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
           ),
           const SizedBox(height: 8),
           const Center(
-            child: Text('per week',
-                style: TextStyle(fontSize: 12, color: EC.muted)),
+            child: Text(
+              'per week',
+              style: TextStyle(fontSize: 12, color: EC.muted),
+            ),
           ),
           const SizedBox(height: 32),
           AnimatedSwitcher(
@@ -2185,7 +2606,9 @@ class _OPageWeeklyMileageState extends State<OPageWeeklyMileage> {
                     key: ValueKey(_hint(km)),
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: belowMin
                           ? EC.amber.withOpacity(0.07)
@@ -2244,7 +2667,8 @@ class _StepButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        width: 52, height: 52,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
           color: enabled ? EC.surface2 : EC.surface,
           borderRadius: BorderRadius.circular(14),
@@ -2253,11 +2677,7 @@ class _StepButton extends StatelessWidget {
             width: ET.borderWidth,
           ),
         ),
-        child: Icon(
-          icon,
-          size: 24,
-          color: enabled ? EC.textPrimary : EC.muted,
-        ),
+        child: Icon(icon, size: 24, color: enabled ? EC.textPrimary : EC.muted),
       ),
     );
   }
@@ -2274,23 +2694,39 @@ class _RaceProjection {
   final String experienceLevel;
 
   static const _distances = {
-    '5k':            5.0,
-    '10k':           10.0,
+    '5k': 5.0,
+    '10k': 10.0,
     'half_marathon': 21.0975,
-    'marathon':      42.195,
+    'marathon': 42.195,
   };
 
   static const _vdotGainPer12Weeks = {
-    'beginner':     3.0,
+    'beginner': 3.0,
     'intermediate': 2.0,
-    'advanced':     1.0,
+    'advanced': 1.0,
   };
 
   static const _vdotPaceTable = {
-    30: 440.0, 32: 422.0, 34: 405.0, 36: 390.0, 38: 375.0,
-    40: 361.0, 42: 348.0, 44: 336.0, 46: 325.0, 48: 314.0,
-    50: 304.0, 52: 295.0, 54: 286.0, 56: 278.0, 58: 270.0,
-    60: 263.0, 62: 256.0, 64: 249.0, 66: 243.0, 68: 237.0,
+    30: 440.0,
+    32: 422.0,
+    34: 405.0,
+    36: 390.0,
+    38: 375.0,
+    40: 361.0,
+    42: 348.0,
+    44: 336.0,
+    46: 325.0,
+    48: 314.0,
+    50: 304.0,
+    52: 295.0,
+    54: 286.0,
+    56: 278.0,
+    58: 270.0,
+    60: 263.0,
+    62: 256.0,
+    64: 249.0,
+    66: 243.0,
+    68: 237.0,
     70: 232.0,
   };
 
@@ -2320,8 +2756,11 @@ class _RaceProjection {
   }
 
   int get _currentVdot {
-    final fiveKEquivSec =
-        _riegel(currentTimeSec.toDouble(), paceDistanceKm, 5.0);
+    final fiveKEquivSec = _riegel(
+      currentTimeSec.toDouble(),
+      paceDistanceKm,
+      5.0,
+    );
     final paceSec = fiveKEquivSec / 5.0;
     final keys = _vdotPaceTable.keys.toList()..sort();
     for (int i = 0; i < keys.length - 1; i++) {
@@ -2368,7 +2807,7 @@ class OPageWelcome extends StatelessWidget {
   final double paceDistanceKm;
   final VoidCallback onContinue;
 
-  static const _distanceKeys   = ['5k', '10k', 'half_marathon', 'marathon'];
+  static const _distanceKeys = ['5k', '10k', 'half_marathon', 'marathon'];
   static const _distanceLabels = ['5K', '10K', '21.1', '42.2'];
   static const _distanceColors = [EC.teal, EC.violet, EC.orange, EC.red];
 
@@ -2385,18 +2824,18 @@ class OPageWelcome extends StatelessWidget {
   });
 
   String get _goalLabel => switch (goal) {
-        '10k'           => '10K',
-        'half_marathon' => 'Half Marathon',
-        'marathon'      => 'Marathon',
-        _               => '5K',
-      };
+    '10k' => '10K',
+    'half_marathon' => 'Half Marathon',
+    'marathon' => 'Marathon',
+    _ => '5K',
+  };
 
   String get _goalDistKey => switch (goal) {
-        '10k'           => '10k',
-        'half_marathon' => 'half_marathon',
-        'marathon'      => 'marathon',
-        _               => '5k',
-      };
+    '10k' => '10k',
+    'half_marathon' => 'half_marathon',
+    'marathon' => 'marathon',
+    _ => '5k',
+  };
 
   String _fmt(int totalSec) {
     if (totalSec <= 0) return '--:--';
@@ -2435,7 +2874,7 @@ class OPageWelcome extends StatelessWidget {
       experienceLevel: experienceLevel,
     );
 
-    final goalCurrent   = proj.currentSec(_goalDistKey);
+    final goalCurrent = proj.currentSec(_goalDistKey);
     final goalProjected = proj.projectedSec(_goalDistKey);
 
     return SingleChildScrollView(
@@ -2447,16 +2886,18 @@ class OPageWelcome extends StatelessWidget {
           RichText(
             text: TextSpan(
               style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: EC.textPrimary,
-                  height: 1.2,
-                  letterSpacing: -0.5),
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                color: EC.textPrimary,
+                height: 1.2,
+                letterSpacing: -0.5,
+              ),
               children: [
                 const TextSpan(text: "Welcome,\n"),
                 TextSpan(
-                    text: '$firstName.',
-                    style: const TextStyle(color: EC.teal)),
+                  text: '$firstName.',
+                  style: const TextStyle(color: EC.teal),
+                ),
               ],
             ),
           ),
@@ -2464,7 +2905,10 @@ class OPageWelcome extends StatelessWidget {
           Text(
             "Your $_goalLabel plan is locked in.\nMax is ready when you are.",
             style: const TextStyle(
-                fontSize: 15, color: EC.textSecondary, height: 1.6),
+              fontSize: 15,
+              color: EC.textSecondary,
+              height: 1.6,
+            ),
           ),
           const SizedBox(height: 32),
           Container(
@@ -2478,29 +2922,39 @@ class OPageWelcome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: EC.teal.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(_goalLabel,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: EC.teal.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _goalLabel,
                         style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: EC.teal,
-                            letterSpacing: 0.5)),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('PROJECTED TARGET',
-                      style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: EC.muted,
-                          letterSpacing: 1.1)),
-                ]),
+                          color: EC.teal,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'PROJECTED TARGET',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: EC.muted,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -2508,56 +2962,77 @@ class OPageWelcome extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('NOW',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: EC.muted,
-                                letterSpacing: 1)),
+                        Text(
+                          'NOW',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: EC.muted,
+                            letterSpacing: 1,
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text(_fmt(goalCurrent),
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: EC.textSecondary)),
+                        Text(
+                          _fmt(goalCurrent),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: EC.textSecondary,
+                          ),
+                        ),
                       ],
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(children: [
-                        Container(
+                      child: Row(
+                        children: [
+                          Container(
                             width: 28,
                             height: 1.5,
-                            color: EC.teal.withOpacity(0.4)),
-                        const Icon(Icons.directions_run_rounded,
-                            size: 18, color: EC.teal),
-                        Container(
+                            color: EC.teal.withOpacity(0.4),
+                          ),
+                          const Icon(
+                            Icons.directions_run_rounded,
+                            size: 18,
+                            color: EC.teal,
+                          ),
+                          Container(
                             width: 28,
                             height: 1.5,
-                            color: EC.teal.withOpacity(0.4)),
-                      ]),
+                            color: EC.teal.withOpacity(0.4),
+                          ),
+                        ],
+                      ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('IN $planWeeks WEEKS',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: EC.muted,
-                                letterSpacing: 1)),
+                        Text(
+                          'IN $planWeeks WEEKS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: EC.muted,
+                            letterSpacing: 1,
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text(_fmt(goalProjected),
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: EC.textPrimary)),
+                        Text(
+                          _fmt(goalProjected),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: EC.textPrimary,
+                          ),
+                        ),
                       ],
                     ),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: EC.teal.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8),
@@ -2565,9 +3040,10 @@ class OPageWelcome extends StatelessWidget {
                       child: Text(
                         _fmtDelta(proj.deltaSec(_goalDistKey)),
                         style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: EC.teal),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: EC.teal,
+                        ),
                       ),
                     ),
                   ],
@@ -2587,110 +3063,128 @@ class OPageWelcome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  const SizedBox(width: 52),
-                  Expanded(
-                    child: Text('Current',
+                Row(
+                  children: [
+                    const SizedBox(width: 52),
+                    Expanded(
+                      child: Text(
+                        'Current',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: EC.muted,
-                            letterSpacing: 0.5)),
-                  ),
-                  const SizedBox(width: 32),
-                  Expanded(
-                    child: Text('In $planWeeks weeks',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: EC.muted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 32),
+                    Expanded(
+                      child: Text(
+                        'In $planWeeks weeks',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: EC.teal,
-                            letterSpacing: 0.5)),
-                  ),
-                ]),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: EC.teal,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 14),
                 const Divider(color: EC.border, height: 1),
                 const SizedBox(height: 14),
                 ...List.generate(_distanceKeys.length, (i) {
-                  final key     = _distanceKeys[i];
-                  final label   = _distanceLabels[i];
-                  final color   = _distanceColors[i];
-                  final curSec  = proj.currentSec(key);
+                  final key = _distanceKeys[i];
+                  final label = _distanceLabels[i];
+                  final color = _distanceColors[i];
+                  final curSec = proj.currentSec(key);
                   final projSec = proj.projectedSec(key);
-                  final delta   = proj.deltaSec(key);
-                  final isGoal  = key == _goalDistKey;
+                  final delta = proj.deltaSec(key);
+                  final isGoal = key == _goalDistKey;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: Row(children: [
-                      Container(
-                        width: 44, height: 28,
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Center(
-                          child: Text(label,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              label,
                               style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: color)),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _fmt(curSec),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _fmt(curSec),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: isGoal
-                                  ? EC.textPrimary
-                                  : EC.textSecondary),
+                              color: isGoal ? EC.textPrimary : EC.textSecondary,
+                            ),
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: 32,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _dot(EC.muted),
-                            const SizedBox(width: 2),
-                            const Icon(Icons.directions_run_rounded,
-                                size: 12, color: EC.teal),
-                            const SizedBox(width: 2),
-                            _dot(EC.muted),
-                          ],
+                        SizedBox(
+                          width: 32,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _dot(EC.muted),
+                              const SizedBox(width: 2),
+                              const Icon(
+                                Icons.directions_run_rounded,
+                                size: 12,
+                                color: EC.teal,
+                              ),
+                              const SizedBox(width: 2),
+                              _dot(EC.muted),
+                            ],
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              _fmt(projSec),
-                              style: TextStyle(
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                _fmt(projSec),
+                                style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: isGoal
                                       ? EC.textPrimary
-                                      : EC.textSecondary),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _fmtDelta(delta),
-                              style: const TextStyle(
+                                      : EC.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _fmtDelta(delta),
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: EC.teal),
-                            ),
-                          ],
+                                  color: EC.teal,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ]),
+                      ],
+                    ),
                   );
                 }),
                 const Divider(color: EC.border, height: 1),
@@ -2698,8 +3192,11 @@ class OPageWelcome extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 13, color: EC.muted),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 13,
+                      color: EC.muted,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -2707,7 +3204,10 @@ class OPageWelcome extends StatelessWidget {
                         'Times are calculated using your vDOT $vdot '
                         'and Riegel race equivalence formula.',
                         style: const TextStyle(
-                            fontSize: 11, color: EC.muted, height: 1.5),
+                          fontSize: 11,
+                          color: EC.muted,
+                          height: 1.5,
+                        ),
                       ),
                     ),
                   ],
@@ -2726,10 +3226,13 @@ class OPageWelcome extends StatelessWidget {
                 foregroundColor: EC.black,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(ET.radius)),
+                  borderRadius: BorderRadius.circular(ET.radius),
+                ),
               ),
-              child: const Text("Let's get to work",
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              child: const Text(
+                "Let's get to work",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
             ),
           ),
           const SizedBox(height: 32),
@@ -2739,7 +3242,8 @@ class OPageWelcome extends StatelessWidget {
   }
 
   Widget _dot(Color c) => Container(
-        width: 3, height: 3,
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      );
+    width: 3,
+    height: 3,
+    decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+  );
 }

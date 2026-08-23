@@ -14,7 +14,6 @@ import '../utils/workout_type_style.dart';
 import '../widgets/achievement_tile.dart';
 import 'milestones_screen.dart';
 
-
 class YouScreen extends StatefulWidget {
   const YouScreen({super.key});
 
@@ -37,8 +36,6 @@ class _YouScreenState extends State<YouScreen>
   late TabController _tabController;
   DateTime _selectedWeekStart = DateTime.now();
   bool _useMiles = false;
-
-
 
   @override
   void initState() {
@@ -74,40 +71,46 @@ class _YouScreenState extends State<YouScreen>
       final records = await DatabaseService.instance.getAllRuns();
 
       List<Run> prRuns = runs
-          .map((r) => Run(
-                distanceKm: r.distance,
-                durationSeconds: _paceToSeconds(r.averagePace, r.distance),
-                date: r.date,
-              ))
+          .map(
+            (r) => Run(
+              distanceKm: r.distance,
+              durationSeconds: _paceToSeconds(r.averagePace, r.distance),
+              date: r.date,
+            ),
+          )
           .toList();
 
       List<achieve.RunData> achieveRunData = runs
-          .map((r) => achieve.RunData(
-                distance: r.distance,
-                pace: r.averagePace,
-                date: r.date,
-              ))
+          .map(
+            (r) => achieve.RunData(
+              distance: r.distance,
+              pace: r.averagePace,
+              date: r.date,
+            ),
+          )
           .toList();
 
       PREngine prEngine = PREngine(prRuns);
       PRResults prResults = prEngine.calculate();
-      achieve.AchievementEngine achieveEngine =
-          achieve.AchievementEngine(achieveRunData);
-      final List<achieve.Achievement> calculated =
-          achieveEngine.checkAchievements();
+      achieve.AchievementEngine achieveEngine = achieve.AchievementEngine(
+        achieveRunData,
+      );
+      final List<achieve.Achievement> calculated = achieveEngine
+          .checkAchievements();
 
       // Persist any newly earned achievements (INSERT OR IGNORE keeps dates frozen).
       final List<String> newlyUnlocked = [];
       for (final a in calculated) {
         final isNew = await DatabaseService.instance.saveAchievementIfNew(
-          a.type.name, a.unlockedAt, a.tier,
+          a.type.name,
+          a.unlockedAt,
+          a.tier,
         );
         if (isNew) newlyUnlocked.add(a.title);
       }
 
       // Merge calculated achievements with frozen unlock dates from DB.
-      final frozenDates =
-          await DatabaseService.instance.getAchievementDates();
+      final frozenDates = await DatabaseService.instance.getAchievementDates();
       final List<achieve.Achievement> achievements = calculated.map((a) {
         final frozen = frozenDates[a.type.name];
         if (frozen == null) return a;
@@ -177,9 +180,9 @@ class _YouScreenState extends State<YouScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    if (difference.inDays == 0)      return 'Today';
-    if (difference.inDays == 1)      return 'Yesterday';
-    if (difference.inDays < 7)       return '${difference.inDays} days ago';
+    if (difference.inDays == 0) return 'Today';
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
     return '${date.day}/${date.month}/${date.year}';
   }
 
@@ -211,7 +214,7 @@ class _YouScreenState extends State<YouScreen>
             ),
             onPressed: _navigateToSettings,
             tooltip: 'Settings',
-          )
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -236,34 +239,26 @@ class _YouScreenState extends State<YouScreen>
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: c.textTertiary),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage,
-                        style: TextStyle(
-                            color: c.textSecondary, fontSize: 14),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: loadData,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 48, color: c.textTertiary),
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorMessage,
+                    style: TextStyle(color: c.textSecondary, fontSize: 14),
+                    textAlign: TextAlign.center,
                   ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildSummaryTab(),
-                    _buildHistoryTab(),
-                  ],
-                ),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: loadData, child: const Text('Retry')),
+                ],
+              ),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: [_buildSummaryTab(), _buildHistoryTab()],
+            ),
     );
   }
 
@@ -359,10 +354,11 @@ class _YouScreenState extends State<YouScreen>
         '${_selectedWeekStart.day}–${weekEnd.day} ${_getMonthName(weekEnd.month)}';
 
     List<dynamic> weekRuns = _getRunsInWeek(_selectedWeekStart);
-    double totalDistance =
-        weekRuns.fold(0.0, (sum, run) => sum + run.distance);
+    double totalDistance = weekRuns.fold(0.0, (sum, run) => sum + run.distance);
     int totalSeconds = weekRuns.fold(
-        0, (sum, run) => sum + _paceToSeconds(run.averagePace, run.distance));
+      0,
+      (sum, run) => sum + _paceToSeconds(run.averagePace, run.distance),
+    );
     String totalTime = _formatDuration(totalSeconds);
     int totalRuns = weekRuns.length;
 
@@ -394,20 +390,28 @@ class _YouScreenState extends State<YouScreen>
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.chevron_left,
-                        color: c.textTertiary, size: 20),
+                    icon: Icon(
+                      Icons.chevron_left,
+                      color: c.textTertiary,
+                      size: 20,
+                    ),
                     onPressed: () {
-                      DateTime prevWeek = _selectedWeekStart
-                          .subtract(const Duration(days: 7));
-                      if (prevWeek.isBefore(DateTime.now()
-                          .subtract(const Duration(days: 365)))) return;
+                      DateTime prevWeek = _selectedWeekStart.subtract(
+                        const Duration(days: 7),
+                      );
+                      if (prevWeek.isBefore(
+                        DateTime.now().subtract(const Duration(days: 365)),
+                      ))
+                        return;
                       setState(() {
                         _selectedWeekStart = prevWeek;
                       });
                     },
                     padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
                   ),
                   const SizedBox(width: 4),
                   InkWell(
@@ -429,16 +433,15 @@ class _YouScreenState extends State<YouScreen>
                   IconButton(
                     icon: Icon(
                       Icons.chevron_right,
-                      color: isCurrentWeek
-                          ? c.textFaint
-                          : c.textTertiary,
+                      color: isCurrentWeek ? c.textFaint : c.textTertiary,
                       size: 20,
                     ),
                     onPressed: isCurrentWeek
                         ? null
                         : () {
-                            DateTime nextWeek = _selectedWeekStart
-                                .add(const Duration(days: 7));
+                            DateTime nextWeek = _selectedWeekStart.add(
+                              const Duration(days: 7),
+                            );
                             if (nextWeek.isAfter(DateTime.now())) return;
                             setState(() {
                               _selectedWeekStart = nextWeek;
@@ -468,13 +471,18 @@ class _YouScreenState extends State<YouScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            UnitUtils.displayDistance(totalDistance, _useMiles).toStringAsFixed(1),
+                            UnitUtils.displayDistance(
+                              totalDistance,
+                              _useMiles,
+                            ).toStringAsFixed(1),
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w600,
                               color: c.textPrimary,
                               letterSpacing: -0.5,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
                             ),
                           ),
                           Padding(
@@ -581,8 +589,18 @@ class _YouScreenState extends State<YouScreen>
 
   String _getMonthName(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return months[month - 1];
   }
@@ -615,8 +633,9 @@ class _YouScreenState extends State<YouScreen>
             final int index = entry.key;
             final pr = entry.value;
             return Container(
-              margin:
-                  EdgeInsets.only(bottom: index < entries.length - 1 ? 12 : 0),
+              margin: EdgeInsets.only(
+                bottom: index < entries.length - 1 ? 12 : 0,
+              ),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: c.background,
@@ -642,10 +661,7 @@ class _YouScreenState extends State<YouScreen>
                         const SizedBox(height: 2),
                         Text(
                           'Set ${_formatDate(pr.setOn!)}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: c.textFaint,
-                          ),
+                          style: TextStyle(fontSize: 10, color: c.textFaint),
                         ),
                       ],
                     ],
@@ -666,10 +682,7 @@ class _YouScreenState extends State<YouScreen>
                       if (pr.unit != null)
                         Text(
                           pr.unit!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: c.textTertiary,
-                          ),
+                          style: TextStyle(fontSize: 10, color: c.textTertiary),
                         ),
                     ],
                   ),
@@ -716,7 +729,8 @@ class _YouScreenState extends State<YouScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => MilestonesScreen(achievements: _achievements),
+                      builder: (_) =>
+                          MilestonesScreen(achievements: _achievements),
                     ),
                   ),
                   child: Row(
@@ -741,7 +755,9 @@ class _YouScreenState extends State<YouScreen>
             final index = entry.key;
             return AchievementTile(
               achievement: entry.value,
-              margin: EdgeInsets.only(bottom: index < preview.length - 1 ? 12 : 0),
+              margin: EdgeInsets.only(
+                bottom: index < preview.length - 1 ? 12 : 0,
+              ),
             );
           }),
         ],
@@ -767,15 +783,18 @@ class _YouScreenState extends State<YouScreen>
     if (avgRpe == null) {
       statusColor = c.textTertiary;
       statusLabel = 'No data';
-      statusMessage = 'Complete a few runs with RPE feedback to see your training status.';
+      statusMessage =
+          'Complete a few runs with RPE feedback to see your training status.';
     } else if (avgRpe >= 7.0) {
       statusColor = const Color(0xFFD32F2F);
       statusLabel = 'High effort';
-      statusMessage = 'Recent runs have felt hard. Consider an easy day or rest.';
+      statusMessage =
+          'Recent runs have felt hard. Consider an easy day or rest.';
     } else if (avgRpe >= 5.5) {
       statusColor = const Color(0xFFF57C00);
       statusLabel = 'Moderate';
-      statusMessage = 'Effort is building. Monitor how you feel before pushing harder.';
+      statusMessage =
+          'Effort is building. Monitor how you feel before pushing harder.';
     } else {
       statusColor = const Color(0xFF388E3C);
       statusLabel = 'On track';
@@ -852,10 +871,7 @@ class _YouScreenState extends State<YouScreen>
                   const SizedBox(height: 8),
                   Text(
                     'Avg RPE (last ${rpeValues.length} runs): ${avgRpe.toStringAsFixed(1)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textTertiary,
-                    ),
+                    style: TextStyle(fontSize: 12, color: c.textTertiary),
                   ),
                 ],
               ],
@@ -911,7 +927,9 @@ class _YouScreenState extends State<YouScreen>
                       Text(
                         'Your first run will show here',
                         style: TextStyle(
-                            fontSize: 13, color: context.colors.textTertiary),
+                          fontSize: 13,
+                          color: context.colors.textTertiary,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -924,11 +942,13 @@ class _YouScreenState extends State<YouScreen>
               itemCount: _runHistory.length,
               itemBuilder: (context, index) {
                 final run = _runHistory[index];
-                final record =
-                    index < _runRecords.length ? _runRecords[index] : null;
+                final record = index < _runRecords.length
+                    ? _runRecords[index]
+                    : null;
                 return Padding(
                   padding: EdgeInsets.only(
-                      bottom: index < _runHistory.length - 1 ? 12 : 0),
+                    bottom: index < _runHistory.length - 1 ? 12 : 0,
+                  ),
                   child: _buildRunHistoryCard(run, record: record),
                 );
               },
@@ -947,126 +967,129 @@ class _YouScreenState extends State<YouScreen>
       button: true,
       label: '$typeLabel run',
       child: GestureDetector(
-      onTap: () => _openRunDetail(run, record: record),
-      child: Container(
-        decoration: BoxDecoration(
-          color: c.surface,
-          border: Border.all(color: c.border),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: typeColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    typeLabel.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: typeColor,
-                      letterSpacing: 0.6,
+        onTap: () => _openRunDetail(run, record: record),
+        child: Container(
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border.all(color: c.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
                     ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatDate(run.date),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: c.textTertiary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${UnitUtils.displayDistance(run.distance, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: c.textPrimary,
-                      letterSpacing: -0.3,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                    decoration: BoxDecoration(
+                      color: typeColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      UnitUtils.formatPaceString(run.averagePace, _useMiles),
+                    child: Text(
+                      typeLabel.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: typeColor,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatDate(run.date),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: c.textTertiary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${UnitUtils.displayDistance(run.distance, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
+                      style: TextStyle(
+                        fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: c.textPrimary,
-                        letterSpacing: -0.2,
+                        letterSpacing: -0.3,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'PER ${_useMiles ? 'MI' : 'KM'}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: c.textTertiary,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        UnitUtils.formatPaceString(run.averagePace, _useMiles),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: c.textPrimary,
+                          letterSpacing: -0.2,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'PER ${_useMiles ? 'MI' : 'KM'}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: c.textTertiary,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (durationSeconds != null || run.rpe != null) ...[
+                const SizedBox(height: 10),
+                Divider(color: c.divider, height: 1, thickness: 1),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (durationSeconds != null) ...[
+                      Icon(Icons.schedule, size: 13, color: c.textTertiary),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDuration(durationSeconds),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: c.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    if (durationSeconds != null && run.rpe != null)
+                      const SizedBox(width: 14),
+                    if (run.rpe != null) ...[
+                      Icon(Icons.speed, size: 13, color: c.textTertiary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'RPE ${run.rpe}/10',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: c.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
-            ),
-            if (durationSeconds != null || run.rpe != null) ...[
-              const SizedBox(height: 10),
-              Divider(color: c.divider, height: 1, thickness: 1),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  if (durationSeconds != null) ...[
-                    Icon(Icons.schedule, size: 13, color: c.textTertiary),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatDuration(durationSeconds),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: c.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                  if (durationSeconds != null && run.rpe != null)
-                    const SizedBox(width: 14),
-                  if (run.rpe != null) ...[
-                    Icon(Icons.speed, size: 13, color: c.textTertiary),
-                    const SizedBox(width: 4),
-                    Text(
-                      'RPE ${run.rpe}/10',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: c.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
             ],
-          ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1077,8 +1100,11 @@ class _YouScreenState extends State<YouScreen>
 
   DateTime _getWeekStart(DateTime date) {
     int daysFromMonday = date.weekday - 1;
-    return DateTime(date.year, date.month, date.day)
-        .subtract(Duration(days: daysFromMonday));
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(Duration(days: daysFromMonday));
   }
 
   bool _isSameWeek(DateTime date1, DateTime date2) {
@@ -1095,10 +1121,12 @@ class _YouScreenState extends State<YouScreen>
   /// `_selectedWeekStart`, oldest first.
   List<double> _getWeeklyTotals(int weeks) {
     return List.generate(weeks, (i) {
-      final weekStart =
-          _selectedWeekStart.subtract(Duration(days: 7 * (weeks - 1 - i)));
-      return _getRunsInWeek(weekStart)
-          .fold(0.0, (sum, run) => sum + run.distance);
+      final weekStart = _selectedWeekStart.subtract(
+        Duration(days: 7 * (weeks - 1 - i)),
+      );
+      return _getRunsInWeek(
+        weekStart,
+      ).fold(0.0, (sum, run) => sum + run.distance);
     });
   }
 
@@ -1107,8 +1135,7 @@ class _YouScreenState extends State<YouScreen>
     final weeklyTotals = weeklyTotalsKm
         .map((km) => UnitUtils.displayDistance(km, _useMiles))
         .toList();
-    final maxDistance =
-        weeklyTotals.fold(0.0, (m, v) => v > m ? v : m);
+    final maxDistance = weeklyTotals.fold(0.0, (m, v) => v > m ? v : m);
     final maxY = maxDistance <= 0 ? 10.0 : maxDistance * 1.2;
     final weeks = weeklyTotals.length;
 
@@ -1134,10 +1161,12 @@ class _YouScreenState extends State<YouScreen>
                 FlLine(color: c.divider, strokeWidth: 1),
           ),
           titlesData: FlTitlesData(
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             rightTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -1163,8 +1192,9 @@ class _YouScreenState extends State<YouScreen>
                     return const SizedBox.shrink();
                   }
                   final month = weekStartFor(index).month;
-                  final prevMonth =
-                      index == 0 ? null : weekStartFor(index - 1).month;
+                  final prevMonth = index == 0
+                      ? null
+                      : weekStartFor(index - 1).month;
                   if (month == prevMonth) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 6),

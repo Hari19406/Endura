@@ -47,13 +47,13 @@ class SavedRun {
   }
 
   Map<String, dynamic> toJson() => {
-        'distance': distance,
-        'averagePace': averagePace,
-        'date': date.toIso8601String(),
-        'gpsPoints': gpsPoints,
-        'rpe': rpe,
-        'workoutType': workoutType,
-      };
+    'distance': distance,
+    'averagePace': averagePace,
+    'date': date.toIso8601String(),
+    'gpsPoints': gpsPoints,
+    'rpe': rpe,
+    'workoutType': workoutType,
+  };
 }
 
 // ============================================================================

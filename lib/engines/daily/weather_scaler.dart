@@ -45,7 +45,9 @@ class WeatherScaler {
       return WeatherScaleResult(workout: workout);
     }
 
-    final adjustedBlocks = workout.blocks.map((b) => _adjustBlock(b, delta)).toList();
+    final adjustedBlocks = workout.blocks
+        .map((b) => _adjustBlock(b, delta))
+        .toList();
     final note = _buildNote(weather, delta);
 
     return WeatherScaleResult(

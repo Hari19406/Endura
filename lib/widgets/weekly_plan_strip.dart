@@ -47,10 +47,7 @@ class WeeklyPlanStrip extends StatelessWidget {
               ),
               Text(
                 _weekLabel(plan.weekStartDate),
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF999999),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
               ),
             ],
           ),
@@ -91,8 +88,18 @@ class WeeklyPlanStrip extends StatelessWidget {
 
   static String _monthAbbr(int m) {
     const names = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return names[m - 1];
   }
@@ -195,9 +202,7 @@ class _DayCell extends StatelessWidget {
           style: TextStyle(
             fontSize: 8,
             fontWeight: FontWeight.w500,
-            color: isToday
-                ? Colors.black
-                : const Color(0xFFBBBBBB),
+            color: isToday ? Colors.black : const Color(0xFFBBBBBB),
             letterSpacing: 0.3,
           ),
         ),
@@ -213,8 +218,6 @@ class _DayCell extends StatelessWidget {
         return Icons.timer_outlined;
       case WorkoutType.long:
         return Icons.landscape_outlined;
-      case WorkoutType.recovery:
-        return Icons.favorite_border;
       case WorkoutType.rest:
         return Icons.bedtime_outlined;
       default:
@@ -230,8 +233,6 @@ class _DayCell extends StatelessWidget {
         return 'INT';
       case WorkoutType.long:
         return 'LONG';
-      case WorkoutType.recovery:
-        return 'REC';
       default:
         return 'EASY';
     }
@@ -245,8 +246,6 @@ class _DayCell extends StatelessWidget {
         return const Color(0xFFE3F2FD);
       case WorkoutType.long:
         return const Color(0xFFE8F5E9);
-      case WorkoutType.recovery:
-        return const Color(0xFFF3E5F5);
       default:
         return const Color(0xFFF5F5F5);
     }
@@ -260,8 +259,6 @@ class _DayCell extends StatelessWidget {
         return const Color(0xFF90CAF9);
       case WorkoutType.long:
         return const Color(0xFFA5D6A7);
-      case WorkoutType.recovery:
-        return const Color(0xFFCE93D8);
       default:
         return const Color(0xFFDDDDDD);
     }
@@ -275,8 +272,6 @@ class _DayCell extends StatelessWidget {
         return const Color(0xFF1565C0);
       case WorkoutType.long:
         return const Color(0xFF2E7D32);
-      case WorkoutType.recovery:
-        return const Color(0xFF6A1B9A);
       default:
         return const Color(0xFF666666);
     }

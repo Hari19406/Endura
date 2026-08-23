@@ -2,18 +2,11 @@ class Session {
   final int duration;
   final DateTime timestamp;
 
-
-  Session({
-    required this.duration,
-    required this.timestamp,
-  });
+  Session({required this.duration, required this.timestamp});
 
   // Optional: Convert to JSON for storage
   Map<String, dynamic> toJson() {
-    return {
-      'duration': duration,
-      'timestamp': timestamp.toIso8601String(),
-    };
+    return {'duration': duration, 'timestamp': timestamp.toIso8601String()};
   }
 
   // Optional: Create from JSON
@@ -28,15 +21,16 @@ class Session {
   String getFormattedDuration() {
     int minutes = duration ~/ 60;
     int seconds = duration % 60;
-    
+
     if (minutes > 0) {
       return '${minutes}m ${seconds}s';
     } else {
       return '${seconds}s';
     }
   }
+
   String getFormattedTimestamp() {
     return "${timestamp.hour.toString().padLeft(2, '0')}:"
-           "${timestamp.minute.toString().padLeft(2, '0')}";
+        "${timestamp.minute.toString().padLeft(2, '0')}";
   }
 }

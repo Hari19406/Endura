@@ -17,12 +17,12 @@ class TrainingDaysService {
   ///   - space hard days with rest before them
   ///   - put the long run where the day after is a rest day
   static const Map<int, List<int>> _defaults = {
-    1: [0],               // Mon
-    2: [0, 3],            // Mon, Thu
-    3: [0, 2, 4],         // Mon, Wed, Fri
-    4: [0, 2, 3, 5],      // Mon, Wed, Thu, Sat
-    5: [0, 1, 3, 4, 6],   // Mon, Tue, Thu, Fri, Sun
-    6: [0, 1, 2, 4, 5, 6],// Mon, Tue, Wed, Fri, Sat, Sun
+    1: [0], // Mon
+    2: [0, 3], // Mon, Thu
+    3: [0, 2, 4], // Mon, Wed, Fri
+    4: [0, 2, 3, 5], // Mon, Wed, Thu, Sat
+    5: [0, 1, 3, 4, 6], // Mon, Tue, Thu, Fri, Sun
+    6: [0, 1, 2, 4, 5, 6], // Mon, Tue, Wed, Fri, Sat, Sun
     7: [0, 1, 2, 3, 4, 5, 6],
   };
 
@@ -61,7 +61,10 @@ class TrainingDaysService {
     final prefs = await SharedPreferences.getInstance();
     final sorted = [...indices]..sort();
     await prefs.setString(_key, jsonEncode(sorted));
-    await prefs.setString(_updatedAtKey, DateTime.now().toUtc().toIso8601String());
+    await prefs.setString(
+      _updatedAtKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
     if (syncToCloud) {
       await EngineStateSyncService.instance.syncTrainingDays(sorted);
     }
@@ -70,7 +73,12 @@ class TrainingDaysService {
   /// Day labels for display (index 0–6 → Mon–Sun).
   static const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   static const dayNames = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 }

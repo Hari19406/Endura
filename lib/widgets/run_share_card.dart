@@ -77,8 +77,9 @@ class _RunShareSheetState extends State<_RunShareSheet> {
   final Map<ShareCardTemplate, GlobalKey> _cardKeys = {
     for (final t in ShareCardTemplate.values) t: GlobalKey(),
   };
-  late final PageController _pageController =
-      PageController(initialPage: ShareCardTemplate.values.indexOf(_template));
+  late final PageController _pageController = PageController(
+    initialPage: ShareCardTemplate.values.indexOf(_template),
+  );
   ShareCardTemplate _template = ShareCardTemplate.full;
   ShareCardStyle _style = ShareCardStyle.classic;
   bool _busy = false;
@@ -87,18 +88,18 @@ class _RunShareSheetState extends State<_RunShareSheet> {
       _style == ShareCardStyle.transparent ? 'transparent' : 'classic';
 
   String get _templateName => switch (_template) {
-        ShareCardTemplate.full => 'full',
-        ShareCardTemplate.compact => 'compact',
-        ShareCardTemplate.blank => 'blank',
-        ShareCardTemplate.poster => 'poster',
-      };
+    ShareCardTemplate.full => 'full',
+    ShareCardTemplate.compact => 'compact',
+    ShareCardTemplate.blank => 'blank',
+    ShareCardTemplate.poster => 'poster',
+  };
 
   String get _templateLabel => switch (_template) {
-        ShareCardTemplate.full => 'Full',
-        ShareCardTemplate.compact => 'Compact',
-        ShareCardTemplate.blank => 'Blank',
-        ShareCardTemplate.poster => 'Poster',
-      };
+    ShareCardTemplate.full => 'Full',
+    ShareCardTemplate.compact => 'Compact',
+    ShareCardTemplate.blank => 'Blank',
+    ShareCardTemplate.poster => 'Poster',
+  };
 
   @override
   void dispose() {
@@ -107,8 +108,9 @@ class _RunShareSheetState extends State<_RunShareSheet> {
   }
 
   Future<Uint8List> _renderPng() async {
-    final boundary = _cardKeys[_template]!.currentContext!.findRenderObject()
-        as RenderRepaintBoundary;
+    final boundary =
+        _cardKeys[_template]!.currentContext!.findRenderObject()
+            as RenderRepaintBoundary;
     // 360x640 logical * 3 = 1080x1920, native story resolution.
     final image = await boundary.toImage(pixelRatio: 3.0);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -119,7 +121,8 @@ class _RunShareSheetState extends State<_RunShareSheet> {
     final bytes = await _renderPng();
     final dir = await getTemporaryDirectory();
     final file = File(
-        '${dir.path}/endura_run_${DateTime.now().millisecondsSinceEpoch}.png');
+      '${dir.path}/endura_run_${DateTime.now().millisecondsSinceEpoch}.png',
+    );
     await file.writeAsBytes(bytes);
     return file;
   }
@@ -138,9 +141,9 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         action: 'share',
       );
 
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile(file.path, mimeType: 'image/png')],
-      ));
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path, mimeType: 'image/png')]),
+      );
     } catch (e) {
       debugPrint('[RunShareSheet] share failed: $e');
       _showError('Couldn\'t create share image');
@@ -165,12 +168,14 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         action: analyticsAction,
       );
 
-      final opened =
-          await SocialShareService.shareImageTo(file.path, packageName);
+      final opened = await SocialShareService.shareImageTo(
+        file.path,
+        packageName,
+      );
       if (!opened) {
-        await SharePlus.instance.share(ShareParams(
-          files: [XFile(file.path, mimeType: 'image/png')],
-        ));
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(file.path, mimeType: 'image/png')]),
+        );
       }
     } catch (e) {
       debugPrint('[RunShareSheet] targeted share failed: $e');
@@ -190,8 +195,10 @@ class _RunShareSheetState extends State<_RunShareSheet> {
         return;
       }
       final bytes = await _renderPng();
-      await Gal.putImageBytes(bytes,
-          name: 'endura_run_${DateTime.now().millisecondsSinceEpoch}');
+      await Gal.putImageBytes(
+        bytes,
+        name: 'endura_run_${DateTime.now().millisecondsSinceEpoch}',
+      );
 
       await Analytics.runShared(
         workoutType: widget.data.workoutType,
@@ -202,9 +209,9 @@ class _RunShareSheetState extends State<_RunShareSheet> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved to gallery')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Saved to gallery')));
       }
     } catch (e) {
       debugPrint('[RunShareSheet] save failed: $e');
@@ -261,11 +268,17 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildChip('Solid', _style == ShareCardStyle.classic,
-                  () => setState(() => _style = ShareCardStyle.classic)),
+              _buildChip(
+                'Solid',
+                _style == ShareCardStyle.classic,
+                () => setState(() => _style = ShareCardStyle.classic),
+              ),
               const SizedBox(width: 8),
-              _buildChip('Transparent', _style == ShareCardStyle.transparent,
-                  () => setState(() => _style = ShareCardStyle.transparent)),
+              _buildChip(
+                'Transparent',
+                _style == ShareCardStyle.transparent,
+                () => setState(() => _style = ShareCardStyle.transparent),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -339,13 +352,17 @@ class _RunShareSheetState extends State<_RunShareSheet> {
                   label: 'Instagram',
                   asset: 'assets/instagram_logo.png',
                   onTap: () => _shareToApp(
-                      SocialShareService.instagramPackage, 'instagram'),
+                    SocialShareService.instagramPackage,
+                    'instagram',
+                  ),
                 ),
                 _buildQuickAction(
                   label: 'WhatsApp',
                   asset: 'assets/whatsapp_logo.png',
                   onTap: () => _shareToApp(
-                      SocialShareService.whatsappPackage, 'whatsapp'),
+                    SocialShareService.whatsappPackage,
+                    'whatsapp',
+                  ),
                 ),
                 _buildQuickAction(
                   label: 'Save',
@@ -531,8 +548,18 @@ class RunShareCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
@@ -566,10 +593,7 @@ class RunShareCard extends StatelessWidget {
                   gradient: RadialGradient(
                     center: const Alignment(0, -0.2),
                     radius: 1.1,
-                    colors: [
-                      wColor.withOpacity(0.10),
-                      Colors.transparent,
-                    ],
+                    colors: [wColor.withOpacity(0.10), Colors.transparent],
                   ),
                 ),
               ),
@@ -586,16 +610,15 @@ class RunShareCard extends StatelessWidget {
   // ── Full — route trace + hero distance ──────────────────────────────────
 
   Widget _buildFullContent(Color wColor, bool isTransparent) {
-    final distanceValue =
-        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+    final distanceValue = UnitUtils.displayDistance(
+      data.distanceKm,
+      data.useMiles,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ENDURA',
-          style: _wordmarkStyle.copyWith(color: Colors.white),
-        ),
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
         const SizedBox(height: 8),
         Text(
           _formatDate(data.date),
@@ -719,8 +742,10 @@ class RunShareCard extends StatelessWidget {
   // ── Compact — wordmark + date header, stats stacked at the bottom ───────
 
   Widget _buildCompactContent(bool isTransparent) {
-    final distanceValue =
-        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+    final distanceValue = UnitUtils.displayDistance(
+      data.distanceKm,
+      data.useMiles,
+    );
 
     return Center(
       child: Column(
@@ -733,23 +758,27 @@ class RunShareCard extends StatelessWidget {
             boxHeight: 170,
           ),
           const SizedBox(height: 24),
-          _buildCompactStat('DISTANCE', distanceValue.toStringAsFixed(2),
-              UnitUtils.unitLabel(data.useMiles)),
+          _buildCompactStat(
+            'DISTANCE',
+            distanceValue.toStringAsFixed(2),
+            UnitUtils.unitLabel(data.useMiles),
+          ),
           const SizedBox(height: 14),
           _buildCompactStat(
-              'PACE',
-              UnitUtils.formatPaceString(data.averagePace, data.useMiles),
-              UnitUtils.perUnitLabel(data.useMiles)),
+            'PACE',
+            UnitUtils.formatPaceString(data.averagePace, data.useMiles),
+            UnitUtils.perUnitLabel(data.useMiles),
+          ),
           if (data.durationSeconds > 0) ...[
             const SizedBox(height: 14),
             _buildCompactStat(
-                'TIME', _formatDuration(data.durationSeconds), ''),
+              'TIME',
+              _formatDuration(data.durationSeconds),
+              '',
+            ),
           ],
           const SizedBox(height: 28),
-          Text(
-            'ENDURA',
-            style: _wordmarkStyle.copyWith(color: Colors.white),
-          ),
+          Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
         ],
       ),
     );
@@ -803,16 +832,15 @@ class RunShareCard extends StatelessWidget {
   // ── Blank — wordmark header, route trace, stats pinned low ──────────────
 
   Widget _buildBlankContent(bool isTransparent) {
-    final distanceValue =
-        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+    final distanceValue = UnitUtils.displayDistance(
+      data.distanceKm,
+      data.useMiles,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ENDURA',
-          style: _wordmarkStyle.copyWith(color: Colors.white),
-        ),
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
         Expanded(
           child: Center(
             child: _buildRouteBox(
@@ -825,10 +853,14 @@ class RunShareCard extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildBlankStat('DISTANCE',
-                '${distanceValue.toStringAsFixed(2)}${UnitUtils.unitLabel(data.useMiles)}'),
-            _buildBlankStat('PACE',
-                '${UnitUtils.formatPaceString(data.averagePace, data.useMiles)}${UnitUtils.perUnitLabel(data.useMiles)}'),
+            _buildBlankStat(
+              'DISTANCE',
+              '${distanceValue.toStringAsFixed(2)}${UnitUtils.unitLabel(data.useMiles)}',
+            ),
+            _buildBlankStat(
+              'PACE',
+              '${UnitUtils.formatPaceString(data.averagePace, data.useMiles)}${UnitUtils.perUnitLabel(data.useMiles)}',
+            ),
             if (data.durationSeconds > 0)
               _buildBlankStat('TIME', _formatDuration(data.durationSeconds)),
           ],
@@ -866,16 +898,15 @@ class RunShareCard extends StatelessWidget {
   // ── Poster — light ground, one bold route stroke ────────────────────────
 
   Widget _buildPosterContent(bool isTransparent) {
-    final distanceValue =
-        UnitUtils.displayDistance(data.distanceKm, data.useMiles);
+    final distanceValue = UnitUtils.displayDistance(
+      data.distanceKm,
+      data.useMiles,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ENDURA',
-          style: _wordmarkStyle.copyWith(color: _posterInk),
-        ),
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: _posterInk)),
         Expanded(
           child: Center(
             child: _buildRouteBox(

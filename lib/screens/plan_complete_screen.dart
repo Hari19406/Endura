@@ -126,7 +126,10 @@ class PlanCompleteCard extends StatelessWidget {
                 _statChip(
                   context,
                   label: UnitUtils.unitLabel(useMiles),
-                  value: UnitUtils.displayDistance(totalKmCompleted, useMiles).toStringAsFixed(0),
+                  value: UnitUtils.displayDistance(
+                    totalKmCompleted,
+                    useMiles,
+                  ).toStringAsFixed(0),
                   icon: Icons.straighten_rounded,
                 ),
                 if (vdotGain > 0) ...[
@@ -214,7 +217,9 @@ class PlanCompleteCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: highlight
               ? Border.all(
-                  color: const Color(0xFF00796B).withOpacity(0.25), width: 1)
+                  color: const Color(0xFF00796B).withOpacity(0.25),
+                  width: 1,
+                )
               : null,
         ),
         child: Column(
@@ -223,9 +228,7 @@ class PlanCompleteCard extends StatelessWidget {
             Icon(
               icon,
               size: 13,
-              color: highlight
-                  ? const Color(0xFF00796B)
-                  : c.textTertiary,
+              color: highlight ? const Color(0xFF00796B) : c.textTertiary,
             ),
             const SizedBox(height: 4),
             Text(
@@ -233,9 +236,7 @@ class PlanCompleteCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: highlight
-                    ? const Color(0xFF00796B)
-                    : c.textPrimary,
+                color: highlight ? const Color(0xFF00796B) : c.textPrimary,
               ),
             ),
             Text(
@@ -252,4 +253,3 @@ class PlanCompleteCard extends StatelessWidget {
     );
   }
 }
-

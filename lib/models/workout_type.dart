@@ -1,4 +1,4 @@
-enum WorkoutType { easy, tempo, interval, long, recovery, quality, rest }
+enum WorkoutType { easy, tempo, interval, long, quality, rest }
 
 extension WorkoutTypeX on WorkoutType {
   bool get isQuality =>
@@ -7,13 +7,14 @@ extension WorkoutTypeX on WorkoutType {
   bool get isHard => isQuality || this == WorkoutType.long;
 
   static WorkoutType fromString(String s) => switch (s) {
-        'easy' => WorkoutType.easy,
-        'tempo' => WorkoutType.tempo,
-        'interval' => WorkoutType.interval,
-        'long' => WorkoutType.long,
-        'recovery' => WorkoutType.recovery,
-        'quality' => WorkoutType.quality,
-        'rest' => WorkoutType.rest,
-        _ => WorkoutType.easy,
-      };
+    'easy' => WorkoutType.easy,
+    'tempo' => WorkoutType.tempo,
+    'interval' => WorkoutType.interval,
+    'long' => WorkoutType.long,
+    // 'recovery' is legacy data from before recovery was folded into easy.
+    'recovery' => WorkoutType.easy,
+    'quality' => WorkoutType.quality,
+    'rest' => WorkoutType.rest,
+    _ => WorkoutType.easy,
+  };
 }

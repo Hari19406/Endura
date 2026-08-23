@@ -74,9 +74,13 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
         final c = ctx.colors;
         return AlertDialog(
           backgroundColor: c.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Remove your plan?',
-              style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.w700)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Remove your plan?',
+            style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.w700),
+          ),
           content: Text(
             'This will delete your current training plan. This cannot be undone.',
             style: TextStyle(color: c.textSecondary, fontSize: 14),
@@ -88,7 +92,10 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Remove', style: TextStyle(color: Color(0xFFD32F2F))),
+              child: const Text(
+                'Remove',
+                style: TextStyle(color: Color(0xFFD32F2F)),
+              ),
             ),
           ],
         );
@@ -112,12 +119,12 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
   }
 
   String _raceLabel(String key) => switch (key) {
-        '5k'            => '5K',
-        '10k'           => '10K',
-        'half_marathon' => 'Half Marathon',
-        'marathon'      => 'Marathon',
-        _               => '5K',
-      };
+    '5k' => '5K',
+    '10k' => '10K',
+    'half_marathon' => 'Half Marathon',
+    'marathon' => 'Marathon',
+    _ => '5K',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -125,12 +132,15 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
     return Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(
-        title: Text('Manage Plan',
-            style: TextStyle(
-                color: c.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                letterSpacing: -0.5)),
+        title: Text(
+          'Manage Plan',
+          style: TextStyle(
+            color: c.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            letterSpacing: -0.5,
+          ),
+        ),
         centerTitle: false,
         backgroundColor: c.background,
         elevation: 0,
@@ -148,27 +158,34 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Goal Race ────────────────────────────────────────────
-                  Text('GOAL RACE',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.textTertiary,
-                          letterSpacing: 1.2)),
+                  Text(
+                    'GOAL RACE',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: c.textTertiary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 10,
-                    children: ['5k', '10k', 'half_marathon', 'marathon']
-                        .map((key) {
+                    children: ['5k', '10k', 'half_marathon', 'marathon'].map((
+                      key,
+                    ) {
                       final selected = _goalRace == key;
                       return GestureDetector(
                         onTap: () => setState(() => _goalRace = key),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: selected ? c.accent : c.surface,
                             border: Border.all(
-                                color: selected ? c.accent : c.border),
+                              color: selected ? c.accent : c.border,
+                            ),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -187,12 +204,15 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                   const SizedBox(height: 28),
 
                   // ── Race Date ────────────────────────────────────────────
-                  Text('RACE DATE',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.textTertiary,
-                          letterSpacing: 1.2)),
+                  Text(
+                    'RACE DATE',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: c.textTertiary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () async {
@@ -217,7 +237,9 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: c.surface,
                         border: Border.all(color: c.border),
@@ -229,12 +251,16 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                           Text(
                             '${_raceDate.day} ${_monthName(_raceDate.month)} ${_raceDate.year}',
                             style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: c.textPrimary),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: c.textPrimary,
+                            ),
                           ),
-                          Icon(Icons.calendar_today_outlined,
-                              size: 16, color: c.textTertiary),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 16,
+                            color: c.textTertiary,
+                          ),
                         ],
                       ),
                     ),
@@ -258,12 +284,18 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: c.onAccent))
-                            : Text('Save Changes',
+                                  strokeWidth: 2,
+                                  color: c.onAccent,
+                                ),
+                              )
+                            : Text(
+                                'Save Changes',
                                 style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: c.onAccent)),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: c.onAccent,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -276,12 +308,15 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                   const SizedBox(height: 28),
 
                   // ── Remove Plan ──────────────────────────────────────────
-                  Text('REMOVE PLAN',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.textTertiary,
-                          letterSpacing: 1.2)),
+                  Text(
+                    'REMOVE PLAN',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: c.textTertiary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'Permanently deletes your current training plan.',
@@ -299,11 +334,14 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Center(
-                        child: Text('Remove Plan',
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFD32F2F))),
+                        child: Text(
+                          'Remove Plan',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFD32F2F),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -316,8 +354,18 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
 
   String _monthName(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return months[month - 1];
   }

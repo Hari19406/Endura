@@ -101,7 +101,9 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
     debugPrint('[WeatherDebug] weather=$weather');
     if (weather != null) {
       final weatherResult = const WeatherScaler().scale(finalWorkout, weather);
-      debugPrint('[WeatherDebug] apparentTempC=${weather.apparentTempC} humidity=${weather.humidityPercent} wasAdjusted=${weatherResult.wasAdjusted}');
+      debugPrint(
+        '[WeatherDebug] apparentTempC=${weather.apparentTempC} humidity=${weather.humidityPercent} wasAdjusted=${weatherResult.wasAdjusted}',
+      );
       if (weatherResult.wasAdjusted) {
         finalWorkout = weatherResult.workout;
         finalNote = finalNote != null
@@ -114,8 +116,7 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
 
     // ── Record downgrade if workout was actually reduced ──────────────────
     // Poor sleep OR leg pain causes PreRunScaler to reduce the workout.
-    final wasDowngraded =
-        sleep == PreRunSleep.poor || pain == PainLocation.leg;
+    final wasDowngraded = sleep == PreRunSleep.poor || pain == PainLocation.leg;
     if (wasDowngraded) {
       // Fire and forget — non-blocking
       EngineMemoryService().recordPreRunDowngrade();
@@ -130,7 +131,7 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
     widget.onSkip();
   }
 
-  void _onTakeRecoveryRun() {
+  void _onTakeEasyRun() {
     Navigator.pop(context);
     widget.onProceed(widget.coachMessage);
   }
@@ -162,7 +163,9 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(
-        24, 20, 24,
+        24,
+        20,
+        24,
         MediaQuery.of(context).viewInsets.bottom + 32,
       ),
       child: AnimatedSwitcher(
@@ -174,10 +177,22 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
 
   Widget _buildStep() {
     return switch (_step) {
-      _Step.sleep        => _SleepStep(onSleep: _onSleepSelected),
-      _Step.pain         => _PainStep(onPain: _onPainSelected, onBack: () => setState(() => _step = _Step.sleep)),
-      _Step.restChoice   => _RestChoiceStep(onFullRest: _onTakeFullRest, onRecoveryRun: _onTakeRecoveryRun, onBack: () => setState(() => _step = _Step.sleep)),
-      _Step.chestWarning => _ChestWarningStep(onDismiss: () { Navigator.pop(context); widget.onSkip(); }),
+      _Step.sleep => _SleepStep(onSleep: _onSleepSelected),
+      _Step.pain => _PainStep(
+        onPain: _onPainSelected,
+        onBack: () => setState(() => _step = _Step.sleep),
+      ),
+      _Step.restChoice => _RestChoiceStep(
+        onFullRest: _onTakeFullRest,
+        onEasyRun: _onTakeEasyRun,
+        onBack: () => setState(() => _step = _Step.sleep),
+      ),
+      _Step.chestWarning => _ChestWarningStep(
+        onDismiss: () {
+          Navigator.pop(context);
+          widget.onSkip();
+        },
+      ),
     };
   }
 }
@@ -197,8 +212,18 @@ class _SleepStep extends StatelessWidget {
       title: 'How was your sleep?',
       subtitle: 'Poor sleep affects recovery and performance.',
       children: [
-        _OptionCard(emoji: '😴', label: 'Slept well', subtitle: '7+ hours, felt rested', onTap: () => onSleep(PreRunSleep.good)),
-        _OptionCard(emoji: '🥱', label: 'Poor sleep', subtitle: 'Broken or under 6 hours', onTap: () => onSleep(PreRunSleep.poor)),
+        _OptionCard(
+          emoji: '😴',
+          label: 'Slept well',
+          subtitle: '7+ hours, felt rested',
+          onTap: () => onSleep(PreRunSleep.good),
+        ),
+        _OptionCard(
+          emoji: '🥱',
+          label: 'Poor sleep',
+          subtitle: 'Broken or under 6 hours',
+          onTap: () => onSleep(PreRunSleep.poor),
+        ),
       ],
     );
   }
@@ -217,10 +242,30 @@ class _PainStep extends StatelessWidget {
       subtitle: 'Be honest — this keeps you running long term.',
       onBack: onBack,
       children: [
-        _OptionCard(emoji: '✅', label: 'No pain', subtitle: 'Feeling physically fine', onTap: () => onPain(PainLocation.none)),
-        _OptionCard(emoji: '💪', label: 'Upper body', subtitle: 'Shoulders, arms, back — won\'t affect the run', onTap: () => onPain(PainLocation.upperBody)),
-        _OptionCard(emoji: '🦵', label: 'Leg or foot pain', subtitle: 'Shins, knees, calves, feet — dose reduced', onTap: () => onPain(PainLocation.leg)),
-        _OptionCard(emoji: '❤️', label: 'Chest or breathing', subtitle: 'Take today off and consider seeing a doctor', onTap: () => onPain(PainLocation.chest)),
+        _OptionCard(
+          emoji: '✅',
+          label: 'No pain',
+          subtitle: 'Feeling physically fine',
+          onTap: () => onPain(PainLocation.none),
+        ),
+        _OptionCard(
+          emoji: '💪',
+          label: 'Upper body',
+          subtitle: 'Shoulders, arms, back — won\'t affect the run',
+          onTap: () => onPain(PainLocation.upperBody),
+        ),
+        _OptionCard(
+          emoji: '🦵',
+          label: 'Leg or foot pain',
+          subtitle: 'Shins, knees, calves, feet — dose reduced',
+          onTap: () => onPain(PainLocation.leg),
+        ),
+        _OptionCard(
+          emoji: '❤️',
+          label: 'Chest or breathing',
+          subtitle: 'Take today off and consider seeing a doctor',
+          onTap: () => onPain(PainLocation.chest),
+        ),
       ],
     );
   }
@@ -228,12 +273,12 @@ class _PainStep extends StatelessWidget {
 
 class _RestChoiceStep extends StatelessWidget {
   final VoidCallback onFullRest;
-  final VoidCallback onRecoveryRun;
+  final VoidCallback onEasyRun;
   final VoidCallback onBack;
 
   const _RestChoiceStep({
     required this.onFullRest,
-    required this.onRecoveryRun,
+    required this.onEasyRun,
     required this.onBack,
   });
 
@@ -244,8 +289,18 @@ class _RestChoiceStep extends StatelessWidget {
       subtitle: 'What do you want to do today?',
       onBack: onBack,
       children: [
-        _OptionCard(emoji: '🛌', label: 'Take full rest', subtitle: 'Skip today, mark as rest day', onTap: onFullRest),
-        _OptionCard(emoji: '🚶', label: 'Easy recovery run', subtitle: '20–30 min shakeout at very easy pace', onTap: onRecoveryRun),
+        _OptionCard(
+          emoji: '🛌',
+          label: 'Take full rest',
+          subtitle: 'Skip today, mark as rest day',
+          onTap: onFullRest,
+        ),
+        _OptionCard(
+          emoji: '🚶',
+          label: 'Take it easy instead',
+          subtitle: '20–30 min shakeout at very easy pace',
+          onTap: onEasyRun,
+        ),
       ],
     );
   }
@@ -268,7 +323,11 @@ class _ChestWarningStep extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           'Take today off',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.textPrimary),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: c.textPrimary,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
@@ -290,7 +349,11 @@ class _ChestWarningStep extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(
                 'Got it, taking rest today',
-                style: TextStyle(color: c.onAccent, fontWeight: FontWeight.w600, fontSize: 15),
+                style: TextStyle(
+                  color: c.onAccent,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
@@ -326,20 +389,43 @@ class _StepShell extends StatelessWidget {
       children: [
         Center(child: _dragHandle(context)),
         const SizedBox(height: 20),
-        Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.textPrimary, letterSpacing: -0.5)),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: c.textPrimary,
+            letterSpacing: -0.5,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(subtitle, style: TextStyle(fontSize: 13, color: c.textTertiary, height: 1.4)),
+        Text(
+          subtitle,
+          style: TextStyle(fontSize: 13, color: c.textTertiary, height: 1.4),
+        ),
         const SizedBox(height: 20),
-        ...children.expand((w) => [w, const SizedBox(height: 10)]).toList()..removeLast(),
+        ...children.expand((w) => [w, const SizedBox(height: 10)]).toList()
+          ..removeLast(),
         if (onBack != null) ...[
           const SizedBox(height: 14),
           GestureDetector(
             onTap: onBack,
             child: Row(
               children: [
-                Icon(Icons.arrow_back_ios_rounded, size: 13, color: c.textTertiary),
+                Icon(
+                  Icons.arrow_back_ios_rounded,
+                  size: 13,
+                  color: c.textTertiary,
+                ),
                 const SizedBox(width: 4),
-                Text('Go back', style: TextStyle(fontSize: 13, color: c.textTertiary, fontWeight: FontWeight.w500)),
+                Text(
+                  'Go back',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: c.textTertiary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
@@ -350,8 +436,12 @@ class _StepShell extends StatelessWidget {
 }
 
 Widget _dragHandle(BuildContext context) => Container(
-  width: 36, height: 4,
-  decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(2)),
+  width: 36,
+  height: 4,
+  decoration: BoxDecoration(
+    color: context.colors.border,
+    borderRadius: BorderRadius.circular(2),
+  ),
 );
 
 class _OptionCard extends StatelessWidget {
@@ -387,9 +477,19 @@ class _OptionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: c.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(fontSize: 12, color: c.textTertiary)),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: c.textTertiary),
+                  ),
                 ],
               ),
             ),

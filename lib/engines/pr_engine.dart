@@ -47,13 +47,13 @@ class PRResults {
   });
 
   List<PREntry> get allEntries => [
-        if (best5K != null) best5K!,
-        if (best10K != null) best10K!,
-        if (bestHalf != null) bestHalf!,
-        if (bestMarathon != null) bestMarathon!,
-        bestAvgPace,
-        longestRun,
-      ];
+    if (best5K != null) best5K!,
+    if (best10K != null) best10K!,
+    if (bestHalf != null) bestHalf!,
+    if (bestMarathon != null) bestMarathon!,
+    bestAvgPace,
+    longestRun,
+  ];
 }
 
 class PREngine {
@@ -80,11 +80,13 @@ class PREngine {
   // Among runs of at least [minKm], find the fastest-paced one and project
   // its pace onto [targetKm] to get the PR time.
   PREntry? _bestForDistance(double minKm, double targetKm, String label) {
-    final eligible =
-        runs.where((r) => r.distanceKm >= minKm && r.paceSecPerKm > 0).toList();
+    final eligible = runs
+        .where((r) => r.distanceKm >= minKm && r.paceSecPerKm > 0)
+        .toList();
     if (eligible.isEmpty) return null;
-    final best =
-        eligible.reduce((a, b) => a.paceSecPerKm < b.paceSecPerKm ? a : b);
+    final best = eligible.reduce(
+      (a, b) => a.paceSecPerKm < b.paceSecPerKm ? a : b,
+    );
     final timeSeconds = (best.paceSecPerKm * targetKm).round();
     return PREntry(
       label: label,
@@ -97,10 +99,16 @@ class PREngine {
   PRResults calculate() {
     if (runs.isEmpty) {
       return PRResults(
-        bestAvgPace:
-            const PREntry(label: 'Best avg pace', value: '--:--', unit: '/km'),
-        longestRun:
-            const PREntry(label: 'Longest run', value: '0.0', unit: 'km'),
+        bestAvgPace: const PREntry(
+          label: 'Best avg pace',
+          value: '--:--',
+          unit: '/km',
+        ),
+        longestRun: const PREntry(
+          label: 'Longest run',
+          value: '0.0',
+          unit: 'km',
+        ),
       );
     }
 
@@ -108,8 +116,9 @@ class PREngine {
     final fastestRun = withPace.isEmpty
         ? null
         : withPace.reduce((a, b) => a.paceSecPerKm < b.paceSecPerKm ? a : b);
-    final longestRun =
-        runs.reduce((a, b) => a.distanceKm > b.distanceKm ? a : b);
+    final longestRun = runs.reduce(
+      (a, b) => a.distanceKm > b.distanceKm ? a : b,
+    );
 
     return PRResults(
       best5K: _bestForDistance(4.5, 5.0, 'Best 5K'),
@@ -118,7 +127,9 @@ class PREngine {
       bestMarathon: _bestForDistance(40.0, 42.195, 'Best marathon'),
       bestAvgPace: PREntry(
         label: 'Best avg pace',
-        value: fastestRun == null ? '--:--' : _formatPace(fastestRun.paceSecPerKm),
+        value: fastestRun == null
+            ? '--:--'
+            : _formatPace(fastestRun.paceSecPerKm),
         unit: '/km',
         setOn: fastestRun?.date,
       ),
