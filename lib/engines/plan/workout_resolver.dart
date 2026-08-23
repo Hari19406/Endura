@@ -353,6 +353,7 @@ class WorkoutResolver {
       'vo2_pyramid'          => ['vo2_classic', 'vo2_600'],
       'race_simulation'      => ['race_gp_intervals'],
       'race_dress_rehearsal' => ['race_gp_intervals'],
+      'race_time_trial'      => ['race_gp_intervals'],
       _                      => <String>[],
     };
 

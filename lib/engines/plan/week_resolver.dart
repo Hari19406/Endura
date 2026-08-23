@@ -138,6 +138,7 @@ const Map<WorkoutIntent, List<String>> ladderTemplateIds = {
     'long_steady',       // base/build/peak/taper — all distances
     'long_progression',  // base/build/peak — all distances
     'long_strides',      // base/build/peak — all distances
+    'long_hilly',        // base/build/peak — all distances
     'long_gp_finish',    // build/peak — all distances
     'long_fartlek',      // build/peak — 5K/10K/HM
     'long_surges',       // build/peak — HM/FM
@@ -150,19 +151,25 @@ const Map<WorkoutIntent, List<String>> ladderTemplateIds = {
     'cruise_intervals_mile',
     'steady_state',
     'tempo_continuous',
+    'tempo_intervals',
   ],
   WorkoutIntent.vo2max: [
+    'vo2_400',
     'vo2_600',
     'vo2_classic',
     'vo2_1000',
     'vo2_1200',
+    'vo2_thirty_thirty',
     'vo2_ladder',
     'vo2_pyramid',
   ],
   WorkoutIntent.raceSpecific: [
     'race_gp_intervals',
+    'race_pace_progression',
+    'race_negative_split',
     'race_simulation',
     'race_dress_rehearsal',
+    'race_time_trial',
   ],
 };
 

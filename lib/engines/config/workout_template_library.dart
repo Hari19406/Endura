@@ -466,6 +466,32 @@ class WorkoutLibrary {
       ],
     ),
 
+    WorkoutTemplate(
+      id: 'easy_hilly',
+      name: 'Hilly Easy Run',
+      intent: WorkoutIntent.aerobicBase,
+      applicablePhases: {
+        TrainingPhase.base, TrainingPhase.build,
+        TrainingPhase.peak, TrainingPhase.taper,
+      },
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 3, maxKm: 6),
+        RaceDistance.tenK:         DistanceRange(minKm: 4, maxKm: 12),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 12),
+        RaceDistance.marathon:     DistanceRange(minKm: 6, maxKm: 14),
+      },
+      description:
+          'Easy run on rolling or hilly terrain. Effort stays easy — '
+          'let pace drift slower on the climbs, strength work is the bonus.',
+      blocks: [
+        BlockTemplate.percent(type: BlockType.main, fraction: 1.0, zone: PaceZone.aerobicEasy),
+      ],
+    ),
+
     // ════════════════════════════════════════════════════════════════════════
     // ENDURANCE (LONG RUNS)
     // ════════════════════════════════════════════════════════════════════════
@@ -704,6 +730,29 @@ class WorkoutLibrary {
       },
     ),
 
+    WorkoutTemplate(
+      id: 'long_hilly',
+      name: 'Long Run — Hilly',
+      intent: WorkoutIntent.endurance,
+      applicablePhases: {TrainingPhase.base, TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 6,  maxKm: 16),
+        RaceDistance.tenK:         DistanceRange(minKm: 8,  maxKm: 20),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 12, maxKm: 28),
+        RaceDistance.marathon:     DistanceRange(minKm: 16, maxKm: 35),
+      },
+      description:
+          'Long run on hilly terrain at the same easy effort as a standard long run. '
+          'Expect a slower average pace — the climbs are the extra strength stimulus.',
+      blocks: [
+        BlockTemplate.percent(type: BlockType.main, fraction: 1.0, zone: PaceZone.aerobicEasy),
+      ],
+    ),
+
     // ════════════════════════════════════════════════════════════════════════
     // THRESHOLD
     // ════════════════════════════════════════════════════════════════════════
@@ -864,6 +913,35 @@ class WorkoutLibrary {
         TrainingPhase.base:  PhaseVariant(volumeMultiplier: 0.85, note: 'Intro steady state — keep it honest, not hard'),
         TrainingPhase.build: PhaseVariant(volumeMultiplier: 1.0,  note: 'Standard steady state — sustained M-pace'),
         TrainingPhase.peak:  PhaseVariant(volumeMultiplier: 1.10, note: 'Peak steady state — longest of the plan'),
+      },
+    ),
+
+    WorkoutTemplate(
+      id: 'tempo_intervals',
+      name: 'Broken Tempo',
+      intent: WorkoutIntent.threshold,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 5,  maxKm: 8),
+        RaceDistance.tenK:         DistanceRange(minKm: 6,  maxKm: 10),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 8,  maxKm: 14),
+        RaceDistance.marathon:     DistanceRange(minKm: 10, maxKm: 18),
+      },
+      description:
+          'Tempo effort split into two blocks with a short jog recovery. '
+          'Same time at threshold as a continuous tempo — easier to hold pace on tired legs.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.main(km: 2.5, zone: PaceZone.tempo, reps: 2, recoverySeconds: 180, label: 'Tempo Block'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+      phaseVariants: {
+        TrainingPhase.build: PhaseVariant(reps: 2, repDistanceKm: 2.5, recoverySeconds: 180, note: '2 × 2.5km @ tempo, 180s jog recovery'),
+        TrainingPhase.peak:  PhaseVariant(reps: 2, repDistanceKm: 3.0, recoverySeconds: 150, note: '2 × 3km @ tempo, 150s jog recovery'),
       },
     ),
 
@@ -1051,6 +1129,57 @@ class WorkoutLibrary {
       ],
     ),
 
+    WorkoutTemplate(
+      id: 'vo2_400',
+      name: 'VO₂ Intervals — 400m',
+      intent: WorkoutIntent.vo2max,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 5, maxKm: 8),
+        RaceDistance.tenK:         DistanceRange(minKm: 6, maxKm: 10),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 7, maxKm: 11),
+        RaceDistance.marathon:     DistanceRange(minKm: 8, maxKm: 12),
+      },
+      description: 'Classic 400m reps at I-pace with short recovery. High rep count for VO₂max stimulus.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.mainMeters(meters: 400, zone: PaceZone.vo2Intervals, reps: 10, recoverySeconds: 90, label: 'I-rep'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+      phaseVariants: {
+        TrainingPhase.build: PhaseVariant(reps: 8,  repDistanceMeters: 400, recoverySeconds: 90, note: '8 × 400m, 90s recovery'),
+        TrainingPhase.peak:  PhaseVariant(reps: 12, repDistanceMeters: 400, recoverySeconds: 75, note: '12 × 400m, 75s recovery'),
+      },
+    ),
+
+    WorkoutTemplate(
+      id: 'vo2_thirty_thirty',
+      name: '30/30 Intervals',
+      intent: WorkoutIntent.vo2max,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {RaceDistance.fiveK, RaceDistance.tenK},
+      distanceByRace: {
+        RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
+        RaceDistance.tenK:  DistanceRange(minKm: 6, maxKm: 10),
+      },
+      description:
+          '30 seconds hard / 30 seconds easy float, repeated. Classic VO₂max '
+          'session — minimal joint stress, high time-at-VO₂max.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.mainSeconds(seconds: 30, zone: PaceZone.vo2Intervals, reps: 16, recoverySeconds: 30, label: 'Hard'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+      phaseVariants: {
+        TrainingPhase.build: PhaseVariant(reps: 12, repDurationSeconds: 30, recoverySeconds: 30, note: '12 × 30s hard/30s float'),
+        TrainingPhase.peak:  PhaseVariant(reps: 18, repDurationSeconds: 30, recoverySeconds: 30, note: '18 × 30s hard/30s float'),
+      },
+    ),
+
     // ════════════════════════════════════════════════════════════════════════
     // SPEED / NEUROMUSCULAR
     // ════════════════════════════════════════════════════════════════════════
@@ -1128,6 +1257,98 @@ class WorkoutLibrary {
       },
     ),
 
+    WorkoutTemplate(
+      id: 'speed_reps_intro',
+      name: 'Speed Reps — Intro',
+      intent: WorkoutIntent.speed,
+      applicablePhases: {TrainingPhase.base},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 4, maxKm: 7),
+        RaceDistance.tenK:         DistanceRange(minKm: 5, maxKm: 8),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 6, maxKm: 10),
+        RaceDistance.marathon:     DistanceRange(minKm: 6, maxKm: 10),
+      },
+      description:
+          'Short, controlled fast reps to introduce leg speed in base phase, '
+          'ahead of the harder quality work in build.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.mainMeters(meters: 150, zone: PaceZone.speedReps, reps: 5, recoverySeconds: 120, label: 'Speed Rep'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+    ),
+
+    WorkoutTemplate(
+      id: 'speed_hills_endurance',
+      name: 'Hill Sprints — Endurance Runners',
+      intent: WorkoutIntent.speed,
+      applicablePhases: {TrainingPhase.base, TrainingPhase.build},
+      applicableRaceDistances: {RaceDistance.halfMarathon, RaceDistance.marathon},
+      distanceByRace: {
+        RaceDistance.halfMarathon: DistanceRange(minKm: 5, maxKm: 9),
+        RaceDistance.marathon:     DistanceRange(minKm: 6, maxKm: 10),
+      },
+      description:
+          'Short max-effort hill sprints for HM/marathon runners. Builds power '
+          'and running economy without the impact cost of dedicated speed work.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.mainSeconds(seconds: 10, zone: PaceZone.hillSprints, reps: 6, recoverySeconds: 120, label: 'Hill Sprint'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+      phaseVariants: {
+        TrainingPhase.base:  PhaseVariant(reps: 5, repDurationSeconds: 10, recoverySeconds: 120, note: '5 × 10s hill sprints, 120s recovery'),
+        TrainingPhase.build: PhaseVariant(reps: 8, repDurationSeconds: 10, recoverySeconds: 120, note: '8 × 10s hill sprints, 120s recovery'),
+      },
+    ),
+
+    WorkoutTemplate(
+      id: 'speed_flying_sprints',
+      name: 'Flying Sprints',
+      intent: WorkoutIntent.speed,
+      applicablePhases: {TrainingPhase.peak},
+      applicableRaceDistances: {RaceDistance.fiveK, RaceDistance.tenK},
+      distanceByRace: {
+        RaceDistance.fiveK: DistanceRange(minKm: 4, maxKm: 7),
+        RaceDistance.tenK:  DistanceRange(minKm: 5, maxKm: 8),
+      },
+      description:
+          '30m acceleration into a 20m flying sprint at max controlled speed. '
+          'Full recovery — pure neuromuscular power, not conditioning.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.mainMeters(meters: 50, zone: PaceZone.speedReps, reps: 6, recoverySeconds: 150, label: 'Flying Sprint'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+    ),
+
+    WorkoutTemplate(
+      id: 'speed_strides_taper',
+      name: 'Strides — Taper Sharpener',
+      intent: WorkoutIntent.speed,
+      applicablePhases: {TrainingPhase.taper},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 3, maxKm: 5),
+        RaceDistance.tenK:         DistanceRange(minKm: 3, maxKm: 6),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 3, maxKm: 6),
+        RaceDistance.marathon:     DistanceRange(minKm: 3, maxKm: 8),
+      },
+      description:
+          'Short easy jog with strides to stay sharp without adding fatigue before race day.',
+      blocks: [
+        BlockTemplate.percent(type: BlockType.main, fraction: 0.8, zone: PaceZone.aerobicEasy),
+        BlockTemplate.mainMeters(meters: 100, zone: PaceZone.strides, reps: 4, recoveryMeters: 100, label: 'Stride'),
+      ],
+    ),
+
     // ════════════════════════════════════════════════════════════════════════
     // RACE SPECIFIC
     // ════════════════════════════════════════════════════════════════════════
@@ -1203,6 +1424,76 @@ class WorkoutLibrary {
       blocks: [
         BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
         BlockTemplate.main(km: 2.0, zone: PaceZone.dressRehearsal, label: 'Race Pace'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+    ),
+
+    WorkoutTemplate(
+      id: 'race_negative_split',
+      name: 'Negative Split Run',
+      intent: WorkoutIntent.raceSpecific,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {RaceDistance.halfMarathon, RaceDistance.marathon},
+      distanceByRace: {
+        RaceDistance.halfMarathon: DistanceRange(minKm: 8,  maxKm: 16),
+        RaceDistance.marathon:     DistanceRange(minKm: 10, maxKm: 18),
+      },
+      description:
+          'First half at easy/steady effort, second half at goal pace. '
+          'Trains the discipline to hold back early and finish strong.',
+      blocks: [
+        BlockTemplate.percent(type: BlockType.warmup, fraction: 0.10, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main,   fraction: 0.45, zone: PaceZone.aerobicEasy),
+        BlockTemplate.percent(type: BlockType.main,   fraction: 0.45, zone: PaceZone.goalPace),
+      ],
+    ),
+
+    WorkoutTemplate(
+      id: 'race_pace_progression',
+      name: 'Goal Pace Progression',
+      intent: WorkoutIntent.raceSpecific,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK, RaceDistance.tenK,
+        RaceDistance.halfMarathon, RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK:        DistanceRange(minKm: 5,  maxKm: 8),
+        RaceDistance.tenK:         DistanceRange(minKm: 6,  maxKm: 12),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 8,  maxKm: 16),
+        RaceDistance.marathon:     DistanceRange(minKm: 10, maxKm: 16),
+      },
+      description:
+          'Three ascending blocks finishing at goal race pace. Builds '
+          'confidence in closing fast on tired legs.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate.main(km: 1.5, zone: PaceZone.steadyState, label: 'Block 1 — Steady'),
+        BlockTemplate.recoveryJog(km: 0.3),
+        BlockTemplate.main(km: 1.5, zone: PaceZone.tempo, label: 'Block 2 — Threshold'),
+        BlockTemplate.recoveryJog(km: 0.3),
+        BlockTemplate.main(km: 1.5, zone: PaceZone.goalPace, label: 'Block 3 — Goal Pace'),
+        BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
+      ],
+    ),
+
+    WorkoutTemplate(
+      id: 'race_time_trial',
+      name: 'Fitness Time Trial',
+      intent: WorkoutIntent.raceSpecific,
+      supportsScaling: false,
+      applicablePhases: {TrainingPhase.peak},
+      applicableRaceDistances: {RaceDistance.fiveK, RaceDistance.tenK},
+      distanceByRace: {
+        RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
+        RaceDistance.tenK:  DistanceRange(minKm: 6, maxKm: 10),
+      },
+      description:
+          'Hard continuous effort at close to race intensity — a fitness '
+          'checkpoint, not to be run more than once or twice a cycle.',
+      blocks: [
+        BlockTemplate(type: BlockType.warmup, durationType: DurationType.fixedKm, value: 2.0, paceZone: PaceZone.aerobicEasy),
+        BlockTemplate(type: BlockType.main, durationType: DurationType.fixedKm, value: 3.0, paceZone: PaceZone.vo2Intervals),
         BlockTemplate(type: BlockType.cooldown, durationType: DurationType.fixedKm, value: 1.5, paceZone: PaceZone.aerobicEasy),
       ],
     ),
