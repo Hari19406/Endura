@@ -1251,10 +1251,55 @@ class WorkoutLibrary {
     ),
 
     WorkoutTemplate(
+      id: 'cruise_intervals_taper',
+      name: 'Taper Sharpener — Cruise Intervals',
+      intent: WorkoutIntent.threshold,
+      applicablePhases: {TrainingPhase.taper},
+      applicableRaceDistances: {
+        RaceDistance.fiveK,
+        RaceDistance.tenK,
+        RaceDistance.halfMarathon,
+        RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
+        RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 10),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 14),
+        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18),
+      },
+      description:
+          'Short cruise intervals to stay sharp in taper without adding '
+          'fatigue. Broken format with generous recovery — lower risk than a '
+          'sustained tempo, confidence work rather than conditioning.',
+      blocks: [
+        BlockTemplate(
+          type: BlockType.warmup,
+          durationType: DurationType.fixedKm,
+          value: 1.5,
+          paceZone: PaceZone.aerobicEasy,
+        ),
+        BlockTemplate.mainMeters(
+          meters: 1000,
+          zone: PaceZone.cruiseIntervals,
+          reps: 3,
+          recoverySeconds: 120,
+          label: 'T-rep',
+        ),
+        BlockTemplate(
+          type: BlockType.cooldown,
+          durationType: DurationType.fixedKm,
+          value: 1.0,
+          paceZone: PaceZone.aerobicEasy,
+        ),
+      ],
+    ),
+
+    WorkoutTemplate(
       id: 'tempo_continuous',
       name: 'Tempo Run',
       intent: WorkoutIntent.threshold,
       applicablePhases: {
+        TrainingPhase.base,
         TrainingPhase.build,
         TrainingPhase.peak,
         TrainingPhase.taper,
@@ -1290,6 +1335,10 @@ class WorkoutLibrary {
         ),
       ],
       phaseVariants: {
+        TrainingPhase.base: PhaseVariant(
+          volumeMultiplier: 0.75,
+          note: 'Introductory continuous tempo — base phase',
+        ),
         TrainingPhase.build: PhaseVariant(
           volumeMultiplier: 0.90,
           note: 'Moderate tempo volume in build',
