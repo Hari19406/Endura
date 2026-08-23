@@ -502,11 +502,14 @@ class WeekResolver {
     RaceDistance race,
     TrainingPhase phase,
   ) {
-    if (phase == TrainingPhase.base) return WorkoutIntent.vo2max;
+    // Base = aerobic development + economy work (Daniels' R-pace/strides
+    // territory), not another interval session — vo2max belongs to build/peak.
+    if (phase == TrainingPhase.base) return WorkoutIntent.speed;
     if (phase == TrainingPhase.peak) return WorkoutIntent.raceSpecific;
     return switch (race) {
-      RaceDistance.fiveK => WorkoutIntent.threshold,
-      RaceDistance.tenK => WorkoutIntent.threshold,
+      // 5K/10K keep layering R-pace/economy work through build.
+      RaceDistance.fiveK => WorkoutIntent.speed,
+      RaceDistance.tenK => WorkoutIntent.speed,
       RaceDistance.halfMarathon => WorkoutIntent.vo2max,
       RaceDistance.marathon => WorkoutIntent.threshold,
     };

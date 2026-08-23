@@ -1384,7 +1384,7 @@ class WorkoutLibrary {
           km: 2.5,
           zone: PaceZone.tempo,
           reps: 2,
-          recoverySeconds: 180,
+          recoverySeconds: 150,
           label: 'Tempo Block',
         ),
         BlockTemplate(
@@ -1398,14 +1398,14 @@ class WorkoutLibrary {
         TrainingPhase.build: PhaseVariant(
           reps: 2,
           repDistanceKm: 2.5,
-          recoverySeconds: 180,
-          note: '2 × 2.5km @ tempo, 180s jog recovery',
+          recoverySeconds: 150,
+          note: '2 × 2.5km @ tempo, 150s jog recovery',
         ),
         TrainingPhase.peak: PhaseVariant(
           reps: 2,
           repDistanceKm: 3.0,
-          recoverySeconds: 150,
-          note: '2 × 3km @ tempo, 150s jog recovery',
+          recoverySeconds: 120,
+          note: '2 × 3km @ tempo, 120s jog recovery',
         ),
       },
     ),
@@ -2112,7 +2112,10 @@ class WorkoutLibrary {
       id: 'speed_hills_endurance',
       name: 'Hill Sprints — Endurance Runners',
       intent: WorkoutIntent.speed,
-      applicablePhases: {TrainingPhase.base, TrainingPhase.build},
+      // Base only: secondaryQuality never resolves to `speed` for HM/marathon
+      // in build (see week_resolver._secondaryQualityIntent) — those distances
+      // keep vo2max/threshold as their build secondary quality instead.
+      applicablePhases: {TrainingPhase.base},
       applicableRaceDistances: {
         RaceDistance.halfMarathon,
         RaceDistance.marathon,
@@ -2134,7 +2137,7 @@ class WorkoutLibrary {
         BlockTemplate.mainSeconds(
           seconds: 10,
           zone: PaceZone.hillSprints,
-          reps: 6,
+          reps: 5,
           recoverySeconds: 120,
           label: 'Hill Sprint',
         ),
@@ -2145,27 +2148,16 @@ class WorkoutLibrary {
           paceZone: PaceZone.aerobicEasy,
         ),
       ],
-      phaseVariants: {
-        TrainingPhase.base: PhaseVariant(
-          reps: 5,
-          repDurationSeconds: 10,
-          recoverySeconds: 120,
-          note: '5 × 10s hill sprints, 120s recovery',
-        ),
-        TrainingPhase.build: PhaseVariant(
-          reps: 8,
-          repDurationSeconds: 10,
-          recoverySeconds: 120,
-          note: '8 × 10s hill sprints, 120s recovery',
-        ),
-      },
     ),
 
     WorkoutTemplate(
       id: 'speed_flying_sprints',
       name: 'Flying Sprints',
       intent: WorkoutIntent.speed,
-      applicablePhases: {TrainingPhase.peak},
+      // Base, not peak: peak's secondaryQuality always resolves to
+      // raceSpecific (see week_resolver._secondaryQualityIntent), so `speed`
+      // is never requested in peak. Base is where 5K/10K R-pace work lives.
+      applicablePhases: {TrainingPhase.base},
       applicableRaceDistances: {RaceDistance.fiveK, RaceDistance.tenK},
       distanceByRace: {
         RaceDistance.fiveK: DistanceRange(minKm: 4, maxKm: 7),
@@ -2197,40 +2189,10 @@ class WorkoutLibrary {
       ],
     ),
 
-    WorkoutTemplate(
-      id: 'speed_strides_taper',
-      name: 'Strides — Taper Sharpener',
-      intent: WorkoutIntent.speed,
-      applicablePhases: {TrainingPhase.taper},
-      applicableRaceDistances: {
-        RaceDistance.fiveK,
-        RaceDistance.tenK,
-        RaceDistance.halfMarathon,
-        RaceDistance.marathon,
-      },
-      distanceByRace: {
-        RaceDistance.fiveK: DistanceRange(minKm: 3, maxKm: 5),
-        RaceDistance.tenK: DistanceRange(minKm: 3, maxKm: 6),
-        RaceDistance.halfMarathon: DistanceRange(minKm: 3, maxKm: 6),
-        RaceDistance.marathon: DistanceRange(minKm: 3, maxKm: 8),
-      },
-      description:
-          'Short easy jog with strides to stay sharp without adding fatigue before race day.',
-      blocks: [
-        BlockTemplate.percent(
-          type: BlockType.main,
-          fraction: 0.8,
-          zone: PaceZone.aerobicEasy,
-        ),
-        BlockTemplate.mainMeters(
-          meters: 100,
-          zone: PaceZone.strides,
-          reps: 4,
-          recoveryMeters: 100,
-          label: 'Stride',
-        ),
-      ],
-    ),
+    // speed_strides_taper removed — duplicated easy_strides' existing
+    // TrainingPhase.taper phaseVariant ("Light strides — stay sharp before
+    // race"), and taper has no secondary-quality slot to place it in anyway
+    // (WeekResolver drops Q2 to easy for every taper week).
 
     // ════════════════════════════════════════════════════════════════════════
     // RACE SPECIFIC
@@ -2486,7 +2448,10 @@ class WorkoutLibrary {
           type: BlockType.main,
           durationType: DurationType.fixedKm,
           value: 3.0,
-          paceZone: PaceZone.vo2Intervals,
+          // tenKPace, not vo2Intervals: I-pace is only meant to be sustained
+          // in 3-5min reps with rest, not as one continuous unbroken block —
+          // a slower runner would spend 15-20+ min at that intensity here.
+          paceZone: PaceZone.tenKPace,
         ),
         BlockTemplate(
           type: BlockType.cooldown,
