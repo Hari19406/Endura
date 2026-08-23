@@ -29,6 +29,7 @@ import '../screens/plan_complete_screen.dart';
 import '../screens/manage_plan_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/paywall_screen.dart';
+import '../screens/plan_overview_screen.dart';
 import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/weather_service.dart';
@@ -56,47 +57,47 @@ class WorkoutDisplayStyle {
 WorkoutDisplayStyle _workoutDisplayStyle(WorkoutIntent intent) {
   return switch (intent) {
     WorkoutIntent.aerobicBase => const WorkoutDisplayStyle(
-        category: WorkoutCategory.easy,
-        accentColor: Color(0xFF004D40),
-        badgeLabel: 'EASY',
-        icon: Icons.directions_run,
-      ),
+      category: WorkoutCategory.easy,
+      accentColor: Color(0xFF004D40),
+      badgeLabel: 'EASY',
+      icon: Icons.directions_run,
+    ),
     WorkoutIntent.endurance => const WorkoutDisplayStyle(
-        category: WorkoutCategory.long,
-        accentColor: Color(0xFF1B5E20),
-        badgeLabel: 'ENDURANCE',
-        icon: Icons.landscape_outlined,
-      ),
+      category: WorkoutCategory.long,
+      accentColor: Color(0xFF1B5E20),
+      badgeLabel: 'ENDURANCE',
+      icon: Icons.landscape_outlined,
+    ),
     WorkoutIntent.threshold => const WorkoutDisplayStyle(
-        category: WorkoutCategory.tempo,
-        accentColor: Color(0xFFBF360C),
-        badgeLabel: 'QUALITY',
-        icon: Icons.bolt,
-      ),
+      category: WorkoutCategory.tempo,
+      accentColor: Color(0xFFBF360C),
+      badgeLabel: 'QUALITY',
+      icon: Icons.bolt,
+    ),
     WorkoutIntent.vo2max => const WorkoutDisplayStyle(
-        category: WorkoutCategory.interval,
-        accentColor: Color(0xFF0D47A1),
-        badgeLabel: 'QUALITY',
-        icon: Icons.repeat_rounded,
-      ),
+      category: WorkoutCategory.interval,
+      accentColor: Color(0xFF0D47A1),
+      badgeLabel: 'QUALITY',
+      icon: Icons.repeat_rounded,
+    ),
     WorkoutIntent.speed => const WorkoutDisplayStyle(
-        category: WorkoutCategory.interval,
-        accentColor: Color(0xFF0D47A1),
-        badgeLabel: 'SPEED',
-        icon: Icons.flash_on,
-      ),
+      category: WorkoutCategory.interval,
+      accentColor: Color(0xFF0D47A1),
+      badgeLabel: 'SPEED',
+      icon: Icons.flash_on,
+    ),
     WorkoutIntent.raceSpecific => const WorkoutDisplayStyle(
-        category: WorkoutCategory.tempo,
-        accentColor: Color(0xFFBF360C),
-        badgeLabel: 'RACE PACE',
-        icon: Icons.flag_outlined,
-      ),
+      category: WorkoutCategory.tempo,
+      accentColor: Color(0xFFBF360C),
+      badgeLabel: 'RACE PACE',
+      icon: Icons.flag_outlined,
+    ),
     WorkoutIntent.recovery => const WorkoutDisplayStyle(
-        category: WorkoutCategory.recovery,
-        accentColor: Color(0xFF4A148C),
-        badgeLabel: 'RECOVERY',
-        icon: Icons.self_improvement,
-      ),
+      category: WorkoutCategory.recovery,
+      accentColor: Color(0xFF4A148C),
+      badgeLabel: 'RECOVERY',
+      icon: Icons.self_improvement,
+    ),
   };
 }
 
@@ -185,13 +186,13 @@ class WorkoutDisplayModel {
     }
 
     final feelHint = switch (msg.workoutIntent) {
-      WorkoutIntent.aerobicBase  => 'Conversational pace',
-      WorkoutIntent.endurance    => 'Easy and steady',
-      WorkoutIntent.threshold    => 'Comfortably hard',
-      WorkoutIntent.vo2max       => 'Hard intervals',
-      WorkoutIntent.speed        => 'Short and snappy',
+      WorkoutIntent.aerobicBase => 'Conversational pace',
+      WorkoutIntent.endurance => 'Easy and steady',
+      WorkoutIntent.threshold => 'Comfortably hard',
+      WorkoutIntent.vo2max => 'Hard intervals',
+      WorkoutIntent.speed => 'Short and snappy',
       WorkoutIntent.raceSpecific => 'Race pace',
-      WorkoutIntent.recovery     => 'Very easy',
+      WorkoutIntent.recovery => 'Very easy',
     };
 
     return WorkoutDisplayModel(
@@ -318,7 +319,9 @@ class WorkoutCard extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: _accent.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
@@ -344,7 +347,9 @@ class WorkoutCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: c.divider,
                         borderRadius: BorderRadius.circular(8),
@@ -352,8 +357,11 @@ class WorkoutCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.chat_bubble_outline_rounded,
-                              size: 11, color: Color(0xFF00A08A)),
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 11,
+                            color: Color(0xFF00A08A),
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             workout.feelHint,
@@ -374,7 +382,11 @@ class WorkoutCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.lock_outline_rounded, size: 22, color: c.textTertiary),
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    size: 22,
+                    color: c.textTertiary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -436,7 +448,9 @@ class WorkoutCard extends StatelessWidget {
                       onTap: onTap,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 10),
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: c.accent,
                           borderRadius: BorderRadius.circular(12),
@@ -453,8 +467,11 @@ class WorkoutCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 5),
-                            Icon(Icons.arrow_forward_rounded,
-                                size: 13, color: c.onAccent),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 13,
+                              color: c.onAccent,
+                            ),
                           ],
                         ),
                       ),
@@ -576,7 +593,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _onUnitPrefChanged() {
     if (mounted) {
-      setState(() => _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km');
+      setState(
+        () => _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km',
+      );
     }
   }
 
@@ -594,7 +613,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (name.isEmpty) {
         final user = Supabase.instance.client.auth.currentUser;
         final meta = user?.userMetadata;
-        name = (meta?['name'] as String?) ?? (meta?['full_name'] as String?) ?? '';
+        name =
+            (meta?['name'] as String?) ?? (meta?['full_name'] as String?) ?? '';
         if (name.isEmpty) {
           name = user?.email?.split('@').first ?? '';
         }
@@ -640,7 +660,10 @@ class _HomeScreenState extends State<HomeScreen>
 
     try {
       await EngineMemoryService().migrateFirstRunDateIfNeeded();
-      await Future.wait([_restoreFromCloudIfNeeded(force: forceCloudRestore), _loadSettings()]);
+      await Future.wait([
+        _restoreFromCloudIfNeeded(force: forceCloudRestore),
+        _loadSettings(),
+      ]);
       await _restoreCloudCoachingState();
       await _hydrateLocalProfileFromCloud();
       CloudSyncService.instance.syncPendingRuns();
@@ -654,7 +677,8 @@ class _HomeScreenState extends State<HomeScreen>
 
       // ── Post-plan state check (before anything else) ─────────────────────
       final postPlanResult = _coachEngine.checkAndApplyPostPlanState(memory);
-      if (postPlanResult.justCompleted || postPlanResult.justEnteredMaintenance) {
+      if (postPlanResult.justCompleted ||
+          postPlanResult.justEnteredMaintenance) {
         await EngineMemoryService().save(postPlanResult.memory);
         memory = postPlanResult.memory;
       }
@@ -665,7 +689,8 @@ class _HomeScreenState extends State<HomeScreen>
 
       // ── Populate post-plan display fields ────────────────────────────────
       final prefs = await SharedPreferences.getInstance();
-      _vdotBeforePlan = memory.vdotAtPlanStart ??
+      _vdotBeforePlan =
+          memory.vdotAtPlanStart ??
           prefs.getInt('vdot_before_plan') ??
           memory.vdotScore;
       _completedRaceLabel = _raceLabel(prefs.getString('goal_race') ?? '5k');
@@ -673,16 +698,22 @@ class _HomeScreenState extends State<HomeScreen>
 
       // Race countdown chip — explicit race_date pref wins, otherwise use plan end date
       final raceDateStr = prefs.getString('race_date');
-      _raceDate = (raceDateStr != null ? DateTime.tryParse(raceDateStr) : null)
-          ?? _engineMemory?.racePlan?.raceDate;
+      _raceDate =
+          (raceDateStr != null ? DateTime.tryParse(raceDateStr) : null) ??
+          _engineMemory?.racePlan?.raceDate;
       _goalRaceName = _raceLabel(
-        prefs.getString('goal_race') ?? _engineMemory?.racePlan?.goalRace ?? '5k',
+        prefs.getString('goal_race') ??
+            _engineMemory?.racePlan?.goalRace ??
+            '5k',
       );
 
       if (memory.isPlanComplete && !memory.isInMaintenance) {
         final snoozeStr = prefs.getString('plan_complete_snooze_until');
-        final snoozeUntil = snoozeStr != null ? DateTime.tryParse(snoozeStr) : null;
-        final isSnoozed = snoozeUntil != null && DateTime.now().isBefore(snoozeUntil);
+        final snoozeUntil = snoozeStr != null
+            ? DateTime.tryParse(snoozeStr)
+            : null;
+        final isSnoozed =
+            snoozeUntil != null && DateTime.now().isBefore(snoozeUntil);
         if (!isSnoozed) {
           setState(() {
             _showPlanComplete = true;
@@ -747,30 +778,30 @@ class _HomeScreenState extends State<HomeScreen>
           prTimeSeconds = paceMin * 60 + paceSec;
           prDistanceStr = paceDistance;
         }
-        final weeklyMileage = prefs.getDouble('weekly_mileage_km') ??
-            _estimateWeeklyVolume(runs);
+        final weeklyMileage =
+            prefs.getDouble('weekly_mileage_km') ?? _estimateWeeklyVolume(runs);
 
         final recentRuns = runs.take(5).toList();
         int avgEasyPace = experienceLevel == 'advanced'
             ? 300
             : experienceLevel == 'intermediate'
-                ? 330
-                : 360;
+            ? 330
+            : 360;
         if (recentRuns.isNotEmpty) {
           final paces = recentRuns
               .map((r) => _paceToSeconds(r.averagePace))
               .where((p) => p > 0)
               .toList();
           if (paces.isNotEmpty) {
-            avgEasyPace =
-                (paces.reduce((a, b) => a + b) / paces.length).round();
+            avgEasyPace = (paces.reduce((a, b) => a + b) / paces.length)
+                .round();
           }
         }
 
         final avgDistance = recentRuns.isEmpty
             ? 5.0
             : recentRuns.fold(0.0, (sum, r) => sum + r.distance) /
-                recentRuns.length;
+                  recentRuns.length;
 
         final goalIntent = prefs.getString('goal_intent') ?? 'improve';
 
@@ -807,8 +838,7 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
         if (_coachMessage != null) {
-          _workoutModel =
-              WorkoutDisplayModel.fromCoachMessage(_coachMessage!);
+          _workoutModel = WorkoutDisplayModel.fromCoachMessage(_coachMessage!);
         } else {
           _workoutModel = const WorkoutDisplayModel(
             category: WorkoutCategory.rest,
@@ -846,12 +876,9 @@ class _HomeScreenState extends State<HomeScreen>
         _workoutModel = const WorkoutDisplayModel(
           category: WorkoutCategory.easy,
           title: 'Easy Run',
-          coachingReason:
-              'Coach engine is recalibrating. Run easy today.',
+          coachingReason: 'Coach engine is recalibrating. Run easy today.',
           duration: '30 min',
-          steps: [
-            'Run at a comfortable, conversational pace for 30 minutes.'
-          ],
+          steps: ['Run at a comfortable, conversational pace for 30 minutes.'],
         );
         _userMetrics = null;
         widget.onCoachMessageReady?.call(null);
@@ -866,7 +893,9 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     // Fire-and-forget — never blocks initial paint, chip just appears late.
-    WeatherService.getCurrentWeather(forceRefresh: forceCloudRestore).then((weather) {
+    WeatherService.getCurrentWeather(forceRefresh: forceCloudRestore).then((
+      weather,
+    ) {
       if (mounted && weather != null) setState(() => _weather = weather);
     });
   }
@@ -901,12 +930,17 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _onRemindLater() async {
     final prefs = await SharedPreferences.getInstance();
     final remindDate = DateTime.now().add(const Duration(days: 14));
-    await prefs.setString('plan_complete_snooze_until', remindDate.toIso8601String());
+    await prefs.setString(
+      'plan_complete_snooze_until',
+      remindDate.toIso8601String(),
+    );
     // Sync to Supabase so snooze survives a device switch
-    ProfileService.instance.updateField(
-      'plan_snooze_until',
-      remindDate.toIso8601String().substring(0, 10),
-    ).ignore();
+    ProfileService.instance
+        .updateField(
+          'plan_snooze_until',
+          remindDate.toIso8601String().substring(0, 10),
+        )
+        .ignore();
     setState(() => _showPlanComplete = false);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -919,16 +953,17 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   String _raceLabel(String goalRace) => switch (goalRace) {
-        '10k'           => '10K',
-        'half_marathon' => 'Half Marathon',
-        'marathon'      => 'Marathon',
-        _               => '5K',
-      };
+    '10k' => '10K',
+    'half_marathon' => 'Half Marathon',
+    'marathon' => 'Marathon',
+    _ => '5K',
+  };
 
   // ── Cloud / profile helpers (unchanged) ───────────────────────────────────
 
   Future<void> _restoreCloudCoachingState() async {
-    final cloudState = await EngineStateSyncService.instance.fetchCloudCoachingState();
+    final cloudState = await EngineStateSyncService.instance
+        .fetchCloudCoachingState();
     final cloudMemory = cloudState.memory;
     final cloudDays = cloudState.trainingDays;
 
@@ -937,9 +972,11 @@ class _HomeScreenState extends State<HomeScreen>
     // the updatedAt tracking (no local timestamp recorded yet). ─────────
     final localDays = await TrainingDaysService.load();
     final localDaysUpdatedAt = await TrainingDaysService.loadUpdatedAt();
-    final cloudDaysNewer = cloudDays != null &&
+    final cloudDaysNewer =
+        cloudDays != null &&
         (localDaysUpdatedAt == null ||
-            (cloudState.trainingDaysUpdatedAt?.isAfter(localDaysUpdatedAt) ?? false));
+            (cloudState.trainingDaysUpdatedAt?.isAfter(localDaysUpdatedAt) ??
+                false));
     if (cloudDays != null &&
         (localDays == null || !_intListsEqual(localDays, cloudDays)) &&
         (cloudDaysNewer || localDays == null)) {
@@ -956,11 +993,14 @@ class _HomeScreenState extends State<HomeScreen>
     // another device, instead of being stuck forever on its own copy. ──
     final localMemory = await EngineMemoryService().load();
     final localMemoryUpdatedAt = await EngineMemoryService().loadUpdatedAt();
-    final cloudMemoryNewer = cloudMemory != null &&
+    final cloudMemoryNewer =
+        cloudMemory != null &&
         (localMemoryUpdatedAt == null ||
-            (cloudState.memoryUpdatedAt?.isAfter(localMemoryUpdatedAt) ?? false));
+            (cloudState.memoryUpdatedAt?.isAfter(localMemoryUpdatedAt) ??
+                false));
     final shouldRestoreCloudMemory =
-        cloudMemory != null && (cloudMemoryNewer || _shouldRestoreCloudMemory(localMemory));
+        cloudMemory != null &&
+        (cloudMemoryNewer || _shouldRestoreCloudMemory(localMemory));
 
     if (shouldRestoreCloudMemory) {
       await EngineMemoryService().save(cloudMemory, syncToCloud: false);
@@ -970,7 +1010,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   bool _shouldRestoreCloudMemory(EngineMemory localMemory) {
-    final hasMeaningfulLocalState = localMemory.totalRunsCompleted > 0 ||
+    final hasMeaningfulLocalState =
+        localMemory.totalRunsCompleted > 0 ||
         localMemory.activePlan != null ||
         localMemory.racePlan != null ||
         localMemory.lastRunDate != null ||
@@ -988,7 +1029,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _hydrateLocalProfileFromCloud() async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey('goal_race') && prefs.containsKey('experience_level')) return;
+    if (prefs.containsKey('goal_race') && prefs.containsKey('experience_level'))
+      return;
 
     final profile = await ProfileService.instance.fetchProfile();
     if (profile == null) return;
@@ -1026,10 +1068,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (!prefs.containsKey('weekly_mileage_km')) {
       final fallbackWeeklyKm = switch (profile.runsPerWeek ?? 4) {
         <= 2 => 12.0,
-        3    => 20.0,
-        4    => 28.0,
-        5    => 40.0,
-        _    => 50.0,
+        3 => 20.0,
+        4 => 28.0,
+        5 => 40.0,
+        _ => 50.0,
       };
       await prefs.setDouble('weekly_mileage_km', fallbackWeeklyKm);
     }
@@ -1040,7 +1082,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     final raceDateRaw = prefs.getString('race_date');
     final weeklyKm = prefs.getDouble('weekly_mileage_km') ?? 0.0;
-    final experienceLevel = prefs.getString('experience_level') ?? 'intermediate';
+    final experienceLevel =
+        prefs.getString('experience_level') ?? 'intermediate';
     final goalRace = prefs.getString('goal_race') ?? profile.goal ?? '5k';
 
     if (raceDateRaw != null) {
@@ -1192,14 +1235,16 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final savedRuns = runs
-        .map((r) => SavedRun(
-              distance: r.distance,
-              averagePace: r.averagePace,
-              date: r.date,
-              gpsPoints: r.gpsPoints,
-              rpe: r.rpe,
-              workoutType: r.workoutType,
-            ))
+        .map(
+          (r) => SavedRun(
+            distance: r.distance,
+            averagePace: r.averagePace,
+            date: r.date,
+            gpsPoints: r.gpsPoints,
+            rpe: r.rpe,
+            workoutType: r.workoutType,
+          ),
+        )
         .toList();
 
     return HistoricalTrainingData(
@@ -1240,12 +1285,18 @@ class _HomeScreenState extends State<HomeScreen>
 
   selector.WorkoutId? _resolveLastWorkoutId(String lastWorkoutType) {
     switch (lastWorkoutType) {
-      case 'tempo':    return selector.WorkoutId.tempoRun;
-      case 'interval': return selector.WorkoutId.intervalWorkout;
-      case 'long':     return selector.WorkoutId.longEasy;
-      case 'recovery': return selector.WorkoutId.recoveryRun;
-      case 'easy':     return selector.WorkoutId.easyRun;
-      default:         return null;
+      case 'tempo':
+        return selector.WorkoutId.tempoRun;
+      case 'interval':
+        return selector.WorkoutId.intervalWorkout;
+      case 'long':
+        return selector.WorkoutId.longEasy;
+      case 'recovery':
+        return selector.WorkoutId.recoveryRun;
+      case 'easy':
+        return selector.WorkoutId.easyRun;
+      default:
+        return null;
     }
   }
 
@@ -1264,7 +1315,9 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final c = context.colors;
-    final greetingText = _userName.isNotEmpty ? '$_greeting, $_userName' : _greeting;
+    final greetingText = _userName.isNotEmpty
+        ? '$_greeting, $_userName'
+        : _greeting;
     return Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(
@@ -1276,8 +1329,10 @@ class _HomeScreenState extends State<HomeScreen>
             Text(
               greetingText,
               style: TextStyle(
-                fontWeight: FontWeight.w800, color: c.textPrimary,
-                fontSize: 22, letterSpacing: -0.5,
+                fontWeight: FontWeight.w800,
+                color: c.textPrimary,
+                fontSize: 22,
+                letterSpacing: -0.5,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1297,7 +1352,11 @@ class _HomeScreenState extends State<HomeScreen>
         backgroundColor: c.surface,
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications_outlined, color: c.textTertiary, size: 22),
+            icon: Icon(
+              Icons.notifications_outlined,
+              color: c.textTertiary,
+              size: 22,
+            ),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -1352,39 +1411,43 @@ class _HomeScreenState extends State<HomeScreen>
                 ValueListenableBuilder<bool>(
                   valueListenable: RevenueCatService.isProNotifier,
                   builder: (context, isPro, _) => WorkoutCard(
-                    workout: _workoutModel ?? const WorkoutDisplayModel(
-                      category: WorkoutCategory.rest,
-                      title: 'Rest Day',
-                      coachingReason: 'Rest up today. Your next workout is already lined up.',
-                      steps: [],
-                    ),
+                    workout:
+                        _workoutModel ??
+                        const WorkoutDisplayModel(
+                          category: WorkoutCategory.rest,
+                          title: 'Rest Day',
+                          coachingReason:
+                              'Rest up today. Your next workout is already lined up.',
+                          steps: [],
+                        ),
                     locked: !isPro,
                     onTap: !isPro
                         ? () => Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const PaywallScreen()),
-                            )
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PaywallScreen(),
+                            ),
+                          )
                         : (_coachMessage != null
-                            ? () {
-                                showPreRunCheck(
-                                  context: context,
-                                  coachMessage: _coachMessage!,
-                                  weather: _weather,
-                                  onProceed: (scaled) => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => PreRunBriefingScreen(
-                                        coachMessage: scaled,
-                                        onGoToRun: () =>
-                                            widget.onNavigateToRun?.call(),
+                              ? () {
+                                  showPreRunCheck(
+                                    context: context,
+                                    coachMessage: _coachMessage!,
+                                    weather: _weather,
+                                    onProceed: (scaled) => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PreRunBriefingScreen(
+                                          coachMessage: scaled,
+                                          onGoToRun: () =>
+                                              widget.onNavigateToRun?.call(),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  onSkip: _handleSkip,
-                                );
-                              }
-                            : null),
+                                    onSkip: _handleSkip,
+                                  );
+                                }
+                              : null),
                   ),
                 ),
 
@@ -1394,41 +1457,49 @@ class _HomeScreenState extends State<HomeScreen>
                   button: true,
                   label: 'Manage plan',
                   child: GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ManagePlanScreen(onPlanChanged: loadData),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ManagePlanScreen(onPlanChanged: loadData),
+                      ),
                     ),
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      border: Border.all(color: context.colors.border),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Manage Plan',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textPrimary,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: context.colors.surface,
+                        border: Border.all(color: context.colors.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Manage Plan',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: context.colors.textPrimary,
+                            ),
                           ),
-                        ),
-                        Icon(Icons.chevron_right,
-                            color: context.colors.textTertiary, size: 20),
-                      ],
+                          Icon(
+                            Icons.chevron_right,
+                            color: context.colors.textTertiary,
+                            size: 20,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                 ),
               ],
               const SizedBox(height: 16),
-              if (_lastRun == null && _workoutModel?.category != WorkoutCategory.rest) ...[
+              if (_lastRun == null &&
+                  _workoutModel?.category != WorkoutCategory.rest) ...[
                 _buildWelcomeHeroCard(),
                 const SizedBox(height: 16),
               ],
@@ -1447,8 +1518,8 @@ class _HomeScreenState extends State<HomeScreen>
     final label = days == 0
         ? 'Race day — $_goalRaceName!'
         : days == 1
-            ? '1 day to $_goalRaceName'
-            : '$days days to $_goalRaceName';
+        ? '1 day to $_goalRaceName'
+        : '$days days to $_goalRaceName';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -1464,7 +1535,8 @@ class _HomeScreenState extends State<HomeScreen>
           Text(
             label,
             style: const TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
               color: Color(0xFF856404),
             ),
           ),
@@ -1491,8 +1563,10 @@ class _HomeScreenState extends State<HomeScreen>
         Text(
           '${weather.tempC.round()}°C',
           style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600,
-            color: c.textTertiary, letterSpacing: 0.2,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: c.textTertiary,
+            letterSpacing: 0.2,
           ),
         ),
       ],
@@ -1500,10 +1574,15 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildSectionLabel(String text) {
-    return Text(text, style: TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w600,
-      color: context.colors.textTertiary, letterSpacing: 1.2,
-    ));
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: context.colors.textTertiary,
+        letterSpacing: 1.2,
+      ),
+    );
   }
 
   Widget _buildBottomCarousel() {
@@ -1521,7 +1600,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _carouselShell({required Widget child, required double width}) {
     return Container(
-      width: width, height: 190,
+      width: width,
+      height: 190,
       decoration: BoxDecoration(
         color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -1536,10 +1616,14 @@ class _HomeScreenState extends State<HomeScreen>
     final now = DateTime.now();
     final todayIndex = now.weekday - 1;
     const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    final weekMonday = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
+    final weekMonday = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
 
-    final runsThisWeek = _consistencyData?.runsThisWeek ??
+    final runsThisWeek =
+        _consistencyData?.runsThisWeek ??
         _runHistory.where((r) {
           final diff = now.difference(r.date).inDays;
           return diff < 7;
@@ -1550,74 +1634,112 @@ class _HomeScreenState extends State<HomeScreen>
         : 0.0;
     final c = context.colors;
 
-    return _carouselShell(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('THIS WEEK', style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600,
-            color: c.textTertiary, letterSpacing: 1.2,
-          )),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(7, (i) {
-              final isToday = i == todayIndex;
-              final dayDate = weekMonday.add(Duration(days: i));
-              final hasRun = _dayHasRun(dayDate);
-              return Column(
-                children: [
-                  Text(dayLabels[i], style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                    color: isToday ? c.textPrimary : c.textTertiary,
-                  )),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: hasRun ? c.accent : Colors.transparent,
-                      border: Border.all(
-                        color: hasRun ? Colors.transparent : c.border,
-                        width: 1.5,
+    return GestureDetector(
+      onTap: _openPlanOverview,
+      child: _carouselShell(
+        width: width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'THIS WEEK',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: c.textTertiary,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                if (_engineMemory?.racePlan != null)
+                  Icon(Icons.chevron_right, size: 16, color: c.textTertiary),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(7, (i) {
+                final isToday = i == todayIndex;
+                final dayDate = weekMonday.add(Duration(days: i));
+                final hasRun = _dayHasRun(dayDate);
+                return Column(
+                  children: [
+                    Text(
+                      dayLabels[i],
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                        color: isToday ? c.textPrimary : c.textTertiary,
                       ),
                     ),
-                    child: hasRun
-                        ? Icon(Icons.check, size: 15, color: c.onAccent)
-                        : null,
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: hasRun ? c.accent : Colors.transparent,
+                        border: Border.all(
+                          color: hasRun ? Colors.transparent : c.border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: hasRun
+                          ? Icon(Icons.check, size: 15, color: c.onAccent)
+                          : null,
+                    ),
+                  ],
+                );
+              }),
+            ),
+            const Spacer(),
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$runsThisWeek',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: c.textPrimary,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' / $weeklyTarget runs',
+                    style: TextStyle(fontSize: 14, color: c.textTertiary),
                   ),
                 ],
-              );
-            }),
-          ),
-          const Spacer(),
-          RichText(
-            text: TextSpan(children: [
-              TextSpan(
-                text: '$runsThisWeek',
-                style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary,
-                ),
               ),
-              TextSpan(
-                text: ' / $weeklyTarget runs',
-                style: TextStyle(fontSize: 14, color: c.textTertiary),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: ratio, minHeight: 3,
-              backgroundColor: c.divider,
-              valueColor: AlwaysStoppedAnimation<Color>(c.accent),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 3,
+                backgroundColor: c.divider,
+                valueColor: AlwaysStoppedAnimation<Color>(c.accent),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openPlanOverview() {
+    final racePlan = _engineMemory?.racePlan;
+    if (racePlan == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlanOverviewScreen(
+          racePlan: racePlan,
+          activePlan: _activePlan,
+          useMiles: UnitUtils.useMilesNotifier.value,
+        ),
       ),
     );
   }
@@ -1626,7 +1748,8 @@ class _HomeScreenState extends State<HomeScreen>
     for (final RunHistory r in _runHistory) {
       if (r.date.year == day.year &&
           r.date.month == day.month &&
-          r.date.day == day.day) return true;
+          r.date.day == day.day)
+        return true;
     }
     return false;
   }
@@ -1638,14 +1761,20 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('LAST RUN', style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600,
-            color: c.textTertiary, letterSpacing: 1.2,
-          )),
+          Text(
+            'LAST RUN',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: c.textTertiary,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(_formatDate(_lastRun!.date), style: TextStyle(
-            fontSize: 11, color: c.textTertiary,
-          )),
+          Text(
+            _formatDate(_lastRun!.date),
+            style: TextStyle(fontSize: 11, color: c.textTertiary),
+          ),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -1653,28 +1782,41 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('DIST', style: TextStyle(
-                      fontSize: 9, fontWeight: FontWeight.w600,
-                      color: c.textTertiary, letterSpacing: 0.8,
-                    )),
+                    Text(
+                      'DIST',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: c.textTertiary,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          _convertDistance(_lastRun!.distance).toStringAsFixed(1),
+                          _convertDistance(
+                            _lastRun!.distance,
+                          ).toStringAsFixed(1),
                           style: TextStyle(
-                            fontSize: 28, fontWeight: FontWeight.w600,
-                            color: c.textPrimary, letterSpacing: -0.5,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                            color: c.textPrimary,
+                            letterSpacing: -0.5,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4, left: 3),
-                          child: Text(_distanceLabel, style: TextStyle(
-                            fontSize: 12, color: c.textTertiary,
-                            fontWeight: FontWeight.w500,
-                          )),
+                          child: Text(
+                            _distanceLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: c.textTertiary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1685,25 +1827,39 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('PACE', style: TextStyle(
-                      fontSize: 9, fontWeight: FontWeight.w600,
-                      color: c.textTertiary, letterSpacing: 0.8,
-                    )),
+                    Text(
+                      'PACE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: c.textTertiary,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(_lastRun!.averagePace, style: TextStyle(
-                          fontSize: 28, fontWeight: FontWeight.w600,
-                          color: c.textPrimary, letterSpacing: -0.5,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        )),
+                        Text(
+                          _lastRun!.averagePace,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                            color: c.textPrimary,
+                            letterSpacing: -0.5,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4, left: 3),
-                          child: Text('/km', style: TextStyle(
-                            fontSize: 12, color: c.textTertiary,
-                            fontWeight: FontWeight.w500,
-                          )),
+                          child: Text(
+                            '/km',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: c.textTertiary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1721,9 +1877,14 @@ class _HomeScreenState extends State<HomeScreen>
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: c.border),
               ),
-              child: Text('RPE ${_lastRun!.rpe}/10', style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: c.textPrimary,
-              )),
+              child: Text(
+                'RPE ${_lastRun!.rpe}/10',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: c.textPrimary,
+                ),
+              ),
             ),
           ],
         ],
@@ -1738,13 +1899,13 @@ class _HomeScreenState extends State<HomeScreen>
       child: Row(
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: c.divider,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.directions_run,
-                color: c.textTertiary, size: 22),
+            child: Icon(Icons.directions_run, color: c.textTertiary, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1752,15 +1913,21 @@ class _HomeScreenState extends State<HomeScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('No runs yet', style: TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700,
-                  color: c.textPrimary,
-                )),
+                Text(
+                  'No runs yet',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   'Head to the Run tab to record your first run',
                   style: TextStyle(
-                    fontSize: 12, color: c.textTertiary, height: 1.4,
+                    fontSize: 12,
+                    color: c.textTertiary,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -1777,63 +1944,90 @@ class _HomeScreenState extends State<HomeScreen>
       button: true,
       label: 'Start a new training plan',
       child: GestureDetector(
-      onTap: _onStartNextPlan,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: c.border),
+        onTap: _onStartNextPlan,
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.border),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: c.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'NO PLAN',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: c.accent,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Start a new\ntraining plan',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  color: c.textPrimary,
+                  height: 1.1,
+                  letterSpacing: -0.8,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Set your goal race and get a personalised plan built around your schedule.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: c.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: c.accent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Get started',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: c.onAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: c.onAccent,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: c.accent.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text('NO PLAN', style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700,
-                color: c.accent, letterSpacing: 1.5,
-              )),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Start a new\ntraining plan',
-              style: TextStyle(
-                fontSize: 30, fontWeight: FontWeight.w700,
-                color: c.textPrimary, height: 1.1, letterSpacing: -0.8,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Set your goal race and get a personalised plan built around your schedule.',
-              style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.5),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: c.accent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Get started', style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: c.onAccent,
-                  )),
-                  const SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 14, color: c.onAccent),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
       ),
     );
   }
@@ -1857,16 +2051,27 @@ class _HomeScreenState extends State<HomeScreen>
               border: Border.all(color: c.border),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text('WELCOME', style: TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w700,
-              color: c.textTertiary, letterSpacing: 2,
-            )),
+            child: Text(
+              'WELCOME',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: c.textTertiary,
+                letterSpacing: 2,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
-          Text('Ready to\ntrain?', style: TextStyle(
-            fontSize: 48, fontWeight: FontWeight.w800,
-            color: c.textPrimary, height: 1.05, letterSpacing: -1.5,
-          )),
+          Text(
+            'Ready to\ntrain?',
+            style: TextStyle(
+              fontSize: 48,
+              fontWeight: FontWeight.w800,
+              color: c.textPrimary,
+              height: 1.05,
+              letterSpacing: -1.5,
+            ),
+          ),
           const SizedBox(height: 12),
           Text(
             'Complete your first run to unlock\nyour adaptive plan.',
