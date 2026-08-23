@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
@@ -98,6 +99,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   Color _workoutColor(String type) => WorkoutTypeStyle.color(type);
 
   Future<void> _confirmDeleteWorkout() async {
+    HapticFeedback.lightImpact();
     final c = context.colors;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -109,11 +111,17 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.pop(dialogContext, false);
+            },
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(dialogContext, true);
+            },
             child: Text('Delete', style: TextStyle(color: c.danger)),
           ),
         ],
@@ -168,19 +176,22 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               height: 54,
               width: double.infinity,
               child: FloatingActionButton.extended(
-                onPressed: () => showRunShareSheet(
-                  context,
-                  ShareRunData(
-                    distanceKm: distance,
-                    averagePace: pace,
-                    durationSeconds: duration,
-                    date: date,
-                    workoutType: workoutType,
-                    gpsPoints: gpsPoints,
-                    useMiles: _useMiles,
-                  ),
-                  source: 'run_detail',
-                ),
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  showRunShareSheet(
+                    context,
+                    ShareRunData(
+                      distanceKm: distance,
+                      averagePace: pace,
+                      durationSeconds: duration,
+                      date: date,
+                      workoutType: workoutType,
+                      gpsPoints: gpsPoints,
+                      useMiles: _useMiles,
+                    ),
+                    source: 'run_detail',
+                  );
+                },
                 backgroundColor: context.colors.accent,
                 foregroundColor: context.colors.onAccent,
                 elevation: 4,
@@ -229,7 +240,10 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             surfaceTintColor: Colors.transparent,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                Navigator.pop(context);
+              },
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(

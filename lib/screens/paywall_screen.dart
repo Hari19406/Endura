@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/revenue_cat_service.dart';
@@ -47,6 +48,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _purchase(Package package) async {
+    HapticFeedback.mediumImpact();
     setState(() => _purchasingId = package.identifier);
     try {
       final nowPro = await RevenueCatService.purchasePackage(package);
@@ -69,6 +71,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _restore() async {
+    HapticFeedback.lightImpact();
     setState(() => _purchasingId = 'restore');
     try {
       final nowPro = await RevenueCatService.restorePurchases();
@@ -145,6 +148,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
       _selected != null && _selected == _annualPackage;
 
   void _openPlanPicker() {
+    HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -158,6 +162,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ? _monthlyEquivalent(_annualPackage!)
             : null,
         onPick: (pkg) {
+          HapticFeedback.selectionClick();
           setState(() => _selected = pkg);
           Navigator.pop(context);
         },
@@ -207,7 +212,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     padding: const EdgeInsets.fromLTRB(0, 8, 8, 0),
                     child: IconButton(
                       icon: Icon(Icons.close, color: c.textTertiary),
-                      onPressed: () => Navigator.pop(context, false),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pop(context, false);
+                      },
                     ),
                   ),
                 ),
@@ -847,8 +855,10 @@ class _LegalLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () =>
-          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      },
       child: Text(
         label,
         style: TextStyle(

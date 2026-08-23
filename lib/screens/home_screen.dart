@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../utils/stats.dart';
@@ -383,7 +384,12 @@ class WorkoutCard extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: GestureDetector(
-                    onTap: onTap,
+                    onTap: onTap == null
+                        ? null
+                        : () {
+                            HapticFeedback.mediumImpact();
+                            onTap!();
+                          },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       alignment: Alignment.center,
@@ -421,7 +427,12 @@ class WorkoutCard extends StatelessWidget {
                   const Spacer(),
                   if (!_isEmpty && onTap != null)
                     GestureDetector(
-                      onTap: onTap,
+                      onTap: onTap == null
+                          ? null
+                          : () {
+                              HapticFeedback.mediumImpact();
+                              onTap!();
+                            },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 18,
@@ -879,6 +890,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   /// User tapped "Start your next plan" — save vDOT snapshot, launch shortened onboarding.
   Future<void> _onStartNextPlan() async {
+    HapticFeedback.mediumImpact();
     final memory = _engineMemory;
     if (memory == null) return;
 
@@ -1332,10 +1344,15 @@ class _HomeScreenState extends State<HomeScreen>
               color: c.textTertiary,
               size: 22,
             ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            ),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -1432,13 +1449,16 @@ class _HomeScreenState extends State<HomeScreen>
                   button: true,
                   label: 'Manage plan',
                   child: GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ManagePlanScreen(onPlanChanged: loadData),
-                      ),
-                    ),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ManagePlanScreen(onPlanChanged: loadData),
+                        ),
+                      );
+                    },
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
@@ -1716,6 +1736,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _openPlanOverview() {
+    HapticFeedback.lightImpact();
     final racePlan = _engineMemory?.racePlan;
     if (racePlan == null) return;
     Navigator.of(context).push(

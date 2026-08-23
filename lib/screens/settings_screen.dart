@@ -1,6 +1,7 @@
 // lib/screens/settings_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/database_service.dart';
 import '../services/cloud_sync_service.dart';
@@ -68,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _signOut() async {
+    HapticFeedback.lightImpact();
     final c = context.colors;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -88,11 +90,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.pop(context, false);
+            },
             child: Text('Cancel', style: TextStyle(color: c.textSecondary)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              Navigator.pop(context, true);
+            },
             style: TextButton.styleFrom(foregroundColor: c.textPrimary),
             child: const Text(
               'Sign out',
@@ -118,6 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteAccount() async {
+    HapticFeedback.lightImpact();
     final c = context.colors;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -138,11 +147,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.pop(context, false);
+            },
             child: Text('Cancel', style: TextStyle(color: c.textSecondary)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(context, true);
+            },
             style: TextButton.styleFrom(foregroundColor: c.danger),
             child: const Text(
               'Delete everything',
@@ -206,7 +221,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.pop(context);
+                  },
                   child: const Text('OK'),
                 ),
               ],
@@ -264,7 +282,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: c.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.pop(context);
+          },
         ),
       ),
       body: _isLoading
@@ -420,7 +441,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final selected = value == current;
     return Expanded(
       child: GestureDetector(
-        onTap: () => ThemeController.instance.setMode(value),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          ThemeController.instance.setMode(value);
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(

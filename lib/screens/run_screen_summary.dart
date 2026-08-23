@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:latlong2/latlong.dart';
@@ -105,6 +106,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   Future<void> _discardRun() async {
+    HapticFeedback.lightImpact();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -118,7 +120,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.pop(ctx, false);
+            },
             child: Text(
               'Keep',
               style: TextStyle(
@@ -128,7 +133,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(ctx, true);
+            },
             child: const Text(
               'Discard',
               style: TextStyle(
@@ -202,6 +210,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   }
 
   void _shareRun() {
+    HapticFeedback.lightImpact();
     final workoutType = widget.isFreeRun
         ? 'free'
         : _resolveWorkoutType(widget.activeCoachMessage?.workoutIntent);
@@ -340,6 +349,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     child: ElevatedButton(
                       onPressed: (widget.isFreeRun || _rpe != null)
                           ? () async {
+                              HapticFeedback.mediumImpact();
                               await _finaliseRun(widget.isFreeRun ? 0 : _rpe!);
                               await Future.delayed(
                                 const Duration(milliseconds: 200),
@@ -943,7 +953,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                 final isSelected = selected == lvl.value;
                 final isPast = selected != null && lvl.value <= selected;
                 return GestureDetector(
-                  onTap: () => setState(() => _rpe = lvl.value),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _rpe = lvl.value);
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     width: 27,
