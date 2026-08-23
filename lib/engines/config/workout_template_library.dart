@@ -1197,6 +1197,60 @@ class WorkoutLibrary {
     ),
 
     WorkoutTemplate(
+      id: 'cruise_intervals_2000',
+      name: 'Cruise Intervals — 2km',
+      intent: WorkoutIntent.threshold,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.halfMarathon,
+        RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.halfMarathon: DistanceRange(minKm: 8, maxKm: 14),
+        RaceDistance.marathon: DistanceRange(minKm: 10, maxKm: 18),
+      },
+      description:
+          'Longer T-reps (2km) with short recovery — a step beyond mile '
+          'repeats, closer to continuous tempo. For HM/marathon runners '
+          'advancing past cruise_intervals_mile.',
+      blocks: [
+        BlockTemplate(
+          type: BlockType.warmup,
+          durationType: DurationType.fixedKm,
+          value: 2.0,
+          paceZone: PaceZone.aerobicEasy,
+        ),
+        BlockTemplate.mainMeters(
+          meters: 2000,
+          zone: PaceZone.cruiseIntervals,
+          reps: 3,
+          recoverySeconds: 60,
+          label: 'T-rep',
+        ),
+        BlockTemplate(
+          type: BlockType.cooldown,
+          durationType: DurationType.fixedKm,
+          value: 1.5,
+          paceZone: PaceZone.aerobicEasy,
+        ),
+      ],
+      phaseVariants: {
+        TrainingPhase.build: PhaseVariant(
+          reps: 2,
+          repDistanceMeters: 2000,
+          recoverySeconds: 75,
+          note: '2 × 2km, 75s recovery',
+        ),
+        TrainingPhase.peak: PhaseVariant(
+          reps: 3,
+          repDistanceMeters: 2000,
+          recoverySeconds: 60,
+          note: '3 × 2km, 60s recovery',
+        ),
+      },
+    ),
+
+    WorkoutTemplate(
       id: 'tempo_continuous',
       name: 'Tempo Run',
       intent: WorkoutIntent.threshold,
@@ -1625,6 +1679,63 @@ class WorkoutLibrary {
           note: '5 × 1200m @ 10K pace, 180s recovery',
         ),
       },
+    ),
+
+    WorkoutTemplate(
+      id: 'vo2_mixed',
+      name: 'Mixed Intervals',
+      intent: WorkoutIntent.vo2max,
+      applicablePhases: {TrainingPhase.build, TrainingPhase.peak},
+      applicableRaceDistances: {
+        RaceDistance.fiveK,
+        RaceDistance.tenK,
+        RaceDistance.halfMarathon,
+        RaceDistance.marathon,
+      },
+      distanceByRace: {
+        RaceDistance.fiveK: DistanceRange(minKm: 5, maxKm: 8),
+        RaceDistance.tenK: DistanceRange(minKm: 6, maxKm: 10),
+        RaceDistance.halfMarathon: DistanceRange(minKm: 7, maxKm: 11),
+        RaceDistance.marathon: DistanceRange(minKm: 8, maxKm: 12),
+      },
+      description:
+          'Varying rep lengths at the same I-pace — 1000m, then 2×600m, then '
+          '2×400m. Intensity stays constant; only the distance changes, '
+          'breaking up the monotony of same-length reps.',
+      blocks: [
+        BlockTemplate(
+          type: BlockType.warmup,
+          durationType: DurationType.fixedKm,
+          value: 2.0,
+          paceZone: PaceZone.aerobicEasy,
+        ),
+        BlockTemplate.main(
+          km: 1.0,
+          zone: PaceZone.vo2Intervals,
+          recoverySeconds: 240,
+          label: '1000m',
+        ),
+        BlockTemplate.mainMeters(
+          meters: 600,
+          zone: PaceZone.vo2Intervals,
+          reps: 2,
+          recoverySeconds: 150,
+          label: '600m',
+        ),
+        BlockTemplate.mainMeters(
+          meters: 400,
+          zone: PaceZone.vo2Intervals,
+          reps: 2,
+          recoverySeconds: 90,
+          label: '400m',
+        ),
+        BlockTemplate(
+          type: BlockType.cooldown,
+          durationType: DurationType.fixedKm,
+          value: 1.5,
+          paceZone: PaceZone.aerobicEasy,
+        ),
+      ],
     ),
 
     WorkoutTemplate(
