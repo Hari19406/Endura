@@ -278,9 +278,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           monthlyEquivalent: _selectedIsAnnual
                               ? _monthlyEquivalent(_selected!)
                               : null,
-                          savingsPercent: _selectedIsAnnual
-                              ? _savingsPercent()
-                              : null,
                         ),
                         const SizedBox(height: 14),
                         SizedBox(
@@ -906,7 +903,6 @@ class _PriceSummary extends StatelessWidget {
   final bool hasTrial;
   final int trialDays;
   final String? monthlyEquivalent;
-  final int? savingsPercent;
 
   const _PriceSummary({
     required this.colors,
@@ -915,7 +911,6 @@ class _PriceSummary extends StatelessWidget {
     required this.hasTrial,
     required this.trialDays,
     required this.monthlyEquivalent,
-    required this.savingsPercent,
   });
 
   @override
