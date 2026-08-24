@@ -8,8 +8,7 @@ class RevenueCatService {
   static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
 
   // Cached pro status — updated by the listener set up in init()
-  // TEMP: forced true to test the weather pace-adjustment flow past the paywall — REVERT before commit.
-  static final ValueNotifier<bool> isProNotifier = ValueNotifier(true);
+  static final ValueNotifier<bool> isProNotifier = ValueNotifier(false);
 
   static Future<void> init(String supabaseUserId) async {
     if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
@@ -20,13 +19,11 @@ class RevenueCatService {
 
     // Seed the cache immediately
     final info = await Purchases.getCustomerInfo();
-    // TEMP: skip overwrite to test past the paywall — REVERT before commit.
-    // isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
+    isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
 
     // Keep cache live — fires when subscription status changes
     Purchases.addCustomerInfoUpdateListener((info) {
-      // TEMP: skip overwrite to test past the paywall — REVERT before commit.
-      // isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
+      isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
     });
   }
 

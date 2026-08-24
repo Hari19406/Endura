@@ -98,12 +98,8 @@ class _PreRunCheckSheetState extends State<_PreRunCheckSheet> {
     var finalWorkout = result.workout;
     var finalNote = result.coachNote;
     final weather = widget.weather;
-    debugPrint('[WeatherDebug] weather=$weather');
     if (weather != null) {
       final weatherResult = const WeatherScaler().scale(finalWorkout, weather);
-      debugPrint(
-        '[WeatherDebug] apparentTempC=${weather.apparentTempC} humidity=${weather.humidityPercent} wasAdjusted=${weatherResult.wasAdjusted}',
-      );
       if (weatherResult.wasAdjusted) {
         finalWorkout = weatherResult.workout;
         finalNote = finalNote != null
