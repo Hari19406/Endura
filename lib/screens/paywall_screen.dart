@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart';
@@ -26,12 +28,33 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Package? _selected;
   bool _loadingOffering = true;
   String? _purchasingId;
+  String _userName = '';
 
   @override
   void initState() {
     super.initState();
     Analytics.paywallViewed();
     _loadOffering();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String name = prefs.getString('user_name') ?? '';
+      if (name.isEmpty) {
+        final user = Supabase.instance.client.auth.currentUser;
+        final meta = user?.userMetadata;
+        name =
+            (meta?['name'] as String?) ?? (meta?['full_name'] as String?) ?? '';
+        if (name.isEmpty) {
+          name = user?.email?.split('@').first ?? '';
+        }
+      }
+      if (mounted) setState(() => _userName = name.split(' ').first);
+    } catch (e) {
+      debugPrint('[Paywall] load name error: $e');
+    }
   }
 
   Future<void> _loadOffering() async {
@@ -147,29 +170,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
   bool get _selectedIsAnnual =>
       _selected != null && _selected == _annualPackage;
 
-  void _openPlanPicker() {
-    HapticFeedback.lightImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _PlanPickerSheet(
-        annual: _annualPackage,
-        monthly: _monthlyPackage,
-        selected: _selected,
-        savingsPercent: _savingsPercent(),
-        monthlyEquivalent: _annualPackage != null
-            ? _monthlyEquivalent(_annualPackage!)
-            : null,
-        onPick: (pkg) {
-          HapticFeedback.selectionClick();
-          setState(() => _selected = pkg);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -225,41 +225,40 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           child: CircularProgressIndicator(color: _kBrand),
                         )
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Endura Pro',
-                                style: TextStyle(
-                                  color: _kBrand,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                              _Hero(colors: c, userName: _userName),
+                              const SizedBox(height: 28),
+                              if (_annualPackage != null ||
+                                  _monthlyPackage != null)
+                                _InlinePlanSelector(
+                                  colors: c,
+                                  annual: _annualPackage,
+                                  monthly: _monthlyPackage,
+                                  selected: _selected,
+                                  savingsPercent: _savingsPercent(),
+                                  monthlyEquivalent: _annualPackage != null
+                                      ? _monthlyEquivalent(_annualPackage!)
+                                      : null,
+                                  introOf: _introOf,
+                                  trialDaysOf: _trialDays,
+                                  onPick: (pkg) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _selected = pkg);
+                                  },
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                hasTrial
-                                    ? 'How your ${_trialDays(intro)}-day\nfree trial works'
-                                    : 'Coached running.\nBuilt around you.',
-                                style: TextStyle(
-                                  color: c.textPrimary,
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.1,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 32),
                               if (hasTrial)
                                 _TrialTimeline(
                                   colors: c,
                                   trialDays: _trialDays(intro),
-                                )
-                              else
-                                _FeatureList(colors: c),
-                              const SizedBox(height: 24),
+                                ),
+                              if (hasTrial) const SizedBox(height: 32),
+                              _FeatureList(colors: c),
+                              const SizedBox(height: 28),
+                              _TrustBanner(colors: c),
                             ],
                           ),
                         ),
@@ -312,7 +311,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                     ),
                                   )
                                 : Text(
-                                    hasTrial ? 'Continue' : 'Subscribe',
+                                    hasTrial ? 'Start free trial' : 'Subscribe',
                                     style: const TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.bold,
@@ -320,19 +319,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        if (_monthlyPackage != null && _annualPackage != null)
-                          TextButton(
-                            onPressed: busy ? null : _openPlanPicker,
-                            child: Text(
-                              'See all plans',
-                              style: TextStyle(
-                                color: c.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
+                        const SizedBox(height: 6),
                         TextButton(
                           onPressed: busy ? null : _restore,
                           child: _purchasingId == 'restore'
@@ -384,6 +371,250 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---- Hero: personalized greeting ------------------------------------------
+
+class _Hero extends StatelessWidget {
+  final AppColors colors;
+  final String userName;
+
+  const _Hero({required this.colors, required this.userName});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    final greeting = userName.isNotEmpty
+        ? '$userName, your training\nstarts now'
+        : 'Your training\nstarts now';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ENDURA PRO',
+          style: TextStyle(
+            color: _kBrand,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          greeting,
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 30,
+            fontWeight: FontWeight.bold,
+            height: 1.1,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'A plan built around your goal race, with Max adjusting every week to keep you on track.',
+          style: TextStyle(color: c.textSecondary, fontSize: 15, height: 1.4),
+        ),
+      ],
+    );
+  }
+}
+
+// ---- Inline plan selector (Annual / Monthly cards) ------------------------
+
+class _InlinePlanSelector extends StatelessWidget {
+  final AppColors colors;
+  final Package? annual;
+  final Package? monthly;
+  final Package? selected;
+  final int? savingsPercent;
+  final String? monthlyEquivalent;
+  final IntroductoryPrice? Function(Package?) introOf;
+  final int Function(IntroductoryPrice) trialDaysOf;
+  final ValueChanged<Package> onPick;
+
+  const _InlinePlanSelector({
+    required this.colors,
+    required this.annual,
+    required this.monthly,
+    required this.selected,
+    required this.savingsPercent,
+    required this.monthlyEquivalent,
+    required this.introOf,
+    required this.trialDaysOf,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return Column(
+      children: [
+        if (annual != null)
+          _PlanCard(
+            colors: c,
+            title: 'Annual',
+            price: monthlyEquivalent != null
+                ? '$monthlyEquivalent/mo'
+                : annual!.storeProduct.priceString,
+            subtitle: savingsPercent != null
+                ? 'Save $savingsPercent% vs monthly · billed annually'
+                : 'Billed annually',
+            badge: 'RECOMMENDED',
+            trialTag: _trialTag(annual),
+            isSelected: selected == annual,
+            onTap: () => onPick(annual!),
+          ),
+        if (annual != null && monthly != null) const SizedBox(height: 12),
+        if (monthly != null)
+          _PlanCard(
+            colors: c,
+            title: 'Monthly',
+            price: '${monthly!.storeProduct.priceString}/mo',
+            subtitle: 'Billed monthly · cancel anytime',
+            badge: null,
+            trialTag: _trialTag(monthly),
+            isSelected: selected == monthly,
+            onTap: () => onPick(monthly!),
+          ),
+      ],
+    );
+  }
+
+  String? _trialTag(Package? pkg) {
+    final intro = introOf(pkg);
+    if (intro == null) return null;
+    return '${trialDaysOf(intro)}-day free trial';
+  }
+}
+
+class _PlanCard extends StatelessWidget {
+  final AppColors colors;
+  final String title;
+  final String price;
+  final String subtitle;
+  final String? badge;
+  final String? trialTag;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PlanCard({
+    required this.colors,
+    required this.title,
+    required this.price,
+    required this.subtitle,
+    required this.badge,
+    required this.trialTag,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        decoration: BoxDecoration(
+          color: isSelected ? _kBrand.withValues(alpha: 0.08) : c.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? _kBrand : c.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (badge != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: _kBrand,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  badge!,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Row(
+              children: [
+                Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: isSelected ? _kBrand : c.textTertiary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: c.textTertiary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  price,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            if (trialTag != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.lock_clock_rounded,
+                    color: _kBrand,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    trialTag!,
+                    style: const TextStyle(
+                      color: _kBrand,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -529,7 +760,37 @@ class _TimelineStep extends StatelessWidget {
   }
 }
 
-// ---- Fallback feature list (shown when the plan has no trial) -------------
+// ---- Feature list (icon rows) ----------------------------------------------
+
+class _FeatureItem {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _FeatureItem(this.icon, this.title, this.body);
+}
+
+const _kFeatures = [
+  _FeatureItem(
+    Icons.calendar_month_rounded,
+    'Personalized training plans',
+    'Built around your goal race and current fitness — not a generic template.',
+  ),
+  _FeatureItem(
+    Icons.forum_rounded,
+    'Coaching from Max',
+    'Session-by-session guidance, pacing targets and encouragement on every run.',
+  ),
+  _FeatureItem(
+    Icons.trending_up_rounded,
+    'Adapts as you run',
+    'Your plan adjusts automatically as your fitness evolves — never static.',
+  ),
+  _FeatureItem(
+    Icons.flag_rounded,
+    'Race-day pacing',
+    'Precise target paces for your goal race, dialed in as race day gets closer.',
+  ),
+];
 
 class _FeatureList extends StatelessWidget {
   final AppColors colors;
@@ -538,41 +799,100 @@ class _FeatureList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = colors;
-    const features = [
-      'Adaptive plans that react to your runs week by week',
-      'Threshold, VO₂max & long run sessions guided by Max',
-      'vDOT fitness tracking — Max gets smarter every run',
-      'Race target paces set automatically for your goal',
-    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: features
-          .map(
-            (f) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 1),
-                    child: Icon(
-                      Icons.check_circle_rounded,
-                      color: _kBrand,
-                      size: 20,
-                    ),
+      children: [
+        Text(
+          'What you get',
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 14),
+        ..._kFeatures.map(
+          (f) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _kBrand.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      f,
-                      style: TextStyle(color: c.textPrimary, fontSize: 15),
-                    ),
+                  child: Icon(f.icon, color: _kBrand, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        f.title,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        f.body,
+                        style: TextStyle(
+                          color: c.textSecondary,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---- Trust banner (no fabricated stats/testimonials) ----------------------
+
+class _TrustBanner extends StatelessWidget {
+  final AppColors colors;
+  const _TrustBanner({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.favorite_rounded, color: _kBrand, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              'Built by runners, backed by real training science — not a generic template.',
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 13,
+                height: 1.35,
               ),
             ),
-          )
-          .toList(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -616,231 +936,18 @@ class _PriceSummary extends StatelessWidget {
 
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: Text(
-                headline,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            if (savingsPercent != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _kBrand.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'SAVE $savingsPercent%',
-                  style: const TextStyle(
-                    color: _kBrand,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ],
+        Text(
+          headline,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 3),
         Text(sub, style: TextStyle(color: c.textTertiary, fontSize: 13)),
       ],
-    );
-  }
-}
-
-// ---- "See all plans" bottom sheet ----------------------------------------
-
-class _PlanPickerSheet extends StatelessWidget {
-  final Package? annual;
-  final Package? monthly;
-  final Package? selected;
-  final int? savingsPercent;
-  final String? monthlyEquivalent;
-  final ValueChanged<Package> onPick;
-
-  const _PlanPickerSheet({
-    required this.annual,
-    required this.monthly,
-    required this.selected,
-    required this.savingsPercent,
-    required this.monthlyEquivalent,
-    required this.onPick,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surfaceAlt,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        20 + MediaQuery.of(context).padding.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: c.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Choose your plan',
-            style: TextStyle(
-              color: c.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (annual != null)
-            _PlanRow(
-              colors: c,
-              title: 'Yearly',
-              price: '${annual!.storeProduct.priceString}/yr',
-              subtitle: monthlyEquivalent != null
-                  ? '$monthlyEquivalent/mo · billed annually'
-                  : 'Billed annually',
-              badge: savingsPercent != null ? 'SAVE $savingsPercent%' : null,
-              isSelected: selected == annual,
-              onTap: () => onPick(annual!),
-            ),
-          const SizedBox(height: 12),
-          if (monthly != null)
-            _PlanRow(
-              colors: c,
-              title: 'Monthly',
-              price: '${monthly!.storeProduct.priceString}/mo',
-              subtitle: 'Billed monthly · cancel anytime',
-              badge: null,
-              isSelected: selected == monthly,
-              onTap: () => onPick(monthly!),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlanRow extends StatelessWidget {
-  final AppColors colors;
-  final String title;
-  final String price;
-  final String subtitle;
-  final String? badge;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PlanRow({
-    required this.colors,
-    required this.title,
-    required this.price,
-    required this.subtitle,
-    required this.badge,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = colors;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? _kBrand : c.border,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-              color: isSelected ? _kBrand : c.textTertiary,
-              size: 24,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (badge != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _kBrand.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            badge!,
-                            style: const TextStyle(
-                              color: _kBrand,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: c.textTertiary, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              price,
-              style: TextStyle(
-                color: c.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
