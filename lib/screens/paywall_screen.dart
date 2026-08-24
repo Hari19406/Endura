@@ -58,6 +58,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _loadOffering() async {
+    setState(() => _loadingOffering = true);
     final offering = await RevenueCatService.getOffering();
     if (mounted) {
       setState(() {
@@ -69,6 +70,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
       });
     }
   }
+
+  bool get _offeringUnavailable =>
+      !_loadingOffering && _annualPackage == null && _monthlyPackage == null;
 
   Future<void> _purchase(Package package) async {
     HapticFeedback.mediumImpact();
@@ -248,6 +252,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                     HapticFeedback.selectionClick();
                                     setState(() => _selected = pkg);
                                   },
+                                )
+                              else if (_offeringUnavailable)
+                                _OfferingUnavailableCard(
+                                  colors: c,
+                                  onRetry: _loadOffering,
                                 ),
                               const SizedBox(height: 32),
                               if (hasTrial)
@@ -257,14 +266,41 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 ),
                               if (hasTrial) const SizedBox(height: 32),
                               _FeatureList(colors: c),
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 20),
+                              _GuaranteeCard(colors: c),
+                              const SizedBox(height: 16),
                               _TrustBanner(colors: c),
                             ],
                           ),
                         ),
                 ),
                 // ---- Footer: price summary + CTA --------------------------------
-                if (!_loadingOffering && _selected != null)
+                if (_offeringUnavailable)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton(
+                        onPressed: _loadOffering,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: c.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: Text(
+                          'Retry',
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (!_loadingOffering && _selected != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
                     child: Column(
@@ -617,6 +653,62 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
+// ---- Fallback shown when the store offering fails to load -----------------
+
+class _OfferingUnavailableCard extends StatelessWidget {
+  final AppColors colors;
+  final VoidCallback onRetry;
+
+  const _OfferingUnavailableCard({required this.colors, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, color: c.textTertiary, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Couldn't load pricing",
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Check your connection and try again.',
+                  style: TextStyle(color: c.textTertiary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text(
+              'Retry',
+              style: TextStyle(color: _kBrand, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---- Trial timeline (Today → reminder → billed) --------------------------
 
 class _TrialTimeline extends StatelessWidget {
@@ -808,51 +900,123 @@ class _FeatureList extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        ..._kFeatures.map(
-          (f) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: _kBrand.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(f.icon, color: _kBrand, size: 20),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        f.title,
-                        style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.border),
+          ),
+          child: Column(
+            children: _kFeatures
+                .map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _kBrand.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(f.icon, color: _kBrand, size: 20),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        f.body,
-                        style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: 13,
-                          height: 1.35,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                f.title,
+                                style: TextStyle(
+                                  color: c.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                f.body,
+                                style: TextStyle(
+                                  color: c.textSecondary,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                )
+                .toList(),
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---- Guarantee card (truthful — store-managed cancellation, no fake refund
+// promise we don't actually offer) ------------------------------------------
+
+class _GuaranteeCard extends StatelessWidget {
+  final AppColors colors;
+  const _GuaranteeCard({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _kBrand.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.verified_user_rounded,
+              color: _kBrand,
+              size: 22,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Cancel anytime, no lock-in',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Manage or cancel your subscription anytime from your account settings — no calls, no fine print.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: c.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
