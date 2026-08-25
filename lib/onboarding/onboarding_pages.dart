@@ -233,10 +233,21 @@ class OPageIntro extends StatelessWidget {
 // PAGE 2 — GOAL
 // ─────────────────────────────────────────────────────────────────────────────
 
-class OPageGoal extends StatelessWidget {
+const _raceDistanceKeys = {'5k', '10k', 'half_marathon', 'marathon'};
+
+class OPageGoal extends StatefulWidget {
   final String? selected;
   final ValueChanged<String> onSelect;
   const OPageGoal({super.key, required this.selected, required this.onSelect});
+
+  @override
+  State<OPageGoal> createState() => _OPageGoalState();
+}
+
+class _OPageGoalState extends State<OPageGoal> {
+  late bool _showingRaceDistances = _raceDistanceKeys.contains(
+    widget.selected,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -246,58 +257,224 @@ class OPageGoal extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 32),
-          const _Label('Your goal'),
-          const SizedBox(height: 8),
-          const _Title('What are you\ntraining for?'),
-          const SizedBox(height: 6),
-          const _Sub(
-            'Pick your race. Max builds everything backwards from here.',
-          ),
+          if (_showingRaceDistances) ...[
+            GestureDetector(
+              onTap: () => setState(() => _showingRaceDistances = false),
+              child: const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: EC.textSecondary,
+                ),
+              ),
+            ),
+            const _Label('Upcoming race'),
+            const SizedBox(height: 8),
+            const _Title('Pick your\ndistance'),
+            const SizedBox(height: 6),
+            const _Sub(
+              'Pick your race. Max builds everything backwards from here.',
+            ),
+          ] else ...[
+            const _Label('Your goal'),
+            const SizedBox(height: 8),
+            const _Title('What are you\ntraining for?'),
+            const SizedBox(height: 6),
+            const _Sub(
+              "Pick a starting point — we'll fine-tune the details with a few quick questions.",
+            ),
+          ],
           const SizedBox(height: 28),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _g(
-                  '5k',
-                  '5K',
-                  'The perfect starting race',
-                  const Color(0xFF003D35),
-                  EC.teal,
-                ),
-                const SizedBox(height: 10),
-                _g(
-                  '10k',
-                  '10K',
-                  'Step up the challenge',
-                  const Color(0xFF1E1040),
-                  EC.violet,
-                ),
-                const SizedBox(height: 10),
-                _g(
-                  'half_marathon',
-                  'Half Marathon',
-                  "The runner's milestone",
-                  const Color(0xFF3D1A00),
-                  EC.orange,
-                  boxText: '21.1K',
-                ),
-                const SizedBox(height: 10),
-                _g(
-                  'marathon',
-                  'Marathon',
-                  'The ultimate test',
-                  const Color(0xFF3D0000),
-                  EC.red,
-                  boxText: '42.2K',
-                ),
-              ],
-            ),
+            child: _showingRaceDistances
+                ? _buildDistancePicker()
+                : _buildCategoryList(),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildDistancePicker() {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        _g(
+          '5k',
+          '5K',
+          'The perfect starting race',
+          const Color(0xFF003D35),
+          EC.teal,
+        ),
+        const SizedBox(height: 10),
+        _g(
+          '10k',
+          '10K',
+          'Step up the challenge',
+          const Color(0xFF1E1040),
+          EC.violet,
+        ),
+        const SizedBox(height: 10),
+        _g(
+          'half_marathon',
+          'Half Marathon',
+          "The runner's milestone",
+          const Color(0xFF3D1A00),
+          EC.orange,
+          boxText: '21.1K',
+        ),
+        const SizedBox(height: 10),
+        _g(
+          'marathon',
+          'Marathon',
+          'The ultimate test',
+          const Color(0xFF3D0000),
+          EC.red,
+          boxText: '42.2K',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryList() {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        const _SectionHeader(
+          'Most popular',
+          'Top picks based on what runners choose most.',
+        ),
+        const SizedBox(height: 12),
+        _upcomingRaceRow(),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.monitor_heart_outlined,
+          iconBg: Color(0xFF0F2E1E),
+          iconFg: EC.teal,
+          label: 'General fitness',
+          sub: 'Stay consistent and improve between events. Pick your level.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.directions_walk,
+          iconBg: Color(0xFF10202E),
+          iconFg: EC.teal,
+          label: 'Get back into running',
+          sub:
+              'Three days a week, time-based runs. Easy ramp for lapsed runners.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.auto_awesome,
+          iconBg: Color(0xFF1E1040),
+          iconFg: EC.violet,
+          label: 'Intro to running',
+          sub: 'A friendly 5-week walk/run plan to get you off the couch.',
+        ),
+        const SizedBox(height: 26),
+        const _SectionHeader(
+          'Race goals',
+          'Training toward a finish line — first-timer or PR.',
+        ),
+        const SizedBox(height: 12),
+        _upcomingRaceRow(),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.workspace_premium_outlined,
+          iconBg: Color(0xFF1E1040),
+          iconFg: EC.violet,
+          label: 'Train for your first half',
+          sub: 'Build to 13.1 with a gradual ramp and one speed day per week.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.military_tech_outlined,
+          iconBg: Color(0xFF3D0000),
+          iconFg: EC.red,
+          label: 'Train for your first marathon',
+          sub: 'A 16+ week buildup designed for first-time marathoners.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.flag_outlined,
+          iconBg: Color(0xFF003D35),
+          iconFg: EC.teal,
+          label: 'Train for your first 5K',
+          sub: 'Lower-volume plan with one speed workout per week.',
+        ),
+        const SizedBox(height: 26),
+        const _SectionHeader(
+          'General fitness',
+          'Stay consistent and improve without a race target.',
+        ),
+        const SizedBox(height: 12),
+        const _ComingSoonRow(
+          icon: Icons.monitor_heart_outlined,
+          iconBg: Color(0xFF0F2E1E),
+          iconFg: EC.teal,
+          label: 'General fitness',
+          sub: 'Stay consistent and improve between events. Pick your level.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.bolt,
+          iconBg: Color(0xFF0F2E1E),
+          iconFg: EC.teal,
+          label: 'Run faster (general fitness)',
+          sub: 'No race target. Two speed workouts per week to build fitness.',
+        ),
+        const SizedBox(height: 26),
+        const _SectionHeader(
+          'Getting started',
+          'New to running, coming back, or rebuilding after time off.',
+        ),
+        const SizedBox(height: 12),
+        const _ComingSoonRow(
+          icon: Icons.directions_walk,
+          iconBg: Color(0xFF10202E),
+          iconFg: EC.teal,
+          label: 'Get back into running',
+          sub:
+              'Three days a week, time-based runs. Easy ramp for lapsed runners.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.auto_awesome,
+          iconBg: Color(0xFF1E1040),
+          iconFg: EC.violet,
+          label: 'Intro to running',
+          sub: 'A friendly 5-week walk/run plan to get you off the couch.',
+        ),
+        const SizedBox(height: 10),
+        const _ComingSoonRow(
+          icon: Icons.medical_services_outlined,
+          iconBg: Color(0xFF3D1A00),
+          iconFg: EC.orange,
+          label: 'Return from injury',
+          sub: 'Rebuild slowly with a guided ramp window after time off.',
+        ),
+      ],
+    );
+  }
+
+  Widget _upcomingRaceRow() => _Row(
+    leading: Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1400),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Center(
+        child: Icon(Icons.emoji_events_outlined, color: EC.amber, size: 22),
+      ),
+    ),
+    label: 'Upcoming race',
+    sub: 'Train toward a race day with a structured build. Pick your distance.',
+    selected: _raceDistanceKeys.contains(widget.selected),
+    onTap: () => setState(() => _showingRaceDistances = true),
+  );
 
   Widget _g(
     String key,
@@ -328,9 +505,122 @@ class OPageGoal extends StatelessWidget {
     ),
     label: label,
     sub: sub,
-    selected: selected == key,
-    onTap: () => onSelect(key),
+    selected: widget.selected == key,
+    onTap: () => widget.onSelect(key),
   );
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  const _SectionHeader(this.title, this.subtitle);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: EC.textPrimary,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12.5, color: EC.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _ComingSoonRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconFg;
+  final String label;
+  final String sub;
+  const _ComingSoonRow({
+    required this.icon,
+    required this.iconBg,
+    required this.iconFg,
+    required this.label,
+    required this.sub,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.5,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        decoration: BoxDecoration(
+          color: EC.surface,
+          borderRadius: BorderRadius.circular(ET.cardRadius),
+          border: Border.all(color: EC.border, width: ET.borderWidth),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconFg, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: EC.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    sub,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: EC.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: EC.surface2,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: EC.border, width: ET.borderWidth),
+              ),
+              child: const Text(
+                'Coming soon',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: EC.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

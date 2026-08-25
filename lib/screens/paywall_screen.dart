@@ -10,10 +10,32 @@ import '../theme/app_colors.dart';
 
 // Endura teal — brand color, intentionally not a theme token (fixed across light/dark)
 const _kBrand = Color(0xFF00E5CC);
+// Ember — used once, for the mid-trial reminder marker only (urgency accent,
+// kept rare so it doesn't compete with the brand teal).
+const _kEmber = Color(0xFFFF7A45);
 const _kTermsUrl =
     'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
 const _kPrivacyUrl =
     'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
+
+/// Split-clock numerals — every price, day count and percentage on this page
+/// reads like a runner's stopwatch: tabular monospaced digits instead of the
+/// default proportional font, so figures line up the way splits do on a
+/// pace band.
+TextStyle _numeralStyle(
+  Color color, {
+  required double fontSize,
+  FontWeight fontWeight = FontWeight.bold,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontFamily: 'monospace',
+    fontFeatures: const [FontFeature.tabularFigures()],
+    letterSpacing: 0.2,
+  );
+}
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -263,8 +285,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               if (_selected != null) const SizedBox(height: 28),
                               _Hero(colors: c, userName: _userName),
                               const SizedBox(height: 32),
-                              const _SectionLabel('CHOOSE YOUR PLAN'),
-                              const SizedBox(height: 12),
+                              const _RouteMarker(1, 'CHOOSE YOUR PLAN'),
+                              const SizedBox(height: 16),
                               if (_annualPackage != null ||
                                   _monthlyPackage != null)
                                 _InlinePlanSelector(
@@ -295,16 +317,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   trialDays: _trialDays(intro),
                                 ),
                               const SizedBox(height: 36),
-                              const _SectionLabel('WHY ENDURA'),
-                              const SizedBox(height: 12),
+                              const _RouteMarker(2, 'WHY ENDURA'),
+                              const SizedBox(height: 16),
                               const _FeatureTable(),
                               const SizedBox(height: 36),
-                              const _SectionLabel('WHAT RUNNERS ARE SAYING'),
-                              const SizedBox(height: 12),
+                              const _RouteMarker(3, 'WHAT RUNNERS ARE SAYING'),
+                              const SizedBox(height: 16),
                               const _TestimonialCarousel(),
                               const SizedBox(height: 36),
-                              const _SectionLabel('OUR COMMITMENT'),
-                              const SizedBox(height: 12),
+                              const _RouteMarker(4, 'OUR COMMITMENT'),
+                              const SizedBox(height: 16),
                               _GuaranteeCard(colors: c),
                               const SizedBox(height: 20),
                               _TrustRow(colors: c),
@@ -455,23 +477,48 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 }
 
-// ---- Section label (eyebrow heading used between page sections) -----------
+// ---- Route marker: km-marker-style section divider -------------------------
+//
+// The page reads like a route from sign-up to race day — each section is a
+// marker along that course, numbered the way distance markers are painted
+// on a race route, with a lane-line rule running out from it.
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
+class _RouteMarker extends StatelessWidget {
+  final int index;
+  final String label;
+  const _RouteMarker(this.index, this.label);
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Text(
-      text,
-      style: TextStyle(
-        color: c.textTertiary,
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.1,
-      ),
+    return Row(
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _kBrand.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Text(
+            index.toString().padLeft(2, '0'),
+            style: _numeralStyle(_kBrand, fontSize: 11),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Divider(color: c.divider, height: 1)),
+      ],
     );
   }
 }
@@ -515,17 +562,17 @@ class _TopPriceBar extends StatelessWidget {
           const Spacer(),
           Text(
             selected.storeProduct.priceString,
-            style: TextStyle(
-              color: c.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: _numeralStyle(c.textPrimary, fontSize: 19),
           ),
           if (isAnnual && monthlyEquivalent != null) ...[
             const SizedBox(width: 6),
             Text(
               '($monthlyEquivalent/mo)',
-              style: TextStyle(color: c.textTertiary, fontSize: 12),
+              style: _numeralStyle(
+                c.textTertiary,
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
             ),
           ],
         ],
@@ -535,35 +582,74 @@ class _TopPriceBar extends StatelessWidget {
 }
 
 // ---- Hero: app icon mark + personalized greeting ---------------------------
+//
+// The icon's glow breathes on a slow, quiet cycle — a resting-heart-rate cue
+// for a running app, not a decorative flourish. It's the one deliberate
+// motion moment on the page; everything else on screen holds still. Skipped
+// entirely when the OS has "reduce motion" on.
 
-class _Hero extends StatelessWidget {
+class _Hero extends StatefulWidget {
   final AppColors colors;
   final String userName;
 
   const _Hero({required this.colors, required this.userName});
 
   @override
+  State<_Hero> createState() => _HeroState();
+}
+
+class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    if (!MediaQuery.of(context).disableAnimations) {
+      _pulse.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final c = colors;
-    final greeting = userName.isNotEmpty
-        ? '$userName, your training\nstarts now'
+    final c = widget.colors;
+    final greeting = widget.userName.isNotEmpty
+        ? '${widget.userName}, your training\nstarts now'
         : 'Your training\nstarts now';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: _kBrand.withValues(alpha: 0.35),
-                blurRadius: 24,
-                spreadRadius: 2,
+        AnimatedBuilder(
+          animation: _pulse,
+          builder: (_, child) {
+            final t = MediaQuery.of(context).disableAnimations
+                ? 0.0
+                : _pulse.value;
+            return Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kBrand.withValues(alpha: 0.28 + (t * 0.16)),
+                    blurRadius: 20 + (t * 10),
+                    spreadRadius: 1 + (t * 2),
+                  ),
+                ],
               ),
-            ],
-          ),
+              child: child,
+            );
+          },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
             child: Image.asset(
@@ -772,14 +858,7 @@ class _PlanCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  price,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(price, style: _numeralStyle(c.textPrimary, fontSize: 17)),
               ],
             ),
             if (trialTag != null) ...[
@@ -904,6 +983,7 @@ class _TrialTimeline extends StatelessWidget {
             body: "We'll send a reminder that your free trial is ending soon.",
             isFirst: false,
             isLast: false,
+            accent: _kEmber,
           ),
           _TimelineStep(
             colors: c,
@@ -927,6 +1007,7 @@ class _TimelineStep extends StatelessWidget {
   final String body;
   final bool isFirst;
   final bool isLast;
+  final Color accent;
 
   const _TimelineStep({
     required this.colors,
@@ -935,6 +1016,7 @@ class _TimelineStep extends StatelessWidget {
     required this.body,
     required this.isFirst,
     required this.isLast,
+    this.accent = _kBrand,
   });
 
   @override
@@ -945,17 +1027,19 @@ class _TimelineStep extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Continuous vertical bar: solid through the steps, rounded cap on
-          // the first, fading out below the last icon (Buddy-style).
+          // the first, fading out below the last icon (Buddy-style). A step
+          // can break from brand teal to the ember accent to flag urgency
+          // (the trial-ending reminder) without losing the connected line.
           SizedBox(
             width: 36,
             child: Container(
               decoration: BoxDecoration(
-                color: isLast ? null : _kBrand,
+                color: isLast ? null : accent,
                 gradient: isLast
                     ? LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [_kBrand, _kBrand.withValues(alpha: 0.0)],
+                        colors: [accent, accent.withValues(alpha: 0.0)],
                       )
                     : null,
                 borderRadius: isFirst
