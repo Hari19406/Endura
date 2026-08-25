@@ -299,6 +299,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               const SizedBox(height: 12),
                               const _FeatureTable(),
                               const SizedBox(height: 36),
+                              const _SectionLabel('WHAT RUNNERS ARE SAYING'),
+                              const SizedBox(height: 12),
+                              const _TestimonialCarousel(),
+                              const SizedBox(height: 36),
                               const _SectionLabel('OUR COMMITMENT'),
                               const SizedBox(height: 12),
                               _GuaranteeCard(colors: c),
@@ -1083,6 +1087,130 @@ class _FeatureTable extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+// ---- Testimonials -----------------------------------------------------
+//
+// PLACEHOLDER CONTENT — Endura has no real reviews yet. These three are
+// sample copy only, written to illustrate the tone/format, and MUST be
+// swapped for real runner feedback before this ships to the store.
+
+class _Testimonial {
+  final String name;
+  final String context;
+  final String quote;
+  const _Testimonial(this.name, this.context, this.quote);
+}
+
+const _kTestimonials = [
+  _Testimonial(
+    'Priya R.',
+    'Training for a half marathon',
+    'The plan flexes around my week instead of the other way around — Max actually adjusts when I miss a run instead of just guilt-tripping me.',
+  ),
+  _Testimonial(
+    'Arjun K.',
+    'First marathon block',
+    "I've tried generic PDF plans before. This is the first one that felt like it was actually built around my pace and schedule.",
+  ),
+  _Testimonial(
+    'Meera S.',
+    'Chasing a sub-2 half',
+    'Race week pacing finally makes sense — I know exactly what pace to hold in each segment and why.',
+  ),
+];
+
+class _TestimonialCarousel extends StatefulWidget {
+  const _TestimonialCarousel();
+
+  @override
+  State<_TestimonialCarousel> createState() => _TestimonialCarouselState();
+}
+
+class _TestimonialCarouselState extends State<_TestimonialCarousel> {
+  final _controller = PageController(viewportFraction: 1);
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      children: [
+        SizedBox(
+          height: 150,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: _kTestimonials.length,
+            onPageChanged: (i) => setState(() => _page = i),
+            itemBuilder: (_, i) {
+              final t = _kTestimonials[i];
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: c.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '"${t.quote}"',
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 14,
+                        height: 1.4,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      t.name,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      t.context,
+                      style: const TextStyle(color: _kBrand, fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            _kTestimonials.length,
+            (i) => AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: i == _page ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: i == _page ? _kBrand : c.border,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
