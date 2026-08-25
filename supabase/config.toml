@@ -1,0 +1,4 @@
+project_id = "ijgycurltaznhcdoclhv"
+
+[functions.sync-races-aims]
+verify_jwt = false
