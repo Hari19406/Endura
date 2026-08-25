@@ -600,6 +600,7 @@ class _Hero extends StatefulWidget {
 
 class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
+  bool _started = false;
 
   @override
   void initState() {
@@ -608,7 +609,13 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
-    if (!MediaQuery.of(context).disableAnimations) {
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_started && !MediaQuery.of(context).disableAnimations) {
+      _started = true;
       _pulse.repeat(reverse: true);
     }
   }
