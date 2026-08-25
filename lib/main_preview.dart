@@ -3,7 +3,6 @@ import 'services/coach_message_builder.dart' as message;
 import 'engines/config/workout_template_library.dart';
 import 'models/training_phase.dart';
 import 'screens/pre_run_briefing_screen.dart';
-import 'screens/paywall_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -20,7 +19,10 @@ class PreviewApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
-      home: const PaywallScreen(),
+      home: PreRunBriefingScreen(
+        coachMessage: _mockThresholdMessage(),
+        onGoToRun: () {},
+      ),
     );
   }
 }
