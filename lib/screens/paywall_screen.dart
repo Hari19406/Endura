@@ -15,9 +15,6 @@ const _kBrand = Color(0xFF00E5CC);
 // Teal stays the action color everywhere else so buttons/selection state
 // don't get confused with this purely decorative premium cue.
 const _kGold = Color(0xFFE3C170);
-// Ember — used once, for the mid-trial reminder marker only (urgency accent,
-// kept rare so it doesn't compete with the brand teal).
-const _kEmber = Color(0xFFFF7A45);
 const _kTermsUrl =
     'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
 const _kPrivacyUrl =
@@ -348,12 +345,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 _OfferingUnavailableCard(
                                   colors: c,
                                   onRetry: _loadOffering,
-                                ),
-                              if (hasTrial) const SizedBox(height: 32),
-                              if (hasTrial)
-                                _TrialTimeline(
-                                  colors: c,
-                                  trialDays: _trialDays(intro),
                                 ),
                               const SizedBox(height: 36),
                               const _RouteMarker(2, 'WHY ENDURA'),
@@ -782,6 +773,7 @@ class _InlinePlanSelector extends StatelessWidget {
             subtitle: savingsPercent != null
                 ? 'Save $savingsPercent% vs monthly · billed annually'
                 : 'Billed annually',
+            highlight: 'Best for staying on track to race day',
             badge: 'BEST VALUE',
             trialTag: _trialTag(annual),
             isSelected: selected == annual,
@@ -815,6 +807,7 @@ class _PlanCard extends StatelessWidget {
   final String title;
   final String price;
   final String subtitle;
+  final String? highlight;
   final String? badge;
   final String? trialTag;
   final bool isSelected;
@@ -825,6 +818,7 @@ class _PlanCard extends StatelessWidget {
     required this.title,
     required this.price,
     required this.subtitle,
+    this.highlight,
     required this.badge,
     required this.trialTag,
     required this.isSelected,
@@ -955,6 +949,29 @@ class _PlanCard extends StatelessWidget {
                 ],
               ),
             ],
+            if (highlight != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: _kGold,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      highlight!,
+                      style: const TextStyle(
+                        color: _kGold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1010,158 +1027,6 @@ class _OfferingUnavailableCard extends StatelessWidget {
             child: const Text(
               'Retry',
               style: TextStyle(color: _kBrand, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---- Trial timeline (Today → reminder → billed) --------------------------
-
-class _TrialTimeline extends StatelessWidget {
-  final AppColors colors;
-  final int trialDays;
-
-  const _TrialTimeline({required this.colors, required this.trialDays});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = colors;
-    final reminderDay = (trialDays - 2).clamp(1, trialDays);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _TimelineStep(
-            colors: c,
-            icon: Icons.lock_outline_rounded,
-            title: 'Today',
-            body:
-                'Unlock Endura Pro in full — adaptive plans, guided sessions and race paces from Max.',
-            isFirst: true,
-            isLast: false,
-          ),
-          _TimelineStep(
-            colors: c,
-            icon: Icons.notifications_none_rounded,
-            title: 'Day $reminderDay',
-            body: "We'll send a reminder that your free trial is ending soon.",
-            isFirst: false,
-            isLast: false,
-            accent: _kEmber,
-          ),
-          _TimelineStep(
-            colors: c,
-            icon: Icons.star_rounded,
-            title: 'Day $trialDays',
-            body:
-                'Your subscription begins. Cancel any time before this to avoid being charged.',
-            isFirst: false,
-            isLast: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TimelineStep extends StatelessWidget {
-  final AppColors colors;
-  final IconData icon;
-  final String title;
-  final String body;
-  final bool isFirst;
-  final bool isLast;
-  final Color accent;
-
-  const _TimelineStep({
-    required this.colors,
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.isFirst,
-    required this.isLast,
-    this.accent = _kBrand,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = colors;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Continuous vertical bar: solid through the steps, rounded cap on
-          // the first, fading out below the last icon (Buddy-style). A step
-          // can break from brand teal to the ember accent to flag urgency
-          // (the trial-ending reminder) without losing the connected line.
-          SizedBox(
-            width: 36,
-            child: Container(
-              decoration: BoxDecoration(
-                color: isLast ? null : accent,
-                gradient: isLast
-                    ? LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [accent, accent.withValues(alpha: 0.0)],
-                      )
-                    : null,
-                borderRadius: isFirst
-                    ? const BorderRadius.vertical(top: Radius.circular(18))
-                    : null,
-              ),
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(top: isFirst ? 10 : 6),
-                  child: Icon(icon, color: Colors.black, size: 18),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: c.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    body,
-                    style: TextStyle(
-                      color: c.textSecondary,
-                      fontSize: 14,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
