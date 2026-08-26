@@ -19,17 +19,17 @@ class RevenueCatService {
 
     // Seed the cache immediately
     final info = await Purchases.getCustomerInfo();
-    isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
+    isProNotifier.value = info.entitlements.active.containsKey('endura_pro');
 
     // Keep cache live — fires when subscription status changes
     Purchases.addCustomerInfoUpdateListener((info) {
-      isProNotifier.value = info.entitlements.active.containsKey('Endura Pro');
+      isProNotifier.value = info.entitlements.active.containsKey('endura_pro');
     });
   }
 
   static Future<bool> isPro() async {
     final info = await Purchases.getCustomerInfo();
-    return info.entitlements.active.containsKey('Endura Pro');
+    return info.entitlements.active.containsKey('endura_pro');
   }
 
   /// Returns the annual and monthly packages from the default offering.
@@ -48,7 +48,7 @@ class RevenueCatService {
   static Future<bool> purchasePackage(Package package) async {
     final result = await Purchases.purchase(PurchaseParams.package(package));
     final nowPro = result.customerInfo.entitlements.active.containsKey(
-      'Endura Pro',
+      'endura_pro',
     );
     isProNotifier.value = nowPro;
     return nowPro;
@@ -60,7 +60,7 @@ class RevenueCatService {
 
   static Future<bool> restorePurchases() async {
     final info = await Purchases.restorePurchases();
-    final nowPro = info.entitlements.active.containsKey('Endura Pro');
+    final nowPro = info.entitlements.active.containsKey('endura_pro');
     isProNotifier.value = nowPro;
     return nowPro;
   }
