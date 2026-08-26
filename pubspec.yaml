@@ -59,6 +59,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   share_plus: ^13.2.0
   gal: ^2.3.2
+  flutter_blue_plus: ^1.35.3
+  health: ^3.0.6
 
 dev_dependencies:
   flutter_test:

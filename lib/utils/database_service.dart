@@ -27,6 +27,25 @@ class RunRecord {
   // ── Per-km splits as [{'km': 1, 'seconds': 320}, ...], main-set only.
   // Empty for runs recorded before this field existed or under 1km. ──────
   final List<Map<String, dynamic>> splits;
+  // ── Wall-clock elapsed seconds including paused time (vs durationSeconds,
+  // which is moving time). Null for runs recorded before this field existed
+  // or for runs with no pauses (nothing new to show over durationSeconds).
+  final int? elapsedSeconds;
+  // ── Heart rate / cadence summaries. Null when no BLE HR/cadence monitor or
+  // Health Connect/HealthKit source was available for that run — never a
+  // fabricated/estimated value. ───────────────────────────────────────────
+  final int? avgHeartRate;
+  final int? peakHeartRate;
+  final int? avgCadence;
+  final int? peakCadence;
+  // ── Grade-adjusted average pace, same "mm:ss" shape as averagePace. Null
+  // if fewer than 2 track samples have both altitude and pace. ───────────
+  final String? gapAveragePace;
+  // ── Fine-grained time series captured during the main-set phase (every
+  // ~15s or ~150m), backing the pace-trend/elevation-profile/HR/cadence
+  // charts. Each entry: {t, d, alt?, pace?, hr?, cad?}. Empty for runs
+  // recorded before this field existed. ───────────────────────────────────
+  final List<Map<String, dynamic>> trackSamples;
 
   const RunRecord({
     this.id,
@@ -41,6 +60,13 @@ class RunRecord {
     this.rpe,
     this.elevationGain = 0,
     this.splits = const [],
+    this.elapsedSeconds,
+    this.avgHeartRate,
+    this.peakHeartRate,
+    this.avgCadence,
+    this.peakCadence,
+    this.gapAveragePace,
+    this.trackSamples = const [],
   });
 
   Map<String, dynamic> toMap() => {
@@ -53,11 +79,19 @@ class RunRecord {
     'workout_type': workoutType,
     'synced_to_cloud': syncedToCloud ? 1 : 0,
     'cs_value_at_time': csValueAtTime,
-    // rpe is intentionally omitted when null so SQLite keeps DEFAULT NULL
-    // and existing rows are never accidentally zeroed out.
+    // rpe (and the new nullable fields below) are intentionally omitted when
+    // null so SQLite keeps DEFAULT NULL and existing rows are never
+    // accidentally zeroed out.
     if (rpe != null) 'rpe': rpe,
     'elevation_gain': elevationGain,
     'splits_json': jsonEncode(splits),
+    if (elapsedSeconds != null) 'elapsed_seconds': elapsedSeconds,
+    if (avgHeartRate != null) 'avg_heart_rate': avgHeartRate,
+    if (peakHeartRate != null) 'peak_heart_rate': peakHeartRate,
+    if (avgCadence != null) 'avg_cadence': avgCadence,
+    if (peakCadence != null) 'peak_cadence': peakCadence,
+    if (gapAveragePace != null) 'gap_average_pace': gapAveragePace,
+    'track_samples_json': jsonEncode(trackSamples),
   };
 
   factory RunRecord.fromMap(Map<String, dynamic> map) => RunRecord(
@@ -76,9 +110,25 @@ class RunRecord {
     rpe: map['rpe'] as int?,
     elevationGain: (map['elevation_gain'] as num?)?.toDouble() ?? 0,
     splits: _decodeSplits(map['splits_json'] as String?),
+    elapsedSeconds: map['elapsed_seconds'] as int?,
+    avgHeartRate: map['avg_heart_rate'] as int?,
+    peakHeartRate: map['peak_heart_rate'] as int?,
+    avgCadence: map['avg_cadence'] as int?,
+    peakCadence: map['peak_cadence'] as int?,
+    gapAveragePace: map['gap_average_pace'] as String?,
+    trackSamples: _decodeTrackSamples(map['track_samples_json'] as String?),
   );
 
   static List<Map<String, dynamic>> _decodeSplits(String? json) {
+    if (json == null || json.isEmpty) return [];
+    try {
+      return (jsonDecode(json) as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static List<Map<String, dynamic>> _decodeTrackSamples(String? json) {
     if (json == null || json.isEmpty) return [];
     try {
       return (jsonDecode(json) as List).cast<Map<String, dynamic>>();
@@ -188,8 +238,10 @@ class DatabaseService {
       // v5 → added achievements
       // v6 → added elevation_gain, splits_json
       // v7 → backfilled free-run rpe=0 rows to NULL (free runs never rate RPE)
+      // v8 → added elapsed_seconds, avg/peak heart_rate, avg/peak cadence,
+      //      gap_average_pace, track_samples_json
       // ────────────────────────────────────────────────────────────────────
-      version: 7,
+      version: 8,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -205,7 +257,14 @@ class DatabaseService {
             cs_value_at_time  REAL,
             rpe               INTEGER,
             elevation_gain    REAL    NOT NULL DEFAULT 0,
-            splits_json       TEXT    NOT NULL DEFAULT '[]'
+            splits_json       TEXT    NOT NULL DEFAULT '[]',
+            elapsed_seconds   INTEGER,
+            avg_heart_rate    INTEGER,
+            peak_heart_rate   INTEGER,
+            avg_cadence       INTEGER,
+            peak_cadence      INTEGER,
+            gap_average_pace  TEXT,
+            track_samples_json TEXT  NOT NULL DEFAULT '[]'
           )
         ''');
         await db.execute('''
@@ -323,6 +382,34 @@ class DatabaseService {
             );
           } catch (e) {
             debugPrint('[DB] free-run rpe backfill failed: $e');
+          }
+        }
+
+        if (oldVersion < 8) {
+          // v7 → v8: elapsed_seconds (moving vs elapsed), HR/cadence
+          // summaries, GAP, and track_samples_json for pace-trend/elevation/
+          // HR/cadence charts. All nullable — old rows read back as "not
+          // available", never zero.
+          for (final col in [
+            'elapsed_seconds INTEGER',
+            'avg_heart_rate INTEGER',
+            'peak_heart_rate INTEGER',
+            'avg_cadence INTEGER',
+            'peak_cadence INTEGER',
+            'gap_average_pace TEXT',
+          ]) {
+            try {
+              await db.execute('ALTER TABLE runs ADD COLUMN $col');
+            } catch (e) {
+              debugPrint('[DB] $col already exists, skipping: $e');
+            }
+          }
+          try {
+            await db.execute(
+              "ALTER TABLE runs ADD COLUMN track_samples_json TEXT NOT NULL DEFAULT '[]'",
+            );
+          } catch (e) {
+            debugPrint('[DB] track_samples_json already exists, skipping: $e');
           }
         }
       },
