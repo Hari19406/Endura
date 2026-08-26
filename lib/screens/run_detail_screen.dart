@@ -507,7 +507,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       title: 'PACE TREND',
                       samples: trackSamples,
                       valueKey: 'pace',
-                      color: context.colors.chartAccent,
+                      color: context.colors.paceAccent,
                       invertY: true,
                     ),
                   ],
@@ -518,7 +518,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       title: 'ELEVATION PROFILE',
                       samples: trackSamples,
                       valueKey: 'alt',
-                      color: context.colors.textSecondary,
+                      color: context.colors.elevationAccent,
                     ),
                   ],
                   if (avgHr != null) ...[
@@ -698,7 +698,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   /// Bare line chart (no card chrome) of one field from `trackSamples`
   /// against cumulative distance. Returns [SizedBox.shrink] if fewer than 2
   /// samples carry a non-null value for [valueKey] (never renders a chart
-  /// from a single point).
+  /// from a single point). Touch-scrubbable end to end: dragging anywhere
+  /// shows a crosshair + tooltip with the value at that exact point.
   Widget _buildTrendChart(
     BuildContext context, {
     required List<Map<String, dynamic>> samples,
@@ -717,20 +718,37 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     }
     if (spots.length < 2) return const SizedBox.shrink();
 
+    final unit = switch (valueKey) {
+      'pace' => UnitUtils.perUnitLabel(_useMiles),
+      'alt' => 'm',
+      'hr' => 'bpm',
+      'cad' => 'spm',
+      _ => '',
+    };
+
     String formatY(double y) {
       final v = invertY ? -y : y;
       if (valueKey == 'pace') {
         final secs = v.round();
         return '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}';
       }
-      return v.toStringAsFixed(0);
+      return v.round().toString();
     }
+
+    final ys = spots.map((s) => s.y).toList();
+    final minY = ys.reduce(math.min);
+    final maxY = ys.reduce(math.max);
+    final yPad = ((maxY - minY) * 0.15).clamp(1.0, double.infinity);
+    final xMax = spots.last.x;
 
     return LineChart(
       LineChartData(
+        minY: minY - yPad,
+        maxY: maxY + yPad,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
+          horizontalInterval: ((maxY + yPad) - (minY - yPad)) / 3,
           getDrawingHorizontalLine: (_) =>
               FlLine(color: c.divider, strokeWidth: 1),
         ),
@@ -744,34 +762,125 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           rightTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 40,
-              getTitlesWidget: (value, meta) => Text(
-                formatY(value),
-                style: TextStyle(fontSize: 10, color: c.textTertiary),
+              reservedSize: 44,
+              interval: ((maxY + yPad) - (minY - yPad)) / 3,
+              getTitlesWidget: (value, meta) => Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(
+                  '${formatY(value)}${unit.isNotEmpty ? ' $unit' : ''}',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: c.textTertiary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
               ),
             ),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 18,
-              getTitlesWidget: (value, meta) => Text(
-                '${value.toStringAsFixed(1)}${UnitUtils.unitLabel(_useMiles)}',
-                style: TextStyle(fontSize: 10, color: c.textTertiary),
-              ),
+              reservedSize: 20,
+              interval: xMax > 0 ? (xMax / 4).clamp(0.5, double.infinity) : 1,
+              getTitlesWidget: (value, meta) {
+                if (value < 0 || value > xMax + 0.01) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${value.toStringAsFixed(1)}${UnitUtils.unitLabel(_useMiles)}',
+                    style: TextStyle(fontSize: 9.5, color: c.textTertiary),
+                  ),
+                );
+              },
             ),
           ),
         ),
-        borderData: FlBorderData(show: false),
-        lineTouchData: const LineTouchData(enabled: false),
+        borderData: FlBorderData(
+          show: true,
+          border: Border(bottom: BorderSide(color: c.border, width: 1)),
+        ),
+        lineTouchData: LineTouchData(
+          enabled: true,
+          getTouchedSpotIndicator: (bar, indexes) => indexes
+              .map(
+                (_) => TouchedSpotIndicatorData(
+                  FlLine(color: color.withOpacity(0.5), strokeWidth: 1.5),
+                  FlDotData(
+                    getDotPainter: (spot, percent, bar, index) =>
+                        FlDotCirclePainter(
+                          radius: 4,
+                          color: c.surface,
+                          strokeWidth: 2.5,
+                          strokeColor: color,
+                        ),
+                  ),
+                ),
+              )
+              .toList(),
+          touchTooltipData: LineTouchTooltipData(
+            tooltipBgColor: c.surfaceAlt,
+            tooltipRoundedRadius: 8,
+            tooltipBorder: BorderSide(color: c.border),
+            tooltipPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 6,
+            ),
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipItems: (touchedSpots) => touchedSpots
+                .map(
+                  (spot) => LineTooltipItem(
+                    '${formatY(spot.y)}${unit.isNotEmpty ? ' $unit' : ''}\n',
+                    TextStyle(
+                      color: c.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                    children: [
+                      TextSpan(
+                        text:
+                            '${spot.x.toStringAsFixed(2)}${UnitUtils.unitLabel(_useMiles)}',
+                        style: TextStyle(
+                          color: c.textTertiary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+                .toList(),
+          ),
+        ),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
-            isCurved: false,
+            isCurved: true,
+            curveSmoothness: 0.2,
+            preventCurveOverShooting: true,
             color: color,
-            barWidth: 2,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: color.withOpacity(0.08)),
+            barWidth: 2.5,
+            dotData: FlDotData(
+              show: true,
+              checkToShowDot: (spot, bar) => spot == bar.spots.last,
+              getDotPainter: (spot, percent, bar, index) =>
+                  FlDotCirclePainter(
+                    radius: 3.5,
+                    color: color,
+                    strokeWidth: 2,
+                    strokeColor: c.surfaceAlt,
+                  ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [color.withOpacity(0.22), color.withOpacity(0.0)],
+              ),
+            ),
           ),
         ],
       ),
@@ -966,7 +1075,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                 context,
                 samples: samples,
                 valueKey: 'cad',
-                color: c.chartAccent,
+                color: c.cadenceAccent,
               ),
             ),
           ],

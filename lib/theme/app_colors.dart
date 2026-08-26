@@ -55,6 +55,19 @@ class AppColors extends ThemeExtension<AppColors> {
   /// the paywall brand color — does not invert between palettes.
   final Color chartAccent;
 
+  /// Pace-trend chart line (run detail). Does not invert between palettes.
+  final Color paceAccent;
+
+  /// Elevation-profile chart line (run detail) — warm/earthy, distinct from
+  /// pace. Does not invert between palettes.
+  final Color elevationAccent;
+
+  /// Cadence chart line (run detail) — distinct from pace/elevation/HR.
+  /// Does not invert between palettes. Heart rate intentionally reuses
+  /// [danger] (red) rather than a dedicated token — it's already the
+  /// correct semantic color for that chart.
+  final Color cadenceAccent;
+
   const AppColors({
     required this.background,
     required this.surface,
@@ -70,6 +83,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.danger,
     required this.success,
     required this.chartAccent,
+    required this.paceAccent,
+    required this.elevationAccent,
+    required this.cadenceAccent,
   });
 
   static const AppColors light = AppColors(
@@ -87,6 +103,9 @@ class AppColors extends ThemeExtension<AppColors> {
     danger: Color(0xFFD32F2F),
     success: Color(0xFF388E3C),
     chartAccent: Color(0xFF00E5CC),
+    paceAccent: Color(0xFF6A4FFF),
+    elevationAccent: Color(0xFFC97B1D),
+    cadenceAccent: Color(0xFF1FA97A),
   );
 
   static const AppColors dark = AppColors(
@@ -104,6 +123,9 @@ class AppColors extends ThemeExtension<AppColors> {
     danger: Color(0xFFEF5350),
     success: Color(0xFF66BB6A),
     chartAccent: Color(0xFF00E5CC),
+    paceAccent: Color(0xFF8C6BFF),
+    elevationAccent: Color(0xFFE8A33D),
+    cadenceAccent: Color(0xFF3ADCA0),
   );
 
   @override
@@ -122,6 +144,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? danger,
     Color? success,
     Color? chartAccent,
+    Color? paceAccent,
+    Color? elevationAccent,
+    Color? cadenceAccent,
   }) {
     return AppColors(
       background: background ?? this.background,
@@ -138,6 +163,9 @@ class AppColors extends ThemeExtension<AppColors> {
       danger: danger ?? this.danger,
       success: success ?? this.success,
       chartAccent: chartAccent ?? this.chartAccent,
+      paceAccent: paceAccent ?? this.paceAccent,
+      elevationAccent: elevationAccent ?? this.elevationAccent,
+      cadenceAccent: cadenceAccent ?? this.cadenceAccent,
     );
   }
 
@@ -159,6 +187,9 @@ class AppColors extends ThemeExtension<AppColors> {
       danger: Color.lerp(danger, other.danger, t)!,
       success: Color.lerp(success, other.success, t)!,
       chartAccent: Color.lerp(chartAccent, other.chartAccent, t)!,
+      paceAccent: Color.lerp(paceAccent, other.paceAccent, t)!,
+      elevationAccent: Color.lerp(elevationAccent, other.elevationAccent, t)!,
+      cadenceAccent: Color.lerp(cadenceAccent, other.cadenceAccent, t)!,
     );
   }
 }
