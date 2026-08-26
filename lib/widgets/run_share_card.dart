@@ -520,6 +520,243 @@ class _RunShareSheetState extends State<_RunShareSheet> {
   }
 }
 
+/// "Pick a layout" bottom sheet — category tabs (All / Charts / Activity)
+/// over a grid of live thumbnails. Pops the tapped [ShareCardTemplate].
+class _LayoutPickerSheet extends StatefulWidget {
+  final ShareRunData data;
+  final ShareCardStyle style;
+  final List<double>? weekKm;
+  final ShareCardTemplate selected;
+
+  const _LayoutPickerSheet({
+    required this.data,
+    required this.style,
+    required this.weekKm,
+    required this.selected,
+  });
+
+  @override
+  State<_LayoutPickerSheet> createState() => _LayoutPickerSheetState();
+}
+
+class _LayoutPickerSheetState extends State<_LayoutPickerSheet> {
+  ShareCardCategory _category = ShareCardCategory.all;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final templates = ShareCardTemplate.values
+        .where(
+          (t) =>
+              _category == ShareCardCategory.all ||
+              _categoryOf(t) == _category,
+        )
+        .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.82,
+      maxChildSize: 0.92,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: c.surfaceAlt,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: c.divider,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Pick a layout',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(Icons.close, color: c.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    for (final cat in ShareCardCategory.values) ...[
+                      _buildCategoryChip(cat),
+                      const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _category == ShareCardCategory.charts
+                    ? _buildComingSoon(c)
+                    : GridView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 20,
+                              crossAxisSpacing: 14,
+                              childAspectRatio: 0.62,
+                            ),
+                        itemCount: templates.length,
+                        itemBuilder: (context, i) =>
+                            _buildThumbnail(templates[i]),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildComingSoon(AppColors c) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bar_chart_rounded, size: 40, color: c.textTertiary),
+          const SizedBox(height: 12),
+          Text(
+            'Coming soon',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: c.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Chart-based layouts are on the way',
+            style: TextStyle(fontSize: 12, color: c.textTertiary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(ShareCardCategory cat) {
+    final c = context.colors;
+    final selected = _category == cat;
+    return GestureDetector(
+      onTap: () => setState(() => _category = cat),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? c.accent : c.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? c.accent : c.border),
+        ),
+        child: Text(
+          _categoryLabel(cat),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? c.onAccent : c.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThumbnail(ShareCardTemplate t) {
+    final c = context.colors;
+    final isSelected = t == widget.selected;
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(t),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected ? c.accent : c.border,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: RunShareCard.width,
+                  height: RunShareCard.height,
+                  child: IgnorePointer(
+                    child: RunShareCard(
+                      data: widget.data,
+                      template: t,
+                      style: widget.style,
+                      weekKm: widget.weekKm,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _labelOf(t),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: c.border),
+                ),
+                child: Text(
+                  _categoryLabel(_categoryOf(t)),
+                  style: TextStyle(fontSize: 10, color: c.textTertiary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The story-format (9:16) card itself. Always uses its own fixed palette
 /// regardless of app theme — it's a branded export, not an in-app surface.
 /// [ShareCardStyle.transparent] drops the background entirely (any template)
@@ -1049,6 +1286,294 @@ class RunShareCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Week by Day — Mon–Sun bar chart of the week this run falls in ───────
+
+  Widget _buildWeekByDayContent() {
+    final km = weekKm ?? List<double>.filled(7, 0.0);
+    final total = km.fold<double>(0, (a, b) => a + b);
+    final maxKm = km.fold<double>(0.001, (a, b) => a > b ? a : b);
+    const dayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final todayIndex = data.date.weekday - 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            const Text(
+              'THIS WEEK',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white54,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              '${total.toStringAsFixed(1)} km',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _mapBlue,
+              ),
+            ),
+          ],
+        ),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (int i = 0; i < 7; i++)
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      km[i] > 0 ? km[i].toStringAsFixed(1) : '',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 22,
+                      height: 8 + (km[i] / maxKm) * 210,
+                      decoration: BoxDecoration(
+                        color: km[i] > 0 ? _mapBlue : Colors.white12,
+                        borderRadius: BorderRadius.circular(6),
+                        border: i == todayIndex
+                            ? Border.all(color: Colors.white, width: 1.5)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      dayLetters[i],
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: i == todayIndex
+                            ? Colors.white
+                            : Colors.white38,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            const Icon(Icons.directions_run, size: 13, color: _mapBlue),
+            const SizedBox(width: 6),
+            const Text(
+              'COACHED BY MAX',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white38,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Big Distance — single oversized hero stat ────────────────────────────
+
+  Widget _buildBigDistanceContent() {
+    final distanceValue = UnitUtils.displayDistance(
+      data.distanceKm,
+      data.useMiles,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'DISTANCE',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white54,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      distanceValue.toStringAsFixed(2),
+                      style: const TextStyle(
+                        fontSize: 80,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -3,
+                        height: 1.0,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      UnitUtils.unitLabel(data.useMiles),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Icon(Icons.directions_run, size: 13, color: WorkoutTypeStyle.color(data.workoutType)),
+            const SizedBox(width: 6),
+            const Text(
+              'COACHED BY MAX',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white38,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Time on Feet — single oversized hero stat, duration-led ──────────────
+
+  Widget _buildTimeOnFeetContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'TIME ON FEET',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white54,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _formatDuration(data.durationSeconds),
+                  style: const TextStyle(
+                    fontSize: 68,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -2,
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Icon(Icons.directions_run, size: 13, color: WorkoutTypeStyle.color(data.workoutType)),
+            const SizedBox(width: 6),
+            const Text(
+              'COACHED BY MAX',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white38,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Stats Only — three-column row, no route ──────────────────────────────
+
+  Widget _buildStatsOnlyContent() {
+    final distanceValue = UnitUtils.displayDistance(
+      data.distanceKm,
+      data.useMiles,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
+        Expanded(
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildCompactStat(
+                  'DISTANCE',
+                  distanceValue.toStringAsFixed(2),
+                  UnitUtils.unitLabel(data.useMiles),
+                ),
+                _buildCompactStat(
+                  'TIME',
+                  _formatDuration(data.durationSeconds),
+                  '',
+                ),
+                _buildCompactStat(
+                  'PACE',
+                  UnitUtils.formatPaceString(data.averagePace, data.useMiles),
+                  UnitUtils.perUnitLabel(data.useMiles),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Icon(Icons.directions_run, size: 13, color: WorkoutTypeStyle.color(data.workoutType)),
+            const SizedBox(width: 6),
+            const Text(
+              'COACHED BY MAX',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white38,
+                letterSpacing: 2,
+              ),
             ),
           ],
         ),
