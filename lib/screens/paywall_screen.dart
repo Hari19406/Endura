@@ -105,15 +105,22 @@ class _PaywallScreenState extends State<PaywallScreen> {
         await Analytics.subscriptionStarted();
         if (mounted) Navigator.pop(context, true);
       }
-    } on PurchasesErrorCode catch (e) {
-      if (e == PurchasesErrorCode.purchaseCancelledError) return;
+    } on PlatformException catch (e) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code == PurchasesErrorCode.purchaseCancelledError) return;
+      debugPrint('[Paywall] purchase error: $code');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
+        ).showSnackBar(SnackBar(content: Text(_friendlyError(code))));
       }
     } catch (e) {
       debugPrint('[Paywall] purchase error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Something went wrong. Try again.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _purchasingId = null);
     }
