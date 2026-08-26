@@ -23,6 +23,10 @@ import '../widgets/target_pace_indicator.dart';
 import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/analytics_service.dart';
+import '../services/ble_heart_rate_service.dart';
+import '../services/ble_cadence_service.dart';
+import '../services/health_bridge_service.dart';
+import '../utils/gap_calculator.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -101,6 +105,29 @@ class _RunScreenState extends State<RunScreen>
   double? _lastAltitudeForGain;
   final List<Map<String, dynamic>> _splits = [];
   int _lastSplitKm = 0;
+
+  // ── Wall-clock elapsed time (incl. pauses) — never cancelled on pause,
+  // unlike `_timer`/`_seconds` which are effectively "moving time". ───────
+  int _elapsedSeconds = 0;
+  Timer? _elapsedTimer;
+
+  // ── Fine-grained time-series for pace-trend/elevation/HR/cadence charts,
+  // main-set phase only, same scoping as elevation gain/splits. ──────────
+  final List<Map<String, dynamic>> _trackSamples = [];
+  int _lastTrackSampleT = 0;
+  double _lastTrackSampleD = 0;
+
+  // ── Live vitals: real BLE/Health Connect/HealthKit data only, never
+  // estimated. Null fields simply mean "no source connected". ────────────
+  int? _latestHr;
+  int? _peakHrSeen;
+  final List<int> _hrSamplesForAvg = [];
+  int? _latestCadence;
+  int? _peakCadenceSeen;
+  final List<int> _cadenceSamplesForAvg = [];
+  StreamSubscription<int>? _hrSub;
+  StreamSubscription<int>? _cadenceSub;
+  Timer? _healthPollTimer;
 
   double _deviceHeading = 0.0;
 
@@ -689,6 +716,16 @@ class _RunScreenState extends State<RunScreen>
         _lastAltitudeForGain = null;
         _splits.clear();
         _lastSplitKm = 0;
+        _elapsedSeconds = 0;
+        _trackSamples.clear();
+        _lastTrackSampleT = 0;
+        _lastTrackSampleD = 0;
+        _latestHr = null;
+        _peakHrSeen = null;
+        _hrSamplesForAvg.clear();
+        _latestCadence = null;
+        _peakCadenceSeen = null;
+        _cadenceSamplesForAvg.clear();
       });
     }
 
@@ -699,6 +736,7 @@ class _RunScreenState extends State<RunScreen>
           : 'free',
     );
     _startGPSMonitoring();
+    _startVitalsTracking();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _runState == RunState.running) {
@@ -707,6 +745,14 @@ class _RunScreenState extends State<RunScreen>
           _paceSnapshot = _paceEngine.tick(_seconds);
         });
         _checkPhaseMilestone();
+      }
+    });
+
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted &&
+          (_runState == RunState.running || _runState == RunState.paused)) {
+        setState(() => _elapsedSeconds++);
       }
     });
 
@@ -752,6 +798,27 @@ class _RunScreenState extends State<RunScreen>
                     _elevationGainM += altDelta;
                 }
                 _lastAltitudeForGain = position.altitude;
+
+                // ── Track-sample capture: every ~15s of phase time or ~150m
+                // of phase distance, whichever first — bounds sample count
+                // for pace-trend/elevation/HR/cadence charts. ─────────────
+                final sampleT = _phaseElapsedSeconds;
+                final sampleD = _phaseDistanceM;
+                if (sampleT - _lastTrackSampleT >= 15 ||
+                    sampleD - _lastTrackSampleD >= 150) {
+                  _trackSamples.add({
+                    't': sampleT,
+                    'd': sampleD,
+                    'alt': position.altitude,
+                    'pace': _paceSnapshot.smoothedPaceSecondsPerKm > 0
+                        ? _paceSnapshot.smoothedPaceSecondsPerKm
+                        : null,
+                    'hr': _latestHr,
+                    'cad': _latestCadence,
+                  });
+                  _lastTrackSampleT = sampleT;
+                  _lastTrackSampleD = sampleD;
+                }
               }
 
               if (_lastPosition != null) {
@@ -889,6 +956,63 @@ class _RunScreenState extends State<RunScreen>
         if (secondsSinceLastUpdate > 10 && !_isGPSSignalLost && mounted)
           setState(() => _isGPSSignalLost = true);
       }
+    });
+  }
+
+  /// Subscribes to whatever live HR/cadence sources are available for this
+  /// run — BLE first, falling back to a coarse Health Connect/HealthKit poll
+  /// for HR only if no BLE monitor connects within a few seconds. Never
+  /// estimates a value: fields stay null when nothing is connected.
+  void _startVitalsTracking() {
+    _hrSub?.cancel();
+    _hrSub = BleHeartRateService.instance.bpmStream.listen((bpm) {
+      _latestHr = bpm;
+      _peakHrSeen = _peakHrSeen == null
+          ? bpm
+          : (bpm > _peakHrSeen! ? bpm : _peakHrSeen);
+      _hrSamplesForAvg.add(bpm);
+      _healthPollTimer?.cancel();
+      _healthPollTimer = null;
+    });
+
+    _cadenceSub?.cancel();
+    _cadenceSub = BleCadenceService.instance.cadenceStream.listen((spm) {
+      _latestCadence = spm;
+      _peakCadenceSeen = _peakCadenceSeen == null
+          ? spm
+          : (spm > _peakCadenceSeen! ? spm : _peakCadenceSeen);
+      _cadenceSamplesForAvg.add(spm);
+    });
+
+    BleHeartRateService.instance.reconnectToLastKnownDevice();
+    BleCadenceService.instance.reconnectToLastKnownDevice();
+
+    Future.delayed(const Duration(seconds: 5), () {
+      if (!mounted || _runState != RunState.running) return;
+      if (BleHeartRateService.instance.lastBpm != null) return;
+      _healthPollTimer?.cancel();
+      _healthPollTimer = Timer.periodic(const Duration(seconds: 30), (
+        _,
+      ) async {
+        if (BleHeartRateService.instance.lastBpm != null) {
+          _healthPollTimer?.cancel();
+          return;
+        }
+        final hasPermission = await HealthBridgeService.instance
+            .hasPermissions();
+        if (!hasPermission) return;
+        final bpm = await HealthBridgeService.instance.fetchAverageHeartRate(
+          DateTime.now().subtract(const Duration(seconds: 35)),
+          DateTime.now(),
+        );
+        if (bpm != null) {
+          _latestHr = bpm;
+          _peakHrSeen = _peakHrSeen == null
+              ? bpm
+              : (bpm > _peakHrSeen! ? bpm : _peakHrSeen);
+          _hrSamplesForAvg.add(bpm);
+        }
+      });
     });
   }
 
@@ -1039,6 +1163,14 @@ class _RunScreenState extends State<RunScreen>
 
     _timer?.cancel();
     _timer = null;
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    _hrSub?.cancel();
+    _hrSub = null;
+    _cadenceSub?.cancel();
+    _cadenceSub = null;
+    _healthPollTimer?.cancel();
+    _healthPollTimer = null;
     _positionStream?.cancel();
     _positionStream = null;
     _gpsMonitorTimer?.cancel();
@@ -1112,6 +1244,54 @@ class _RunScreenState extends State<RunScreen>
           });
           prevSplitSeconds = cumSeconds;
         }
+
+        final capturedTrackSamples = List<Map<String, dynamic>>.from(
+          _trackSamples,
+        );
+
+        // Health Connect/HealthKit backfill — authoritative reconciliation
+        // over the main-set wall-clock window. Best-effort: failures leave
+        // any BLE-derived averages untouched.
+        List<HealthHrSample> healthHrBackfill = [];
+        if (await HealthBridgeService.instance.hasPermissions()) {
+          final mainSetStart = runDate.subtract(
+            Duration(seconds: _capturedMainSeconds),
+          );
+          healthHrBackfill = await HealthBridgeService.instance
+              .fetchHeartRateSeries(mainSetStart, runDate);
+        }
+
+        int? avgHr;
+        int? peakHr;
+        if (_hrSamplesForAvg.isNotEmpty) {
+          avgHr = (_hrSamplesForAvg.reduce((a, b) => a + b) /
+                  _hrSamplesForAvg.length)
+              .round();
+          peakHr = _peakHrSeen;
+        } else if (healthHrBackfill.isNotEmpty) {
+          final bpms = healthHrBackfill.map((s) => s.bpm).toList();
+          avgHr = (bpms.reduce((a, b) => a + b) / bpms.length).round();
+          peakHr = bpms.reduce((a, b) => a > b ? a : b);
+        }
+
+        int? avgCadence;
+        int? peakCadence;
+        if (_cadenceSamplesForAvg.isNotEmpty) {
+          avgCadence = (_cadenceSamplesForAvg.reduce((a, b) => a + b) /
+                  _cadenceSamplesForAvg.length)
+              .round();
+          peakCadence = _peakCadenceSeen;
+        }
+        // else leave both null — no phone-accelerometer estimation, by
+        // project decision.
+
+        final gapAvgSecPerKm = GapCalculator.averageGapSecPerKm(
+          capturedTrackSamples,
+        );
+        final gapAveragePace = gapAvgSecPerKm != null
+            ? _formatPaceFromSeconds(gapAvgSecPerKm)
+            : null;
+
         final newRun = RunRecord(
           distanceKm: _capturedMainDistanceM / 1000,
           averagePace: _capturedMainPace,
@@ -1121,6 +1301,13 @@ class _RunScreenState extends State<RunScreen>
           workoutType: capturedWorkoutType,
           elevationGain: _elevationGainM,
           splits: capturedSplits,
+          elapsedSeconds: _elapsedSeconds > 0 ? _elapsedSeconds : null,
+          avgHeartRate: avgHr,
+          peakHeartRate: peakHr,
+          avgCadence: avgCadence,
+          peakCadence: peakCadence,
+          gapAveragePace: gapAveragePace,
+          trackSamples: capturedTrackSamples,
         );
         await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then(
@@ -1223,6 +1410,9 @@ class _RunScreenState extends State<RunScreen>
         _lastAltitudeForGain = null;
         _splits.clear();
         _lastSplitKm = 0;
+        _trackSamples.clear();
+        _lastTrackSampleT = 0;
+        _lastTrackSampleD = 0;
       });
       AudioCueService.instance.announceMainSetStart(targetPace: paceStr);
     } else if (_currentPhase == RunMode.mainSet) {
@@ -1271,6 +1461,13 @@ class _RunScreenState extends State<RunScreen>
     return '$mins:${secs.toString().padLeft(2, '0')}';
   }
 
+  String _formatPaceFromSeconds(double secPerKm) {
+    final rounded = secPerKm.round();
+    final mins = rounded ~/ 60;
+    final secs = rounded % 60;
+    return '$mins:${secs.toString().padLeft(2, '0')}';
+  }
+
   String _buildDistanceText() {
     final phaseKm = _convertDistance(_phaseDistanceM);
     if (_currentPhase == RunMode.mainSet) {
@@ -1288,6 +1485,10 @@ class _RunScreenState extends State<RunScreen>
     WidgetsBinding.instance.removeObserver(this);
     UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
     _timer?.cancel();
+    _elapsedTimer?.cancel();
+    _hrSub?.cancel();
+    _cadenceSub?.cancel();
+    _healthPollTimer?.cancel();
     _positionStream?.cancel();
     _warmupStream?.cancel();
     _gpsMonitorTimer?.cancel();
@@ -2015,6 +2216,14 @@ class _RunScreenState extends State<RunScreen>
   Future<void> _resetToReady() async {
     _timer?.cancel();
     _timer = null;
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    _hrSub?.cancel();
+    _hrSub = null;
+    _cadenceSub?.cancel();
+    _cadenceSub = null;
+    _healthPollTimer?.cancel();
+    _healthPollTimer = null;
     _positionStream?.cancel();
     _positionStream = null;
     _gpsMonitorTimer?.cancel();
@@ -2050,6 +2259,16 @@ class _RunScreenState extends State<RunScreen>
       _lastAltitudeForGain = null;
       _splits.clear();
       _lastSplitKm = 0;
+      _elapsedSeconds = 0;
+      _trackSamples.clear();
+      _lastTrackSampleT = 0;
+      _lastTrackSampleD = 0;
+      _latestHr = null;
+      _peakHrSeen = null;
+      _hrSamplesForAvg.clear();
+      _latestCadence = null;
+      _peakCadenceSeen = null;
+      _cadenceSamplesForAvg.clear();
       _isFreeRun = false;
       _showRunTypeChoice = false;
       _workoutReadyToStart = false;

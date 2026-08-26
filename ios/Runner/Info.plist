@@ -49,6 +49,12 @@
     <string>This app needs location access to track your run</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>This app needs location access to track your run</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Endura uses Bluetooth to connect to your heart rate monitor and cadence sensor.</string>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>Endura uses Bluetooth to connect to your heart rate monitor and cadence sensor.</string>
+    <key>NSHealthShareUsageDescription</key>
+    <string>Endura reads your heart rate data to show it alongside your runs.</string>
 	<key>NSAppTransportSecurity</key>
 <dict>
     <key>NSAllowsArbitraryLoads</key>

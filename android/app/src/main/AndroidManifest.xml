@@ -11,6 +11,17 @@
     <!-- Save share cards to gallery on Android 9 and below (no-op on 10+). -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
+    <!-- BLE heart-rate/cadence monitor pairing. Scanning is filtered by GATT
+         service UUID (0x180D/0x1814), never used to infer location, hence
+         neverForLocation — this does NOT replace the existing location
+         permissions above, which are still required for GPS run tracking. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Health data source is Google Fit (via the `health` package's Fitness
+         API + GoogleSignIn), not Health Connect, so no android.permission.
+         health.* manifest permissions are needed — consent is an OAuth
+         scope grant at runtime through the existing Google Sign-In flow. -->
+
 
     <application
         android:label="Endura"

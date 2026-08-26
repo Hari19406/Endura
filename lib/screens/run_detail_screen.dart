@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
 import '../utils/database_service.dart';
 import '../widgets/run_share_card.dart';
+import '../services/profile_service.dart';
 
 class RunDetailScreen extends StatefulWidget {
   final dynamic run;
@@ -18,11 +20,25 @@ class RunDetailScreen extends StatefulWidget {
 
 class _RunDetailScreenState extends State<RunDetailScreen> {
   bool _useMiles = UnitUtils.useMilesNotifier.value;
+  int _maxHrEstimate = 190;
 
   @override
   void initState() {
     super.initState();
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
+    _loadMaxHrEstimate();
+  }
+
+  Future<void> _loadMaxHrEstimate() async {
+    try {
+      final profile = await ProfileService.instance.fetchProfile();
+      final dob = profile?.dob;
+      if (dob == null || !mounted) return;
+      final age = DateTime.now().difference(dob).inDays ~/ 365;
+      if (age > 0) setState(() => _maxHrEstimate = 220 - age);
+    } catch (_) {
+      // Keep the 190 fallback — never block the screen on this.
+    }
   }
 
   void _onUnitPrefChanged() {
@@ -41,6 +57,14 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final s = seconds % 60;
     if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
     return '${m}m ${s.toString().padLeft(2, '0')}s';
+  }
+
+  String _calcPaceString(double distanceKm, int seconds) {
+    if (distanceKm <= 0 || seconds <= 0) return '0:00';
+    final secPerKm = (seconds / distanceKm).round();
+    final mins = secPerKm ~/ 60;
+    final secs = secPerKm % 60;
+    return '$mins:${secs.toString().padLeft(2, '0')}';
   }
 
   String _formatDate(DateTime date) {
@@ -163,6 +187,17 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         const [];
     final wColor = _workoutColor(workoutType);
     final gpsPoints = _getGpsPoints();
+
+    final elapsedSeconds = widget.record?.elapsedSeconds as int?;
+    final avgHr = widget.record?.avgHeartRate as int?;
+    final peakHr = widget.record?.peakHeartRate as int?;
+    final avgCadence = widget.record?.avgCadence as int?;
+    final peakCadence = widget.record?.peakCadence as int?;
+    final gapAveragePace = widget.record?.gapAveragePace as String?;
+    final trackSamples =
+        (widget.record?.trackSamples as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        const <Map<String, dynamic>>[];
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -382,6 +417,47 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       ],
                     ),
                   ),
+                  // Moving vs elapsed time — only shown when the run had
+                  // pauses (otherwise the two are identical and a 3rd row
+                  // conveys nothing new).
+                  if (elapsedSeconds != null && elapsedSeconds > duration) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.colors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.colors.border),
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Row(
+                        children: [
+                          _buildStat(
+                            context,
+                            label: 'MOVING TIME',
+                            value: _formatDuration(duration),
+                            unit: '',
+                          ),
+                          _buildDivider(context),
+                          _buildStat(
+                            context,
+                            label: 'ELAPSED TIME',
+                            value: _formatDuration(elapsedSeconds),
+                            unit: '',
+                          ),
+                          _buildDivider(context),
+                          _buildStat(
+                            context,
+                            label: 'ELAPSED PACE',
+                            value: UnitUtils.formatPaceString(
+                              _calcPaceString(distance, elapsedSeconds),
+                              _useMiles,
+                            ),
+                            unit: UnitUtils.perUnitLabel(_useMiles),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Secondary stats
@@ -409,12 +485,65 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                               : '—',
                           unit: elevationGain > 0 ? 'm gain' : '',
                         ),
+                        if (gapAveragePace != null) ...[
+                          _buildDivider(context),
+                          _buildStat(
+                            context,
+                            label: 'GRADE-ADJ PACE',
+                            value: UnitUtils.formatPaceString(
+                              gapAveragePace,
+                              _useMiles,
+                            ),
+                            unit: UnitUtils.perUnitLabel(_useMiles),
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  if (trackSamples.length >= 2) ...[
+                    const SizedBox(height: 16),
+                    _buildTrendCard(
+                      context,
+                      title: 'PACE TREND',
+                      samples: trackSamples,
+                      valueKey: 'pace',
+                      color: context.colors.chartAccent,
+                      invertY: true,
+                    ),
+                  ],
+                  if (trackSamples.any((s) => s['alt'] != null)) ...[
+                    const SizedBox(height: 16),
+                    _buildTrendCard(
+                      context,
+                      title: 'ELEVATION PROFILE',
+                      samples: trackSamples,
+                      valueKey: 'alt',
+                      color: context.colors.textSecondary,
+                    ),
+                  ],
+                  if (avgHr != null) ...[
+                    const SizedBox(height: 16),
+                    _buildHrCard(context, avgHr, peakHr, trackSamples),
+                  ],
+                  if (avgCadence != null) ...[
+                    const SizedBox(height: 16),
+                    _buildCadenceCard(context, avgCadence, peakCadence, trackSamples),
+                  ],
                   if (splits.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     _buildSplitsCard(context, splits),
+                  ],
+                  if (widget.record?.id != null) ...[
+                    const SizedBox(height: 24),
+                    Center(
+                      child: Text(
+                        'Activity #${widget.record!.id}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.colors.textFaint,
+                        ),
+                      ),
+                    ),
                   ],
                   // Clearance for the floating Share + Delete buttons.
                   const SizedBox(height: 156),
@@ -561,6 +690,286 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               ),
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  /// Bare line chart (no card chrome) of one field from `trackSamples`
+  /// against cumulative distance. Returns [SizedBox.shrink] if fewer than 2
+  /// samples carry a non-null value for [valueKey] (never renders a chart
+  /// from a single point).
+  Widget _buildTrendChart(
+    BuildContext context, {
+    required List<Map<String, dynamic>> samples,
+    required String valueKey,
+    required Color color,
+    bool invertY = false,
+  }) {
+    final c = context.colors;
+    final spots = <FlSpot>[];
+    for (final s in samples) {
+      final v = s[valueKey];
+      if (v == null) continue;
+      final distKm = (s['d'] as num).toDouble() / 1000;
+      final value = (v as num).toDouble();
+      spots.add(FlSpot(distKm, invertY ? -value : value));
+    }
+    if (spots.length < 2) return const SizedBox.shrink();
+
+    String formatY(double y) {
+      final v = invertY ? -y : y;
+      if (valueKey == 'pace') {
+        final secs = v.round();
+        return '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}';
+      }
+      return v.toStringAsFixed(0);
+    }
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) =>
+              FlLine(color: c.divider, strokeWidth: 1),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) => Text(
+                formatY(value),
+                style: TextStyle(fontSize: 10, color: c.textTertiary),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 18,
+              getTitlesWidget: (value, meta) => Text(
+                '${value.toStringAsFixed(1)}${UnitUtils.unitLabel(_useMiles)}',
+                style: TextStyle(fontSize: 10, color: c.textTertiary),
+              ),
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        lineTouchData: const LineTouchData(enabled: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: false,
+            color: color,
+            barWidth: 2,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(show: true, color: color.withOpacity(0.08)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Card chrome (title + surface) wrapping [_buildTrendChart] — used for
+  /// the standalone pace-trend and elevation-profile cards.
+  Widget _buildTrendCard(
+    BuildContext context, {
+    required String title,
+    required List<Map<String, dynamic>> samples,
+    required String valueKey,
+    required Color color,
+    bool invertY = false,
+  }) {
+    final c = context.colors;
+    final usableSamples = samples.where((s) => s[valueKey] != null).length;
+    if (usableSamples < 2) return const SizedBox.shrink();
+    final chart = _buildTrendChart(
+      context,
+      samples: samples,
+      valueKey: valueKey,
+      color: color,
+      invertY: invertY,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: c.textTertiary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(height: 120, child: chart),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHrCard(
+    BuildContext context,
+    int avgHr,
+    int? peakHr,
+    List<Map<String, dynamic>> samples,
+  ) {
+    final c = context.colors;
+    final hasTrend = samples.any((s) => s['hr'] != null);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildStat(context, label: 'AVG HR', value: '$avgHr', unit: 'bpm'),
+              if (peakHr != null) ...[
+                _buildDivider(context),
+                _buildStat(
+                  context,
+                  label: 'PEAK HR',
+                  value: '$peakHr',
+                  unit: 'bpm',
+                ),
+              ],
+            ],
+          ),
+          if (hasTrend) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: _buildTrendChart(
+                context,
+                samples: samples,
+                valueKey: 'hr',
+                color: c.danger,
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          _buildHrZoneBar(context, avgHr),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHrZoneBar(BuildContext context, int avgHr) {
+    final c = context.colors;
+    final maxHr = _maxHrEstimate;
+    final bands = [
+      ('Z1', 0.50, 0.60, c.textTertiary),
+      ('Z2', 0.60, 0.70, c.chartAccent),
+      ('Z3', 0.70, 0.80, c.success),
+      ('Z4', 0.80, 0.90, c.accent),
+      ('Z5', 0.90, 1.00, c.danger),
+    ];
+    final avgPct = (avgHr / maxHr).clamp(0.0, 1.0);
+    String activeZone = 'Z1';
+    for (final b in bands) {
+      if (avgPct >= b.$2) activeZone = b.$1;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: bands
+              .map(
+                (b) => Expanded(
+                  child: Container(
+                    height: 8,
+                    margin: EdgeInsets.only(right: b == bands.last ? 0 : 2),
+                    decoration: BoxDecoration(
+                      color: b.$1 == activeZone
+                          ? b.$4
+                          : b.$4.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '$activeZone avg · est. max $maxHr bpm',
+          style: TextStyle(fontSize: 11, color: c.textFaint),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCadenceCard(
+    BuildContext context,
+    int avgCadence,
+    int? peakCadence,
+    List<Map<String, dynamic>> samples,
+  ) {
+    final c = context.colors;
+    final hasTrend = samples.any((s) => s['cad'] != null);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildStat(
+                context,
+                label: 'AVG CADENCE',
+                value: '$avgCadence',
+                unit: 'spm',
+              ),
+              if (peakCadence != null) ...[
+                _buildDivider(context),
+                _buildStat(
+                  context,
+                  label: 'PEAK CADENCE',
+                  value: '$peakCadence',
+                  unit: 'spm',
+                ),
+              ],
+            ],
+          ),
+          if (hasTrend) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: _buildTrendChart(
+                context,
+                samples: samples,
+                valueKey: 'cad',
+                color: c.chartAccent,
+              ),
+            ),
+          ],
         ],
       ),
     );

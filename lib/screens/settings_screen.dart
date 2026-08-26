@@ -12,6 +12,10 @@ import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../services/ble_heart_rate_service.dart';
+import '../services/ble_cadence_service.dart';
+import '../services/health_bridge_service.dart';
+import 'device_pairing_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -26,11 +30,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   int _runsPerWeek = 4;
   List<int> _trainingDays = TrainingDaysService.defaultsFor(4);
+  String? _hrDeviceId;
+  String? _cadenceDeviceId;
+  bool _healthConnected = false;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadDeviceState();
+  }
+
+  Future<void> _loadDeviceState() async {
+    final hrId = await BleHeartRateService.instance.lastDeviceId();
+    final cadenceId = await BleCadenceService.instance.lastDeviceId();
+    final healthGranted = await HealthBridgeService.instance.hasPermissions();
+    if (!mounted) return;
+    setState(() {
+      _hrDeviceId = hrId;
+      _cadenceDeviceId = cadenceId;
+      _healthConnected = healthGranted;
+    });
   }
 
   Future<void> _loadSettings() async {
@@ -335,6 +355,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 24),
 
+                    // DEVICES
+                    _buildSectionHeader('DEVICES'),
+                    const SizedBox(height: 12),
+                    _buildCard(
+                      child: Column(
+                        children: [
+                          _deviceRow(
+                            icon: Icons.favorite_border,
+                            title: 'Heart rate monitor',
+                            subtitle: _hrDeviceId != null
+                                ? 'Paired'
+                                : 'Not connected',
+                            onTap: () async {
+                              HapticFeedback.lightImpact();
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const DevicePairingScreen(
+                                    deviceType: DeviceType.heartRate,
+                                  ),
+                                ),
+                              );
+                              _loadDeviceState();
+                            },
+                          ),
+                          Divider(height: 24, color: context.colors.divider),
+                          _deviceRow(
+                            icon: Icons.directions_run,
+                            title: 'Running cadence sensor',
+                            subtitle: _cadenceDeviceId != null
+                                ? 'Paired'
+                                : 'Not connected',
+                            onTap: () async {
+                              HapticFeedback.lightImpact();
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const DevicePairingScreen(
+                                    deviceType: DeviceType.cadence,
+                                  ),
+                                ),
+                              );
+                              _loadDeviceState();
+                            },
+                          ),
+                          Divider(height: 24, color: context.colors.divider),
+                          _deviceRow(
+                            icon: Icons.health_and_safety_outlined,
+                            title: 'Health Connect / Apple Health',
+                            subtitle: _healthConnected
+                                ? 'Connected'
+                                : 'Not connected',
+                            onTap: () async {
+                              HapticFeedback.lightImpact();
+                              final granted = await HealthBridgeService
+                                  .instance
+                                  .requestPermissions();
+                              if (!mounted) return;
+                              setState(() => _healthConnected = granted);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
                     // ACCOUNT
                     _buildSectionHeader('ACCOUNT'),
                     const SizedBox(height: 12),
@@ -462,6 +548,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _deviceRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: c.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: c.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: c.textTertiary),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, size: 20, color: c.textFaint),
+        ],
       ),
     );
   }

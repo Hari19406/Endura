@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HealthHrSample {
   final DateTime time;
@@ -22,12 +23,19 @@ class HealthBridgeService {
   final HealthFactory _health = HealthFactory();
 
   static const _types = [HealthDataType.HEART_RATE, HealthDataType.STEPS];
+  static const _prefsGrantedKey = 'health_connect_permissions_granted';
 
   bool _authorized = false;
 
+  /// Triggers the native OS consent screen (Health Connect/HealthKit). Only
+  /// call this from an explicit user action (e.g. tapping the Settings
+  /// "Health Connect" tile) — never from a background timer, since it can
+  /// surface a system permission dialog unprompted.
   Future<bool> requestPermissions() async {
     try {
       _authorized = await _health.requestAuthorization(List.of(_types));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefsGrantedKey, _authorized);
       return _authorized;
     } catch (e) {
       debugPrint('[HealthBridgeService] requestPermissions failed: $e');
@@ -35,12 +43,18 @@ class HealthBridgeService {
     }
   }
 
-  /// The `health` package (v3 API) has no standalone permission-check call —
-  /// requestAuthorization is idempotent (re-granted access returns true
-  /// without re-prompting), so it doubles as the check here.
+  /// Safe to call anywhere (background timers, save-time backfill) — reads
+  /// the persisted result of the last explicit [requestPermissions] call
+  /// rather than re-invoking the OS consent flow.
   Future<bool> hasPermissions() async {
     if (_authorized) return true;
-    return requestPermissions();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _authorized = prefs.getBool(_prefsGrantedKey) ?? false;
+      return _authorized;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<List<HealthHrSample>> fetchHeartRateSeries(

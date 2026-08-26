@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/analytics_service.dart';
 import '../services/social_share_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/database_service.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
 
@@ -43,8 +45,60 @@ class ShareRunData {
 /// every [ShareCardTemplate], including [ShareCardTemplate.poster].
 enum ShareCardStyle { classic, transparent }
 
-/// Layout of the exported card. All four render at the same story size.
-enum ShareCardTemplate { full, compact, blank, poster }
+/// Layout of the exported card. All render at the same story size.
+enum ShareCardTemplate {
+  full,
+  compact,
+  blank,
+  poster,
+  weekByDay,
+  bigDistance,
+  timeOnFeet,
+  statsOnly,
+}
+
+/// Grouping used by the "Pick a layout" picker sheet. [charts] has no
+/// templates yet — it renders a "Coming soon" placeholder.
+enum ShareCardCategory { all, charts, activity }
+
+ShareCardCategory _categoryOf(ShareCardTemplate t) => ShareCardCategory.activity;
+
+String _labelOf(ShareCardTemplate t) => switch (t) {
+  ShareCardTemplate.full => 'Full',
+  ShareCardTemplate.compact => 'Compact',
+  ShareCardTemplate.blank => 'Blank',
+  ShareCardTemplate.poster => 'Poster',
+  ShareCardTemplate.weekByDay => 'Week by Day',
+  ShareCardTemplate.bigDistance => 'Big Distance',
+  ShareCardTemplate.timeOnFeet => 'Time on Feet',
+  ShareCardTemplate.statsOnly => 'Stats Only',
+};
+
+String _categoryLabel(ShareCardCategory c) => switch (c) {
+  ShareCardCategory.all => 'All',
+  ShareCardCategory.charts => 'Charts',
+  ShareCardCategory.activity => 'Activity',
+};
+
+/// Per-day distance for the Mon–Sun week containing [ShareRunData.date],
+/// used by [ShareCardTemplate.weekByDay]. Index 0 = Monday.
+Future<List<double>> _loadWeekKm(DateTime anchor) async {
+  final weekStart = DateTime(
+    anchor.year,
+    anchor.month,
+    anchor.day,
+  ).subtract(Duration(days: anchor.weekday - 1));
+  final weekEnd = weekStart.add(const Duration(days: 7));
+
+  final runs = await DatabaseService.instance.getAllRuns();
+  final km = List<double>.filled(7, 0.0);
+  for (final r in runs) {
+    if (r.date.isBefore(weekStart) || !r.date.isBefore(weekEnd)) continue;
+    final dayIndex = r.date.weekday - 1;
+    km[dayIndex] += r.distanceKm;
+  }
+  return km;
+}
 
 /// Opens a bottom sheet with a story-format preview of the run card, a
 /// template picker, a style toggle (opaque / transparent), and quick
@@ -72,39 +126,29 @@ class _RunShareSheet extends StatefulWidget {
 }
 
 class _RunShareSheetState extends State<_RunShareSheet> {
-  // One RepaintBoundary key per template — the PageView can keep neighboring
-  // pages built for caching, so a single shared GlobalKey would collide.
+  // One RepaintBoundary key per template — reused across the static preview
+  // and (briefly, while rendering) the picker thumbnails.
   final Map<ShareCardTemplate, GlobalKey> _cardKeys = {
     for (final t in ShareCardTemplate.values) t: GlobalKey(),
   };
-  late final PageController _pageController = PageController(
-    initialPage: ShareCardTemplate.values.indexOf(_template),
-  );
   ShareCardTemplate _template = ShareCardTemplate.full;
   ShareCardStyle _style = ShareCardStyle.classic;
   bool _busy = false;
+  List<double>? _weekKm;
 
   String get _styleName =>
       _style == ShareCardStyle.transparent ? 'transparent' : 'classic';
 
-  String get _templateName => switch (_template) {
-    ShareCardTemplate.full => 'full',
-    ShareCardTemplate.compact => 'compact',
-    ShareCardTemplate.blank => 'blank',
-    ShareCardTemplate.poster => 'poster',
-  };
+  String get _templateName => _template.name;
 
-  String get _templateLabel => switch (_template) {
-    ShareCardTemplate.full => 'Full',
-    ShareCardTemplate.compact => 'Compact',
-    ShareCardTemplate.blank => 'Blank',
-    ShareCardTemplate.poster => 'Poster',
-  };
+  String get _templateLabel => _labelOf(_template);
 
   @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadWeekKm(widget.data.date).then((km) {
+      if (mounted) setState(() => _weekKm = km);
+    });
   }
 
   Future<Uint8List> _renderPng() async {
@@ -227,6 +271,24 @@ class _RunShareSheetState extends State<_RunShareSheet> {
     }
   }
 
+  Future<void> _openLayoutPicker() async {
+    HapticFeedback.selectionClick();
+    final picked = await showModalBottomSheet<ShareCardTemplate>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LayoutPickerSheet(
+        data: widget.data,
+        style: _style,
+        weekKm: _weekKm,
+        selected: _template,
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() => _template = picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -283,63 +345,59 @@ class _RunShareSheetState extends State<_RunShareSheet> {
           ),
           const SizedBox(height: 14),
 
-          // Swipeable template carousel
+          // Static preview of the selected layout
           SizedBox(
             height: previewHeight,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: ShareCardTemplate.values.length,
-              onPageChanged: (i) =>
-                  setState(() => _template = ShareCardTemplate.values[i]),
-              itemBuilder: (context, i) {
-                final t = ShareCardTemplate.values[i];
-                return Center(
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      // Checkerboard sits OUTSIDE the RepaintBoundary so the
-                      // exported PNG keeps its alpha channel.
-                      child: CustomPaint(
-                        painter: isTransparent ? _CheckerboardPainter() : null,
-                        child: RepaintBoundary(
-                          key: _cardKeys[t],
-                          child: RunShareCard(
-                            data: widget.data,
-                            template: t,
-                            style: _style,
-                          ),
-                        ),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  // Checkerboard sits OUTSIDE the RepaintBoundary so the
+                  // exported PNG keeps its alpha channel.
+                  child: CustomPaint(
+                    painter: isTransparent ? _CheckerboardPainter() : null,
+                    child: RepaintBoundary(
+                      key: _cardKeys[_template],
+                      child: RunShareCard(
+                        data: widget.data,
+                        template: _template,
+                        style: _style,
+                        weekKm: _weekKm,
                       ),
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
 
-          // Page dots
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (final t in ShareCardTemplate.values)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: t == _template ? 18 : 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: t == _template ? c.accent : c.border,
-                    borderRadius: BorderRadius.circular(999),
+          GestureDetector(
+            onTap: _openLayoutPicker,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              decoration: BoxDecoration(
+                color: c.surface,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: c.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.grid_view_rounded, size: 15, color: c.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$_templateLabel · Change layout',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: c.textPrimary,
+                    ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$_templateLabel · ${isTransparent ? 'transparent overlay' : 'ready to post as-is'}',
-            style: TextStyle(fontSize: 11, color: c.textTertiary),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -471,12 +529,16 @@ class RunShareCard extends StatelessWidget {
   final ShareRunData data;
   final ShareCardTemplate template;
   final ShareCardStyle style;
+  /// Mon–Sun distance for [ShareCardTemplate.weekByDay]; null while loading,
+  /// in which case the template renders with all-zero bars.
+  final List<double>? weekKm;
 
   const RunShareCard({
     super.key,
     required this.data,
     this.template = ShareCardTemplate.full,
     this.style = ShareCardStyle.classic,
+    this.weekKm,
   });
 
   static const double width = 360;
@@ -577,6 +639,10 @@ class RunShareCard extends StatelessWidget {
       ShareCardTemplate.compact => _buildCompactContent(isTransparent),
       ShareCardTemplate.blank => _buildBlankContent(isTransparent),
       ShareCardTemplate.poster => _buildPosterContent(isTransparent),
+      ShareCardTemplate.weekByDay => _buildWeekByDayContent(),
+      ShareCardTemplate.bigDistance => _buildBigDistanceContent(),
+      ShareCardTemplate.timeOnFeet => _buildTimeOnFeetContent(),
+      ShareCardTemplate.statsOnly => _buildStatsOnlyContent(),
     };
 
     return Container(
