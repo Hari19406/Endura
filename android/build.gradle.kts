@@ -33,13 +33,17 @@ subprojects {
 // plugin, which predates AGP's namespace requirement and has no
 // android.namespace set. Rather than patch the plugin (which pub_cache
 // would overwrite), inject the namespace from its legacy Groovy `group`
-// value at configuration time — the standard workaround for this AGP 8
-// error class with old, unmaintained Flutter plugins.
+// value — the standard workaround for this AGP 8 error class with old,
+// unmaintained Flutter plugins. Hooked via plugins.withId (fires the moment
+// the android-library plugin is applied) rather than afterEvaluate, since
+// evaluationDependsOn(":app") above can cause some subprojects to already
+// be evaluated by the time a later afterEvaluate block would run.
 subprojects {
-    afterEvaluate {
-        val android = extensions.findByName("android")
-        if (android is com.android.build.gradle.BaseExtension && android.namespace == null) {
-            android.namespace = project.group.toString()
+    plugins.withId("com.android.library") {
+        extensions.configure<com.android.build.gradle.LibraryExtension> {
+            if (namespace == null) {
+                namespace = project.group.toString()
+            }
         }
     }
 }
