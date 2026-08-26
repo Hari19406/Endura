@@ -146,9 +146,13 @@ class _RunShareSheetState extends State<_RunShareSheet> {
   @override
   void initState() {
     super.initState();
-    _loadWeekKm(widget.data.date).then((km) {
-      if (mounted) setState(() => _weekKm = km);
-    });
+    _loadWeekKm(widget.data.date)
+        .then((km) {
+          if (mounted) setState(() => _weekKm = km);
+        })
+        .catchError((e) {
+          debugPrint('[RunShareSheet] week load failed: $e');
+        });
   }
 
   Future<Uint8List> _renderPng() async {
