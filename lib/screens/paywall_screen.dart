@@ -10,6 +10,11 @@ import '../theme/app_colors.dart';
 
 // Endura teal — brand color, intentionally not a theme token (fixed across light/dark)
 const _kBrand = Color(0xFF00E5CC);
+// Champagne gold — a second, deliberately rare accent used only to mark
+// "premium" signifiers (best-value badge, guarantee seal, pro checkmarks).
+// Teal stays the action color everywhere else so buttons/selection state
+// don't get confused with this purely decorative premium cue.
+const _kGold = Color(0xFFE3C170);
 // Ember — used once, for the mid-trial reminder marker only (urgency accent,
 // kept rare so it doesn't compete with the brand teal).
 const _kEmber = Color(0xFFFF7A45);
@@ -38,7 +43,11 @@ TextStyle _numeralStyle(
 }
 
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
+  /// Preview/test-only override — skips the RevenueCat network call and
+  /// renders these packages directly. Never set in production code paths.
+  final ({Package? annual, Package? monthly})? debugOffering;
+
+  const PaywallScreen({super.key, this.debugOffering});
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -81,7 +90,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Future<void> _loadOffering() async {
     setState(() => _loadingOffering = true);
-    final offering = await RevenueCatService.getOffering();
+    final offering =
+        widget.debugOffering ?? await RevenueCatService.getOffering();
     if (mounted) {
       setState(() {
         _annualPackage = offering.annual;
@@ -214,25 +224,47 @@ class _PaywallScreenState extends State<PaywallScreen> {
       backgroundColor: c.background,
       body: Stack(
         children: [
-          // Teal hero glow behind the header, fading into the background.
+          // Layered hero glow: a wide teal wash with a tighter, warmer gold
+          // core behind the icon — the second hue reads as depth/quality
+          // rather than a second brand color, so it stays this subtle.
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: 280,
+            height: 320,
             child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      _kBrand.withValues(alpha: 0.28),
-                      _kBrand.withValues(alpha: 0.1),
-                      _kBrand.withValues(alpha: 0.0),
-                    ],
+              child: Stack(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          _kBrand.withValues(alpha: 0.26),
+                          _kBrand.withValues(alpha: 0.09),
+                          _kBrand.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  Align(
+                    alignment: const Alignment(0, -0.7),
+                    child: Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            _kGold.withValues(alpha: 0.16),
+                            _kGold.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -555,6 +587,13 @@ class _TopPriceBar extends StatelessWidget {
         color: c.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -807,15 +846,15 @@ class _PlanCard extends StatelessWidget {
             color: isSelected ? _kBrand : c.border,
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: _kBrand.withValues(alpha: 0.18),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? _kBrand.withValues(alpha: 0.18)
+                  : Colors.black.withValues(alpha: 0.16),
+              blurRadius: isSelected ? 18 : 10,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -823,21 +862,41 @@ class _PlanCard extends StatelessWidget {
             if (badge != null) ...[
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
+                  horizontal: 9,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: _kBrand,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.3,
+                  gradient: const LinearGradient(
+                    colors: [_kGold, Color(0xFFC9A052)],
                   ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kGold.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Colors.black,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      badge!,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 10),
@@ -978,6 +1037,13 @@ class _TrialTimeline extends StatelessWidget {
         color: c.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: c.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1131,6 +1197,13 @@ class _FeatureTable extends StatelessWidget {
         color: c.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1148,9 +1221,15 @@ class _FeatureTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
+                const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: _kGold,
+                  size: 14,
+                ),
+                const SizedBox(width: 4),
+                const Text(
                   'ENDURA PRO',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _kBrand,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -1174,7 +1253,7 @@ class _FeatureTable extends StatelessWidget {
                   ),
                   const Icon(
                     Icons.check_circle_rounded,
-                    color: _kBrand,
+                    color: _kGold,
                     size: 20,
                   ),
                 ],
@@ -1243,7 +1322,7 @@ class _TestimonialCarouselState extends State<_TestimonialCarousel> {
     return Column(
       children: [
         SizedBox(
-          height: 150,
+          height: 184,
           child: PageView.builder(
             controller: _controller,
             itemCount: _kTestimonials.length,
@@ -1258,6 +1337,13 @@ class _TestimonialCarouselState extends State<_TestimonialCarousel> {
                   color: c.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: c.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.14),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1330,6 +1416,13 @@ class _GuaranteeCard extends StatelessWidget {
         color: c.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1337,12 +1430,19 @@ class _GuaranteeCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: _kBrand.withValues(alpha: 0.12),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _kGold.withValues(alpha: 0.22),
+                  _kBrand.withValues(alpha: 0.14),
+                ],
+              ),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.verified_user_rounded,
-              color: _kBrand,
+              color: _kGold,
               size: 22,
             ),
           ),

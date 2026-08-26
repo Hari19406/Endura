@@ -12,6 +12,12 @@
       "runtimeExecutable": "flutter",
       "runtimeArgs": ["run", "-d", "web-server", "-t", "lib/main_preview.dart", "--web-port", "8766", "--web-hostname", "0.0.0.0"],
       "port": 8766
+    },
+    {
+      "name": "flutter-preview-paywall",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "web-server", "-t", "lib/main_preview_paywall.dart", "--web-port", "8767", "--web-hostname", "0.0.0.0"],
+      "port": 8767
     }
   ]
 }
