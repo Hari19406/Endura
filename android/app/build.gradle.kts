@@ -30,7 +30,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hari.endura"
-        minSdk = flutter.minSdkVersion
+        minSdk = 26 // health package requires 26+; flutter default (24) is too low
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
