@@ -2,7 +2,6 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class HealthHrSample {
   final DateTime time;
@@ -20,12 +19,16 @@ class HealthBridgeService {
   HealthBridgeService._();
   static final HealthBridgeService instance = HealthBridgeService._();
 
-  final HealthFactory _health = HealthFactory();
+  final Health _health = Health();
+  bool _configured = false;
 
   static const _types = [HealthDataType.HEART_RATE, HealthDataType.STEPS];
-  static const _prefsGrantedKey = 'health_connect_permissions_granted';
 
-  bool _authorized = false;
+  Future<void> _ensureConfigured() async {
+    if (_configured) return;
+    await _health.configure();
+    _configured = true;
+  }
 
   /// Triggers the native OS consent screen (Health Connect/HealthKit). Only
   /// call this from an explicit user action (e.g. tapping the Settings
@@ -33,26 +36,22 @@ class HealthBridgeService {
   /// surface a system permission dialog unprompted.
   Future<bool> requestPermissions() async {
     try {
-      _authorized = await _health.requestAuthorization(List.of(_types));
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefsGrantedKey, _authorized);
-      return _authorized;
+      await _ensureConfigured();
+      return await _health.requestAuthorization(List.of(_types));
     } catch (e) {
       debugPrint('[HealthBridgeService] requestPermissions failed: $e');
       return false;
     }
   }
 
-  /// Safe to call anywhere (background timers, save-time backfill) — reads
-  /// the persisted result of the last explicit [requestPermissions] call
-  /// rather than re-invoking the OS consent flow.
+  /// Safe to call anywhere (background timers, save-time backfill) — a real
+  /// permission-status check, never triggers the OS consent flow.
   Future<bool> hasPermissions() async {
-    if (_authorized) return true;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _authorized = prefs.getBool(_prefsGrantedKey) ?? false;
-      return _authorized;
-    } catch (_) {
+      await _ensureConfigured();
+      return await _health.hasPermissions(List.of(_types)) ?? false;
+    } catch (e) {
+      debugPrint('[HealthBridgeService] hasPermissions failed: $e');
       return false;
     }
   }
@@ -62,16 +61,28 @@ class HealthBridgeService {
     DateTime end,
   ) async {
     try {
-      final points = await _health.getHealthDataFromTypes(start, end, [
-        HealthDataType.HEART_RATE,
-      ]);
-      return points
-          .map((p) => HealthHrSample(p.dateFrom, p.value.round()))
-          .toList();
+      await _ensureConfigured();
+      final points = await _health.getHealthDataFromTypes(
+        types: [HealthDataType.HEART_RATE],
+        startTime: start,
+        endTime: end,
+      );
+      final samples = <HealthHrSample>[];
+      for (final p in points) {
+        final bpm = _asBpm(p);
+        if (bpm != null) samples.add(HealthHrSample(p.dateFrom, bpm));
+      }
+      return samples;
     } catch (e) {
       debugPrint('[HealthBridgeService] fetchHeartRateSeries failed: $e');
       return [];
     }
+  }
+
+  int? _asBpm(HealthDataPoint p) {
+    final v = p.value;
+    if (v is NumericHealthValue) return v.numericValue.round();
+    return null;
   }
 
   Future<int?> fetchAverageHeartRate(DateTime start, DateTime end) async {
@@ -93,16 +104,20 @@ class HealthBridgeService {
   /// the run; never presented as a live/instant value.
   Future<int?> fetchAverageCadence(DateTime start, DateTime end) async {
     try {
-      final points = await _health.getHealthDataFromTypes(start, end, [
-        HealthDataType.STEPS,
-      ]);
-      if (points.isEmpty) return null;
-      final totalSteps = points.fold<double>(
-        0,
-        (acc, p) => acc + p.value.toDouble(),
+      await _ensureConfigured();
+      final points = await _health.getHealthDataFromTypes(
+        types: [HealthDataType.STEPS],
+        startTime: start,
+        endTime: end,
       );
+      if (points.isEmpty) return null;
+      double totalSteps = 0;
+      for (final p in points) {
+        final v = p.value;
+        if (v is NumericHealthValue) totalSteps += v.numericValue.toDouble();
+      }
       final minutes = end.difference(start).inSeconds / 60.0;
-      if (minutes <= 0) return null;
+      if (minutes <= 0 || totalSteps <= 0) return null;
       return (totalSteps / minutes).round();
     } catch (e) {
       debugPrint('[HealthBridgeService] fetchAverageCadence failed: $e');
