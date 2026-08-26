@@ -1493,11 +1493,6 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
               const SizedBox(height: 16),
-              if (_lastRun == null &&
-                  _workoutModel?.category != WorkoutCategory.rest) ...[
-                _buildWelcomeHeroCard(),
-                const SizedBox(height: 16),
-              ],
               _buildSectionLabel('INSIGHTS'),
               const SizedBox(height: 10),
               _buildBottomCarousel(),
@@ -2053,53 +2048,4 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildWelcomeHeroCard() {
-    final c = context.colors;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(16)),
-        border: Border.all(color: c.border),
-      ),
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border.all(color: c.border),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              'WELCOME',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: c.textTertiary,
-                letterSpacing: 2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Ready to\ntrain?',
-            style: TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.w800,
-              color: c.textPrimary,
-              height: 1.05,
-              letterSpacing: -1.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Complete your first run to unlock\nyour adaptive plan.',
-            style: TextStyle(fontSize: 13, color: c.textTertiary, height: 1.6),
-          ),
-        ],
-      ),
-    );
-  }
 }
