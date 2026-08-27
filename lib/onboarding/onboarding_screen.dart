@@ -37,28 +37,51 @@ class ET {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PAGE ENUM
+// PAGE ENUM — race-first onboarding
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum OPage {
-  intro,
-  goal,
-  experience,
-  bestTime,
-  daysCount,
-  dayPicker,
-  longRunDay,
-  weeklyMileage,
-  intensity,
-  planTimeline,
-  raceDay,
-  dob,
-  gender,
-  name,
-  generatePlan,
-  buildPlan,
+  goal, // "What are you training for?" — only Upcoming race is live
+  racePicker, // pick a real race (or add one manually)
+  experience, // race-type experience (this flow's own 5-level vocab)
+  pastMonth, // km run in the past month
+  raceGoal, // what's the goal for this race (this flow's own vocab)
+  targetTime, // shown only for pr / target_time goals
+  runsPerWeek, // slider + live plan preview
+  dayPicker, // which days are free
+  longRunDay, // long run day
+  currentTime, // current race time -> vDOT
+  planStart, // start today vs start next week
+  review, // final plan overview
+  buildPlan, // building animation
   welcome,
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENGINE BRIDGE
+// The onboarding flow speaks its own vocabulary. The plan engine still speaks
+// the legacy one (beginner/intermediate/advanced, structured/steady). These two
+// helpers are the ONLY place the two vocabularies meet. Remove them when the
+// engine is rebuilt to speak the new vocab natively.
+// ─────────────────────────────────────────────────────────────────────────────
+
+String _bridgeExperience(String? raceExperience) => switch (raceExperience) {
+  'just_starting' => 'beginner',
+  'early' => 'beginner',
+  'regular' => 'intermediate',
+  'seasoned' => 'advanced',
+  'competitive' => 'advanced',
+  _ => 'intermediate',
+};
+
+String _bridgeGoalIntent(String? raceGoal) => switch (raceGoal) {
+  'pr' => 'structured',
+  'target_time' => 'structured',
+  'undecided' => 'structured',
+  'finish' => 'steady',
+  'enjoy' => 'steady',
+  _ => 'structured',
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHELL
@@ -67,8 +90,9 @@ enum OPage {
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
-  /// When true, skips intro, experience, bestTime, dob, gender, name.
-  /// Used for post-plan re-onboarding. Carries over existing profile data.
+  /// When true, skips the goal page (drops straight into the race picker) and
+  /// carries over experience / fitness data from the existing profile.
+  /// Used for post-plan re-onboarding.
   final bool shortenedMode;
 
   const OnboardingScreen({
@@ -88,36 +112,42 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _prefilledFromMemory = false;
 
   // ── Collected data ───────────────────────────────────────────────────────
+
+  // Race (from racePicker)
+  String? _raceId;
+  String? _raceName;
+  String? _raceCity;
+  DateTime? _raceDate;
+
+  // Goal distance key: '5k' | '10k' | 'half_marathon' | 'marathon'
   String? _goal;
+
+  // Race-type experience — this flow's own vocab
   String? _experience;
 
-  // Best time
-  String _paceDistance = '5k';
-  int _paceHours = 0;
-  int _paceMinutes = 25;
-  int _paceSeconds = 0;
+  // Past-month volume
+  String? _pastMonthBucket;
+  double _pastMonthKm = 0;
+
+  // Race goal — this flow's own vocab
+  String? _raceGoal;
+  int? _timeToBeatSec; // for 'pr'
+  int? _targetFinishSec; // for 'target_time'
 
   // Training days
   int _runsPerWeek = 4;
   List<int> _selectedDays = TrainingDaysService.defaultsFor(4);
   int? _longRunDayIndex;
 
-  // Weekly mileage
-  double _weeklyKm = 0;
+  // Current race time (vDOT inputs) — OPageBestTime uses 'half' not 'half_marathon'
+  String _paceDistance = '5k';
+  int _paceHours = 0;
+  int _paceMinutes = 25;
+  int _paceSeconds = 0;
 
-  // Intensity / goal intent (carried over)
-  String? _intensity;
-
-  // Plan timeline
+  // Plan start
   DateTime _startDate = DateTime.now();
   int? _planWeeks;
-  DateTime? _raceDate;
-  int _raceDayIndex = 6; // 0=Mon … 6=Sun, default Sunday
-
-  // Personal (carried over in shortened mode)
-  DateTime? _dob;
-  String? _gender;
-  String _firstName = '';
 
   // Computed
   int _vdot = 40;
@@ -142,7 +172,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _prefillFromExistingProfile();
     }
 
-    // onPageChanged doesn't fire for the initial page — track funnel entry here.
     Analytics.onboardingStepViewed(_sequence.first.name, 0);
   }
 
@@ -153,7 +182,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.dispose();
   }
 
-  /// Load carried-over values from prefs + EngineMemory for shortened mode.
   Future<void> _prefillFromExistingProfile() async {
     if (_prefilledFromMemory) return;
     _prefilledFromMemory = true;
@@ -162,15 +190,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final prefs = await SharedPreferences.getInstance();
       final memory = await EngineMemoryService().load();
 
-      // Carry over experience + personal info
-      _experience = prefs.getString('experience_level') ?? 'intermediate';
-      _intensity = prefs.getString('goal_intent');
-      _gender = prefs.getString('gender');
-      _firstName = prefs.getString('first_name') ?? '';
-      final dobRaw = prefs.getString('dob');
-      if (dobRaw != null) _dob = DateTime.tryParse(dobRaw);
+      _experience = prefs.getString('race_experience');
+      _raceGoal = prefs.getString('race_goal');
 
-      // Carry over best time
       final paceMin = prefs.getInt('pace_minutes');
       final paceSec = prefs.getInt('pace_seconds') ?? 0;
       if (paceMin != null) {
@@ -182,19 +204,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _vdot = memory.vdotScore;
       _vdotProvisional = memory.vdotIsProvisional;
 
-      // Pre-fill training days from last plan
       final storedDays = await TrainingDaysService.load();
       if (storedDays != null && storedDays.isNotEmpty) {
         _selectedDays = storedDays;
         _runsPerWeek = storedDays.length;
       }
       _longRunDayIndex =
-          prefs.getInt('long_run_day_index') ?? (memory.longRunDayIndex);
+          prefs.getInt('long_run_day_index') ?? memory.longRunDayIndex;
 
-      // Pre-fill weekly mileage from last plan's final week volume
-      final lastWeekKm = memory.previousWeekTargetKm ?? memory.baselineWeeklyKm;
-      if (lastWeekKm != null && lastWeekKm > 0) {
-        _weeklyKm = lastWeekKm;
+      final lastMonthKm = prefs.getDouble('past_month_km');
+      if (lastMonthKm != null && lastMonthKm > 0) {
+        _pastMonthKm = lastMonthKm;
       }
 
       if (mounted) setState(() {});
@@ -205,23 +225,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── Navigation ───────────────────────────────────────────────────────────
 
-  /// Full sequence (first-time onboarding).
   static const _fullSequence = OPage.values;
 
-  /// Shortened sequence (post-plan re-onboarding).
-  /// Skips: intro, dob, gender, name — personal profile fields that don't affect plan generation.
   static const _shortSequence = [
-    OPage.goal,
+    OPage.racePicker,
     OPage.experience,
-    OPage.bestTime,
-    OPage.planTimeline,
-    OPage.raceDay,
-    OPage.daysCount,
+    OPage.pastMonth,
+    OPage.raceGoal,
+    OPage.targetTime,
+    OPage.runsPerWeek,
     OPage.dayPicker,
     OPage.longRunDay,
-    OPage.weeklyMileage,
-    OPage.intensity,
-    OPage.generatePlan,
+    OPage.currentTime,
+    OPage.planStart,
+    OPage.review,
     OPage.buildPlan,
     OPage.welcome,
   ];
@@ -232,23 +249,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int get _total => _sequence.length;
   OPage get _currentPage => _sequence[_current];
 
+  bool get _needsTargetTime => _raceGoal == 'pr' || _raceGoal == 'target_time';
+
   bool get _showTopBar =>
-      _currentPage != OPage.intro &&
-      _currentPage != OPage.buildPlan &&
-      _currentPage != OPage.welcome;
+      _currentPage != OPage.buildPlan && _currentPage != OPage.welcome;
 
   bool get _showBottom =>
+      _currentPage != OPage.goal &&
+      _currentPage != OPage.review &&
       _currentPage != OPage.buildPlan &&
-      _currentPage != OPage.welcome &&
-      _currentPage != OPage.generatePlan;
+      _currentPage != OPage.welcome;
 
   double get _progress => 0.05 + (_current / max(1, _total - 1)) * 0.95;
 
   void _next() {
     int next = _current + 1;
     if (next < _total &&
-        _sequence[next] == OPage.raceDay &&
-        _raceDate != null) {
+        _sequence[next] == OPage.targetTime &&
+        !_needsTargetTime) {
       next++;
     }
     if (next < _total) {
@@ -262,7 +280,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _prev() {
     int prev = _current - 1;
-    if (prev >= 0 && _sequence[prev] == OPage.raceDay && _raceDate != null) {
+    if (prev >= 0 &&
+        _sequence[prev] == OPage.targetTime &&
+        !_needsTargetTime) {
       prev--;
     }
     if (prev >= 0) {
@@ -284,74 +304,46 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   bool get _canContinue {
     switch (_currentPage) {
-      case OPage.intro:
-        return true;
       case OPage.goal:
-        return _goal != null;
+        return false; // auto-advances on tap; no Continue button
+      case OPage.racePicker:
+        return _raceDate != null && _goal != null;
       case OPage.experience:
         return _experience != null;
-      case OPage.bestTime:
-        return _paceMinutes > 0 || _paceHours > 0;
-      case OPage.daysCount:
+      case OPage.pastMonth:
+        return _pastMonthBucket != null;
+      case OPage.raceGoal:
+        return _raceGoal != null;
+      case OPage.targetTime:
+        return _raceGoal == 'pr'
+            ? _timeToBeatSec != null
+            : _targetFinishSec != null;
+      case OPage.runsPerWeek:
         return true;
       case OPage.dayPicker:
         return _selectedDays.length == _runsPerWeek;
       case OPage.longRunDay:
         return _longRunDayIndex != null;
-      case OPage.weeklyMileage:
-        return _weeklyKm >= 5;
-      case OPage.intensity:
-        return _intensity != null;
-      case OPage.planTimeline:
-        return _planWeeks != null || _raceDate != null;
-      case OPage.raceDay:
-        return true;
-      case OPage.dob:
-        return _dob != null;
-      case OPage.gender:
-        return _gender != null;
-      case OPage.name:
-        return _firstName.trim().isNotEmpty;
-      case OPage.generatePlan:
-        return false;
+      case OPage.currentTime:
+        return _paceMinutes > 0 || _paceHours > 0;
+      case OPage.planStart:
+        return _planWeeks != null;
+      case OPage.review:
       case OPage.buildPlan:
-        return false;
       case OPage.welcome:
         return false;
     }
   }
 
-  // ── vDOT computation ─────────────────────────────────────────────────────
+  // ── Distance helpers ─────────────────────────────────────────────────────
 
-  (int, bool) _computeVdot() {
-    // In shortened mode use existing vDOT directly — don't re-derive from time.
-    if (widget.shortenedMode && !_vdotProvisional) {
-      return (_vdot, false);
-    }
-
-    final totalSec = _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
-    if (totalSec > 0) {
-      final distKm = switch (_paceDistance) {
-        '10k' => 10.0,
-        'half' => 21.0975,
-        'marathon' => 42.195,
-        _ => 5.0,
-      };
-      final vdot = vdotFromPr(
-        prTimeSeconds: totalSec,
-        prDistanceKm: distKm,
-        confidence: PrConfidence.high,
-      );
-      return (vdot, false);
-    }
-
-    return (_vdot, _vdotProvisional);
-  }
-
-  // ── Helpers for welcome page ─────────────────────────────────────────────
-
-  int get _currentTimeSec =>
-      _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
+  /// Goal key -> OPageBestTime's distance key ('half' vs 'half_marathon').
+  static String _paceDistFor(String? goal) => switch (goal) {
+    '10k' => '10k',
+    'half_marathon' => 'half',
+    'marathon' => 'marathon',
+    _ => '5k',
+  };
 
   double get _paceDistanceKm => switch (_paceDistance) {
     '10k' => 10.0,
@@ -360,13 +352,55 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _ => 5.0,
   };
 
-  int get _effectivePlanWeeks {
-    if (_planWeeks != null) return _planWeeks!;
-    if (_raceDate != null) {
-      return _raceDate!.difference(DateTime.now()).inDays ~/ 7;
-    }
-    return 12;
+  int get _currentTimeSec =>
+      _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
+
+  // ── Plan-start options ───────────────────────────────────────────────────
+
+  List<PlanStartOption> _planStartOptions() {
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    final race = _raceDate ?? today.add(const Duration(days: 84));
+
+    int weeksBetween(DateTime from) =>
+        max(4, race.difference(from).inDays ~/ 7);
+
+    // Next Monday strictly after today.
+    final daysToMon = (8 - today.weekday) % 7 == 0 ? 7 : (8 - today.weekday) % 7;
+    final nextMon = today.add(Duration(days: daysToMon));
+
+    final wToday = weeksBetween(today);
+    var wMon = weeksBetween(nextMon);
+    if (wMon >= wToday) wMon = max(4, wToday - 1);
+
+    return [
+      PlanStartOption(startDate: today, weeks: wToday, isToday: true),
+      PlanStartOption(startDate: nextMon, weeks: wMon, isToday: false),
+    ];
   }
+
+  // ── vDOT computation ─────────────────────────────────────────────────────
+
+  (int, bool) _computeVdot() {
+    if (widget.shortenedMode && !_vdotProvisional && _currentTimeSec == 0) {
+      return (_vdot, false);
+    }
+    final totalSec = _currentTimeSec;
+    if (totalSec > 0) {
+      final vdot = vdotFromPr(
+        prTimeSeconds: totalSec,
+        prDistanceKm: _paceDistanceKm,
+        confidence: PrConfidence.high,
+      );
+      return (vdot, false);
+    }
+    return (_vdot, _vdotProvisional);
+  }
+
+  int get _effectivePlanWeeks => _planWeeks ?? 12;
 
   // ── Save & complete ──────────────────────────────────────────────────────
 
@@ -375,62 +409,67 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _vdot = vdot;
     _vdotProvisional = provisional;
 
-    final double effectiveBaselineKm = _weeklyKm > 0
-        ? _weeklyKm
+    final double effectiveBaselineKm = _pastMonthKm > 0
+        ? _pastMonthKm / 4.345
         : _runsPerWeek * 8.0;
+
+    final goalRace = _goal ?? '5k';
+    final exp = _bridgeExperience(_experience);
+    final intent = _bridgeGoalIntent(_raceGoal);
+    final raceDate =
+        _raceDate ?? _startDate.add(Duration(days: _effectivePlanWeeks * 7));
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final exp = _experience ?? 'intermediate';
 
-      await prefs.setString('goal_race', _goal ?? '5k');
+      // ── Race + goal ────────────────────────────────────────────────────
+      await prefs.setString('goal_race', goalRace);
       await prefs.setString('experience_level', exp);
+      await prefs.setString('goal_intent', intent);
+
+      // New-vocab values (source of truth going forward)
+      if (_experience != null) {
+        await prefs.setString('race_experience', _experience!);
+      }
+      if (_raceGoal != null) await prefs.setString('race_goal', _raceGoal!);
+      if (_raceName != null) await prefs.setString('race_name', _raceName!);
+      if (_raceId != null) {
+        await prefs.setString('race_id', _raceId!);
+      } else {
+        await prefs.remove('race_id');
+      }
+      if (_raceCity != null) await prefs.setString('race_city', _raceCity!);
+      if (_timeToBeatSec != null) {
+        await prefs.setInt('time_to_beat_seconds', _timeToBeatSec!);
+      }
+      if (_targetFinishSec != null) {
+        await prefs.setInt('target_finish_seconds', _targetFinishSec!);
+      }
+      await prefs.setDouble('past_month_km', _pastMonthKm);
+
+      // ── Schedule ───────────────────────────────────────────────────────
       await prefs.setInt('runs_per_week', _runsPerWeek);
       await TrainingDaysService.save(_selectedDays);
-
       if (_longRunDayIndex != null) {
         await prefs.setInt('long_run_day_index', _longRunDayIndex!);
       }
-      if (_intensity != null) {
-        await prefs.setString('goal_intent', _intensity!);
-      }
-      final effectiveWeeks = _planWeeks ?? 12;
-      final DateTime computedRaceDate;
-      if (_raceDate != null) {
-        computedRaceDate = _raceDate!;
-      } else {
-        final endOfPlan = _startDate.add(Duration(days: effectiveWeeks * 7));
-        final lastWeekMonday = endOfPlan.subtract(
-          Duration(days: endOfPlan.weekday - 1),
-        );
-        computedRaceDate = lastWeekMonday.add(Duration(days: _raceDayIndex));
-      }
-      await prefs.setString('race_date', computedRaceDate.toIso8601String());
-      if (_planWeeks != null) {
-        await prefs.setInt('plan_weeks', _planWeeks!);
-      }
+
+      // ── Timeline ───────────────────────────────────────────────────────
+      await prefs.setString('race_date', raceDate.toIso8601String());
+      if (_planWeeks != null) await prefs.setInt('plan_weeks', _planWeeks!);
       await prefs.setString('plan_start_date', _startDate.toIso8601String());
 
-      // bestTime (VDOT inputs) — persisted in both modes since re-onboarding includes bestTime.
+      // ── vDOT inputs ────────────────────────────────────────────────────
       await prefs.setString('pace_distance', _paceDistance);
       await prefs.setInt('pace_hours', _paceHours);
       await prefs.setInt('pace_minutes', _paceMinutes);
       await prefs.setInt('pace_seconds', _paceSeconds);
 
-      // Personal profile fields — only persist in full mode (shortened skips these screens).
-      if (!widget.shortenedMode) {
-        if (_dob != null) {
-          await prefs.setString('dob', _dob!.toIso8601String());
-        }
-        if (_gender != null) await prefs.setString('gender', _gender!);
-        await prefs.setString('first_name', _firstName.trim());
-      }
-
       await prefs.setDouble('weekly_mileage_km', effectiveBaselineKm);
       await prefs.setInt('vdot_score', _vdot);
       await prefs.setBool('vdot_is_provisional', _vdotProvisional);
 
-      // ── Engine memory — clear post-plan state, seed new plan ───────────
+      // ── Engine memory ──────────────────────────────────────────────────
       final memService = EngineMemoryService();
       final mem = await memService.load();
       await memService.save(
@@ -441,7 +480,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           baselineWeeklyKm: effectiveBaselineKm,
           previousWeekTargetKm: effectiveBaselineKm,
           firstRunDate: _startDate,
-          // Clear post-plan flags so normal flow resumes.
           clearPlanCompletedAt: true,
           isInMaintenance: false,
           currentPhase: TrainingPhase.base,
@@ -452,8 +490,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       try {
         final plan = RacePlanBuilder.build(
           currentWeeklyKm: effectiveBaselineKm,
-          goalRace: _goal ?? '5k',
-          raceDate: computedRaceDate,
+          goalRace: goalRace,
+          raceDate: raceDate,
           experienceLevel: exp,
         );
         await EngineMemoryService().saveRacePlan(plan);
@@ -461,21 +499,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         debugPrint('[Onboarding] Race plan error: $e');
       }
 
-      // ── Supabase profile ───────────────────────────────────────────────
-      final nameToSave = _firstName.trim();
+      // ── Supabase profile — name/gender/dob dropped from this flow ───────
       await ProfileService.instance.saveProfile(
         UserProfile(
-          firstName: nameToSave.isNotEmpty ? nameToSave : null,
-          gender: _gender,
-          dob: _dob,
-          goal: _goal,
+          firstName: null,
+          gender: null,
+          dob: null,
+          goal: goalRace,
           runsPerWeek: _runsPerWeek,
           trainingDays: _selectedDays,
           paceDistance: _paceDistance,
           paceHours: _paceHours,
           paceMinutes: _paceMinutes,
           paceSeconds: _paceSeconds,
-          raceDate: _raceDate,
+          raceDate: raceDate,
           useMetric: true,
           baselineWeeklyKm: effectiveBaselineKm,
           planStartDate: _startDate,
@@ -483,13 +520,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           vdotScore: _vdot,
           vdotIsProvisional: _vdotProvisional,
           experienceLevel: exp,
-          goalIntent: _intensity,
+          goalIntent: intent,
           longRunDayIndex: _longRunDayIndex,
         ),
       );
 
       await Analytics.onboardingCompleted(
-        goal: _goal ?? '5k',
+        goal: goalRace,
         level: exp,
         runsPerWeek: _runsPerWeek,
         planWeeks: _effectivePlanWeeks,
@@ -573,9 +610,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         borderRadius: BorderRadius.circular(ET.radius),
                       ),
                     ),
-                    child: Text(
-                      _currentPage == OPage.intro ? "Let's go" : 'Continue',
-                      style: const TextStyle(
+                    child: const Text(
+                      'Continue',
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -598,11 +635,29 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildPage(OPage page, (int, bool) previewVdot) {
     return switch (page) {
-      OPage.intro => OPageIntro(loopCtrl: _loopCtrl),
-
       OPage.goal => OPageGoal(
         selected: _goal,
-        onSelect: (v) => setState(() => _goal = v),
+        onOpenRaceFunnel: _next,
+      ),
+
+      OPage.racePicker => OPageRacePicker(
+        raceName: _raceName,
+        raceDate: _raceDate,
+        goal: _goal,
+        onSelect: ({id, required name, city, required date, distanceKey}) {
+          setState(() {
+            _raceId = id;
+            _raceName = name;
+            _raceCity = city;
+            _raceDate = date;
+            _goal = distanceKey ?? _goal;
+            _paceDistance = _paceDistFor(_goal);
+          });
+        },
+        onDistanceKey: (k) => setState(() {
+          _goal = k;
+          _paceDistance = _paceDistFor(k);
+        }),
       ),
 
       OPage.experience => OPageExperience(
@@ -610,19 +665,40 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onSelect: (v) => setState(() => _experience = v),
       ),
 
-      OPage.bestTime => OPageBestTime(
-        distance: _paceDistance,
-        hours: _paceHours,
-        minutes: _paceMinutes,
-        seconds: _paceSeconds,
-        onDistChanged: (v) => setState(() => _paceDistance = v),
-        onHoursChanged: (v) => setState(() => _paceHours = v),
-        onMinsChanged: (v) => setState(() => _paceMinutes = v),
-        onSecsChanged: (v) => setState(() => _paceSeconds = v),
+      OPage.pastMonth => OPagePastMonth(
+        selected: _pastMonthBucket,
+        onSelect: (bucket, km) => setState(() {
+          _pastMonthBucket = bucket;
+          _pastMonthKm = km;
+        }),
       ),
 
-      OPage.daysCount => OPageDaysCount(
+      OPage.raceGoal => OPageRaceGoal(
+        selected: _raceGoal,
+        onSelect: (v) => setState(() {
+          _raceGoal = v;
+          if (v != 'pr') _timeToBeatSec = null;
+          if (v != 'target_time') _targetFinishSec = null;
+        }),
+      ),
+
+      OPage.targetTime => OPageTargetTime(
+        mode: _raceGoal == 'pr' ? TargetTimeMode.beat : TargetTimeMode.finish,
+        goal: _goal ?? '5k',
+        seconds: _raceGoal == 'pr' ? _timeToBeatSec : _targetFinishSec,
+        onChanged: (s) => setState(() {
+          if (_raceGoal == 'pr') {
+            _timeToBeatSec = s;
+          } else {
+            _targetFinishSec = s;
+          }
+        }),
+      ),
+
+      OPage.runsPerWeek => OPageRunsPerWeek(
         runsPerWeek: _runsPerWeek,
+        pastMonthKm: _pastMonthKm,
+        goal: _goal ?? '5k',
         onChanged: (n) => setState(() {
           _runsPerWeek = n;
           _selectedDays = TrainingDaysService.defaultsFor(n);
@@ -645,71 +721,42 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onSelect: (i) => setState(() => _longRunDayIndex = i),
       ),
 
-      OPage.weeklyMileage => OPageWeeklyMileage(
-        weeklyKm: _weeklyKm,
-        goalRace: _goal,
-        runsPerWeek: _runsPerWeek,
-        onChanged: (v) => setState(() => _weeklyKm = v),
+      OPage.currentTime => OPageBestTime(
+        distance: _paceDistance,
+        hours: _paceHours,
+        minutes: _paceMinutes,
+        seconds: _paceSeconds,
+        onDistChanged: (v) => setState(() => _paceDistance = v),
+        onHoursChanged: (v) => setState(() => _paceHours = v),
+        onMinsChanged: (v) => setState(() => _paceMinutes = v),
+        onSecsChanged: (v) => setState(() => _paceSeconds = v),
       ),
 
-      OPage.intensity => OPageIntensity(
-        selected: _intensity,
-        onSelect: (v) => setState(() => _intensity = v),
-      ),
-
-      OPage.raceDay => OPageRaceDay(
-        startDate: _startDate,
-        planWeeks: _planWeeks ?? 12,
-        selectedDayIndex: _raceDayIndex,
-        onSelect: (i) => setState(() => _raceDayIndex = i),
-      ),
-
-      OPage.planTimeline => OPagePlanTimeline(
-        startDate: _startDate,
-        planWeeks: _planWeeks,
-        raceDate: _raceDate,
-        onStartChanged: (d) => setState(() => _startDate = d),
-        onWeeksChanged: (w) => setState(() {
-          _planWeeks = w;
-          _raceDate = null;
-        }),
-        onRaceDate: (d) => setState(() {
-          _raceDate = d;
-          _planWeeks = null;
+      OPage.planStart => OPagePlanStart(
+        options: _planStartOptions(),
+        selectedStart: _planWeeks == null ? null : _startDate,
+        onSelect: (opt) => setState(() {
+          _startDate = opt.startDate;
+          _planWeeks = opt.weeks;
         }),
       ),
 
-      OPage.dob => OPageDob(
-        dob: _dob,
-        onChanged: (d) => setState(() => _dob = d),
-      ),
-
-      OPage.gender => OPageGender(
-        selected: _gender,
-        onSelect: (v) => setState(() => _gender = v),
-      ),
-
-      OPage.name => OPageName(
-        firstName: _firstName,
-        onFirstChanged: (v) => setState(() => _firstName = v),
-      ),
-
-      OPage.generatePlan => OPageGeneratePlan(
-        firstName: _firstName.trim().isNotEmpty ? _firstName.trim() : 'you',
+      OPage.review => OPageGeneratePlan(
+        firstName: 'you',
         goal: _goal ?? '5k',
         startDate: _startDate,
         planWeeks: _planWeeks,
         raceDate: _raceDate,
-        raceDayIndex: _raceDayIndex,
+        raceDayIndex: (_raceDate?.weekday ?? 7) - 1,
         runsPerWeek: _runsPerWeek,
         selectedDays: _selectedDays,
-        intensity: _intensity,
+        intensity: _bridgeGoalIntent(_raceGoal),
         vdotScore: previewVdot.$1,
         onGenerate: _next,
       ),
 
       OPage.buildPlan => OPageBuildPlan(
-        firstName: _firstName.trim().isNotEmpty ? _firstName.trim() : 'you',
+        firstName: 'you',
         goal: _goal ?? '5k',
         onComplete: () async {
           await _saveAll();
@@ -718,11 +765,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ),
 
       OPage.welcome => OPageWelcome(
-        firstName: _firstName.trim().isNotEmpty ? _firstName.trim() : 'Runner',
+        firstName: 'Runner',
         goal: _goal ?? '5k',
         vdot: previewVdot.$1,
         planWeeks: _effectivePlanWeeks,
-        experienceLevel: _experience ?? 'intermediate',
+        experienceLevel: _bridgeExperience(_experience),
         currentTimeSec: _currentTimeSec,
         paceDistanceKm: _paceDistanceKm,
         onContinue: widget.onComplete,

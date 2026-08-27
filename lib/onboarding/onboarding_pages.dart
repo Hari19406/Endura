@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding_screen.dart' show EC, ET;
 import '../../engines/config/archetype_table.dart';
+import '../../services/race_service.dart';
+import '../../models/race_listing.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED WIDGETS
@@ -235,19 +237,18 @@ class OPageIntro extends StatelessWidget {
 
 const _raceDistanceKeys = {'5k', '10k', 'half_marathon', 'marathon'};
 
-class OPageGoal extends StatefulWidget {
+class OPageGoal extends StatelessWidget {
+  /// Non-null once a race (or its distance) has been chosen in the funnel.
   final String? selected;
-  final ValueChanged<String> onSelect;
-  const OPageGoal({super.key, required this.selected, required this.onSelect});
 
-  @override
-  State<OPageGoal> createState() => _OPageGoalState();
-}
+  /// Called when the user taps the (only live) "Upcoming race" row.
+  final VoidCallback onOpenRaceFunnel;
 
-class _OPageGoalState extends State<OPageGoal> {
-  late bool _showingRaceDistances = _raceDistanceKeys.contains(
-    widget.selected,
-  );
+  const OPageGoal({
+    super.key,
+    required this.selected,
+    required this.onOpenRaceFunnel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -257,83 +258,34 @@ class _OPageGoalState extends State<OPageGoal> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 32),
-          if (_showingRaceDistances) ...[
-            GestureDetector(
-              onTap: () => setState(() => _showingRaceDistances = false),
-              child: const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 18,
-                  color: EC.textSecondary,
-                ),
+          const _Label('Your goal'),
+          const SizedBox(height: 8),
+          const _Title('What are you\ntraining for?'),
+          const SizedBox(height: 6),
+          const _Sub(
+            "Pick a starting point — we'll fine-tune the details with a few quick questions.",
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: EC.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: EC.border, width: ET.borderWidth),
+            ),
+            child: const Text(
+              '~1 min setup',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: EC.textSecondary,
               ),
             ),
-            const _Label('Upcoming race'),
-            const SizedBox(height: 8),
-            const _Title('Pick your\ndistance'),
-            const SizedBox(height: 6),
-            const _Sub(
-              'Pick your race. Max builds everything backwards from here.',
-            ),
-          ] else ...[
-            const _Label('Your goal'),
-            const SizedBox(height: 8),
-            const _Title('What are you\ntraining for?'),
-            const SizedBox(height: 6),
-            const _Sub(
-              "Pick a starting point — we'll fine-tune the details with a few quick questions.",
-            ),
-          ],
-          const SizedBox(height: 28),
-          Expanded(
-            child: _showingRaceDistances
-                ? _buildDistancePicker()
-                : _buildCategoryList(),
           ),
+          const SizedBox(height: 20),
+          Expanded(child: _buildCategoryList()),
         ],
       ),
-    );
-  }
-
-  Widget _buildDistancePicker() {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        _g(
-          '5k',
-          '5K',
-          'The perfect starting race',
-          const Color(0xFF003D35),
-          EC.teal,
-        ),
-        const SizedBox(height: 10),
-        _g(
-          '10k',
-          '10K',
-          'Step up the challenge',
-          const Color(0xFF1E1040),
-          EC.violet,
-        ),
-        const SizedBox(height: 10),
-        _g(
-          'half_marathon',
-          'Half Marathon',
-          "The runner's milestone",
-          const Color(0xFF3D1A00),
-          EC.orange,
-          boxText: '21.1K',
-        ),
-        const SizedBox(height: 10),
-        _g(
-          'marathon',
-          'Marathon',
-          'The ultimate test',
-          const Color(0xFF3D0000),
-          EC.red,
-          boxText: '42.2K',
-        ),
-      ],
     );
   }
 
@@ -472,41 +424,8 @@ class _OPageGoalState extends State<OPageGoal> {
     ),
     label: 'Upcoming race',
     sub: 'Train toward a race day with a structured build. Pick your distance.',
-    selected: _raceDistanceKeys.contains(widget.selected),
-    onTap: () => setState(() => _showingRaceDistances = true),
-  );
-
-  Widget _g(
-    String key,
-    String label,
-    String sub,
-    Color bg,
-    Color fg, {
-    String? boxText,
-  }) => _Row(
-    leading: Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Center(
-        child: Text(
-          boxText ?? label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: fg,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ),
-    ),
-    label: label,
-    sub: sub,
-    selected: widget.selected == key,
-    onTap: () => widget.onSelect(key),
+    selected: _raceDistanceKeys.contains(selected),
+    onTap: onOpenRaceFunnel,
   );
 }
 
@@ -555,10 +474,27 @@ class _ComingSoonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.5,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: EC.surface2,
+              content: Text(
+                '“$label” is coming soon — we\'re still building it.',
+                style: const TextStyle(color: EC.textPrimary, fontSize: 13),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+      },
+      child: Opacity(
+        opacity: 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         decoration: BoxDecoration(
           color: EC.surface,
           borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -618,6 +554,7 @@ class _ComingSoonRow extends StatelessWidget {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -636,6 +573,49 @@ class OPageExperience extends StatelessWidget {
     required this.onSelect,
   });
 
+  static const _opts = [
+    (
+      'just_starting',
+      Icons.spa_outlined,
+      Color(0xFF10202E),
+      EC.teal,
+      'Just getting started',
+      'New to running — building the habit',
+    ),
+    (
+      'early',
+      Icons.trending_up_rounded,
+      Color(0xFF0F2E1E),
+      EC.teal,
+      'Early stages',
+      'Running a few months, still finding my feet',
+    ),
+    (
+      'regular',
+      Icons.directions_run_rounded,
+      Color(0xFF1E1040),
+      EC.violet,
+      'Regular runner',
+      'Out 2–3× a week, comfortable with distance',
+    ),
+    (
+      'seasoned',
+      Icons.military_tech_outlined,
+      Color(0xFF3D1A00),
+      EC.orange,
+      'Seasoned runner',
+      'Consistent for years, raced before',
+    ),
+    (
+      'competitive',
+      Icons.emoji_events_outlined,
+      Color(0xFF3D0000),
+      EC.red,
+      'Competitive athlete',
+      'Structured training, chasing results',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -644,87 +624,30 @@ class OPageExperience extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 32),
-          const _Label('Your background'),
+          const _Label('Your experience'),
           const SizedBox(height: 8),
-          const _Title('How would you\ndescribe yourself?'),
+          const _Title("What's your\nrunning background?"),
           const SizedBox(height: 6),
           const _Sub(
-            'Be honest — Max uses this to set the right intensity from day one.',
+            'Be honest — this sets the right starting intensity for your plan.',
           ),
-          const SizedBox(height: 28),
-          _Row(
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF003D35),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'B',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: EC.teal,
-                  ),
-                ),
-              ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: _opts.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final (key, icon, bg, fg, label, sub) = _opts[i];
+                return _Row(
+                  leading: _iconBox(bg, icon, fg),
+                  label: label,
+                  sub: sub,
+                  selected: selected == key,
+                  onTap: () => onSelect(key),
+                );
+              },
             ),
-            label: 'Beginner',
-            sub: 'I can run 5K without stopping, in under 60 minutes',
-            selected: selected == 'beginner',
-            onTap: () => onSelect('beginner'),
-          ),
-          const SizedBox(height: 10),
-          _Row(
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1040),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'I',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: EC.violet,
-                  ),
-                ),
-              ),
-            ),
-            label: 'Intermediate',
-            sub: 'I run regularly but don\'t follow a structured plan',
-            selected: selected == 'intermediate',
-            onTap: () => onSelect('intermediate'),
-          ),
-          const SizedBox(height: 10),
-          _Row(
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3D1A00),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'A',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: EC.orange,
-                  ),
-                ),
-              ),
-            ),
-            label: 'Advanced',
-            sub: 'I run at least 10K and do structured interval training',
-            selected: selected == 'advanced',
-            onTap: () => onSelect('advanced'),
           ),
         ],
       ),
@@ -3536,4 +3459,1226 @@ class OPageWelcome extends StatelessWidget {
     height: 3,
     decoration: BoxDecoration(color: c, shape: BoxShape.circle),
   );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// NEW RACE-FIRST FUNNEL PAGES
+// ═════════════════════════════════════════════════════════════════════════════
+
+const _months3 = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+const _wkd3 = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+String _dLabel(DateTime d) =>
+    '${_wkd3[d.weekday - 1]} ${d.day} ${_months3[d.month - 1]}';
+
+String _fmtHMS(int s) {
+  if (s <= 0) return '--:--';
+  final h = s ~/ 3600, m = (s % 3600) ~/ 60, sec = s % 60;
+  final mm = m.toString().padLeft(2, '0');
+  final ss = sec.toString().padLeft(2, '0');
+  return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+}
+
+String _goalLabelFor(String goal) => switch (goal) {
+  '10k' => '10K',
+  'half_marathon' => 'Half Marathon',
+  'marathon' => 'Marathon',
+  _ => '5K',
+};
+
+// ── Data holders shared with OnboardingScreen ────────────────────────────────
+
+class PlanStartOption {
+  final DateTime startDate;
+  final int weeks;
+  final bool isToday;
+  const PlanStartOption({
+    required this.startDate,
+    required this.weeks,
+    required this.isToday,
+  });
+}
+
+enum TargetTimeMode { beat, finish }
+
+typedef RaceSelected =
+    void Function({
+      String? id,
+      required String name,
+      String? city,
+      required DateTime date,
+      String? distanceKey,
+    });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RACE PICKER
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPageRacePicker extends StatefulWidget {
+  final String? raceName;
+  final DateTime? raceDate;
+  final String? goal;
+  final RaceSelected onSelect;
+  final ValueChanged<String> onDistanceKey;
+
+  const OPageRacePicker({
+    super.key,
+    required this.raceName,
+    required this.raceDate,
+    required this.goal,
+    required this.onSelect,
+    required this.onDistanceKey,
+  });
+
+  @override
+  State<OPageRacePicker> createState() => _OPageRacePickerState();
+}
+
+class _OPageRacePickerState extends State<OPageRacePicker> {
+  final _searchCtrl = TextEditingController();
+  List<RaceListing> _results = [];
+  bool _loading = true;
+  bool _manual = false;
+
+  // manual-entry scratch
+  final _manualNameCtrl = TextEditingController();
+  DateTime? _manualDate;
+  String? _manualDist;
+
+  static const _distChips = [
+    ('5k', '5K'),
+    ('10k', '10K'),
+    ('half_marathon', 'Half'),
+    ('marathon', 'Marathon'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _manualNameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({String? city}) async {
+    setState(() => _loading = true);
+    final rows = await RaceService.instance.upcomingRaces(city: city, limit: 30);
+    if (!mounted) return;
+    setState(() {
+      _results = rows;
+      _loading = false;
+    });
+  }
+
+  String? _distanceKeyFromLabel(String? label) {
+    if (label == null) return null;
+    final l = label.toLowerCase();
+    if (l.contains('marathon') && !l.contains('half')) return 'marathon';
+    if (l.contains('42') || l.contains('26.2')) return 'marathon';
+    if (l.contains('half') || l.contains('21') || l.contains('13.1')) {
+      return 'half_marathon';
+    }
+    if (l.contains('10k') || l.contains('10 k') || l.contains('10km')) {
+      return '10k';
+    }
+    if (l.contains('5k') || l.contains('5 k') || l.contains('5km')) return '5k';
+    return null;
+  }
+
+  bool get _hasSelection => widget.raceName != null && widget.raceDate != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          const _Label('Your race'),
+          const SizedBox(height: 8),
+          const _Title('Which race are\nyou training for?'),
+          const SizedBox(height: 6),
+          const _Sub(
+            'Everything in your plan is built backwards from race day.',
+          ),
+          const SizedBox(height: 18),
+          if (_manual) _buildManual() else _buildSearch(),
+        ],
+      ),
+    );
+  }
+
+  // ── Search + list ─────────────────────────────────────────────────────────
+
+  Widget _buildSearch() {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: EC.surface,
+              borderRadius: BorderRadius.circular(ET.cardRadius),
+              border: Border.all(color: EC.border, width: ET.borderWidth),
+            ),
+            child: TextField(
+              controller: _searchCtrl,
+              style: const TextStyle(color: EC.textPrimary, fontSize: 14),
+              textInputAction: TextInputAction.search,
+              onSubmitted: (v) => _load(city: v.trim()),
+              decoration: const InputDecoration(
+                hintText: 'Search by city — e.g. Bengaluru',
+                hintStyle: TextStyle(color: EC.muted, fontSize: 14),
+                prefixIcon: Icon(Icons.search, color: EC.muted, size: 20),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_hasSelection) _selectedBanner(),
+          const SizedBox(height: 6),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: EC.teal,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : _results.isEmpty
+                ? _emptyState()
+                : ListView.separated(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    itemCount: _results.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) => _raceTile(_results[i]),
+                  ),
+          ),
+          _manualButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectedBanner() {
+    final needsDist = widget.goal == null;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: EC.teal.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(ET.cardRadius),
+        border: Border.all(color: EC.teal, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: EC.teal, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.raceName!,
+                  style: const TextStyle(
+                    color: EC.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${_dLabel(widget.raceDate!)} ${widget.raceDate!.year}'
+            '${widget.goal != null ? '  ·  ${_goalLabelFor(widget.goal!)}' : ''}',
+            style: const TextStyle(color: EC.textSecondary, fontSize: 12.5),
+          ),
+          if (needsDist) ...[
+            const SizedBox(height: 10),
+            const Text(
+              "We couldn't detect the distance — pick one:",
+              style: TextStyle(color: EC.amber, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            _distanceChipRow(
+              selected: widget.goal,
+              onTap: widget.onDistanceKey,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _raceTile(RaceListing r) {
+    final selected = widget.raceName == r.name && widget.raceDate == r.raceDate;
+    final loc = [
+      r.city,
+      r.country,
+    ].where((e) => e != null && e.isNotEmpty).join(', ');
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        widget.onSelect(
+          id: r.id,
+          name: r.name,
+          city: r.city,
+          date: r.raceDate,
+          distanceKey: _distanceKeyFromLabel(r.distanceLabel),
+        );
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: selected ? EC.surface2 : EC.surface,
+          borderRadius: BorderRadius.circular(ET.cardRadius),
+          border: Border.all(
+            color: selected ? EC.teal : EC.border,
+            width: selected ? 1.5 : ET.borderWidth,
+          ),
+        ),
+        child: Row(
+          children: [
+            Column(
+              children: [
+                Text(
+                  _months3[r.raceDate.month - 1].toUpperCase(),
+                  style: const TextStyle(
+                    color: EC.teal,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${r.raceDate.day}',
+                  style: const TextStyle(
+                    color: EC.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    r.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: EC.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (loc.isNotEmpty) loc,
+                      if (r.distanceLabel != null) r.distanceLabel!,
+                    ].join('  ·  '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: EC.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: EC.teal, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.event_busy_outlined, color: EC.muted, size: 32),
+            const SizedBox(height: 12),
+            const Text(
+              'No races found for that search.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: EC.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Try another city, or add your race manually below.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: EC.muted, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _manualButton() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _manual = true),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            "Can't find it? Add your race manually",
+            style: TextStyle(
+              color: EC.teal,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Manual entry ─────────────────────────────────────────────────────────
+
+  Widget _buildManual() {
+    return Expanded(
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 8),
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _manual = false),
+            child: const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_back_ios_new, size: 15, color: EC.teal),
+                  SizedBox(width: 6),
+                  Text(
+                    'Back to search',
+                    style: TextStyle(
+                      color: EC.teal,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Text(
+            'RACE NAME',
+            style: TextStyle(
+              color: EC.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: EC.surface,
+              borderRadius: BorderRadius.circular(ET.cardRadius),
+              border: Border.all(color: EC.border, width: ET.borderWidth),
+            ),
+            child: TextField(
+              controller: _manualNameCtrl,
+              style: const TextStyle(color: EC.textPrimary, fontSize: 14),
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                hintText: 'e.g. Bengaluru Marathon',
+                hintStyle: TextStyle(color: EC.muted, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'RACE DATE',
+            style: TextStyle(
+              color: EC.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _pickManualDate,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+              decoration: BoxDecoration(
+                color: EC.surface,
+                borderRadius: BorderRadius.circular(ET.cardRadius),
+                border: Border.all(color: EC.border, width: ET.borderWidth),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_rounded,
+                    color: EC.teal,
+                    size: 17,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _manualDate == null
+                        ? 'Pick a date'
+                        : '${_dLabel(_manualDate!)} ${_manualDate!.year}',
+                    style: TextStyle(
+                      color: _manualDate == null
+                          ? EC.muted
+                          : EC.textPrimary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'DISTANCE',
+            style: TextStyle(
+              color: EC.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _distanceChipRow(
+            selected: _manualDist,
+            onTap: (k) => setState(() => _manualDist = k),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _manualReady
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      widget.onSelect(
+                        id: null,
+                        name: _manualNameCtrl.text.trim(),
+                        city: null,
+                        date: _manualDate!,
+                        distanceKey: _manualDist,
+                      );
+                      setState(() => _manual = false);
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EC.teal,
+                foregroundColor: EC.black,
+                disabledBackgroundColor: EC.surface2,
+                disabledForegroundColor: EC.muted,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ET.radius),
+                ),
+              ),
+              child: const Text(
+                'Use this race',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool get _manualReady =>
+      _manualNameCtrl.text.trim().isNotEmpty &&
+      _manualDate != null &&
+      _manualDist != null;
+
+  Future<void> _pickManualDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 70)),
+      firstDate: now.add(const Duration(days: 14)),
+      lastDate: now.add(const Duration(days: 500)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: EC.teal,
+            onPrimary: EC.black,
+            surface: EC.surface,
+            onSurface: EC.textPrimary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _manualDate = picked);
+  }
+
+  Widget _distanceChipRow({
+    required String? selected,
+    required ValueChanged<String> onTap,
+  }) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _distChips.map((c) {
+        final sel = selected == c.$1;
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap(c.$1);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: sel ? EC.teal : EC.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: sel ? EC.teal : EC.border,
+                width: ET.borderWidth,
+              ),
+            ),
+            child: Text(
+              c.$2,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: sel ? EC.black : EC.textSecondary,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAST-MONTH VOLUME
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPagePastMonth extends StatelessWidget {
+  final String? selected;
+  final void Function(String bucket, double km) onSelect;
+  const OPagePastMonth({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  // (label, representative total km for the last 4 weeks)
+  static const _buckets = <(String, double)>[
+    ('0 km — just starting out', 0),
+    ('Under 25 km', 13),
+    ('25–50 km', 37.5),
+    ('50–100 km', 75),
+    ('100–150 km', 125),
+    ('150 km or more', 175),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          const _Label('Recent training'),
+          const SizedBox(height: 8),
+          const _Title('How much have you\nrun in the past month?'),
+          const SizedBox(height: 6),
+          const _Sub(
+            'A rough total is fine. This sets a safe starting volume.',
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: _buckets.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final (label, km) = _buckets[i];
+                final sel = selected == label;
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onSelect(label, km);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 170),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 17,
+                    ),
+                    decoration: BoxDecoration(
+                      color: sel ? EC.surface2 : EC.surface,
+                      borderRadius: BorderRadius.circular(ET.cardRadius),
+                      border: Border.all(
+                        color: sel ? EC.teal : EC.border,
+                        width: sel ? 1.5 : ET.borderWidth,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: EC.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (sel)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 20,
+                            color: EC.teal,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RACE GOAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPageRaceGoal extends StatelessWidget {
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  const OPageRaceGoal({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  static const _opts = [
+    (
+      'pr',
+      Icons.trending_up_rounded,
+      Color(0xFF3D0000),
+      EC.red,
+      'Set a PR',
+      'Beat a time I\'ve already run',
+    ),
+    (
+      'target_time',
+      Icons.timer_outlined,
+      Color(0xFF3D1A00),
+      EC.orange,
+      'Run a specific time',
+      'I have a finish time in mind',
+    ),
+    (
+      'finish',
+      Icons.flag_outlined,
+      Color(0xFF003D35),
+      EC.teal,
+      'Just complete it',
+      'Cross the line feeling strong',
+    ),
+    (
+      'enjoy',
+      Icons.celebration_outlined,
+      Color(0xFF1E1040),
+      EC.violet,
+      'Enjoy the experience',
+      'Have fun, no pressure on the clock',
+    ),
+    (
+      'undecided',
+      Icons.help_outline_rounded,
+      Color(0xFF10202E),
+      EC.teal,
+      'Not sure yet',
+      'Decide as training goes on',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          const _Label('Your goal for this race'),
+          const SizedBox(height: 8),
+          const _Title("What do you want\nfrom race day?"),
+          const SizedBox(height: 6),
+          const _Sub('This shapes how hard the plan pushes you.'),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: _opts.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final (key, icon, bg, fg, label, sub) = _opts[i];
+                return _Row(
+                  leading: _iconBox(bg, icon, fg),
+                  label: label,
+                  sub: sub,
+                  selected: selected == key,
+                  onTap: () => onSelect(key),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TARGET TIME  (shown only for pr / target_time)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPageTargetTime extends StatelessWidget {
+  final TargetTimeMode mode;
+  final String goal;
+  final int? seconds;
+  final ValueChanged<int> onChanged;
+
+  const OPageTargetTime({
+    super.key,
+    required this.mode,
+    required this.goal,
+    required this.seconds,
+    required this.onChanged,
+  });
+
+  int get _h => (seconds ?? 0) ~/ 3600;
+  int get _m => ((seconds ?? 0) % 3600) ~/ 60;
+  int get _s => (seconds ?? 0) % 60;
+
+  void _emit({int? h, int? m, int? s}) =>
+      onChanged((h ?? _h) * 3600 + (m ?? _m) * 60 + (s ?? _s));
+
+  @override
+  Widget build(BuildContext context) {
+    final title = mode == TargetTimeMode.beat
+        ? 'What time do you\nwant to beat?'
+        : "What's your target\nfinish time?";
+    final sub = mode == TargetTimeMode.beat
+        ? 'Your current best for the ${_goalLabelFor(goal)} — the plan will aim to take you under it.'
+        : 'Your goal ${_goalLabelFor(goal)} time. Be ambitious but realistic.';
+
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          _Label(mode == TargetTimeMode.beat ? 'Time to beat' : 'Target time'),
+          const SizedBox(height: 8),
+          _Title(title),
+          const SizedBox(height: 6),
+          _Sub(sub),
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              _fmtHMS(seconds ?? 0),
+              style: const TextStyle(
+                color: EC.teal,
+                fontSize: 30,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _drum('HH', 8, _h, (v) => _emit(h: v)),
+                ),
+                _colon(),
+                Expanded(
+                  child: _drum('MM', 60, _m, (v) => _emit(m: v)),
+                ),
+                _colon(),
+                Expanded(
+                  child: _drum('SS', 60, _s, (v) => _emit(s: v)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colon() => const Padding(
+    padding: EdgeInsets.only(bottom: 24),
+    child: Text(
+      ':',
+      style: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.w300,
+        color: EC.muted,
+      ),
+    ),
+  );
+
+  Widget _drum(
+    String label,
+    int count,
+    int selected,
+    ValueChanged<int> onSel,
+  ) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: EC.muted,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: EC.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: EC.border, width: ET.borderWidth),
+            ),
+            child: CupertinoPicker(
+              scrollController: FixedExtentScrollController(
+                initialItem: selected,
+              ),
+              itemExtent: 44,
+              onSelectedItemChanged: onSel,
+              selectionOverlay: Container(
+                decoration: BoxDecoration(
+                  border: Border.symmetric(
+                    horizontal: BorderSide(
+                      color: EC.teal.withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                ),
+              ),
+              children: List.generate(
+                count,
+                (i) => Center(
+                  child: Text(
+                    i.toString().padLeft(2, '0'),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w500,
+                      color: EC.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUNS PER WEEK  (slider + live plan preview)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPageRunsPerWeek extends StatelessWidget {
+  final int runsPerWeek;
+  final double pastMonthKm;
+  final String goal;
+  final ValueChanged<int> onChanged;
+
+  const OPageRunsPerWeek({
+    super.key,
+    required this.runsPerWeek,
+    required this.pastMonthKm,
+    required this.goal,
+    required this.onChanged,
+  });
+
+  ({int lo, int hi}) get _weeklyRange {
+    final base = pastMonthKm > 0 ? pastMonthKm / 4.345 : runsPerWeek * 8.0;
+    var lo = (base * 0.85).round();
+    var hi = (base * 1.15).round();
+    if (lo < runsPerWeek * 4) lo = runsPerWeek * 4;
+    if (hi <= lo) hi = lo + runsPerWeek * 3;
+    return (lo: lo, hi: hi);
+  }
+
+  int get _workoutDays => runsPerWeek >= 5 ? 2 : 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _weeklyRange;
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          const _Label('Your week'),
+          const SizedBox(height: 8),
+          const _Title('How many days a\nweek can you run?'),
+          const SizedBox(height: 6),
+          const _Sub('Pick what fits your life — you can adjust this later.'),
+          const SizedBox(height: 36),
+          Center(
+            child: Text(
+              '$runsPerWeek days',
+              style: const TextStyle(
+                color: EC.textPrimary,
+                fontSize: 34,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: EC.teal,
+              inactiveTrackColor: EC.surface2,
+              thumbColor: EC.teal,
+              overlayColor: EC.teal.withOpacity(0.15),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: runsPerWeek.toDouble(),
+              min: 3,
+              max: 7,
+              divisions: 4,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                onChanged(v.round());
+              },
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('3', style: TextStyle(color: EC.muted, fontSize: 12)),
+                Text('7', style: TextStyle(color: EC.muted, fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: EC.surface,
+              borderRadius: BorderRadius.circular(ET.cardRadius),
+              border: Border.all(color: EC.border, width: ET.borderWidth),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'YOUR PLAN AT A GLANCE',
+                  style: TextStyle(
+                    color: EC.muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _row(
+                  Icons.route_outlined,
+                  'Weekly distance',
+                  '~${r.lo}–${r.hi} km',
+                ),
+                const SizedBox(height: 10),
+                _row(
+                  Icons.calendar_month_outlined,
+                  'Runs per week',
+                  '$runsPerWeek',
+                ),
+                const SizedBox(height: 10),
+                _row(
+                  Icons.bolt_rounded,
+                  'Hard workouts',
+                  '$_workoutDays of $runsPerWeek runs',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String label, String value) => Row(
+    children: [
+      Icon(icon, size: 16, color: EC.teal),
+      const SizedBox(width: 10),
+      Text(label, style: const TextStyle(color: EC.textSecondary, fontSize: 13)),
+      const Spacer(),
+      Text(
+        value,
+        style: const TextStyle(
+          color: EC.textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ],
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAN START
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OPagePlanStart extends StatelessWidget {
+  final List<PlanStartOption> options;
+  final DateTime? selectedStart;
+  final ValueChanged<PlanStartOption> onSelect;
+
+  const OPagePlanStart({
+    super.key,
+    required this.options,
+    required this.selectedStart,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: ET.pagePad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          const _Label('Start date'),
+          const SizedBox(height: 8),
+          const _Title('When do you want\nto start?'),
+          const SizedBox(height: 6),
+          const _Sub(
+            'Both options land you on race day — a later start just means a shorter build.',
+          ),
+          const SizedBox(height: 28),
+          ...options.map((o) {
+            final sel =
+                selectedStart != null &&
+                selectedStart!.year == o.startDate.year &&
+                selectedStart!.month == o.startDate.month &&
+                selectedStart!.day == o.startDate.day;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  onSelect(o);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 170),
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: sel ? EC.surface2 : EC.surface,
+                    borderRadius: BorderRadius.circular(ET.cardRadius),
+                    border: Border.all(
+                      color: sel ? EC.teal : EC.border,
+                      width: sel ? 1.5 : ET.borderWidth,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            o.isToday
+                                ? 'Start today'
+                                : 'Start ${_wkd3[o.startDate.weekday - 1]}',
+                            style: const TextStyle(
+                              color: EC.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${_dLabel(o.startDate)} ${o.startDate.year}',
+                            style: const TextStyle(
+                              color: EC.textSecondary,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: sel
+                              ? EC.teal.withOpacity(0.15)
+                              : EC.surface2,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${o.weeks} wk',
+                          style: TextStyle(
+                            color: sel ? EC.teal : EC.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
 }
