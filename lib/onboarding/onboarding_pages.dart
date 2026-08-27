@@ -3513,6 +3513,20 @@ typedef RaceSelected =
       String? distanceKey,
     });
 
+String _ordinal(int d) {
+  if (d >= 11 && d <= 13) return 'th';
+  switch (d % 10) {
+    case 1:
+      return 'st';
+    case 2:
+      return 'nd';
+    case 3:
+      return 'rd';
+    default:
+      return 'th';
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RACE PICKER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3522,7 +3536,12 @@ class OPageRacePicker extends StatefulWidget {
   final DateTime? raceDate;
   final String? goal;
   final RaceSelected onSelect;
-  final ValueChanged<String> onDistanceKey;
+
+  /// The top-left X. Goes back to the goal screen.
+  final VoidCallback onClose;
+
+  /// Called once a race + its distance are locked in — advances to the next page.
+  final VoidCallback onAdvance;
 
   const OPageRacePicker({
     super.key,
@@ -3530,7 +3549,8 @@ class OPageRacePicker extends StatefulWidget {
     required this.raceDate,
     required this.goal,
     required this.onSelect,
-    required this.onDistanceKey,
+    required this.onClose,
+    required this.onAdvance,
   });
 
   @override
@@ -3539,15 +3559,32 @@ class OPageRacePicker extends StatefulWidget {
 
 class _OPageRacePickerState extends State<OPageRacePicker> {
   final _searchCtrl = TextEditingController();
-  List<RaceListing> _results = [];
+  List<RaceListing> _all = [];
   bool _loading = true;
-  bool _manual = false;
 
-  // manual-entry scratch
+  String _query = '';
+  String? _fDistance; // '5k'|'10k'|'half_marathon'|'marathon'|'other'
+  String? _fCity;
+  int? _fMonths; // 3 | 6 | 12
+
+  // manual entry
+  bool _manual = false;
   final _manualNameCtrl = TextEditingController();
   DateTime? _manualDate;
   String? _manualDist;
 
+  static const _distOpts = [
+    ('5k', '5K'),
+    ('10k', '10K'),
+    ('half_marathon', 'Half Marathon'),
+    ('marathon', 'Marathon'),
+    ('other', 'Other'),
+  ];
+  static const _dateOpts = [
+    (3, 'Next 3 months'),
+    (6, 'Next 6 months'),
+    (12, 'Next 12 months'),
+  ];
   static const _distChips = [
     ('5k', '5K'),
     ('10k', '10K'),
@@ -3568,17 +3605,17 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
     super.dispose();
   }
 
-  Future<void> _load({String? city}) async {
+  Future<void> _load() async {
     setState(() => _loading = true);
-    final rows = await RaceService.instance.upcomingRaces(city: city, limit: 30);
+    final rows = await RaceService.instance.upcomingRaces(limit: 250);
     if (!mounted) return;
     setState(() {
-      _results = rows;
+      _all = rows;
       _loading = false;
     });
   }
 
-  String? _distanceKeyFromLabel(String? label) {
+  String? _distKey(String? label) {
     if (label == null) return null;
     final l = label.toLowerCase();
     if (l.contains('marathon') && !l.contains('half')) return 'marathon';
@@ -3593,226 +3630,300 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
     return null;
   }
 
-  bool get _hasSelection => widget.raceName != null && widget.raceDate != null;
+  List<String> get _cities => _all
+      .map((r) => r.city)
+      .whereType<String>()
+      .where((c) => c.trim().isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
+
+  List<RaceListing> get _filtered {
+    final q = _query.trim().toLowerCase();
+    final now = DateTime.now();
+    final cutoff = _fMonths == null
+        ? null
+        : DateTime(now.year, now.month + _fMonths!, now.day);
+    return _all.where((r) {
+      if (q.isNotEmpty) {
+        final hay = '${r.name} ${r.city ?? ''} ${r.country ?? ''}'
+            .toLowerCase();
+        if (!hay.contains(q)) return false;
+      }
+      if (_fDistance != null) {
+        final k = _distKey(r.distanceLabel);
+        if (_fDistance == 'other') {
+          if (k != null) return false;
+        } else if (k != _fDistance) {
+          return false;
+        }
+      }
+      if (_fCity != null && r.city != _fCity) return false;
+      if (cutoff != null && r.raceDate.isAfter(cutoff)) return false;
+      return true;
+    }).toList();
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: ET.pagePad,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 32),
-          const _Label('Your race'),
-          const SizedBox(height: 8),
-          const _Title('Which race are\nyou training for?'),
           const SizedBox(height: 6),
-          const _Sub(
-            'Everything in your plan is built backwards from race day.',
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.onClose();
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close_rounded, size: 26, color: EC.textPrimary),
+            ),
           ),
-          const SizedBox(height: 18),
-          if (_manual) _buildManual() else _buildSearch(),
+          const SizedBox(height: 12),
+          Expanded(child: _manual ? _buildManual() : _buildBrowser()),
         ],
       ),
     );
   }
 
-  // ── Search + list ─────────────────────────────────────────────────────────
+  // ── Browser ──────────────────────────────────────────────────────────────
 
-  Widget _buildSearch() {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: EC.surface,
-              borderRadius: BorderRadius.circular(ET.cardRadius),
-              border: Border.all(color: EC.border, width: ET.borderWidth),
-            ),
-            child: TextField(
-              controller: _searchCtrl,
-              style: const TextStyle(color: EC.textPrimary, fontSize: 14),
-              textInputAction: TextInputAction.search,
-              onSubmitted: (v) => _load(city: v.trim()),
-              decoration: const InputDecoration(
-                hintText: 'Search by city — e.g. Bengaluru',
-                hintStyle: TextStyle(color: EC.muted, fontSize: 14),
-                prefixIcon: Icon(Icons.search, color: EC.muted, size: 20),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
+  Widget _buildBrowser() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'What race are\nyou running?',
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: EC.textPrimary,
+            height: 1.2,
+            letterSpacing: -0.3,
           ),
-          const SizedBox(height: 8),
-          if (_hasSelection) _selectedBanner(),
-          const SizedBox(height: 6),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: EC.teal,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : _results.isEmpty
-                ? _emptyState()
-                : ListView.separated(
-                    padding: const EdgeInsets.only(top: 4, bottom: 8),
-                    itemCount: _results.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _raceTile(_results[i]),
-                  ),
+        ),
+        const SizedBox(height: 10),
+        const Center(
+          child: Text(
+            'Choose a race to train for',
+            style: TextStyle(color: EC.textSecondary, fontSize: 14),
           ),
-          _manualButton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _selectedBanner() {
-    final needsDist = widget.goal == null;
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: EC.teal.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(ET.cardRadius),
-        border: Border.all(color: EC.teal, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: EC.teal, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.raceName!,
-                  style: const TextStyle(
-                    color: EC.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: GestureDetector(
+            onTap: () => setState(() => _manual = true),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                "Don't see your race?",
+                style: TextStyle(
+                  color: Color(0xFF3B82F6),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${_dLabel(widget.raceDate!)} ${widget.raceDate!.year}'
-            '${widget.goal != null ? '  ·  ${_goalLabelFor(widget.goal!)}' : ''}',
-            style: const TextStyle(color: EC.textSecondary, fontSize: 12.5),
-          ),
-          if (needsDist) ...[
-            const SizedBox(height: 10),
-            const Text(
-              "We couldn't detect the distance — pick one:",
-              style: TextStyle(color: EC.amber, fontSize: 12),
             ),
-            const SizedBox(height: 8),
-            _distanceChipRow(
-              selected: widget.goal,
-              onTap: widget.onDistanceKey,
-            ),
-          ],
-        ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _searchField(),
+        const SizedBox(height: 16),
+        _filterRow(),
+        const SizedBox(height: 16),
+        Expanded(child: _list()),
+      ],
+    );
+  }
+
+  Widget _searchField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: EC.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: EC.border, width: ET.borderWidth),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        style: const TextStyle(color: EC.textPrimary, fontSize: 14),
+        onChanged: (v) => setState(() => _query = v),
+        decoration: const InputDecoration(
+          hintText: 'Search for your race',
+          hintStyle: TextStyle(color: EC.muted, fontSize: 14),
+          prefixIcon: Icon(Icons.search, color: EC.muted, size: 20),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 14),
+        ),
       ),
     );
   }
 
-  Widget _raceTile(RaceListing r) {
-    final selected = widget.raceName == r.name && widget.raceDate == r.raceDate;
-    final loc = [
-      r.city,
-      r.country,
-    ].where((e) => e != null && e.isNotEmpty).join(', ');
+  Widget _filterRow() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _filterPill(
+          'Date',
+          _fMonths == null
+              ? null
+              : _dateOpts.firstWhere((o) => o.$1 == _fMonths).$2,
+          _openDateFilter,
+        ),
+        _filterPill(
+          'Distance',
+          _fDistance == null
+              ? null
+              : _distOpts.firstWhere((o) => o.$1 == _fDistance).$2,
+          _openDistanceFilter,
+        ),
+        _filterPill('City', _fCity, _openCityFilter),
+      ],
+    );
+  }
+
+  Widget _filterPill(String label, String? value, VoidCallback onTap) {
+    final active = value != null;
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
-        widget.onSelect(
-          id: r.id,
-          name: r.name,
-          city: r.city,
-          date: r.raceDate,
-          distanceKey: _distanceKeyFromLabel(r.distanceLabel),
-        );
+        HapticFeedback.selectionClick();
+        onTap();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? EC.surface2 : EC.surface,
-          borderRadius: BorderRadius.circular(ET.cardRadius),
+          color: EC.surface,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? EC.teal : EC.border,
-            width: selected ? 1.5 : ET.borderWidth,
+            color: active ? EC.teal : EC.border,
+            width: active ? 1.2 : ET.borderWidth,
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Column(
-              children: [
-                Text(
-                  _months3[r.raceDate.month - 1].toUpperCase(),
-                  style: const TextStyle(
-                    color: EC.teal,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  '${r.raceDate.day}',
-                  style: const TextStyle(
-                    color: EC.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+            Text(
+              value ?? label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: active ? EC.teal : EC.textSecondary,
+              ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: active ? EC.teal : EC.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _list() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: EC.teal, strokeWidth: 2),
+      );
+    }
+    final rows = _filtered;
+    if (rows.isEmpty) return _empty();
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: rows.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, i) => _raceCard(rows[i]),
+    );
+  }
+
+  Widget _raceCard(RaceListing r) {
+    return GestureDetector(
+      onTap: () => _choose(r),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: EC.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: EC.border, width: ET.borderWidth),
+        ),
+        child: Row(
+          children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 13,
+                        color: EC.textSecondary,
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        _fmtDate(r.raceDate),
+                        style: const TextStyle(
+                          color: EC.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     r.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: EC.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      if (loc.isNotEmpty) loc,
-                      if (r.distanceLabel != null) r.distanceLabel!,
-                    ].join('  ·  '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: EC.textSecondary,
-                      fontSize: 12,
-                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.military_tech_outlined,
+                        size: 15,
+                        color: EC.textSecondary,
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          _metaLine(r),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: EC.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            if (selected)
-              const Icon(Icons.check_circle_rounded, color: EC.teal, size: 20),
+            const SizedBox(width: 12),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: EC.muted,
+              size: 24,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _emptyState() {
+  Widget _empty() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -3822,15 +3933,27 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
             const Icon(Icons.event_busy_outlined, color: EC.muted, size: 32),
             const SizedBox(height: 12),
             const Text(
-              'No races found for that search.',
+              'No races match those filters.',
               textAlign: TextAlign.center,
               style: TextStyle(color: EC.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Try another city, or add your race manually below.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: EC.muted, fontSize: 12),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () => setState(() {
+                _query = '';
+                _searchCtrl.clear();
+                _fDistance = null;
+                _fCity = null;
+                _fMonths = null;
+              }),
+              child: const Text(
+                'Clear filters',
+                style: TextStyle(
+                  color: EC.teal,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -3838,21 +3961,214 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
     );
   }
 
-  Widget _manualButton() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 8),
-      child: GestureDetector(
-        onTap: () => setState(() => _manual = true),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            "Can't find it? Add your race manually",
-            style: TextStyle(
-              color: EC.teal,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+  String _fmtDate(DateTime d) =>
+      '${_months3[d.month - 1]} ${d.day}${_ordinal(d.day)}, ${d.year}';
+
+  String _metaLine(RaceListing r) {
+    final dist = r.distanceLabel?.trim();
+    final loc = [
+      r.city,
+      r.country,
+    ].where((e) => e != null && e.trim().isNotEmpty).join(', ');
+    final parts = [
+      if (dist != null && dist.isNotEmpty) dist,
+      if (loc.isNotEmpty) loc,
+    ];
+    return parts.isEmpty ? 'Race' : parts.join('  •  ');
+  }
+
+  // ── Selection ────────────────────────────────────────────────────────────
+
+  void _choose(RaceListing r) {
+    HapticFeedback.lightImpact();
+    final k = _distKey(r.distanceLabel);
+    if (k != null) {
+      widget.onSelect(
+        id: r.id,
+        name: r.name,
+        city: r.city,
+        date: r.raceDate,
+        distanceKey: k,
+      );
+      widget.onAdvance();
+    } else {
+      _askDistance(r);
+    }
+  }
+
+  Future<void> _askDistance(RaceListing r) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: EC.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                r.name,
+                style: const TextStyle(
+                  color: EC.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Which distance are you running?',
+                style: TextStyle(color: EC.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _distChips.map((c) {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      widget.onSelect(
+                        id: r.id,
+                        name: r.name,
+                        city: r.city,
+                        date: r.raceDate,
+                        distanceKey: c.$1,
+                      );
+                      widget.onAdvance();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: EC.surface2,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: EC.border, width: ET.borderWidth),
+                      ),
+                      child: Text(
+                        c.$2,
+                        style: const TextStyle(
+                          color: EC.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── Filter sheets ────────────────────────────────────────────────────────
+
+  Future<void> _openDateFilter() => _openSheet<int>(
+    title: 'Race date',
+    current: _fMonths,
+    options: [for (final o in _dateOpts) (o.$1, o.$2)],
+    onPick: (v) => setState(() => _fMonths = v),
+  );
+
+  Future<void> _openDistanceFilter() => _openSheet<String>(
+    title: 'Distance',
+    current: _fDistance,
+    options: [for (final o in _distOpts) (o.$1, o.$2)],
+    onPick: (v) => setState(() => _fDistance = v),
+  );
+
+  Future<void> _openCityFilter() => _openSheet<String>(
+    title: 'City',
+    current: _fCity,
+    options: [for (final c in _cities) (c, c)],
+    onPick: (v) => setState(() => _fCity = v),
+  );
+
+  Future<void> _openSheet<T>({
+    required String title,
+    required T? current,
+    required List<(T, String)> options,
+    required ValueChanged<T?> onPick,
+  }) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: EC.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: EC.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    _sheetRow('Any', current == null, () {
+                      Navigator.pop(ctx);
+                      onPick(null);
+                    }),
+                    for (final o in options)
+                      _sheetRow(o.$2, current == o.$1, () {
+                        Navigator.pop(ctx);
+                        onPick(o.$1);
+                      }),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sheetRow(String label, bool selected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? EC.teal : EC.textPrimary,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_rounded, color: EC.teal, size: 18),
+          ],
         ),
       ),
     );
@@ -3860,162 +4176,186 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
 
   // ── Manual entry ─────────────────────────────────────────────────────────
 
+  bool get _manualReady =>
+      _manualNameCtrl.text.trim().isNotEmpty &&
+      _manualDate != null &&
+      _manualDist != null;
+
   Widget _buildManual() {
-    return Expanded(
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 8),
-        children: [
-          GestureDetector(
-            onTap: () => setState(() => _manual = false),
-            child: const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_back_ios_new, size: 15, color: EC.teal),
-                  SizedBox(width: 6),
-                  Text(
-                    'Back to search',
-                    style: TextStyle(
-                      color: EC.teal,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _manual = false),
+          child: const Padding(
+            padding: EdgeInsets.only(bottom: 14),
+            child: Row(
+              children: [
+                Icon(Icons.arrow_back_ios_new, size: 15, color: EC.teal),
+                SizedBox(width: 6),
+                Text(
+                  'Back to races',
+                  style: TextStyle(
+                    color: EC.teal,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          const Text(
-            'RACE NAME',
-            style: TextStyle(
-              color: EC.muted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
+        ),
+        const Text(
+          'Add your race',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: EC.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          "We'll build your plan around the date and distance you give.",
+          style: TextStyle(color: EC.textSecondary, fontSize: 13, height: 1.5),
+        ),
+        const SizedBox(height: 22),
+        _manualLabel('RACE NAME'),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: EC.surface,
+            borderRadius: BorderRadius.circular(ET.cardRadius),
+            border: Border.all(color: EC.border, width: ET.borderWidth),
+          ),
+          child: TextField(
+            controller: _manualNameCtrl,
+            style: const TextStyle(color: EC.textPrimary, fontSize: 14),
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: 'e.g. Bengaluru Marathon',
+              hintStyle: TextStyle(color: EC.muted, fontSize: 14),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
           ),
-          const SizedBox(height: 8),
-          Container(
+        ),
+        const SizedBox(height: 18),
+        _manualLabel('RACE DATE'),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickManualDate,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
             decoration: BoxDecoration(
               color: EC.surface,
               borderRadius: BorderRadius.circular(ET.cardRadius),
               border: Border.all(color: EC.border, width: ET.borderWidth),
             ),
-            child: TextField(
-              controller: _manualNameCtrl,
-              style: const TextStyle(color: EC.textPrimary, fontSize: 14),
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'e.g. Bengaluru Marathon',
-                hintStyle: TextStyle(color: EC.muted, fontSize: 14),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  color: EC.teal,
+                  size: 17,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  _manualDate == null
+                      ? 'Pick a date'
+                      : _fmtDate(_manualDate!),
+                  style: TextStyle(
+                    color: _manualDate == null ? EC.muted : EC.textPrimary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        _manualLabel('DISTANCE'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _distChips.map((c) {
+            final sel = _manualDist == c.$1;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _manualDist = c.$1);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: sel ? EC.teal : EC.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: sel ? EC.teal : EC.border,
+                    width: ET.borderWidth,
+                  ),
+                ),
+                child: Text(
+                  c.$2,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: sel ? EC.black : EC.textSecondary,
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'RACE DATE',
-            style: TextStyle(
-              color: EC.muted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: _pickManualDate,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-              decoration: BoxDecoration(
-                color: EC.surface,
-                borderRadius: BorderRadius.circular(ET.cardRadius),
-                border: Border.all(color: EC.border, width: ET.borderWidth),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    color: EC.teal,
-                    size: 17,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _manualDate == null
-                        ? 'Pick a date'
-                        : '${_dLabel(_manualDate!)} ${_manualDate!.year}',
-                    style: TextStyle(
-                      color: _manualDate == null
-                          ? EC.muted
-                          : EC.textPrimary,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 26),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _manualReady
+                ? () {
+                    HapticFeedback.mediumImpact();
+                    widget.onSelect(
+                      id: null,
+                      name: _manualNameCtrl.text.trim(),
+                      city: null,
+                      date: _manualDate!,
+                      distanceKey: _manualDist,
+                    );
+                    widget.onAdvance();
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: EC.teal,
+              foregroundColor: EC.black,
+              disabledBackgroundColor: EC.surface2,
+              disabledForegroundColor: EC.muted,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ET.radius),
               ),
             ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'DISTANCE',
-            style: TextStyle(
-              color: EC.muted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
+            child: const Text(
+              'Use this race',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ),
-          const SizedBox(height: 8),
-          _distanceChipRow(
-            selected: _manualDist,
-            onTap: (k) => setState(() => _manualDist = k),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _manualReady
-                  ? () {
-                      HapticFeedback.mediumImpact();
-                      widget.onSelect(
-                        id: null,
-                        name: _manualNameCtrl.text.trim(),
-                        city: null,
-                        date: _manualDate!,
-                        distanceKey: _manualDist,
-                      );
-                      setState(() => _manual = false);
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: EC.teal,
-                foregroundColor: EC.black,
-                disabledBackgroundColor: EC.surface2,
-                disabledForegroundColor: EC.muted,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ET.radius),
-                ),
-              ),
-              child: const Text(
-                'Use this race',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  bool get _manualReady =>
-      _manualNameCtrl.text.trim().isNotEmpty &&
-      _manualDate != null &&
-      _manualDist != null;
+  Widget _manualLabel(String t) => Text(
+    t,
+    style: const TextStyle(
+      color: EC.muted,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1,
+    ),
+  );
 
   Future<void> _pickManualDate() async {
     final now = DateTime.now();
@@ -4037,44 +4377,6 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
       ),
     );
     if (picked != null) setState(() => _manualDate = picked);
-  }
-
-  Widget _distanceChipRow({
-    required String? selected,
-    required ValueChanged<String> onTap,
-  }) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _distChips.map((c) {
-        final sel = selected == c.$1;
-        return GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap(c.$1);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: sel ? EC.teal : EC.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: sel ? EC.teal : EC.border,
-                width: ET.borderWidth,
-              ),
-            ),
-            child: Text(
-              c.$2,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: sel ? EC.black : EC.textSecondary,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
   }
 }
 

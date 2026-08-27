@@ -252,10 +252,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool get _needsTargetTime => _raceGoal == 'pr' || _raceGoal == 'target_time';
 
   bool get _showTopBar =>
-      _currentPage != OPage.buildPlan && _currentPage != OPage.welcome;
+      _currentPage != OPage.racePicker &&
+      _currentPage != OPage.buildPlan &&
+      _currentPage != OPage.welcome;
 
   bool get _showBottom =>
       _currentPage != OPage.goal &&
+      _currentPage != OPage.racePicker &&
       _currentPage != OPage.review &&
       _currentPage != OPage.buildPlan &&
       _currentPage != OPage.welcome;
@@ -654,10 +657,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _paceDistance = _paceDistFor(_goal);
           });
         },
-        onDistanceKey: (k) => setState(() {
-          _goal = k;
-          _paceDistance = _paceDistFor(k);
-        }),
+        onClose: _prev,
+        onAdvance: _next,
       ),
 
       OPage.experience => OPageExperience(
