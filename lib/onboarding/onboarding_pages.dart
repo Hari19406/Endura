@@ -3563,9 +3563,9 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
   bool _loading = true;
 
   String _query = '';
-  String? _fDistance; // '5k'|'10k'|'half_marathon'|'marathon'|'other'
+  String? _fDistance; // '5k'|'10k'|'half_marathon'|'marathon'
   String? _fCity;
-  int? _fMonths; // 3 | 6 | 12
+  DateTime? _fDate;
 
   // manual entry
   bool _manual = false;
@@ -3576,20 +3576,14 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
   static const _distOpts = [
     ('5k', '5K'),
     ('10k', '10K'),
-    ('half_marathon', 'Half Marathon'),
-    ('marathon', 'Marathon'),
-    ('other', 'Other'),
-  ];
-  static const _dateOpts = [
-    (3, 'Next 3 months'),
-    (6, 'Next 6 months'),
-    (12, 'Next 12 months'),
+    ('half_marathon', 'HM'),
+    ('marathon', 'FM'),
   ];
   static const _distChips = [
     ('5k', '5K'),
     ('10k', '10K'),
-    ('half_marathon', 'Half'),
-    ('marathon', 'Marathon'),
+    ('half_marathon', 'HM'),
+    ('marathon', 'FM'),
   ];
 
   @override
@@ -3640,26 +3634,17 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
 
   List<RaceListing> get _filtered {
     final q = _query.trim().toLowerCase();
-    final now = DateTime.now();
-    final cutoff = _fMonths == null
-        ? null
-        : DateTime(now.year, now.month + _fMonths!, now.day);
     return _all.where((r) {
       if (q.isNotEmpty) {
         final hay = '${r.name} ${r.city ?? ''} ${r.country ?? ''}'
             .toLowerCase();
         if (!hay.contains(q)) return false;
       }
-      if (_fDistance != null) {
-        final k = _distKey(r.distanceLabel);
-        if (_fDistance == 'other') {
-          if (k != null) return false;
-        } else if (k != _fDistance) {
-          return false;
-        }
+      if (_fDistance != null && _distKey(r.distanceLabel) != _fDistance) {
+        return false;
       }
       if (_fCity != null && r.city != _fCity) return false;
-      if (cutoff != null && r.raceDate.isAfter(cutoff)) return false;
+      if (_fDate != null && r.raceDate.isAfter(_fDate!)) return false;
       return true;
     }).toList();
   }
@@ -3770,10 +3755,9 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
       children: [
         _filterPill(
           'Date',
-          _fMonths == null
-              ? null
-              : _dateOpts.firstWhere((o) => o.$1 == _fMonths).$2,
+          _fDate == null ? null : _fmtDate(_fDate!),
           _openDateFilter,
+          onClear: () => setState(() => _fDate = null),
         ),
         _filterPill(
           'Distance',
@@ -3781,13 +3765,24 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
               ? null
               : _distOpts.firstWhere((o) => o.$1 == _fDistance).$2,
           _openDistanceFilter,
+          onClear: () => setState(() => _fDistance = null),
         ),
-        _filterPill('City', _fCity, _openCityFilter),
+        _filterPill(
+          'City',
+          _fCity,
+          _openCityFilter,
+          onClear: () => setState(() => _fCity = null),
+        ),
       ],
     );
   }
 
-  Widget _filterPill(String label, String? value, VoidCallback onTap) {
+  Widget _filterPill(
+    String label,
+    String? value,
+    VoidCallback onTap, {
+    VoidCallback? onClear,
+  }) {
     final active = value != null;
     return GestureDetector(
       onTap: () {
@@ -3816,11 +3811,23 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 18,
-              color: active ? EC.teal : EC.textSecondary,
-            ),
+            if (active && onClear != null)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onClear();
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(Icons.close_rounded, size: 15, color: EC.teal),
+                ),
+              )
+            else
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: active ? EC.teal : EC.textSecondary,
+              ),
           ],
         ),
       ),
@@ -3944,7 +3951,7 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
                 _searchCtrl.clear();
                 _fDistance = null;
                 _fCity = null;
-                _fMonths = null;
+                _fDate = null;
               }),
               child: const Text(
                 'Clear filters',
@@ -4071,12 +4078,27 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
 
   // ── Filter sheets ────────────────────────────────────────────────────────
 
-  Future<void> _openDateFilter() => _openSheet<int>(
-    title: 'Race date',
-    current: _fMonths,
-    options: [for (final o in _dateOpts) (o.$1, o.$2)],
-    onPick: (v) => setState(() => _fMonths = v),
-  );
+  Future<void> _openDateFilter() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fDate ?? now.add(const Duration(days: 90)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 730)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: EC.teal,
+            onPrimary: EC.black,
+            surface: EC.surface,
+            onSurface: EC.textPrimary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _fDate = picked);
+  }
 
   Future<void> _openDistanceFilter() => _openSheet<String>(
     title: 'Distance',
@@ -4085,12 +4107,116 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
     onPick: (v) => setState(() => _fDistance = v),
   );
 
-  Future<void> _openCityFilter() => _openSheet<String>(
-    title: 'City',
-    current: _fCity,
-    options: [for (final c in _cities) (c, c)],
-    onPick: (v) => setState(() => _fCity = v),
-  );
+  /// City filter — a live search field over the cities present in loaded
+  /// races, not a plain scrolling list.
+  Future<void> _openCityFilter() {
+    final ctrl = TextEditingController();
+    var query = '';
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: EC.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final q = query.trim().toLowerCase();
+          final matches = q.isEmpty
+              ? _cities
+              : _cities.where((c) => c.toLowerCase().contains(q)).toList();
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 18, 20, 12),
+                    child: Text(
+                      'City',
+                      style: TextStyle(
+                        color: EC.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: EC.surface2,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: EC.border,
+                          width: ET.borderWidth,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: ctrl,
+                        autofocus: true,
+                        style: const TextStyle(
+                          color: EC.textPrimary,
+                          fontSize: 14,
+                        ),
+                        onChanged: (v) => setSheetState(() => query = v),
+                        decoration: const InputDecoration(
+                          hintText: 'Search city',
+                          hintStyle: TextStyle(color: EC.muted, fontSize: 14),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: EC.muted,
+                            size: 20,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        _sheetRow('Any', _fCity == null, () {
+                          Navigator.pop(ctx);
+                          setState(() => _fCity = null);
+                        }),
+                        for (final c in matches)
+                          _sheetRow(c, _fCity == c, () {
+                            Navigator.pop(ctx);
+                            setState(() => _fCity = c);
+                          }),
+                        if (matches.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 20,
+                            ),
+                            child: Text(
+                              'No cities match',
+                              style: TextStyle(
+                                color: EC.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   Future<void> _openSheet<T>({
     required String title,
