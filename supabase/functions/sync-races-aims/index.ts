@@ -75,6 +75,58 @@ function splitLocation(location: string | null): { city: string | null; country:
   return { city: null, country: null };
 }
 
+// AIMS's LOCATION field is very often just "India" with no city — but the
+// race NAME itself almost always names the host city ("Tata Mumbai
+// Marathon", "Run Bhopal Run"). Used only as a fallback when splitLocation
+// couldn't find a city and the country resolved to India. Matches are
+// deliberately specific (known race-name patterns), not a guess from any
+// city substring, to avoid misattributing a race to the wrong place.
+const INDIA_CITY_NAME_PATTERNS: [RegExp, string][] = [
+  [/delhi half marathon/i, "Delhi"],
+  [/tawang marathon/i, "Tawang"],
+  [/kashmir marathon/i, "Srinagar"],
+  [/trivandrum marathon/i, "Trivandrum"],
+  [/kolkata marathon/i, "Kolkata"],
+  [/run bhopal run/i, "Bhopal"],
+  [/pune international marathon/i, "Pune"],
+  [/indore marathon/i, "Indore"],
+  [/chennai marathon/i, "Chennai"],
+  [/durgapur marathon/i, "Durgapur"],
+  [/mumbai marathon/i, "Mumbai"],
+  [/vadodara international marathon/i, "Vadodara"],
+  [/amdavad marathon/i, "Ahmedabad"],
+  [/bodhgaya marathon/i, "Bodh Gaya"],
+  [/world 10k bengaluru/i, "Bengaluru"],
+  [/spiti marathon/i, "Spiti Valley"],
+  [/sohra international half marathon/i, "Sohra"],
+  [/hyderabad marathon/i, "Hyderabad"],
+  [/goa river marathon|goa marathon/i, "Goa"],
+  [/jaipur marathon/i, "Jaipur"],
+  [/lucknow marathon/i, "Lucknow"],
+  [/nagpur marathon/i, "Nagpur"],
+  [/coimbatore marathon/i, "Coimbatore"],
+  [/surat marathon/i, "Surat"],
+  [/bhubaneswar marathon/i, "Bhubaneswar"],
+  [/guwahati marathon/i, "Guwahati"],
+  [/chandigarh marathon/i, "Chandigarh"],
+  [/kochi marathon/i, "Kochi"],
+  [/vizag marathon|visakhapatnam marathon/i, "Visakhapatnam"],
+  [/nashik marathon/i, "Nashik"],
+  [/rajkot marathon/i, "Rajkot"],
+  [/amritsar marathon/i, "Amritsar"],
+  [/agra marathon/i, "Agra"],
+  [/varanasi marathon/i, "Varanasi"],
+  [/mysore marathon|mysuru marathon/i, "Mysuru"],
+  [/bengaluru marathon|bangalore marathon/i, "Bengaluru"],
+];
+
+function guessIndiaCityFromName(name: string): string | null {
+  for (const [pattern, city] of INDIA_CITY_NAME_PATTERNS) {
+    if (pattern.test(name)) return city;
+  }
+  return null;
+}
+
 function parseEvents(icsText: string): ParsedEvent[] {
   const lines = unfoldIcs(icsText);
   const events: ParsedEvent[] = [];
@@ -120,6 +172,8 @@ function toParsedEvent(fields: Record<string, string>): ParsedEvent {
   const name = unescapeIcsText(summary);
   const location = fields["LOCATION"] ? unescapeIcsText(fields["LOCATION"]) : null;
   const { city, country } = splitLocation(location);
+  const resolvedCity =
+    city ?? (country && /india/i.test(country) ? guessIndiaCityFromName(name) : null);
 
   return {
     source_uid: uid.trim(),
@@ -127,7 +181,7 @@ function toParsedEvent(fields: Record<string, string>): ParsedEvent {
     race_date: parseIcsDate(dtstart),
     race_end_date: fields["DTEND"] ? parseIcsDate(fields["DTEND"]) : null,
     location_raw: location,
-    city,
+    city: resolvedCity,
     country,
     distance_label: guessDistanceLabel(name),
     registration_url: fields["URL"] ? unescapeIcsText(fields["URL"]) : null,
