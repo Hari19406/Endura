@@ -3601,7 +3601,12 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final rows = await RaceService.instance.upcomingRaces(limit: 250);
+    // India-only for now — data quality (city/distance parsing) is only
+    // solid there. Expand to other countries once this proves out.
+    final rows = await RaceService.instance.upcomingRaces(
+      country: 'India',
+      limit: 250,
+    );
     if (!mounted) return;
     setState(() {
       _all = rows;
@@ -4182,10 +4187,6 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
                     child: ListView(
                       shrinkWrap: true,
                       children: [
-                        _sheetRow('Any', _fCity == null, () {
-                          Navigator.pop(ctx);
-                          setState(() => _fCity = null);
-                        }),
                         for (final c in matches)
                           _sheetRow(c, _fCity == c, () {
                             Navigator.pop(ctx);
@@ -4255,10 +4256,6 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
                 child: ListView(
                   shrinkWrap: true,
                   children: [
-                    _sheetRow('Any', current == null, () {
-                      Navigator.pop(ctx);
-                      onPick(null);
-                    }),
                     for (final o in options)
                       _sheetRow(o.$2, current == o.$1, () {
                         Navigator.pop(ctx);
