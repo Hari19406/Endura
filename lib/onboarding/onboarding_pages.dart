@@ -294,38 +294,6 @@ class OPageGoal extends StatelessWidget {
       padding: EdgeInsets.zero,
       children: [
         const _SectionHeader(
-          'Most popular',
-          'Top picks based on what runners choose most.',
-        ),
-        const SizedBox(height: 12),
-        _upcomingRaceRow(),
-        const SizedBox(height: 10),
-        const _ComingSoonRow(
-          icon: Icons.monitor_heart_outlined,
-          iconBg: Color(0xFF0F2E1E),
-          iconFg: EC.teal,
-          label: 'General fitness',
-          sub: 'Stay consistent and improve between events. Pick your level.',
-        ),
-        const SizedBox(height: 10),
-        const _ComingSoonRow(
-          icon: Icons.directions_walk,
-          iconBg: Color(0xFF10202E),
-          iconFg: EC.teal,
-          label: 'Get back into running',
-          sub:
-              'Three days a week, time-based runs. Easy ramp for lapsed runners.',
-        ),
-        const SizedBox(height: 10),
-        const _ComingSoonRow(
-          icon: Icons.auto_awesome,
-          iconBg: Color(0xFF1E1040),
-          iconFg: EC.violet,
-          label: 'Intro to running',
-          sub: 'A friendly 5-week walk/run plan to get you off the couch.',
-        ),
-        const SizedBox(height: 26),
-        const _SectionHeader(
           'Race goals',
           'Training toward a finish line — first-timer or PR.',
         ),
