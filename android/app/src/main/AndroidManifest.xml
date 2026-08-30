@@ -1,7 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Foreground (while-in-use) location only. Run tracking continues with the
+         screen off via a location-typed foreground service (see below), which
+         does NOT require ACCESS_BACKGROUND_LOCATION. That permission was removed
+         because the app never accesses location without an active foreground
+         service, and declaring it triggers Play's Prominent Disclosure review. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
