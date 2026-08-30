@@ -18,7 +18,7 @@ const _kGold = Color(0xFFE3C170);
 const _kTermsUrl =
     'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
 const _kPrivacyUrl =
-    'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
+    'https://sites.google.com/view/enduraprivacypolicy';
 
 /// Split-clock numerals — every price, day count and percentage on this page
 /// reads like a runner's stopwatch: tabular monospaced digits instead of the

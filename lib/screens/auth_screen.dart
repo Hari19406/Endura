@@ -32,7 +32,7 @@ class _AuthScreenState extends State<AuthScreen> {
   static const _termsUrl =
       'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
   static const _privacyUrl =
-      'https://laced-drill-6ab.notion.site/Privacy-Policy-for-Endura-3862582d8c2d802b9495d8391dadfb44';
+      'https://sites.google.com/view/enduraprivacypolicy';
 
   // ── Theme tokens ──────────────────────────────────────────────────────────
   static const _bg = Color(0xFF000000);
