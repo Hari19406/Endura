@@ -79,6 +79,42 @@ class Analytics {
     },
   );
 
+  // ── Plan reveal ───────────────────────────────────────────────────────────
+  // Fired once per onboarding run, on the first successful projection — not on
+  // every arrival at the reveal, or returning from an edit would inflate it and
+  // destroy the funnel denominator.
+  static Future<void> planRevealViewed({
+    required String goal,
+    required int planWeeks,
+    required double peakWeeklyKm,
+    required int runsPerWeek,
+  }) => capture(
+    'plan_reveal_viewed',
+    properties: {
+      'goal': goal,
+      'plan_weeks': planWeeks,
+      'peak_weekly_km': peakWeeklyKm.round(),
+      'runs_per_week': runsPerWeek,
+    },
+  );
+
+  static Future<void> planRevealEditTapped(String row) =>
+      capture('plan_reveal_edit_tapped', properties: {'row': row});
+
+  /// [changed] is false when the user opened a row and left it as it was —
+  /// which tells us the row was confusing rather than wrong.
+  static Future<void> planRevealEditReturned({
+    required String row,
+    required bool changed,
+  }) => capture(
+    'plan_reveal_edit_returned',
+    properties: {'row': row, 'changed': changed},
+  );
+
+  /// Latched once per screen visit; firing per touch move would flood PostHog.
+  static Future<void> planRevealCurveScrubbed() =>
+      capture('plan_reveal_curve_scrubbed');
+
   // ── Plan ─────────────────────────────────────────────────────────────────
   static Future<void> planCreated({
     required String goal,

@@ -245,7 +245,7 @@ class ArchetypeTable {
     required ExperienceLevel experience,
     required TrainingPhase phase,
   }) {
-    if (days < 3 || days > 6) return null;
+    if (days < 3 || days > 7) return null;
 
     final slots = phase == TrainingPhase.taper
         ? _taperSlots(days: days)
@@ -330,13 +330,26 @@ class ArchetypeTable {
       ],
 
       // 6 days: 3E + 2Q + 1L
-      _ => [
+      6 => [
         const _Slot(ArchetypeSessionType.recoveryEasy, 0.08),
         const _Slot(ArchetypeSessionType.easy, 0.12),
         const _Slot(ArchetypeSessionType.easyMedium, 0.14),
         _Slot(q1, 0.16),
         _Slot(q2, 0.16),
         const _Slot(ArchetypeSessionType.longRun, 0.34),
+      ],
+
+      // 7 days: 4E + 2Q + 1L. Quality count stays at 2 — WeekResolver's
+      // anchored pattern never assigns more than two, regardless of day count.
+      // The extra day is an easy run, and the long run shrinks accordingly.
+      _ => [
+        const _Slot(ArchetypeSessionType.recoveryEasy, 0.07),
+        const _Slot(ArchetypeSessionType.easy, 0.10),
+        const _Slot(ArchetypeSessionType.easy, 0.11),
+        const _Slot(ArchetypeSessionType.easyMedium, 0.13),
+        _Slot(q1, 0.15),
+        _Slot(q2, 0.15),
+        const _Slot(ArchetypeSessionType.longRun, 0.29),
       ],
     };
   }
@@ -364,13 +377,23 @@ class ArchetypeTable {
       const _Slot(ArchetypeSessionType.tempo, 0.22),
       const _Slot(ArchetypeSessionType.longRun, 0.38),
     ],
-    _ => [
+    6 => [
       const _Slot(ArchetypeSessionType.recoveryEasy, 0.08),
       const _Slot(ArchetypeSessionType.easy, 0.12),
       const _Slot(ArchetypeSessionType.easyMedium, 0.14),
       const _Slot(ArchetypeSessionType.easy, 0.12),
       const _Slot(ArchetypeSessionType.tempo, 0.20),
       const _Slot(ArchetypeSessionType.longRun, 0.34),
+    ],
+    // 7 days: 5E + 1Q + 1L — taper keeps one quality slot at any day count.
+    _ => [
+      const _Slot(ArchetypeSessionType.recoveryEasy, 0.07),
+      const _Slot(ArchetypeSessionType.easy, 0.11),
+      const _Slot(ArchetypeSessionType.easyMedium, 0.12),
+      const _Slot(ArchetypeSessionType.easy, 0.11),
+      const _Slot(ArchetypeSessionType.easy, 0.10),
+      const _Slot(ArchetypeSessionType.tempo, 0.19),
+      const _Slot(ArchetypeSessionType.longRun, 0.30),
     ],
   };
 

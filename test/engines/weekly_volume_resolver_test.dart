@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/engines/plan/weekly_volume_resolver.dart';
 import 'package:run_app/engines/memory/engine_memory.dart';
 import 'package:run_app/engines/config/workout_template_library.dart';
-import 'package:run_app/engines/coach_engine_v2.dart' show ProgressionDecision;
+import 'package:run_app/engines/progression_decision.dart';
 
 EngineMemory _mem({
   required double baseline,

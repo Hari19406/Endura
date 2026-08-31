@@ -9,6 +9,8 @@ import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
 import 'onboarding_pages.dart';
+import 'plan_reveal_data.dart';
+import 'plan_reveal_page.dart';
 import '../../models/training_phase.dart';
 
 class EC {
@@ -153,6 +155,26 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int _vdot = 40;
   bool _vdotProvisional = true;
 
+  // ── Plan reveal ──────────────────────────────────────────────────────────
+  // The projection is expensive enough that it must never be computed in
+  // build(): WeekResolver logs a multi-line block per resolve() under assert,
+  // and _buildPages() rebuilds every page every frame.
+  PlanProjection? _projection;
+  String? _projectionKey;
+  bool _revealTracked = false;
+
+  // Edit-and-return: set while the athlete is editing one answer from the
+  // reveal and must bounce back to it. A flag, not a stack — the only return
+  // target is the reveal, and there is no nested-edit case.
+  bool _editReturn = false;
+  PlanEditTarget? _editingTarget;
+  String? _fingerprintAtEditStart;
+
+  /// Set when runs-per-week actually changed during an edit, which is what
+  /// wipes the selected days and long-run day. Without it, opening the row and
+  /// changing nothing would still drag the athlete through two more pages.
+  bool _daysResetDuringEdit = false;
+
   late AnimationController _loopCtrl;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -263,44 +285,214 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _currentPage != OPage.buildPlan &&
       _currentPage != OPage.welcome;
 
-  double get _progress => 0.05 + (_current / max(1, _total - 1)) * 0.95;
+  // Hold the bar full while editing — otherwise tapping "Edit" on the reveal
+  // visibly rewinds progress, which reads as losing your place.
+  double get _progress =>
+      _editReturn ? 1.0 : 0.05 + (_current / max(1, _total - 1)) * 0.95;
+
+  int _indexOf(OPage page) => _sequence.indexOf(page);
+
+  void _animateTo(int index) {
+    if (index < 0 || index >= _total) return;
+    _ctrl.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _goTo(OPage page) => _animateTo(_indexOf(page));
+
+  /// Jump to the question that owns a receipt row, remembering to come back.
+  void _startEdit(PlanEditTarget target) {
+    final page = _pageForEditTarget(target);
+    if (_indexOf(page) < 0) return;
+    setState(() {
+      _editReturn = true;
+      _editingTarget = target;
+      _fingerprintAtEditStart = _projectionKey;
+    });
+    _goTo(page);
+  }
+
+  OPage _pageForEditTarget(PlanEditTarget target) => switch (target) {
+    // Distance is edited through the race picker, not the goal page.
+    PlanEditTarget.goal => OPage.raceGoal,
+    PlanEditTarget.runsPerWeek => OPage.runsPerWeek,
+    PlanEditTarget.trainingDays => OPage.dayPicker,
+    PlanEditTarget.longRunDay => OPage.longRunDay,
+    PlanEditTarget.currentTime => OPage.currentTime,
+    PlanEditTarget.planStart => OPage.planStart,
+  };
+
+  OPage _pageForFollowUp(PlanEditFollowUp followUp) => switch (followUp) {
+    PlanEditFollowUp.targetTime => OPage.targetTime,
+    PlanEditFollowUp.trainingDays => OPage.dayPicker,
+    PlanEditFollowUp.longRunDay => OPage.longRunDay,
+  };
+
+  /// Returns to the reveal, unless the edit invalidated a downstream answer
+  /// that has to be re-confirmed first.
+  void _resumeFromEdit() {
+    // Evaluate against the page just finished, not where the edit began — a
+    // chained edit passes through several pages before returning.
+    final edited =
+        _editTargetForPage(_currentPage) ??
+        _editingTarget ??
+        PlanEditTarget.runsPerWeek;
+
+    final followUp = planEditFollowUp(
+      edited: edited,
+      raceGoal: _raceGoal,
+      timeToBeatSec: _timeToBeatSec,
+      targetFinishSec: _targetFinishSec,
+      needsTargetTime: _needsTargetTime,
+      longRunDayIndex: _longRunDayIndex,
+      daysNeedConfirming: _daysResetDuringEdit,
+    );
+
+    if (followUp != null) {
+      _goTo(_pageForFollowUp(followUp));
+      return;
+    }
+
+    _ensureProjection();
+    final row = _editingTarget?.name ?? 'unknown';
+    Analytics.planRevealEditReturned(
+      row: row,
+      changed: _projectionKey != _fingerprintAtEditStart,
+    );
+    _clearEditState();
+    _goTo(OPage.review);
+  }
+
+  void _clearEditState() {
+    setState(() {
+      _editReturn = false;
+      _editingTarget = null;
+      _fingerprintAtEditStart = null;
+      _daysResetDuringEdit = false;
+    });
+  }
+
+  /// Which edit a given page represents, so the chain can be evaluated against
+  /// the page the athlete actually just finished rather than where they began.
+  PlanEditTarget? _editTargetForPage(OPage page) => switch (page) {
+    OPage.raceGoal => PlanEditTarget.goal,
+    OPage.runsPerWeek => PlanEditTarget.runsPerWeek,
+    OPage.dayPicker => PlanEditTarget.trainingDays,
+    OPage.longRunDay => PlanEditTarget.longRunDay,
+    OPage.currentTime => PlanEditTarget.currentTime,
+    OPage.planStart => PlanEditTarget.planStart,
+    _ => null,
+  };
 
   void _next() {
+    if (_editReturn) {
+      _resumeFromEdit();
+      return;
+    }
     int next = _current + 1;
     if (next < _total &&
         _sequence[next] == OPage.targetTime &&
         !_needsTargetTime) {
       next++;
     }
-    if (next < _total) {
-      _ctrl.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeInOut,
-      );
-    }
+    // Have the projection ready before the slide finishes, so the reveal never
+    // flashes its skeleton.
+    if (next < _total && _sequence[next] == OPage.review) _ensureProjection();
+    _animateTo(next);
   }
 
   void _prev() {
+    // Backing out of an edit abandons it and returns to the reveal rather than
+    // walking backwards through the questionnaire.
+    if (_editReturn) {
+      _clearEditState();
+      _goTo(OPage.review);
+      return;
+    }
     int prev = _current - 1;
     if (prev >= 0 &&
         _sequence[prev] == OPage.targetTime &&
         !_needsTargetTime) {
       prev--;
     }
-    if (prev >= 0) {
-      _ctrl.animateToPage(
-        prev,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeInOut,
-      );
-    }
+    _animateTo(prev);
   }
 
   void _onPageChanged(int p) {
     setState(() => _current = p);
     HapticFeedback.selectionClick();
     Analytics.onboardingStepViewed(_sequence[p].name, p);
+    if (_sequence[p] == OPage.review) _ensureProjection();
+  }
+
+  // ── Plan projection ──────────────────────────────────────────────────────
+
+  /// Weekly baseline the plan is seeded from. Shared by the reveal and by
+  /// _saveAll so the curve the athlete approves is the plan they get.
+  double get _baselineWeeklyKm =>
+      _pastMonthKm > 0 ? _pastMonthKm / 4.345 : _runsPerWeek * 8.0;
+
+  OnboardingAnswers _buildAnswers() {
+    final goalRace = _goal ?? '5k';
+    final (vdot, provisional) = _computeVdot();
+    return OnboardingAnswers(
+      goal: goalRace,
+      raceName: _raceName,
+      raceCity: _raceCity,
+      raceDate:
+          _raceDate ?? _startDate.add(Duration(days: _effectivePlanWeeks * 7)),
+      experienceRaw: _experience ?? 'regular',
+      experienceBridged: _bridgeExperience(_experience),
+      raceGoalRaw: _raceGoal,
+      timeToBeatSec: _timeToBeatSec,
+      targetFinishSec: _targetFinishSec,
+      pastMonthKm: _pastMonthKm,
+      baselineWeeklyKm: _baselineWeeklyKm,
+      runsPerWeek: _runsPerWeek,
+      selectedDays: _selectedDays,
+      longRunDayIndex: _longRunDayIndex,
+      paceDistance: _paceDistance,
+      paceDistanceKm: _paceDistanceKm,
+      currentTimeSec: _currentTimeSec,
+      startDate: _startDate,
+      planWeeks: _effectivePlanWeeks,
+      vdot: vdot,
+      vdotProvisional: provisional,
+    );
+  }
+
+  /// Recomputes the projection only when an answer actually changed.
+  void _ensureProjection() {
+    final answers = _buildAnswers();
+    if (_projectionKey == answers.fingerprint && _projection != null) return;
+
+    PlanProjection? projection;
+    try {
+      projection = PlanProjection.build(answers);
+    } catch (e) {
+      // Degrade to a receipt-only reveal rather than crashing the last screen
+      // of onboarding. _saveAll guards the same builder call the same way.
+      debugPrint('[PlanReveal] projection failed: $e');
+      projection = null;
+    }
+
+    setState(() {
+      _projection = projection;
+      _projectionKey = answers.fingerprint;
+    });
+
+    if (projection != null && !_revealTracked) {
+      _revealTracked = true;
+      Analytics.planRevealViewed(
+        goal: answers.goal,
+        planWeeks: projection.weeks.length,
+        peakWeeklyKm: projection.peakWeeklyKm,
+        runsPerWeek: answers.runsPerWeek,
+      );
+    }
   }
 
   // ── Validation ───────────────────────────────────────────────────────────
@@ -412,9 +604,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _vdot = vdot;
     _vdotProvisional = provisional;
 
-    final double effectiveBaselineKm = _pastMonthKm > 0
-        ? _pastMonthKm / 4.345
-        : _runsPerWeek * 8.0;
+    // Same getter the reveal uses, so the curve the athlete approved is the
+    // plan that actually gets saved.
+    final double effectiveBaselineKm = _baselineWeeklyKm;
 
     final goalRace = _goal ?? '5k';
     final exp = _bridgeExperience(_experience);
@@ -498,6 +690,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           experienceLevel: exp,
         );
         await EngineMemoryService().saveRacePlan(plan);
+        Analytics.planCreated(goal: goalRace, level: exp);
       } catch (e) {
         debugPrint('[Onboarding] Race plan error: $e');
       }
@@ -613,9 +806,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         borderRadius: BorderRadius.circular(ET.radius),
                       ),
                     ),
-                    child: const Text(
-                      'Continue',
-                      style: TextStyle(
+                    child: Text(
+                      // "Done" while editing a single answer from the reveal —
+                      // "Continue" would imply moving forward through the flow.
+                      _editReturn ? 'Done' : 'Continue',
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -704,6 +899,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           _runsPerWeek = n;
           _selectedDays = TrainingDaysService.defaultsFor(n);
           _longRunDayIndex = null;
+          if (_editReturn) _daysResetDuringEdit = true;
         }),
       ),
 
@@ -742,17 +938,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         }),
       ),
 
-      OPage.review => OPageGeneratePlan(
-        firstName: 'you',
-        goal: _goal ?? '5k',
-        startDate: _startDate,
-        planWeeks: _planWeeks,
-        raceDate: _raceDate,
-        raceDayIndex: (_raceDate?.weekday ?? 7) - 1,
-        runsPerWeek: _runsPerWeek,
-        selectedDays: _selectedDays,
-        intensity: _bridgeGoalIntent(_raceGoal),
-        vdotScore: previewVdot.$1,
+      OPage.review => OPagePlanReveal(
+        answers: _buildAnswers(),
+        projection: _projection,
+        onEdit: _startEdit,
         onGenerate: _next,
       ),
 
