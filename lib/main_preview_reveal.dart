@@ -152,9 +152,9 @@ class RevealPreviewApp extends StatefulWidget {
 enum _Screen { reveal, slider, planStart }
 
 class _RevealPreviewAppState extends State<RevealPreviewApp> {
-  int _index = 3; // TEMP-VERIFY short notice marathon
+  int _index = 0;
   bool _skeleton = false;
-  _Screen _screen = _Screen.planStart; // TEMP-VERIFY
+  _Screen _screen = _Screen.reveal;
   int _runs = 4;
   DateTime? _pickedStart;
 

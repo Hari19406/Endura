@@ -25,10 +25,7 @@ Future<ShortNoticeChoice?> _open(
                   context,
                   raceName: raceName,
                   goal: goal,
-                  runway: PlanRunway.resolve(
-                    goal: goal,
-                    weeksAvailable: weeks,
-                  ),
+                  runway: PlanRunway.resolve(goal: goal, weeksAvailable: weeks),
                 );
               },
               child: const Text('open'),
@@ -56,8 +53,10 @@ void main() {
 
     // The coaching truth: sharpening is possible, building is not.
     expect(find.textContaining('sharpen up and taper'), findsOneWidget);
-    expect(find.textContaining('not enough to build new endurance'),
-        findsOneWidget);
+    expect(
+      find.textContaining('not enough to build new endurance'),
+      findsOneWidget,
+    );
     expect(find.textContaining('16-week build'), findsOneWidget);
 
     // Interception, never a wall — the way out is present and secondary.
