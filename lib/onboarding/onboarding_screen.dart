@@ -393,7 +393,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _next() {
     debugPrint(
-      '[DBG] _next() current=$_current page=$_currentPage editReturn=$_editReturn total=$_total',
+      '[DBG] _next current=$_current editReturn=$_editReturn projKey=$_projectionKey',
     );
     if (_editReturn) {
       _resumeFromEdit();
@@ -427,7 +427,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _onPageChanged(int p) {
-    debugPrint('[DBG] _onPageChanged p=$p page=${_sequence[p]}');
+    debugPrint('[DBG] _onPageChanged p=$p');
     setState(() => _current = p);
     HapticFeedback.selectionClick();
     Analytics.onboardingStepViewed(_sequence[p].name, p);
@@ -594,7 +594,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _advanceFromRacePicker() async {
     final runway = _runway;
     debugPrint(
-      '[DBG] _advanceFromRacePicker raceDate=$_raceDate isShortNotice=${runway.isShortNotice} current=$_current',
+      '[DBG] advanceFromRacePicker raceDate=$_raceDate short=${runway.isShortNotice} current=$_current',
     );
     if (_raceDate == null || !runway.isShortNotice) {
       _next();
@@ -817,6 +817,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+      '[DBG] build() current=$_current page=$_currentPage '
+      'ctrlHasClients=${_ctrl.hasClients} '
+      'ctrlPage=${_ctrl.hasClients ? _ctrl.page : "n/a"} '
+      'ctrlOffset=${_ctrl.hasClients ? _ctrl.offset : "n/a"} '
+      'viewportDim=${_ctrl.hasClients && _ctrl.position.hasViewportDimension ? _ctrl.position.viewportDimension : "n/a"}',
+    );
     return Scaffold(
       backgroundColor: EC.bg,
       body: SafeArea(
