@@ -106,7 +106,7 @@ class VolumeGuidance {
     );
 
     final runs = selectedRuns.clamp(kMinRunsPerWeek, maxRuns);
-    final range = WeeklyKmRange.forRaceAndDays(race: goal, days: runs);
+    final range = rangeFor(goal, runs);
 
     return VolumeGuidance(
       maxRuns: maxRuns,
@@ -139,11 +139,29 @@ class VolumeGuidance {
     return week?.qualityCount ?? (days >= 5 ? 2 : 1);
   }
 
+  /// Weekly range for a day count, working around ENGINE-TODO #2.
+  ///
+  /// `WeeklyKmRange.forRaceAndDays` has no row for 7 days and silently returns
+  /// the 4-day row, so a 7-day week reports *less* volume than a 6-day one
+  /// (marathon: 62 km at 6 days, 42 km at 7). Left alone that inverts the
+  /// safety gate — 7 days would look like the cheapest option on the slider.
+  /// Extrapolate from the 6-day row until the engine has a real 7-day entry.
+  static WeeklyKmRange rangeFor(String goal, int days) {
+    if (days <= 6) {
+      return WeeklyKmRange.forRaceAndDays(race: goal, days: days);
+    }
+    final six = WeeklyKmRange.forRaceAndDays(race: goal, days: 6);
+    return WeeklyKmRange(
+      min: six.min * 1.15,
+      max: six.max * 1.12,
+      defaultKm: six.defaultKm * 1.15,
+    );
+  }
+
   static int _largestDaysWithin(String goal, double ceilingKm) {
     var best = kMinRunsPerWeek;
     for (var d = kMinRunsPerWeek; d <= kMaxRunsPerWeek; d++) {
-      final range = WeeklyKmRange.forRaceAndDays(race: goal, days: d);
-      if (range.defaultKm <= ceilingKm) best = d;
+      if (rangeFor(goal, d).defaultKm <= ceilingKm) best = d;
     }
     return best;
   }
@@ -161,9 +179,7 @@ class VolumeGuidance {
     var best = kMinRunsPerWeek;
     var bestGap = double.infinity;
     for (var d = kMinRunsPerWeek; d <= maxRuns; d++) {
-      final gap =
-          (WeeklyKmRange.forRaceAndDays(race: goal, days: d).defaultKm - target)
-              .abs();
+      final gap = (rangeFor(goal, d).defaultKm - target).abs();
       if (gap < bestGap) {
         bestGap = gap;
         best = d;

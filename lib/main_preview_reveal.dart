@@ -11,6 +11,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'onboarding/onboarding_screen.dart' show EC;
+import 'onboarding/onboarding_pages.dart' show OPageRunsPerWeek;
 import 'onboarding/plan_reveal_data.dart';
 import 'onboarding/plan_reveal_page.dart';
 import 'utils/unit_utils.dart';
@@ -148,6 +149,8 @@ class RevealPreviewApp extends StatefulWidget {
 class _RevealPreviewAppState extends State<RevealPreviewApp> {
   int _index = 0;
   bool _skeleton = false;
+  bool _showSlider = false;
+  int _runs = 4;
 
   @override
   Widget build(BuildContext context) {
@@ -173,8 +176,10 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                 personas: _personas,
                 index: _index,
                 skeleton: _skeleton,
+                showSlider: _showSlider,
                 onPersona: (i) => setState(() => _index = i),
                 onSkeleton: (v) => setState(() => _skeleton = v),
+                onShowSlider: (v) => setState(() => _showSlider = v),
               ),
               if (error != null)
                 Padding(
@@ -190,13 +195,22 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                     // Roughly a phone, so overflow shows up here rather than
                     // on device.
                     constraints: const BoxConstraints(maxWidth: 420),
-                    child: OPagePlanReveal(
-                      key: ValueKey('$_index-$_skeleton'),
-                      answers: persona.answers,
-                      projection: projection,
-                      onEdit: (t) => _toast(context, 'Edit → ${t.name}'),
-                      onGenerate: () => _toast(context, 'Start training'),
-                    ),
+                    child: _showSlider
+                        ? OPageRunsPerWeek(
+                            runsPerWeek: _runs,
+                            baselineWeeklyKm: persona.answers.baselineWeeklyKm,
+                            goal: persona.answers.goal,
+                            experienceBridged:
+                                persona.answers.experienceBridged,
+                            onChanged: (n) => setState(() => _runs = n),
+                          )
+                        : OPagePlanReveal(
+                            key: ValueKey('$_index-$_skeleton'),
+                            answers: persona.answers,
+                            projection: projection,
+                            onEdit: (t) => _toast(context, 'Edit → ${t.name}'),
+                            onGenerate: () => _toast(context, 'Start training'),
+                          ),
                   ),
                 ),
               ),
@@ -218,15 +232,19 @@ class _Toolbar extends StatelessWidget {
   final List<_Persona> personas;
   final int index;
   final bool skeleton;
+  final bool showSlider;
   final ValueChanged<int> onPersona;
   final ValueChanged<bool> onSkeleton;
+  final ValueChanged<bool> onShowSlider;
 
   const _Toolbar({
     required this.personas,
     required this.index,
     required this.skeleton,
+    required this.showSlider,
     required this.onPersona,
     required this.onSkeleton,
+    required this.onShowSlider,
   });
 
   @override
@@ -246,6 +264,11 @@ class _Toolbar extends StatelessWidget {
               onSelected: (_) => onPersona(i),
             ),
           const SizedBox(width: 12),
+          FilterChip(
+            label: const Text('Runs slider'),
+            selected: showSlider,
+            onSelected: onShowSlider,
+          ),
           FilterChip(
             label: const Text('Skeleton'),
             selected: skeleton,

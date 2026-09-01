@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -10,6 +9,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'route_trace_painter.dart';
 import '../services/analytics_service.dart';
 import '../services/social_share_service.dart';
 import '../theme/app_colors.dart';
@@ -61,7 +61,8 @@ enum ShareCardTemplate {
 /// templates yet — it renders a "Coming soon" placeholder.
 enum ShareCardCategory { all, charts, activity }
 
-ShareCardCategory _categoryOf(ShareCardTemplate t) => ShareCardCategory.activity;
+ShareCardCategory _categoryOf(ShareCardTemplate t) =>
+    ShareCardCategory.activity;
 
 String _labelOf(ShareCardTemplate t) => switch (t) {
   ShareCardTemplate.full => 'Full',
@@ -552,8 +553,7 @@ class _LayoutPickerSheetState extends State<_LayoutPickerSheet> {
     final templates = ShareCardTemplate.values
         .where(
           (t) =>
-              _category == ShareCardCategory.all ||
-              _categoryOf(t) == _category,
+              _category == ShareCardCategory.all || _categoryOf(t) == _category,
         )
         .toList();
 
@@ -739,10 +739,7 @@ class _LayoutPickerSheetState extends State<_LayoutPickerSheet> {
               ),
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: c.surface,
                   borderRadius: BorderRadius.circular(999),
@@ -770,6 +767,7 @@ class RunShareCard extends StatelessWidget {
   final ShareRunData data;
   final ShareCardTemplate template;
   final ShareCardStyle style;
+
   /// Mon–Sun distance for [ShareCardTemplate.weekByDay]; null while loading,
   /// in which case the template renders with all-zero bars.
   final List<double>? weekKm;
@@ -819,7 +817,7 @@ class RunShareCard extends StatelessWidget {
     if (hasRoute) {
       inner = CustomPaint(
         size: Size.infinite,
-        painter: _ShareRoutePainter(
+        painter: RouteTracePainter(
           points: data.gpsPoints,
           color: _mapBlue,
           strokeWidth: strokeWidth,
@@ -1370,9 +1368,7 @@ class RunShareCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: i == todayIndex
-                            ? Colors.white
-                            : Colors.white38,
+                        color: i == todayIndex ? Colors.white : Colors.white38,
                       ),
                     ),
                   ],
@@ -1458,7 +1454,11 @@ class RunShareCard extends StatelessWidget {
         ),
         Row(
           children: [
-            Icon(Icons.directions_run, size: 13, color: WorkoutTypeStyle.color(data.workoutType)),
+            Icon(
+              Icons.directions_run,
+              size: 13,
+              color: WorkoutTypeStyle.color(data.workoutType),
+            ),
             const SizedBox(width: 6),
             const Text(
               'COACHED BY MAX',
@@ -1513,7 +1513,11 @@ class RunShareCard extends StatelessWidget {
         ),
         Row(
           children: [
-            Icon(Icons.directions_run, size: 13, color: WorkoutTypeStyle.color(data.workoutType)),
+            Icon(
+              Icons.directions_run,
+              size: 13,
+              color: WorkoutTypeStyle.color(data.workoutType),
+            ),
             const SizedBox(width: 6),
             const Text(
               'COACHED BY MAX',
@@ -1568,7 +1572,11 @@ class RunShareCard extends StatelessWidget {
         ),
         Row(
           children: [
-            Icon(Icons.directions_run, size: 13, color: WorkoutTypeStyle.color(data.workoutType)),
+            Icon(
+              Icons.directions_run,
+              size: 13,
+              color: WorkoutTypeStyle.color(data.workoutType),
+            ),
             const SizedBox(width: 6),
             const Text(
               'COACHED BY MAX',
@@ -1584,79 +1592,6 @@ class RunShareCard extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Route trace on a transparent background. White by default; [color] and
-/// [strokeWidth] let the poster template draw a heavier, colored stroke.
-class _ShareRoutePainter extends CustomPainter {
-  final List<Map<String, double>> points;
-  final Color color;
-  final double strokeWidth;
-
-  const _ShareRoutePainter({
-    required this.points,
-    this.color = Colors.white,
-    this.strokeWidth = 3,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (points.length < 2) return;
-
-    double minLat = points.first['lat']!;
-    double maxLat = points.first['lat']!;
-    double minLng = points.first['lng']!;
-    double maxLng = points.first['lng']!;
-
-    for (final p in points) {
-      minLat = math.min(minLat, p['lat']!);
-      maxLat = math.max(maxLat, p['lat']!);
-      minLng = math.min(minLng, p['lng']!);
-      maxLng = math.max(maxLng, p['lng']!);
-    }
-
-    final latRange = maxLat - minLat;
-    final lngRange = maxLng - minLng;
-    if (latRange == 0 || lngRange == 0) return;
-
-    const padding = 24.0;
-    final drawWidth = size.width - padding * 2;
-    final drawHeight = size.height - padding * 2;
-
-    final scaleX = drawWidth / lngRange;
-    final scaleY = drawHeight / latRange;
-    final scale = math.min(scaleX, scaleY);
-
-    final offsetX = padding + (drawWidth - lngRange * scale) / 2;
-    final offsetY = padding + (drawHeight - latRange * scale) / 2;
-
-    Offset toOffset(Map<String, double> p) {
-      final x = offsetX + (p['lng']! - minLng) * scale;
-      final y = offsetY + (maxLat - p['lat']!) * scale;
-      return Offset(x, y);
-    }
-
-    final path = Path();
-    path.moveTo(toOffset(points.first).dx, toOffset(points.first).dy);
-    for (int i = 1; i < points.length; i++) {
-      final o = toOffset(points[i]);
-      path.lineTo(o.dx, o.dy);
-    }
-
-    final linePaint = Paint()
-      ..color = color.withOpacity(0.95)
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(path, linePaint);
-  }
-
-  @override
-  bool shouldRepaint(_ShareRoutePainter oldDelegate) =>
-      oldDelegate.points != points ||
-      oldDelegate.color != color ||
-      oldDelegate.strokeWidth != strokeWidth;
 }
 
 /// Grey checkerboard shown behind the transparent preview so the user can

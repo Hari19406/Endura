@@ -10,9 +10,9 @@ import 'run_detail_screen.dart';
 import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
-import '../utils/workout_type_style.dart';
 import '../widgets/achievement_tile.dart';
 import 'milestones_screen.dart';
+import 'history_tab.dart';
 
 class YouScreen extends StatefulWidget {
   const YouScreen({super.key});
@@ -257,7 +257,15 @@ class _YouScreenState extends State<YouScreen>
             )
           : TabBarView(
               controller: _tabController,
-              children: [_buildSummaryTab(), _buildHistoryTab()],
+              children: [
+                _buildSummaryTab(),
+                HistoryTab(
+                  records: _runRecords.cast<RunRecord>(),
+                  onRefresh: loadData,
+                  onOpenRun: (record) =>
+                      _openRunDetail(record.toRunHistory(), record: record),
+                ),
+              ],
             ),
     );
   }
@@ -878,218 +886,6 @@ class _YouScreenState extends State<YouScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // HISTORY TAB
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildHistoryTab() {
-    return RefreshIndicator(
-      color: context.colors.accent,
-      onRefresh: loadData,
-      child: _runHistory.isEmpty
-          ? Center(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: context.colors.divider,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.directions_run,
-                            size: 32,
-                            color: context.colors.textFaint,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'No runs yet',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Your first run will show here',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: context.colors.textTertiary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(24),
-              itemCount: _runHistory.length,
-              itemBuilder: (context, index) {
-                final run = _runHistory[index];
-                final record = index < _runRecords.length
-                    ? _runRecords[index]
-                    : null;
-                return Padding(
-                  padding: EdgeInsets.only(
-                    bottom: index < _runHistory.length - 1 ? 12 : 0,
-                  ),
-                  child: _buildRunHistoryCard(run, record: record),
-                );
-              },
-            ),
-    );
-  }
-
-  Widget _buildRunHistoryCard(dynamic run, {dynamic record}) {
-    final c = context.colors;
-    final workoutType = record?.workoutType as String? ?? 'easy';
-    final durationSeconds = record?.durationSeconds as int?;
-    final typeLabel = WorkoutTypeStyle.label(workoutType);
-    final typeColor = WorkoutTypeStyle.color(workoutType);
-
-    return Semantics(
-      button: true,
-      label: '$typeLabel run',
-      child: GestureDetector(
-        onTap: () => _openRunDetail(run, record: record),
-        child: Container(
-          decoration: BoxDecoration(
-            color: c.surface,
-            border: Border.all(color: c.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      typeLabel.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: typeColor,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatDate(run.date),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.textTertiary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${UnitUtils.displayDistance(run.distance, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: c.textPrimary,
-                        letterSpacing: -0.3,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        UnitUtils.formatPaceString(run.averagePace, _useMiles),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: c.textPrimary,
-                          letterSpacing: -0.2,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'PER ${_useMiles ? 'MI' : 'KM'}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: c.textTertiary,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (durationSeconds != null || run.rpe != null) ...[
-                const SizedBox(height: 10),
-                Divider(color: c.divider, height: 1, thickness: 1),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    if (durationSeconds != null) ...[
-                      Icon(Icons.schedule, size: 13, color: c.textTertiary),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDuration(durationSeconds),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: c.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    if (durationSeconds != null && run.rpe != null)
-                      const SizedBox(width: 14),
-                    if (run.rpe != null) ...[
-                      Icon(Icons.speed, size: 13, color: c.textTertiary),
-                      const SizedBox(width: 4),
-                      Text(
-                        'RPE ${run.rpe}/10',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: c.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
       ),
     );
   }

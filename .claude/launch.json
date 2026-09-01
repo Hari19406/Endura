@@ -4,32 +4,97 @@
     {
       "name": "flutter-web",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8765", "--web-hostname", "0.0.0.0"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "8765",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
       "port": 8765
     },
     {
       "name": "flutter-preview",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "-t", "lib/main_preview.dart", "--dart-define-from-file=dart_defines.env", "--web-port", "8766", "--web-hostname", "0.0.0.0"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "-t",
+        "lib/main_preview.dart",
+        "--dart-define-from-file=dart_defines.env",
+        "--web-port",
+        "8766",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
       "port": 8766
     },
     {
       "name": "flutter-preview-paywall",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "-t", "lib/main_preview_paywall.dart", "--web-port", "8767", "--web-hostname", "0.0.0.0"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "-t",
+        "lib/main_preview_paywall.dart",
+        "--web-port",
+        "8767",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
       "port": 8767
     },
     {
       "name": "flutter-preview-share",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "-t", "lib/main_preview_share.dart", "--web-port", "8768", "--web-hostname", "0.0.0.0"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "-t",
+        "lib/main_preview_share.dart",
+        "--web-port",
+        "8768",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
       "port": 8768
     },
     {
       "name": "flutter-preview-reveal",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "-t", "lib/main_preview_reveal.dart", "--web-port", "8769", "--web-hostname", "0.0.0.0"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "-t",
+        "lib/main_preview_reveal.dart",
+        "--web-port",
+        "8769",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
       "port": 8769
+    },
+    {
+      "name": "flutter-preview-history",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "-t",
+        "lib/main_preview_history.dart",
+        "--web-port",
+        "8770",
+        "--web-hostname",
+        "0.0.0.0"
+      ],
+      "port": 8770
     }
   ]
 }
