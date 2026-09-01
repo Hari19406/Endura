@@ -537,10 +537,12 @@ class _ComingSoonRow extends StatelessWidget {
 
 class OPageExperience extends StatelessWidget {
   final String? selected;
+  final String goal;
   final ValueChanged<String> onSelect;
   const OPageExperience({
     super.key,
     required this.selected,
+    required this.goal,
     required this.onSelect,
   });
 
@@ -597,7 +599,7 @@ class OPageExperience extends StatelessWidget {
           const SizedBox(height: 32),
           const _Label('Your experience'),
           const SizedBox(height: 8),
-          const _Title("What's your\nrunning background?"),
+          _Title("What's your\n${_goalLabelFor(goal)} experience?"),
           const SizedBox(height: 6),
           const _Sub(
             'Be honest — this sets the right starting intensity for your plan.',
@@ -4339,10 +4341,12 @@ class OPagePastMonth extends StatelessWidget {
 
 class OPageRaceGoal extends StatelessWidget {
   final String? selected;
+  final String goal;
   final ValueChanged<String> onSelect;
   const OPageRaceGoal({
     super.key,
     required this.selected,
+    required this.goal,
     required this.onSelect,
   });
 
@@ -4397,7 +4401,7 @@ class OPageRaceGoal extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 32),
-          const _Label('Your goal for this race'),
+          _Label('Your ${_goalLabelFor(goal)} goal'),
           const SizedBox(height: 8),
           const _Title("What do you want\nfrom race day?"),
           const SizedBox(height: 6),

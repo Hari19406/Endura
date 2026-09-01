@@ -191,6 +191,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     final now = DateTime.now();
     _startDate = DateTime(now.year, now.month, now.day);
+    _longRunDayIndex = _defaultLongRunDay(_selectedDays);
 
     if (widget.shortenedMode) {
       _prefillFromExistingProfile();
@@ -551,6 +552,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _paceHours * 3600 + _paceMinutes * 60 + _paceSeconds;
 
   // ── Plan-start options ───────────────────────────────────────────────────
+
+  /// Sensible long-run-day default: keep the current pick if it's still
+  /// available, otherwise prefer the weekend, otherwise the latest day in the
+  /// week. Pre-answering this (rather than leaving it null) means the athlete
+  /// arrives at the page with a real choice already made, matching the
+  /// pre-checked-everything pattern the rest of onboarding follows.
+  int? _defaultLongRunDay(List<int> days, {int? current}) {
+    if (days.isEmpty) return null;
+    if (current != null && days.contains(current)) return current;
+    if (days.contains(5)) return 5; // Saturday
+    if (days.contains(6)) return 6; // Sunday
+    final sorted = [...days]..sort();
+    return sorted.last;
+  }
 
   // ── Runway ───────────────────────────────────────────────────────────────
 
@@ -913,6 +928,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       OPage.experience => OPageExperience(
         selected: _experience,
+        goal: _goal ?? '5k',
         onSelect: (v) => setState(() => _experience = v),
       ),
 
@@ -926,6 +942,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       OPage.raceGoal => OPageRaceGoal(
         selected: _raceGoal,
+        goal: _goal ?? '5k',
         onSelect: (v) => setState(() {
           _raceGoal = v;
           if (v != 'pr') _timeToBeatSec = null;
@@ -954,7 +971,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onChanged: (n) => setState(() {
           _runsPerWeek = n;
           _selectedDays = TrainingDaysService.defaultsFor(n);
-          _longRunDayIndex = null;
+          _longRunDayIndex = _defaultLongRunDay(_selectedDays);
           if (_editReturn) _daysResetDuringEdit = true;
         }),
       ),
@@ -964,7 +981,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         selectedDays: _selectedDays,
         onChanged: (days) => setState(() {
           _selectedDays = days;
-          _longRunDayIndex = null;
+          _longRunDayIndex = _defaultLongRunDay(
+            days,
+            current: _longRunDayIndex,
+          );
         }),
       ),
 
