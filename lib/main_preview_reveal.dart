@@ -11,9 +11,12 @@ library;
 import 'package:flutter/material.dart';
 
 import 'onboarding/onboarding_screen.dart' show EC;
-import 'onboarding/onboarding_pages.dart' show OPageRunsPerWeek;
+import 'onboarding/onboarding_pages.dart'
+    show OPageRunsPerWeek, OPagePlanStart, PlanStartOption;
 import 'onboarding/plan_reveal_data.dart';
 import 'onboarding/plan_reveal_page.dart';
+import 'onboarding/plan_runway.dart';
+import 'onboarding/short_notice_sheet.dart';
 import 'utils/unit_utils.dart';
 
 void main() => runApp(const RevealPreviewApp());
@@ -149,9 +152,9 @@ class RevealPreviewApp extends StatefulWidget {
 enum _Screen { reveal, slider, planStart }
 
 class _RevealPreviewAppState extends State<RevealPreviewApp> {
-  int _index = 0;
+  int _index = 3; // TEMP-VERIFY short notice marathon
   bool _skeleton = false;
-  _Screen _screen = _Screen.reveal;
+  _Screen _screen = _Screen.planStart; // TEMP-VERIFY
   int _runs = 4;
   DateTime? _pickedStart;
 
@@ -205,9 +208,24 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                 index: _index,
                 skeleton: _skeleton,
                 showSlider: _showSlider,
+                showStart: _screen == _Screen.planStart,
                 onPersona: (i) => setState(() => _index = i),
                 onSkeleton: (v) => setState(() => _skeleton = v),
-                onShowSlider: (v) => setState(() => _showSlider = v),
+                onShowSlider: (v) => setState(
+                  () => _screen = v ? _Screen.slider : _Screen.reveal,
+                ),
+                onShowStart: (v) => setState(
+                  () => _screen = v ? _Screen.planStart : _Screen.reveal,
+                ),
+                onShortNotice: () => showShortNoticeSheet(
+                  context,
+                  raceName: _personas[3].answers.raceName ?? 'that race',
+                  goal: 'marathon',
+                  runway: PlanRunway.resolve(
+                    goal: 'marathon',
+                    weeksAvailable: 5,
+                  ),
+                ),
               ),
               if (error != null)
                 Padding(
@@ -239,7 +257,9 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                             goal: persona.answers.goal,
                             runway: PlanRunway.resolve(
                               goal: persona.answers.goal,
-                              weeksAvailable: _weeksTo(persona.answers.raceDate),
+                              weeksAvailable: _weeksTo(
+                                persona.answers.raceDate,
+                              ),
                             ),
                             onSelect: (o) =>
                                 setState(() => _pickedStart = o.startDate),
@@ -273,18 +293,24 @@ class _Toolbar extends StatelessWidget {
   final int index;
   final bool skeleton;
   final bool showSlider;
+  final bool showStart;
   final ValueChanged<int> onPersona;
   final ValueChanged<bool> onSkeleton;
   final ValueChanged<bool> onShowSlider;
+  final ValueChanged<bool> onShowStart;
+  final VoidCallback onShortNotice;
 
   const _Toolbar({
     required this.personas,
     required this.index,
     required this.skeleton,
     required this.showSlider,
+    required this.showStart,
     required this.onPersona,
     required this.onSkeleton,
     required this.onShowSlider,
+    required this.onShowStart,
+    required this.onShortNotice,
   });
 
   @override
@@ -308,6 +334,15 @@ class _Toolbar extends StatelessWidget {
             label: const Text('Runs slider'),
             selected: showSlider,
             onSelected: onShowSlider,
+          ),
+          FilterChip(
+            label: const Text('Plan start'),
+            selected: showStart,
+            onSelected: onShowStart,
+          ),
+          ActionChip(
+            label: const Text('Short notice'),
+            onPressed: onShortNotice,
           ),
           FilterChip(
             label: const Text('Skeleton'),

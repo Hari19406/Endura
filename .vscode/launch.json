@@ -8,6 +8,15 @@
       "toolArgs": [
         "--dart-define-from-file=dart_defines.env"
       ]
+    },
+    {
+      "name": "Dev Launcher",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_dev.dart",
+      "toolArgs": [
+        "--dart-define-from-file=dart_defines.env"
+      ]
     }
   ]
 }
