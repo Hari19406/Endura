@@ -296,6 +296,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int _indexOf(OPage page) => _sequence.indexOf(page);
 
   void _animateTo(int index) {
+    debugPrint('[DBG] _animateTo index=$index total=$_total');
     if (index < 0 || index >= _total) return;
     _ctrl.animateToPage(
       index,
@@ -391,6 +392,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   };
 
   void _next() {
+    debugPrint(
+      '[DBG] _next() current=$_current page=$_currentPage editReturn=$_editReturn total=$_total',
+    );
     if (_editReturn) {
       _resumeFromEdit();
       return;
@@ -423,6 +427,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _onPageChanged(int p) {
+    debugPrint('[DBG] _onPageChanged p=$p page=${_sequence[p]}');
     setState(() => _current = p);
     HapticFeedback.selectionClick();
     Analytics.onboardingStepViewed(_sequence[p].name, p);
@@ -588,6 +593,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// rather than a wall.
   Future<void> _advanceFromRacePicker() async {
     final runway = _runway;
+    debugPrint(
+      '[DBG] _advanceFromRacePicker raceDate=$_raceDate isShortNotice=${runway.isShortNotice} current=$_current',
+    );
     if (_raceDate == null || !runway.isShortNotice) {
       _next();
       return;
