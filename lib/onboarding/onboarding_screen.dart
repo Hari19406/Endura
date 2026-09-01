@@ -893,8 +893,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       OPage.runsPerWeek => OPageRunsPerWeek(
         runsPerWeek: _runsPerWeek,
-        pastMonthKm: _pastMonthKm,
+        baselineWeeklyKm: _baselineWeeklyKm,
         goal: _goal ?? '5k',
+        experienceBridged: _bridgeExperience(_experience),
         onChanged: (n) => setState(() {
           _runsPerWeek = n;
           _selectedDays = TrainingDaysService.defaultsFor(n);
