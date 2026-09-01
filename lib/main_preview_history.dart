@@ -76,7 +76,9 @@ class HistoryPreviewApp extends StatefulWidget {
 }
 
 class _HistoryPreviewAppState extends State<HistoryPreviewApp> {
-  ThemeMode _mode = ThemeMode.dark;
+  // Starts on system so the browser's colour-scheme emulation drives it;
+  // the AppBar toggle still forces a specific theme.
+  ThemeMode _mode = ThemeMode.system;
   bool _empty = false;
   late final List<RunRecord> _records = _sampleRecords();
 
@@ -115,7 +117,7 @@ class _HistoryPreviewAppState extends State<HistoryPreviewApp> {
                   tooltip: 'Toggle theme',
                   icon: Icon(Icons.brightness_6, color: c.textSecondary),
                   onPressed: () => setState(
-                    () => _mode = _mode == ThemeMode.dark
+                    () => _mode = Theme.of(context).brightness == Brightness.dark
                         ? ThemeMode.light
                         : ThemeMode.dark,
                   ),

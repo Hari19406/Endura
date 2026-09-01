@@ -186,7 +186,9 @@ class PlanProjection {
       now: now,
     );
 
-    final days = a.selectedDays.isNotEmpty ? a.selectedDays : const [0, 1, 2, 3];
+    final days = a.selectedDays.isNotEmpty
+        ? a.selectedDays
+        : const [0, 1, 2, 3];
 
     final points = <PlanWeekPoint>[];
     final resolutions = <int, WeekResolution>{};

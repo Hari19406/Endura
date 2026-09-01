@@ -11,6 +11,8 @@ import '../../services/analytics_service.dart';
 import 'onboarding_pages.dart';
 import 'plan_reveal_data.dart';
 import 'plan_reveal_page.dart';
+import 'plan_runway.dart';
+import 'short_notice_sheet.dart';
 import '../../models/training_phase.dart';
 
 class EC {
@@ -413,9 +415,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
     int prev = _current - 1;
-    if (prev >= 0 &&
-        _sequence[prev] == OPage.targetTime &&
-        !_needsTargetTime) {
+    if (prev >= 0 && _sequence[prev] == OPage.targetTime && !_needsTargetTime) {
       prev--;
     }
     _animateTo(prev);
@@ -552,6 +552,62 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── Plan-start options ───────────────────────────────────────────────────
 
+  // ── Runway ───────────────────────────────────────────────────────────────
+
+  DateTime get _today {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  int get _weeksToRace {
+    final race = _raceDate;
+    if (race == null) return _effectivePlanWeeks;
+    return max(0, race.difference(_today).inDays ~/ 7);
+  }
+
+  PlanRunway get _runway =>
+      PlanRunway.resolve(goal: _goal ?? '5k', weeksAvailable: _weeksToRace);
+
+  /// Race picked. If it is too close to build real fitness for, say so before
+  /// the athlete invests ten more screens in it — and offer a better path
+  /// rather than a wall.
+  Future<void> _advanceFromRacePicker() async {
+    final runway = _runway;
+    if (_raceDate == null || !runway.isShortNotice) {
+      _next();
+      return;
+    }
+
+    Analytics.shortNoticeShown(
+      goal: _goal ?? '5k',
+      weeksAvailable: runway.weeksAvailable,
+    );
+
+    final choice = await showShortNoticeSheet(
+      context,
+      raceName: _raceName ?? 'that race',
+      goal: _goal ?? '5k',
+      runway: runway,
+    );
+    if (!mounted) return;
+
+    // Dismissing the sheet is the same as backing out — never silently
+    // continue with a race we just said was too close.
+    if (choice != ShortNoticeChoice.continueAnyway) {
+      Analytics.shortNoticeChoice('pick_another');
+      setState(() {
+        _raceId = null;
+        _raceName = null;
+        _raceCity = null;
+        _raceDate = null;
+      });
+      return;
+    }
+
+    Analytics.shortNoticeChoice('continue_anyway');
+    _next();
+  }
+
   List<PlanStartOption> _planStartOptions() {
     final today = DateTime(
       DateTime.now().year,
@@ -564,7 +620,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         max(4, race.difference(from).inDays ~/ 7);
 
     // Next Monday strictly after today.
-    final daysToMon = (8 - today.weekday) % 7 == 0 ? 7 : (8 - today.weekday) % 7;
+    final daysToMon = (8 - today.weekday) % 7 == 0
+        ? 7
+        : (8 - today.weekday) % 7;
     final nextMon = today.add(Duration(days: daysToMon));
 
     final wToday = weeksBetween(today);
@@ -833,10 +891,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildPage(OPage page, (int, bool) previewVdot) {
     return switch (page) {
-      OPage.goal => OPageGoal(
-        selected: _goal,
-        onOpenRaceFunnel: _next,
-      ),
+      OPage.goal => OPageGoal(selected: _goal, onOpenRaceFunnel: _next),
 
       OPage.racePicker => OPageRacePicker(
         raceName: _raceName,
@@ -853,7 +908,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           });
         },
         onClose: _prev,
-        onAdvance: _next,
+        onAdvance: _advanceFromRacePicker,
       ),
 
       OPage.experience => OPageExperience(
@@ -933,6 +988,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       OPage.planStart => OPagePlanStart(
         options: _planStartOptions(),
         selectedStart: _planWeeks == null ? null : _startDate,
+        runway: _runway,
+        goal: _goal ?? '5k',
         onSelect: (opt) => setState(() {
           _startDate = opt.startDate;
           _planWeeks = opt.weeks;

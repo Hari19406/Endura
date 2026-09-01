@@ -46,6 +46,13 @@ Future<void> _pump(
   List<RunRecord>? records,
   void Function(RunRecord)? onOpenRun,
 }) async {
+  // The tab is a lazy CustomScrollView: on the default 800x600 test surface
+  // anything below the fold is never built, so give it a tall viewport and
+  // assert against the whole list rather than scrolling between every check.
+  tester.view.physicalSize = const Size(1200, 4000);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.dark,
@@ -164,6 +171,38 @@ void main() {
 
       expect(opened?.id, 3);
       expect(opened?.workoutType, 'long');
+    });
+  });
+
+  group('HistoryTab layout robustness', () {
+    // The hero number, month header and card distance all sit in unflexed
+    // Rows; at a large system text scale they overflowed the card before
+    // maxLines/ellipsis + Flexible were added.
+    testWidgets('does not overflow at a large text scale on a narrow phone', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+            child: Scaffold(
+              body: HistoryTab(
+                records: _records,
+                onRefresh: () async {},
+                onOpenRun: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
     });
   });
 

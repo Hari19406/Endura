@@ -7,6 +7,7 @@ import '../../engines/config/archetype_table.dart';
 import '../../services/race_service.dart';
 import '../../models/race_listing.dart';
 import '../../utils/unit_utils.dart';
+import 'plan_runway.dart';
 import 'volume_guidance.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4855,17 +4856,36 @@ class OPagePlanStart extends StatelessWidget {
   final List<PlanStartOption> options;
   final DateTime? selectedStart;
   final ValueChanged<PlanStartOption> onSelect;
+  final PlanRunway runway;
+  final String goal;
 
   const OPagePlanStart({
     super.key,
     required this.options,
     required this.selectedStart,
     required this.onSelect,
+    required this.runway,
+    required this.goal,
   });
+
+  /// One component, three verdicts — see PlanRunway.
+  String get _subtitle => switch (runway.regime) {
+    RunwayRegime.short =>
+      'Both options land you on race day. With '
+          '${runway.weeksAvailable} weeks we will compress the build.',
+    RunwayRegime.matched =>
+      'You have the runway to do this properly. Starting sooner gives the '
+          'plan more room.',
+    RunwayRegime.surplus =>
+      'You have more time than a ${PlanRunway.labelFor(goal)} build needs, so '
+          'we will open with a base phase rather than make you wait.',
+  };
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final warning = runway.warningFor(goal);
+
+    return SingleChildScrollView(
       padding: ET.pagePad,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4875,9 +4895,7 @@ class OPagePlanStart extends StatelessWidget {
           const SizedBox(height: 8),
           const _Title('When do you want\nto start?'),
           const SizedBox(height: 6),
-          const _Sub(
-            'Both options land you on race day — a later start just means a shorter build.',
-          ),
+          _Sub(_subtitle),
           const SizedBox(height: 28),
           ...options.map((o) {
             final sel =
@@ -4926,6 +4944,17 @@ class OPagePlanStart extends StatelessWidget {
                               fontSize: 12.5,
                             ),
                           ),
+                          const SizedBox(height: 5),
+                          Text(
+                            runway.verdict,
+                            style: TextStyle(
+                              color: runway.regime == RunwayRegime.matched
+                                  ? EC.teal
+                                  : EC.muted,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                       const Spacer(),
@@ -4953,6 +4982,41 @@ class OPagePlanStart extends StatelessWidget {
               ),
             );
           }),
+
+          if (warning != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: EC.amber.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(ET.cardRadius),
+                border: Border.all(color: EC.amber.withOpacity(0.35)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: EC.amber,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      warning,
+                      style: const TextStyle(
+                        color: EC.amber,
+                        fontSize: 12.5,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 32),
         ],
       ),
     );

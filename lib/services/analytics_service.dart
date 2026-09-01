@@ -79,6 +79,20 @@ class Analytics {
     },
   );
 
+  // ── Short-notice interception ─────────────────────────────────────────────
+  static Future<void> shortNoticeShown({
+    required String goal,
+    required int weeksAvailable,
+  }) => capture(
+    'short_notice_shown',
+    properties: {'goal': goal, 'weeks_available': weeksAvailable},
+  );
+
+  /// 'continue_anyway' | 'pick_another'. The split tells us whether the
+  /// interception is genuinely helping or just costing us signups.
+  static Future<void> shortNoticeChoice(String choice) =>
+      capture('short_notice_choice', properties: {'choice': choice});
+
   // ── Plan reveal ───────────────────────────────────────────────────────────
   // Fired once per onboarding run, on the first successful projection — not on
   // every arrival at the reveal, or returning from an edit would inflate it and

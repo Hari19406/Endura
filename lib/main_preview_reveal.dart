@@ -146,11 +146,39 @@ class RevealPreviewApp extends StatefulWidget {
   State<RevealPreviewApp> createState() => _RevealPreviewAppState();
 }
 
+enum _Screen { reveal, slider, planStart }
+
 class _RevealPreviewAppState extends State<RevealPreviewApp> {
   int _index = 0;
   bool _skeleton = false;
-  bool _showSlider = false;
+  _Screen _screen = _Screen.reveal;
   int _runs = 4;
+  DateTime? _pickedStart;
+
+  bool get _showSlider => _screen == _Screen.slider;
+
+  int _weeksTo(DateTime race) {
+    final n = DateTime.now();
+    final today = DateTime(n.year, n.month, n.day);
+    final w = race.difference(today).inDays ~/ 7;
+    return w < 0 ? 0 : w;
+  }
+
+  List<PlanStartOption> _startOptions(OnboardingAnswers a) {
+    final n = DateTime.now();
+    final today = DateTime(n.year, n.month, n.day);
+    final toMon = (8 - today.weekday) % 7 == 0 ? 7 : (8 - today.weekday) % 7;
+    final nextMon = today.add(Duration(days: toMon));
+    final wToday = _weeksTo(a.raceDate);
+    return [
+      PlanStartOption(startDate: today, weeks: wToday, isToday: true),
+      PlanStartOption(
+        startDate: nextMon,
+        weeks: wToday > 1 ? wToday - 1 : wToday,
+        isToday: false,
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +223,7 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                     // Roughly a phone, so overflow shows up here rather than
                     // on device.
                     constraints: const BoxConstraints(maxWidth: 420),
-                    child: _showSlider
+                    child: _screen == _Screen.slider
                         ? OPageRunsPerWeek(
                             runsPerWeek: _runs,
                             baselineWeeklyKm: persona.answers.baselineWeeklyKm,
@@ -203,6 +231,18 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                             experienceBridged:
                                 persona.answers.experienceBridged,
                             onChanged: (n) => setState(() => _runs = n),
+                          )
+                        : _screen == _Screen.planStart
+                        ? OPagePlanStart(
+                            options: _startOptions(persona.answers),
+                            selectedStart: _pickedStart,
+                            goal: persona.answers.goal,
+                            runway: PlanRunway.resolve(
+                              goal: persona.answers.goal,
+                              weeksAvailable: _weeksTo(persona.answers.raceDate),
+                            ),
+                            onSelect: (o) =>
+                                setState(() => _pickedStart = o.startDate),
                           )
                         : OPagePlanReveal(
                             key: ValueKey('$_index-$_skeleton'),

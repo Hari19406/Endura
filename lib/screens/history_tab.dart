@@ -233,14 +233,18 @@ class _HistoryTabState extends State<HistoryTab> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                distance.toStringAsFixed(1),
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: c.textPrimary,
-                  letterSpacing: -1,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              Flexible(
+                child: Text(
+                  distance.toStringAsFixed(1),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary,
+                    letterSpacing: -1,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -469,6 +473,8 @@ class _HistoryTabState extends State<HistoryTab> {
             child: Text(
               '${_monthName(section.month.month)} ${section.month.year}'
                   .toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -477,14 +483,19 @@ class _HistoryTabState extends State<HistoryTab> {
               ),
             ),
           ),
-          Text(
-            '$count ${count == 1 ? 'run' : 'runs'}  ·  '
-            '${dist.toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
-            style: TextStyle(
-              fontSize: 11,
-              color: c.textTertiary,
-              fontWeight: FontWeight.w500,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          Flexible(
+            child: Text(
+              '$count ${count == 1 ? 'run' : 'runs'}  ·  '
+              '${dist.toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 11,
+                color: c.textTertiary,
+                fontWeight: FontWeight.w500,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
@@ -542,6 +553,9 @@ class _HistoryTabState extends State<HistoryTab> {
         height: 64,
         decoration: BoxDecoration(
           color: c.surfaceAlt,
+          // surfaceAlt is near-white in the light palette, so without a
+          // border the tile disappears into the card and the trace floats.
+          border: Border.all(color: c.border),
           borderRadius: BorderRadius.circular(6),
         ),
         child: hasRoute
@@ -577,29 +591,38 @@ class _HistoryTabState extends State<HistoryTab> {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                typeLabel.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: typeColor,
-                  letterSpacing: 0.6,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: typeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  typeLabel.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: typeColor,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
-            Text(
-              _formatDate(record.date),
-              style: TextStyle(
-                fontSize: 12,
-                color: c.textTertiary,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _formatDate(record.date),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: c.textTertiary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -612,6 +635,8 @@ class _HistoryTabState extends State<HistoryTab> {
               child: Text(
                 '${UnitUtils.displayDistance(record.distanceKm, _useMiles).toStringAsFixed(1)} '
                 '${UnitUtils.unitLabel(_useMiles)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -680,12 +705,16 @@ class _HistoryTabState extends State<HistoryTab> {
         // Decorative: the adjacent text already carries the meaning.
         ExcludeSemantics(child: Icon(icon, size: 13, color: c.textTertiary)),
         const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: c.textSecondary,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: c.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
