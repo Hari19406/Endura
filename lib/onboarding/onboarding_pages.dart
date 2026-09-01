@@ -6,6 +6,8 @@ import 'onboarding_screen.dart' show EC, ET;
 import '../../engines/config/archetype_table.dart';
 import '../../services/race_service.dart';
 import '../../models/race_listing.dart';
+import '../../utils/unit_utils.dart';
+import 'volume_guidance.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED WIDGETS
@@ -463,65 +465,65 @@ class _ComingSoonRow extends StatelessWidget {
         opacity: 0.5,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-        decoration: BoxDecoration(
-          color: EC.surface,
-          borderRadius: BorderRadius.circular(ET.cardRadius),
-          border: Border.all(color: EC.border, width: ET.borderWidth),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10),
+          decoration: BoxDecoration(
+            color: EC.surface,
+            borderRadius: BorderRadius.circular(ET.cardRadius),
+            border: Border.all(color: EC.border, width: ET.borderWidth),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconFg, size: 20),
               ),
-              child: Icon(icon, color: iconFg, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: EC.textPrimary,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: EC.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    sub,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: EC.textSecondary,
+                    const SizedBox(height: 3),
+                    Text(
+                      sub,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: EC.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: EC.surface2,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: EC.border, width: ET.borderWidth),
-              ),
-              child: const Text(
-                'Coming soon',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: EC.muted,
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: EC.surface2,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: EC.border, width: ET.borderWidth),
+                ),
+                child: const Text(
+                  'Coming soon',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: EC.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3359,13 +3361,14 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
     return null;
   }
 
-  List<String> get _cities => _all
-      .map((r) => r.city)
-      .whereType<String>()
-      .where((c) => c.trim().isNotEmpty)
-      .toSet()
-      .toList()
-    ..sort();
+  List<String> get _cities =>
+      _all
+          .map((r) => r.city)
+          .whereType<String>()
+          .where((c) => c.trim().isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
 
   List<RaceListing> get _filtered {
     final q = _query.trim().toLowerCase();
@@ -3654,11 +3657,7 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
               ),
             ),
             const SizedBox(width: 12),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: EC.muted,
-              size: 24,
-            ),
+            const Icon(Icons.chevron_right_rounded, color: EC.muted, size: 24),
           ],
         ),
       ),
@@ -3790,7 +3789,10 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
                       decoration: BoxDecoration(
                         color: EC.surface2,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: EC.border, width: ET.borderWidth),
+                        border: Border.all(
+                          color: EC.border,
+                          width: ET.borderWidth,
+                        ),
                       ),
                       child: Text(
                         c.$2,
@@ -4088,7 +4090,10 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
               hintText: 'e.g. Bengaluru Marathon',
               hintStyle: TextStyle(color: EC.muted, fontSize: 14),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 14,
+              ),
             ),
           ),
         ),
@@ -4113,9 +4118,7 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  _manualDate == null
-                      ? 'Pick a date'
-                      : _fmtDate(_manualDate!),
+                  _manualDate == null ? 'Pick a date' : _fmtDate(_manualDate!),
                   style: TextStyle(
                     color: _manualDate == null ? EC.muted : EC.textPrimary,
                     fontSize: 14,
@@ -4482,17 +4485,11 @@ class OPageTargetTime extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                Expanded(
-                  child: _drum('HH', 8, _h, (v) => _emit(h: v)),
-                ),
+                Expanded(child: _drum('HH', 8, _h, (v) => _emit(h: v))),
                 _colon(),
-                Expanded(
-                  child: _drum('MM', 60, _m, (v) => _emit(m: v)),
-                ),
+                Expanded(child: _drum('MM', 60, _m, (v) => _emit(m: v))),
                 _colon(),
-                Expanded(
-                  child: _drum('SS', 60, _s, (v) => _emit(s: v)),
-                ),
+                Expanded(child: _drum('SS', 60, _s, (v) => _emit(s: v))),
               ],
             ),
           ),
@@ -4513,12 +4510,7 @@ class OPageTargetTime extends StatelessWidget {
     ),
   );
 
-  Widget _drum(
-    String label,
-    int count,
-    int selected,
-    ValueChanged<int> onSel,
-  ) {
+  Widget _drum(String label, int count, int selected, ValueChanged<int> onSel) {
     return Column(
       children: [
         Text(
@@ -4581,147 +4573,278 @@ class OPageTargetTime extends StatelessWidget {
 
 class OPageRunsPerWeek extends StatelessWidget {
   final int runsPerWeek;
-  final double pastMonthKm;
+  final double baselineWeeklyKm;
   final String goal;
+  final String experienceBridged;
   final ValueChanged<int> onChanged;
 
   const OPageRunsPerWeek({
     super.key,
     required this.runsPerWeek,
-    required this.pastMonthKm,
+    required this.baselineWeeklyKm,
     required this.goal,
+    required this.experienceBridged,
     required this.onChanged,
   });
 
-  ({int lo, int hi}) get _weeklyRange {
-    final base = pastMonthKm > 0 ? pastMonthKm / 4.345 : runsPerWeek * 8.0;
-    var lo = (base * 0.85).round();
-    var hi = (base * 1.15).round();
-    if (lo < runsPerWeek * 4) lo = runsPerWeek * 4;
-    if (hi <= lo) hi = lo + runsPerWeek * 3;
-    return (lo: lo, hi: hi);
-  }
-
-  int get _workoutDays => runsPerWeek >= 5 ? 2 : 1;
-
   @override
   Widget build(BuildContext context) {
-    final r = _weeklyRange;
-    return Padding(
-      padding: ET.pagePad,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 32),
-          const _Label('Your week'),
-          const SizedBox(height: 8),
-          const _Title('How many days a\nweek can you run?'),
-          const SizedBox(height: 6),
-          const _Sub('Pick what fits your life — you can adjust this later.'),
-          const SizedBox(height: 36),
-          Center(
-            child: Text(
-              '$runsPerWeek days',
-              style: const TextStyle(
-                color: EC.textPrimary,
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
+    final g = VolumeGuidance.resolve(
+      goal: goal,
+      experienceBridged: experienceBridged,
+      baselineWeeklyKm: baselineWeeklyKm,
+      selectedRuns: runsPerWeek,
+    );
+
+    // The ceiling moves with the athlete's base, so it can land on the floor.
+    final locked = g.maxRuns <= kMinRunsPerWeek;
+    final atRecommended = runsPerWeek == g.recommendedRuns;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: UnitUtils.useMilesNotifier,
+      builder: (context, useMiles, _) {
+        final unit = UnitUtils.unitLabel(useMiles);
+        final lo = UnitUtils.displayDistance(
+          g.loKm.toDouble(),
+          useMiles,
+        ).round();
+        final hi = UnitUtils.displayDistance(
+          g.hiKm.toDouble(),
+          useMiles,
+        ).round();
+
+        return SingleChildScrollView(
+          padding: ET.pagePad,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 32),
+              const _Label('Your week'),
+              const SizedBox(height: 8),
+              const _Title('How many days a\nweek can you run?'),
+              const SizedBox(height: 6),
+              const _Sub(
+                'This sets your weekly volume. We build up from what you run '
+                'now, so pick what fits your life.',
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: EC.teal,
-              inactiveTrackColor: EC.surface2,
-              thumbColor: EC.teal,
-              overlayColor: EC.teal.withOpacity(0.15),
-              trackHeight: 4,
-            ),
-            child: Slider(
-              value: runsPerWeek.toDouble(),
-              min: 3,
-              max: 7,
-              divisions: 4,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                onChanged(v.round());
-              },
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('3', style: TextStyle(color: EC.muted, fontSize: 12)),
-                Text('7', style: TextStyle(color: EC.muted, fontSize: 12)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: EC.surface,
-              borderRadius: BorderRadius.circular(ET.cardRadius),
-              border: Border.all(color: EC.border, width: ET.borderWidth),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'YOUR PLAN AT A GLANCE',
-                  style: TextStyle(
-                    color: EC.muted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
+              const SizedBox(height: 28),
+
+              SizedBox(
+                height: 26,
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: atRecommended ? 1 : 0,
+                    duration: const Duration(milliseconds: 160),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: EC.teal.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star_rounded, size: 13, color: EC.teal),
+                          SizedBox(width: 5),
+                          Text(
+                            'RECOMMENDED',
+                            style: TextStyle(
+                              color: EC.teal,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                _row(
-                  Icons.route_outlined,
-                  'Weekly distance',
-                  '~${r.lo}–${r.hi} km',
+              ),
+              const SizedBox(height: 6),
+              Center(
+                child: Text(
+                  '$runsPerWeek days',
+                  style: const TextStyle(
+                    color: EC.textPrimary,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                _row(
-                  Icons.calendar_month_outlined,
-                  'Runs per week',
-                  '$runsPerWeek',
+              ),
+              const SizedBox(height: 8),
+
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: EC.teal,
+                  inactiveTrackColor: EC.surface2,
+                  thumbColor: EC.teal,
+                  overlayColor: EC.teal.withOpacity(0.15),
+                  trackHeight: 4,
                 ),
-                const SizedBox(height: 10),
-                _row(
-                  Icons.bolt_rounded,
-                  'Hard workouts',
-                  '$_workoutDays of $runsPerWeek runs',
+                child: Slider(
+                  value: runsPerWeek
+                      .clamp(kMinRunsPerWeek, g.maxRuns)
+                      .toDouble(),
+                  min: kMinRunsPerWeek.toDouble(),
+                  max: g.maxRuns.toDouble(),
+                  divisions: locked ? null : g.maxRuns - kMinRunsPerWeek,
+                  onChanged: locked
+                      ? null
+                      : (v) {
+                          HapticFeedback.selectionClick();
+                          onChanged(v.round());
+                        },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '$kMinRunsPerWeek',
+                      style: const TextStyle(color: EC.muted, fontSize: 12),
+                    ),
+                    Text(
+                      '${g.maxRuns}',
+                      style: const TextStyle(color: EC.muted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (g.maxRuns < kMaxRunsPerWeek) ...[
+                const SizedBox(height: 12),
+                _GuidanceNote(
+                  icon: Icons.shield_outlined,
+                  tone: EC.textSecondary,
+                  text:
+                      'Capped at ${g.maxRuns} days for now — that is what your '
+                      'current ${UnitUtils.displayDistance(baselineWeeklyKm, useMiles).round()} '
+                      '$unit a week safely supports. It opens up as you build.',
                 ),
               ],
-            ),
+
+              const SizedBox(height: 26),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: EC.surface,
+                  borderRadius: BorderRadius.circular(ET.cardRadius),
+                  border: Border.all(color: EC.border, width: ET.borderWidth),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'YOUR PLAN AT A GLANCE',
+                      style: TextStyle(
+                        color: EC.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _planRow(
+                      Icons.route_outlined,
+                      'Weekly distance',
+                      '$lo–$hi $unit',
+                    ),
+                    const SizedBox(height: 10),
+                    _planRow(
+                      Icons.calendar_month_outlined,
+                      'Runs per week',
+                      '$runsPerWeek',
+                    ),
+                    const SizedBox(height: 10),
+                    _planRow(
+                      Icons.bolt_rounded,
+                      'Hard workouts',
+                      g.qualitySessions == 0
+                          ? 'None — all easy running'
+                          : '${g.qualitySessions} of $runsPerWeek runs',
+                    ),
+                  ],
+                ),
+              ),
+
+              if (g.isStretch) ...[
+                const SizedBox(height: 14),
+                _GuidanceNote(
+                  icon: Icons.trending_up_rounded,
+                  tone: EC.amber,
+                  text:
+                      'That is a big step up from your recent '
+                      '${UnitUtils.displayDistance(baselineWeeklyKm, useMiles).round()} '
+                      '$unit a week. We will ramp you into it gradually.',
+                ),
+              ],
+              const SizedBox(height: 32),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _row(IconData icon, String label, String value) => Row(
+  Widget _planRow(IconData icon, String label, String value) => Row(
     children: [
       Icon(icon, size: 16, color: EC.teal),
       const SizedBox(width: 10),
-      Text(label, style: const TextStyle(color: EC.textSecondary, fontSize: 13)),
-      const Spacer(),
       Text(
-        value,
-        style: const TextStyle(
-          color: EC.textPrimary,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
+        label,
+        style: const TextStyle(color: EC.textSecondary, fontSize: 13),
+      ),
+      const Spacer(),
+      Flexible(
+        child: Text(
+          value,
+          textAlign: TextAlign.right,
+          style: const TextStyle(
+            color: EC.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     ],
   );
+}
+
+/// Small inline note used for the safety cap and the stretch warning.
+class _GuidanceNote extends StatelessWidget {
+  final IconData icon;
+  final Color tone;
+  final String text;
+
+  const _GuidanceNote({
+    required this.icon,
+    required this.tone,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: tone),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: tone, fontSize: 12, height: 1.45),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4812,9 +4935,7 @@ class OPagePlanStart extends StatelessWidget {
                           vertical: 7,
                         ),
                         decoration: BoxDecoration(
-                          color: sel
-                              ? EC.teal.withOpacity(0.15)
-                              : EC.surface2,
+                          color: sel ? EC.teal.withOpacity(0.15) : EC.surface2,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
