@@ -609,7 +609,26 @@ class ArchetypeTable {
         moved = true;
         break;
       }
-      if (!moved) break; // fully clamped — nothing more we can do
+
+      if (moved) continue;
+
+      // Every session is at a soft bound but we still miss tolerance. Bounds
+      // are preferences; the sum guarantee is the contract. Relax onto the
+      // long run first (it is the natural absorber), then the largest easy,
+      // capping the long run at 65% of the week and nothing below its floor.
+      final absorber = mut.firstWhere(
+        (m) => m.type.isLong,
+        orElse: () => ordered.first,
+      );
+      final hardMax = absorber.type.isLong ? 0.65 * wk : (absorber.max + wk);
+      final hardMin = _Floors.forType(absorber.type);
+      final want = _snap(diff.abs(), absorber.step); // close the whole gap
+      if (trimming) {
+        absorber.km = math.max(hardMin, absorber.km - want);
+      } else {
+        absorber.km = math.min(hardMax, absorber.km + want);
+      }
+      break;
     }
   }
 
