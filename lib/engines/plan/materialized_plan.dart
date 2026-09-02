@@ -1,0 +1,293 @@
+/// MaterializedPlan — the whole training plan resolved up front: every week,
+/// every day, every workout with paces. Built by PlanMaterializer at plan
+/// creation and on any input change; read (not recomputed) on app open.
+///
+/// Storage: PlanStore (local cache + Supabase `materialized_plans`). This file
+/// is pure data + JSON — no engine imports beyond the shared models.
+library;
+
+import '../../models/training_phase.dart';
+import '../config/workout_template_library.dart' show ResolvedWorkout, WorkoutIntent;
+
+/// Structural role of a training day. Superset of WeekResolver.SlotType — adds
+/// `mediumLong` so the plan can distinguish a mid-week aerobic run from the
+/// week's single long run.
+enum MaterializedSlot { easy, quality1, quality2, longRun, mediumLong, rest }
+
+extension MaterializedSlotX on MaterializedSlot {
+  bool get isRest => this == MaterializedSlot.rest;
+  bool get isQuality =>
+      this == MaterializedSlot.quality1 || this == MaterializedSlot.quality2;
+  bool get isLongRun => this == MaterializedSlot.longRun;
+}
+
+class DayCompletion {
+  final DateTime completedAt;
+  final double actualKm;
+  final int? actualPaceSecPerKm;
+  final double? rpe;
+  final String? runId;
+
+  const DayCompletion({
+    required this.completedAt,
+    required this.actualKm,
+    this.actualPaceSecPerKm,
+    this.rpe,
+    this.runId,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'completedAt': completedAt.toIso8601String(),
+    'actualKm': actualKm,
+    if (actualPaceSecPerKm != null) 'actualPaceSecPerKm': actualPaceSecPerKm,
+    if (rpe != null) 'rpe': rpe,
+    if (runId != null) 'runId': runId,
+  };
+
+  factory DayCompletion.fromJson(Map<String, dynamic> j) => DayCompletion(
+    completedAt: DateTime.parse(j['completedAt'] as String),
+    actualKm: (j['actualKm'] as num).toDouble(),
+    actualPaceSecPerKm: (j['actualPaceSecPerKm'] as num?)?.toInt(),
+    rpe: (j['rpe'] as num?)?.toDouble(),
+    runId: j['runId'] as String?,
+  );
+}
+
+class MaterializedDay {
+  /// 0 = Monday … 6 = Sunday.
+  final int weekday;
+  final MaterializedSlot slot;
+  final WorkoutIntent? intent;
+  final String? templateId;
+
+  /// 0-based step within the current ladder rung (session-level progression).
+  final int progressionStep;
+
+  /// The fully resolved workout (blocks + paces). Null on a rest day.
+  final ResolvedWorkout? workout;
+
+  /// Set when a run is logged against this day.
+  final DayCompletion? completion;
+
+  const MaterializedDay({
+    required this.weekday,
+    required this.slot,
+    this.intent,
+    this.templateId,
+    this.progressionStep = 0,
+    this.workout,
+    this.completion,
+  });
+
+  bool get isRest => slot.isRest;
+  bool get isCompleted => completion != null;
+  double get plannedKm => workout?.totalDistanceKm ?? 0;
+
+  MaterializedDay copyWith({
+    MaterializedSlot? slot,
+    WorkoutIntent? intent,
+    String? templateId,
+    int? progressionStep,
+    ResolvedWorkout? workout,
+    DayCompletion? completion,
+  }) => MaterializedDay(
+    weekday: weekday,
+    slot: slot ?? this.slot,
+    intent: intent ?? this.intent,
+    templateId: templateId ?? this.templateId,
+    progressionStep: progressionStep ?? this.progressionStep,
+    workout: workout ?? this.workout,
+    completion: completion ?? this.completion,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'weekday': weekday,
+    'slot': slot.name,
+    if (intent != null) 'intent': intent!.name,
+    if (templateId != null) 'templateId': templateId,
+    if (progressionStep != 0) 'progressionStep': progressionStep,
+    if (workout != null) 'workout': workout!.toJson(),
+    if (completion != null) 'completion': completion!.toJson(),
+  };
+
+  factory MaterializedDay.fromJson(Map<String, dynamic> j) => MaterializedDay(
+    weekday: (j['weekday'] as num).toInt(),
+    slot: MaterializedSlot.values.firstWhere(
+      (e) => e.name == j['slot'],
+      orElse: () => MaterializedSlot.rest,
+    ),
+    intent: j['intent'] == null
+        ? null
+        : WorkoutIntent.values.firstWhere(
+            (e) => e.name == j['intent'],
+            orElse: () => WorkoutIntent.aerobicBase,
+          ),
+    templateId: j['templateId'] as String?,
+    progressionStep: (j['progressionStep'] as num?)?.toInt() ?? 0,
+    workout: j['workout'] == null
+        ? null
+        : ResolvedWorkout.fromJson(j['workout'] as Map<String, dynamic>),
+    completion: j['completion'] == null
+        ? null
+        : DayCompletion.fromJson(j['completion'] as Map<String, dynamic>),
+  );
+}
+
+class MaterializedWeek {
+  /// 1-based; matches RacePlan.weeks / WeekTarget.week.
+  final int weekNumber;
+  final TrainingPhase phase;
+
+  /// Effective weekly km after cutback / taper reduction.
+  final double targetKm;
+  final bool isCutback;
+
+  /// A completed week — never recomputed by PlanMaterializer.
+  final bool isFrozen;
+
+  /// Always length 7, index 0 = Monday.
+  final List<MaterializedDay> days;
+
+  const MaterializedWeek({
+    required this.weekNumber,
+    required this.phase,
+    required this.targetKm,
+    required this.isCutback,
+    required this.isFrozen,
+    required this.days,
+  });
+
+  Iterable<MaterializedDay> get trainingDays =>
+      days.where((d) => !d.isRest);
+  double get plannedKm =>
+      days.fold(0.0, (s, d) => s + d.plannedKm);
+  int get qualityCount =>
+      days.where((d) => d.slot.isQuality).length;
+  bool get hasLongRun => days.any((d) => d.slot.isLongRun);
+
+  MaterializedWeek copyWith({
+    TrainingPhase? phase,
+    double? targetKm,
+    bool? isCutback,
+    bool? isFrozen,
+    List<MaterializedDay>? days,
+  }) => MaterializedWeek(
+    weekNumber: weekNumber,
+    phase: phase ?? this.phase,
+    targetKm: targetKm ?? this.targetKm,
+    isCutback: isCutback ?? this.isCutback,
+    isFrozen: isFrozen ?? this.isFrozen,
+    days: days ?? this.days,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'weekNumber': weekNumber,
+    'phase': phase.name,
+    'targetKm': targetKm,
+    'isCutback': isCutback,
+    'isFrozen': isFrozen,
+    'days': days.map((d) => d.toJson()).toList(),
+  };
+
+  factory MaterializedWeek.fromJson(Map<String, dynamic> j) => MaterializedWeek(
+    weekNumber: (j['weekNumber'] as num).toInt(),
+    phase: TrainingPhase.values.firstWhere(
+      (e) => e.name == j['phase'],
+      orElse: () => TrainingPhase.base,
+    ),
+    targetKm: (j['targetKm'] as num).toDouble(),
+    isCutback: j['isCutback'] as bool? ?? false,
+    isFrozen: j['isFrozen'] as bool? ?? false,
+    days: (j['days'] as List)
+        .map((e) => MaterializedDay.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
+}
+
+class MaterializedPlan {
+  /// Schema version of this payload — bump on any breaking shape change.
+  static const int schemaVersion = 1;
+
+  final String planId;
+  final DateTime builtAt;
+
+  /// vDOT the paces were baked from.
+  final int builtFromVdot;
+
+  /// Hash of the inputs the plan was built from (race, date, days, long-run
+  /// day, experience, goal time). A mismatch on load ⇒ the plan is stale ⇒
+  /// re-materialise.
+  final String inputsFingerprint;
+
+  final List<MaterializedWeek> weeks;
+
+  /// Ladder index per intent after the last materialised week.
+  final Map<String, int> ladderState;
+
+  /// Consecutive weeks per intent on the current ladder rung.
+  final Map<String, int> sessionProgress;
+
+  const MaterializedPlan({
+    required this.planId,
+    required this.builtAt,
+    required this.builtFromVdot,
+    required this.inputsFingerprint,
+    required this.weeks,
+    this.ladderState = const {},
+    this.sessionProgress = const {},
+  });
+
+  MaterializedWeek? weekByNumber(int n) {
+    for (final w in weeks) {
+      if (w.weekNumber == n) return w;
+    }
+    return null;
+  }
+
+  int get totalWeeks => weeks.length;
+
+  MaterializedPlan copyWith({
+    List<MaterializedWeek>? weeks,
+    DateTime? builtAt,
+    int? builtFromVdot,
+    String? inputsFingerprint,
+    Map<String, int>? ladderState,
+    Map<String, int>? sessionProgress,
+  }) => MaterializedPlan(
+    planId: planId,
+    builtAt: builtAt ?? this.builtAt,
+    builtFromVdot: builtFromVdot ?? this.builtFromVdot,
+    inputsFingerprint: inputsFingerprint ?? this.inputsFingerprint,
+    weeks: weeks ?? this.weeks,
+    ladderState: ladderState ?? this.ladderState,
+    sessionProgress: sessionProgress ?? this.sessionProgress,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'schemaVersion': schemaVersion,
+    'planId': planId,
+    'builtAt': builtAt.toIso8601String(),
+    'builtFromVdot': builtFromVdot,
+    'inputsFingerprint': inputsFingerprint,
+    'ladderState': ladderState,
+    'sessionProgress': sessionProgress,
+    'weeks': weeks.map((w) => w.toJson()).toList(),
+  };
+
+  factory MaterializedPlan.fromJson(Map<String, dynamic> j) => MaterializedPlan(
+    planId: j['planId'] as String,
+    builtAt: DateTime.parse(j['builtAt'] as String),
+    builtFromVdot: (j['builtFromVdot'] as num).toInt(),
+    inputsFingerprint: j['inputsFingerprint'] as String,
+    ladderState: _intMap(j['ladderState']),
+    sessionProgress: _intMap(j['sessionProgress']),
+    weeks: (j['weeks'] as List)
+        .map((e) => MaterializedWeek.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
+
+  static Map<String, int> _intMap(dynamic raw) {
+    if (raw is! Map) return const {};
+    return raw.map((k, v) => MapEntry(k as String, (v as num).toInt()));
+  }
+}

@@ -668,11 +668,11 @@ class ArchetypeTable {
     int n,
   ) {
     final center = switch (n) {
-      3 => 0.48,
-      4 => 0.44,
-      5 => 0.38,
-      6 => 0.34,
-      _ => 0.30,
+      3 => 0.45,
+      4 => 0.42,
+      5 => 0.36,
+      6 => 0.32,
+      _ => 0.28,
     };
     final raceAdj = switch (race) {
       RaceDistance.fiveK => -0.03,
@@ -695,11 +695,11 @@ class ArchetypeTable {
 
   /// Per-quality-session fraction of the weekly km, before clamping.
   static double _qualityFrac(TrainingPhase phase) => switch (phase) {
-    TrainingPhase.base => 0.12,
-    TrainingPhase.build => 0.16,
-    TrainingPhase.peak => 0.18,
-    TrainingPhase.taper => 0.14,
-    TrainingPhase.maintenance => 0.12,
+    TrainingPhase.base => 0.10,
+    TrainingPhase.build => 0.13,
+    TrainingPhase.peak => 0.15,
+    TrainingPhase.taper => 0.12,
+    TrainingPhase.maintenance => 0.10,
   };
 }
 

@@ -237,6 +237,35 @@ class ResolvedBlock {
   int get targetPace =>
       ((paceMinSecondsPerKm + paceMaxSecondsPerKm) / 2).round();
 
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    'distanceKm': distanceKm,
+    if (durationSeconds != null) 'durationSeconds': durationSeconds,
+    'paceMin': paceMinSecondsPerKm,
+    'paceMax': paceMaxSecondsPerKm,
+    if (isRpeOnly) 'isRpeOnly': true,
+    if (reps != null) 'reps': reps,
+    if (recoverySeconds != null) 'recoverySeconds': recoverySeconds,
+    if (recoveryMeters != null) 'recoveryMeters': recoveryMeters,
+    if (label != null) 'label': label,
+  };
+
+  factory ResolvedBlock.fromJson(Map<String, dynamic> j) => ResolvedBlock(
+    type: BlockType.values.firstWhere(
+      (e) => e.name == j['type'],
+      orElse: () => BlockType.main,
+    ),
+    distanceKm: (j['distanceKm'] as num).toDouble(),
+    durationSeconds: (j['durationSeconds'] as num?)?.toInt(),
+    paceMinSecondsPerKm: (j['paceMin'] as num).toInt(),
+    paceMaxSecondsPerKm: (j['paceMax'] as num).toInt(),
+    isRpeOnly: j['isRpeOnly'] as bool? ?? false,
+    reps: (j['reps'] as num?)?.toInt(),
+    recoverySeconds: (j['recoverySeconds'] as num?)?.toInt(),
+    recoveryMeters: (j['recoveryMeters'] as num?)?.toDouble(),
+    label: j['label'] as String?,
+  );
+
   /// Recovery distance is never counted.
   /// Total = work interval distance × reps only.
   double get totalDistanceKm => distanceKm * (reps ?? 1);
@@ -311,6 +340,32 @@ class ResolvedWorkout {
 
   double get totalDistanceKm =>
       blocks.fold(0.0, (sum, b) => sum + b.totalDistanceKm);
+
+  Map<String, dynamic> toJson() => {
+    'templateId': templateId,
+    'name': name,
+    'intent': intent.name,
+    'phase': phase.name,
+    if (coachNote != null) 'coachNote': coachNote,
+    'blocks': blocks.map((b) => b.toJson()).toList(),
+  };
+
+  factory ResolvedWorkout.fromJson(Map<String, dynamic> j) => ResolvedWorkout(
+    templateId: j['templateId'] as String,
+    name: j['name'] as String,
+    intent: WorkoutIntent.values.firstWhere(
+      (e) => e.name == j['intent'],
+      orElse: () => WorkoutIntent.aerobicBase,
+    ),
+    phase: TrainingPhase.values.firstWhere(
+      (e) => e.name == j['phase'],
+      orElse: () => TrainingPhase.base,
+    ),
+    coachNote: j['coachNote'] as String?,
+    blocks: (j['blocks'] as List)
+        .map((e) => ResolvedBlock.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 
   Duration get estimatedDuration {
     double totalSeconds = 0;
