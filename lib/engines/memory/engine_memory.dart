@@ -52,7 +52,7 @@ class EngineMemory {
   static const int maxRecentTemplateIds = 14;
 
   /// Schema version — bumped to 8 for vdotAtPlanStart drift anchor.
-  static const int _schemaVersion = 8;
+  static const int _schemaVersion = 9;
 
   final int vdotScore;
   final bool vdotIsProvisional;
@@ -105,6 +105,16 @@ class EngineMemory {
   /// Index 0 = bottom rung (easiest). Progresses/regresses with weekly signals.
   final Map<String, int> ladderPositions;
 
+  // ── Materialised plan (schema v9) ────────────────────────────────────────
+  /// Consecutive weeks spent on the current ladder rung, per intent name.
+  /// Drives session-level progression (a rung's workout gets harder each week
+  /// until it maxes out, then the rung advances).
+  final Map<String, int> sessionProgress;
+
+  /// planId of the MaterializedPlan in PlanStore that backs this coaching
+  /// state. Null before the first materialisation.
+  final String? materializedPlanId;
+
   String get lastWorkoutType => lastCompletedType.name;
 
   const EngineMemory({
@@ -140,6 +150,9 @@ class EngineMemory {
     this.weeklyDowngradeCount = 0,
     // v7
     this.ladderPositions = const {},
+    // v9
+    this.sessionProgress = const {},
+    this.materializedPlanId,
   });
 
   bool get hasRacePlan => racePlan != null;
@@ -257,6 +270,9 @@ class EngineMemory {
     'weeklyDowngradeCount': weeklyDowngradeCount,
     // v7
     'ladderPositions': ladderPositions,
+    // v9
+    'sessionProgress': sessionProgress,
+    'materializedPlanId': materializedPlanId,
   };
 
   factory EngineMemory.fromJson(Map<String, dynamic> json) {
@@ -386,6 +402,9 @@ class EngineMemory {
             (json['weeklyDowngradeCount'] as num?)?.toInt() ?? 0,
         // v7 — null-safe for users migrating from v6
         ladderPositions: parseLadderPositions(json['ladderPositions']),
+        // v9 — null-safe for users migrating from v8
+        sessionProgress: parseLadderPositions(json['sessionProgress']),
+        materializedPlanId: json['materializedPlanId'] as String?,
       );
     } catch (_) {
       return defaultSafeMemory();
@@ -435,6 +454,10 @@ class EngineMemory {
     int? weeklyDowngradeCount,
     // v7
     Map<String, int>? ladderPositions,
+    // v9
+    Map<String, int>? sessionProgress,
+    String? materializedPlanId,
+    bool clearMaterializedPlanId = false,
   }) {
     final newTotalRuns = totalRunsCompleted ?? this.totalRunsCompleted;
     final newFirstRunDate = firstRunDate ?? this.firstRunDate;
@@ -494,6 +517,11 @@ class EngineMemory {
       weeklyDowngradeCount: weeklyDowngradeCount ?? this.weeklyDowngradeCount,
       // v7
       ladderPositions: ladderPositions ?? this.ladderPositions,
+      // v9
+      sessionProgress: sessionProgress ?? this.sessionProgress,
+      materializedPlanId: clearMaterializedPlanId
+          ? null
+          : (materializedPlanId ?? this.materializedPlanId),
     );
   }
 }

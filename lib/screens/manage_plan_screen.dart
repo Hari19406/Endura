@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_colors.dart';
 import '../engines/memory/engine_memory_service.dart';
 import '../engines/planner/race_plan_builder.dart';
+import '../engines/plan/plan_materialization_coordinator.dart';
+import '../services/training_days_service.dart';
 
 class ManagePlanScreen extends StatefulWidget {
   final VoidCallback? onPlanChanged;
@@ -59,6 +61,38 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
     await prefs.setString('race_date', _raceDate.toIso8601String());
     await prefs.setString('plan_start_date', originalStart.toIso8601String());
     await prefs.setInt('plan_weeks', newPlan.totalWeeks);
+
+    // Re-materialise the whole plan for the edited inputs. Completed weeks in
+    // the stored plan stay frozen; everything from the current week on is
+    // rebuilt.
+    try {
+      final trainingDays = await TrainingDaysService.loadOrDefault(
+        prefs.getInt('runs_per_week') ?? 4,
+      );
+      final materialized = await PlanMaterializationCoordinator.instance
+          .recompute(
+            skeleton: newPlan,
+            trainingDayIndices: trainingDays,
+            longRunDayIndex: memory.longRunDayIndex,
+            goalRace: _goalRace,
+            experienceLevel:
+                currentPlan?.experienceLevel ?? 'intermediate',
+            vdot: memory.vdotScore,
+            goalTimeSeconds: prefs.getInt('target_finish_seconds') ??
+                prefs.getInt('time_to_beat_seconds'),
+          );
+      if (materialized != null) {
+        await EngineMemoryService().save(
+          (await EngineMemoryService().load()).copyWith(
+            materializedPlanId: materialized.planId,
+            sessionProgress: materialized.sessionProgress,
+            ladderPositions: materialized.ladderState,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[ManagePlan] Re-materialisation error: $e');
+    }
 
     if (mounted) {
       setState(() => _isSaving = false);

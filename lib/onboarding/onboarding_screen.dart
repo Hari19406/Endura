@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/training_days_service.dart';
 import '../../engines/planner/race_plan_builder.dart';
 import '../../engines/memory/engine_memory_service.dart';
+import '../../engines/plan/plan_materialization_coordinator.dart';
 import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
@@ -774,6 +775,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         );
         await EngineMemoryService().saveRacePlan(plan);
         Analytics.planCreated(goal: goalRace, level: exp);
+
+        // Materialise the whole plan up front and persist it (Supabase + local
+        // cache). The runtime reads this instead of re-resolving every open.
+        try {
+          final materialized = await PlanMaterializationCoordinator.instance
+              .buildAndStore(
+                skeleton: plan,
+                trainingDayIndices: _selectedDays,
+                longRunDayIndex: _longRunDayIndex,
+                goalRace: goalRace,
+                experienceLevel: exp,
+                vdot: _vdot,
+                goalTimeSeconds: _targetFinishSec ?? _timeToBeatSec,
+              );
+          await EngineMemoryService().save(
+            (await EngineMemoryService().load()).copyWith(
+              materializedPlanId: materialized.planId,
+              sessionProgress: materialized.sessionProgress,
+              ladderPositions: materialized.ladderState,
+            ),
+          );
+        } catch (e) {
+          debugPrint('[Onboarding] Materialisation error: $e');
+        }
       } catch (e) {
         debugPrint('[Onboarding] Race plan error: $e');
       }
