@@ -1,82 +1,107 @@
 // ignore_for_file: avoid_print
 
-/// Phase 0 — behaviour lock for the session-construction rework.
+/// Phase 0 — behaviour lock (golden characterization test).
 ///
-/// The durable contract today: for a runner who follows the plan (compliant),
-/// sandbags, or over-achieves, the simulator raises ZERO structural warnings.
-/// Only the `skipper` behaviour trips the audit, and those warnings are the
-/// adaptive-progression reshaping this rework is meant to clean up — they are
-/// recorded as a ceiling (count per persona), not pinned exactly.
+/// Freezes the FULL plan the engine produces for every simulator persona under
+/// compliant behaviour: week × day × {phase, slot, intent, templateId,
+/// distance, prescribed pace}. Any change to session construction shows up as a
+/// line-level diff against `goldens/plan_output.txt`.
 ///
-/// When a later phase intentionally moves these numbers, update the maps in the
-/// same commit and say why.
+///   * output identical  → the change was structurally safe
+///   * output differs     → inspect the diff; if intended, regenerate the
+///                          golden (see below) and commit it as the record of
+///                          what changed
+///
+/// Regenerate:  UPDATE_GOLDENS=1 flutter test test/engines/plan_simulator_audit_test.dart
+///
+/// `skipper` / `sandbagger` / `over_achiever` still run in the wider suite for
+/// crash-safety; only the compliant structural output is pinned here.
 library;
+
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/tools/plan_simulator.dart';
 
-void main() {
-  test('non-skipper behaviours raise no simulator warnings', () async {
-    final logs = await PlanSimulator(seed: 42).runAll();
+const _goldenPath = 'test/engines/goldens/plan_output.txt';
 
-    final offenders = <String>[];
-    for (final log in logs) {
-      if (log.behavior.id == 'skipper') continue;
-      if (log.globalWarnings.isNotEmpty) {
-        offenders.add(
-          '${log.persona.id} × ${log.behavior.id}:\n    '
-          '${log.globalWarnings.join('\n    ')}',
-        );
+void main() {
+  test('compliant plan output matches the golden', () async {
+    final logs = await PlanSimulator(seed: 42).runAll(
+      behaviors: [SimBehavior.compliant()],
+    );
+
+    final actual = _render(logs);
+    final file = File(_goldenPath);
+    final update = Platform.environment['UPDATE_GOLDENS'] == '1';
+
+    if (update || !file.existsSync()) {
+      file.parent.createSync(recursive: true);
+      file.writeAsStringSync(actual);
+      print(
+        update
+            ? 'Golden regenerated: $_goldenPath'
+            : 'Golden created: $_goldenPath (first run)',
+      );
+      return;
+    }
+
+    final expected = file.readAsStringSync();
+    if (actual == expected) return;
+
+    // Show the first divergence to make the failure actionable.
+    final a = actual.split('\n');
+    final e = expected.split('\n');
+    final diffs = <String>[];
+    for (var i = 0; i < a.length || i < e.length; i++) {
+      final al = i < a.length ? a[i] : '<eof>';
+      final el = i < e.length ? e[i] : '<eof>';
+      if (al != el) {
+        diffs.add('  line ${i + 1}:\n    golden: $el\n    actual: $al');
+        if (diffs.length >= 15) break;
       }
     }
-
-    expect(
-      offenders,
-      isEmpty,
-      reason: 'compliant/sandbagger/over_achiever must stay clean:\n'
-          '${offenders.join('\n')}',
+    fail(
+      'Plan output changed vs golden ($_goldenPath).\n'
+      'If intended: UPDATE_GOLDENS=1 flutter test ${_goldenPath.replaceFirst('goldens/plan_output.txt', '')}'
+      'plan_simulator_audit_test.dart\n'
+      'First divergences:\n${diffs.join('\n')}',
     );
-  });
-
-  test('skipper warning counts stay within the locked ceiling', () async {
-    final logs = await PlanSimulator(seed: 42).runAll();
-
-    final actual = <String, int>{};
-    for (final log in logs) {
-      if (log.behavior.id != 'skipper') continue;
-      actual[log.persona.id] = log.globalWarnings.length;
-    }
-
-    print('\n===== SKIPPER WARNING COUNTS =====');
-    actual.forEach((k, v) => print('  $k: $v'));
-    print('=================================\n');
-
-    for (final entry in actual.entries) {
-      final ceiling = _skipperCeiling[entry.key];
-      expect(
-        ceiling,
-        isNotNull,
-        reason: 'No ceiling recorded for ${entry.key} — add it to _skipperCeiling',
-      );
-      expect(
-        entry.value,
-        lessThanOrEqualTo(ceiling!),
-        reason: '${entry.key} skipper warnings went UP (${entry.value} > $ceiling)',
-      );
-    }
   });
 }
 
-/// Ceiling (not exact) for `skipper` global-warning count per persona.
-/// Recorded from the pre-rework run on seed 42. Later phases should drive
-/// these DOWN; tighten the numbers when they drop.
-const Map<String, int> _skipperCeiling = {
-  'P1_5K_3day_15km_beginner': 21,
-  'P2_5K_4day_25km_intermediate_highRpe': 15,
-  'P3_10K_5day_40km_intermediate': 17,
-  'P4_10K_6day_80km_advanced': 16,
-  'P5_HM_4day_25km_belowMinViable': 19,
-  'P6_HM_5day_60km_advanced': 16,
-  'P7_FM_5day_35km_belowMinViable': 21,
-  'P8_FM_6day_70km_advanced': 25,
-};
+String _render(List<SimLog> logs) {
+  final buf = StringBuffer();
+  final sorted = [...logs]..sort((x, y) => x.persona.id.compareTo(y.persona.id));
+
+  for (final log in sorted) {
+    buf.writeln('=== ${log.persona.id} ===');
+    for (final week in log.weeks) {
+      buf.writeln(
+        'W${week.weekNumber} ${week.phase.name}'
+        '${week.isCutbackWeek ? ' [cutback]' : ''} '
+        'target=${week.targetKm.toStringAsFixed(1)}km',
+      );
+      for (final s in week.sessions) {
+        buf.writeln(
+          '  ${_day(s.dayOfWeek)} ${s.slotRole.padRight(10)} '
+          '${s.intent.padRight(12)} '
+          '${(s.templateId ?? '-').padRight(24)} '
+          '${s.targetKm.toStringAsFixed(1).padLeft(5)}km '
+          '@ ${_pace(s.prescribedPaceSecPerKm)}',
+        );
+      }
+    }
+    buf.writeln();
+  }
+  return buf.toString();
+}
+
+String _day(int i) =>
+    const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i % 7];
+
+String _pace(double secPerKm) {
+  if (secPerKm <= 0) return 'rpe';
+  final s = secPerKm.round();
+  return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}/km';
+}
