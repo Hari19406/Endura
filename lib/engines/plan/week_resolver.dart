@@ -196,6 +196,10 @@ const Map<WorkoutIntent, List<String>> ladderTemplateIds = {
 // WEEK RESOLVER
 // ============================================================================
 
+/// Templates kept out of the normal easy-day rotation — they exist for
+/// readiness downgrades / explicit use, not week-to-week variety.
+const Set<String> _rotationDenylist = {'recovery_walk_jog', 'recovery_shakeout'};
+
 class WeekResolver {
   const WeekResolver();
 
@@ -417,6 +421,7 @@ class WeekResolver {
           weekNumber: weekNumber,
           recentTemplateIds: recentTemplateIds,
           ladderPositions: mutableLadderPositions,
+          targetKm: kmForDay[weekday] ?? 0,
         );
         templateId = picked;
         mutableLadderPositions.addAll(updatedPositions);
@@ -568,6 +573,7 @@ class WeekResolver {
     required int weekNumber,
     required List<String> recentTemplateIds,
     required Map<String, int> ladderPositions,
+    double targetKm = 0,
   }) {
     var candidates = WorkoutLibrary.forSlot(
       intent: intent,
@@ -597,6 +603,25 @@ class WeekResolver {
         raceDistance: raceDistance,
       );
       return (picked, {intent.name: updatedIndex});
+    }
+
+    // Rotation path (aerobicBase / speed). Two guards, each applied only if it
+    // doesn't empty the pool:
+    //   1. special-purpose templates (walk/jog, shakeout) are for readiness
+    //      substitution, never the normal rotation;
+    //   2. a template whose max distance is below the slot's budget can't cover
+    //      the day (e.g. recovery_walk_jog on a 12 km easy run).
+    final rotatable = candidates
+        .where((t) => !_rotationDenylist.contains(t.id))
+        .toList();
+    if (rotatable.isNotEmpty) candidates = rotatable;
+
+    if (targetKm > 0) {
+      final fit = candidates.where((t) {
+        final max = t.distanceByRace[raceDistance]?.maxKm;
+        return max == null || max >= targetKm * 0.9;
+      }).toList();
+      if (fit.isNotEmpty) candidates = fit;
     }
 
     final picked = _pickByRotation(

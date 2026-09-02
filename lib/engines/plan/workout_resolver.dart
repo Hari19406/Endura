@@ -357,6 +357,7 @@ class WorkoutResolver {
     }
 
     _enforceQualityCap(resolvedBlocks, totalDistanceKm);
+    _fitAerobicVolume(resolvedBlocks, totalDistanceKm, intent, scalingTier);
 
     return ResolvedWorkout(
       templateId: template.id,
@@ -365,6 +366,63 @@ class WorkoutResolver {
       blocks: resolvedBlocks,
       phase: phase,
       coachNote: variant?.note,
+    );
+  }
+
+  /// Aerobic templates (easy / long / medium-long) must actually reach the
+  /// distance the planner budgeted for the day. Some templates have a fixed
+  /// structure (recovery_shakeout = 6×400 m) that ignores the budget entirely;
+  /// stretch or trim the largest distance-based, non-warmup block to close the
+  /// gap. Only runs at full scaling — a readiness cut is meant to fall short.
+  void _fitAerobicVolume(
+    List<ResolvedBlock> blocks,
+    double totalDistanceKm,
+    WorkoutIntent intent,
+    ScalingTier tier,
+  ) {
+    if (tier != ScalingTier.full) return;
+    if (intent != WorkoutIntent.aerobicBase &&
+        intent != WorkoutIntent.endurance) {
+      return;
+    }
+    if (totalDistanceKm <= 0 || blocks.isEmpty) return;
+
+    double total() => blocks.fold(0.0, (s, b) => s + b.totalDistanceKm);
+    final current = total();
+    if (current >= totalDistanceKm * 0.92 &&
+        current <= totalDistanceKm * 1.12) {
+      return;
+    }
+
+    // Pick the block to adjust: the largest by total distance that isn't a
+    // warmup and isn't RPE-only.
+    var idx = -1;
+    var best = -1.0;
+    for (var i = 0; i < blocks.length; i++) {
+      final b = blocks[i];
+      if (b.type == BlockType.warmup || b.isRpeOnly) continue;
+      if (b.totalDistanceKm > best) {
+        best = b.totalDistanceKm;
+        idx = i;
+      }
+    }
+    if (idx < 0) return;
+
+    final b = blocks[idx];
+    final reps = b.reps ?? 1;
+    final delta = (totalDistanceKm - current) / reps;
+    final newPerRep = _roundSmart((b.distanceKm + delta).clamp(0.4, 60.0));
+    blocks[idx] = ResolvedBlock(
+      type: b.type,
+      distanceKm: newPerRep,
+      durationSeconds: b.durationSeconds,
+      paceMinSecondsPerKm: b.paceMinSecondsPerKm,
+      paceMaxSecondsPerKm: b.paceMaxSecondsPerKm,
+      isRpeOnly: b.isRpeOnly,
+      reps: b.reps,
+      recoverySeconds: b.recoverySeconds,
+      recoveryMeters: b.recoveryMeters,
+      label: b.label,
     );
   }
 
@@ -818,10 +876,13 @@ class WorkoutResolver {
     final baseReps = variant?.reps ?? mainBlock.reps!;
     final rawDynamic = (availableKm / repKm).floor();
 
-    // If budget allows more reps, use them. If budget is tight, keep base.
+    // If budget allows more reps, use them. If budget is tight, keep base —
+    // but never demand more than baseReps as the floor (some templates have a
+    // base of 2, below _minIntervalReps).
+    final tightFloor = _minIntervalReps < baseReps ? _minIntervalReps : baseReps;
     final dynamic = rawDynamic >= baseReps
         ? rawDynamic
-        : rawDynamic.clamp(_minIntervalReps, baseReps);
+        : rawDynamic.clamp(tightFloor, baseReps);
 
     if (dynamic != baseReps) {
       scalingAdjustments?.add(
