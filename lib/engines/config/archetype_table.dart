@@ -505,7 +505,10 @@ class ArchetypeTable {
         )
         .toList();
     final weightSum = easyWeights.fold(0.0, (s, w) => s + w);
-    final easyMax = math.max(6.0, 0.22 * wk);
+    // A single easy day carries at most ~20% of the week, and never more than
+    // 20 km absolute — long enough for a genuine mid-week aerobic run at high
+    // mileage, short enough that it never rivals the long run.
+    final easyMax = (0.20 * wk).clamp(8.0, 20.0);
 
     final mut = <_MutSession>[];
     for (var i = 0; i < easyTypes.length; i++) {

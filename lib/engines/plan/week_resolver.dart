@@ -30,16 +30,22 @@ library;
 
 import '../config/workout_template_library.dart';
 import '../config/archetype_table.dart';
+import 'hard_day_planner.dart';
 import '../../models/training_phase.dart';
 import '../../models/race_plan.dart';
 
-enum SlotType { easy, quality1, quality2, longRun, rest }
+enum SlotType { easy, quality1, quality2, longRun, mediumLong, rest }
 
 class DaySlot {
   final int weekday;
   final SlotType slotType;
   final WorkoutIntent? intent;
   final String? templateId;
+
+  /// 0-based step within the current ladder rung (session-level progression).
+  /// Populated from EngineMemory.sessionProgress; consumed by WorkoutResolver.
+  final int progressionStep;
+
   final bool isRest;
   final String label;
   final double? distanceKm;
@@ -49,6 +55,7 @@ class DaySlot {
     required this.slotType,
     this.intent,
     this.templateId,
+    this.progressionStep = 0,
     this.isRest = false,
     this.label = '',
     this.distanceKm,
@@ -59,6 +66,7 @@ class DaySlot {
     slotType: slotType,
     intent: intent,
     templateId: templateId,
+    progressionStep: progressionStep,
     isRest: isRest,
     label: label,
     distanceKm: km,
@@ -66,11 +74,12 @@ class DaySlot {
 
   bool get isTraining => !isRest;
   bool get isQuality =>
-      intent == WorkoutIntent.vo2max ||
-      intent == WorkoutIntent.threshold ||
-      intent == WorkoutIntent.speed ||
-      intent == WorkoutIntent.raceSpecific;
-  bool get isLongRun => intent == WorkoutIntent.endurance;
+      slotType == SlotType.quality1 || slotType == SlotType.quality2;
+
+  /// The week's single longest run. A mediumLong day is endurance-intent too
+  /// but is NOT the long run.
+  bool get isLongRun => slotType == SlotType.longRun;
+  bool get isMediumLong => slotType == SlotType.mediumLong;
   bool get isHard => isQuality || isLongRun;
 
   static const _dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -95,6 +104,11 @@ class WeekResolution {
   /// and pass them back into the next resolve() call.
   final Map<String, int> updatedLadderPositions;
 
+  /// Updated session-progression counters (consecutive weeks per intent on the
+  /// current ladder rung). Echoed unchanged today; PlanMaterializer advances
+  /// them week-to-week (Phase 8).
+  final Map<String, int> updatedSessionProgress;
+
   const WeekResolution({
     required this.days,
     required this.weekNumber,
@@ -102,6 +116,7 @@ class WeekResolution {
     required this.targetKm,
     this.weekPercentageSum = 1.0,
     this.updatedLadderPositions = const {},
+    this.updatedSessionProgress = const {},
   });
 
   DaySlot? slotFor(int weekday) {
@@ -206,6 +221,11 @@ class WeekResolver {
     /// Ladder positions from previous week — keyed by intent name.
     /// Pass EngineMemory.ladderPositions here each call.
     Map<String, int> ladderPositions = const {},
+
+    /// Session-progression counters (consecutive weeks per intent on the current
+    /// ladder rung). Pass EngineMemory.sessionProgress. Echoed back unchanged
+    /// today — PlanMaterializer advances them (Phase 8).
+    Map<String, int> sessionProgress = const {},
   }) {
     final sorted = List<int>.from(trainingDayIndices)..sort();
     final n = sorted.length;
@@ -241,35 +261,124 @@ class WeekResolver {
       effectiveKm = currentWeeklyKm;
     }
 
-    // ── Step 2: Build archetype week ──────────────────────────────────────
-    final archetype = ArchetypeTable.build(
-      weeklyKm: effectiveKm,
-      days: n,
-      experience: experienceLevel,
-      phase: phase,
-    );
-
-    // ── Step 3: Anchor pattern — physical day assignment ──────────────────
+    // ── Step 2: Quality count + hard-day placement (planner first) ────────
     final lrDay = (longRunDayIndex != null && sorted.contains(longRunDayIndex))
         ? longRunDayIndex
         : sorted.last;
 
-    final slotMap = _anchoredPattern(
-      sorted: sorted,
-      lrDay: lrDay,
-      isCutbackWeek: isCutbackWeek,
+    final qualityCount = HardDayPlanner.qualityCountFor(
+      trainingDays: n,
+      phase: phase,
+      isBeginner: experienceLevel == ExperienceLevel.beginner,
+      isCutback: isCutbackWeek,
+    );
+
+    final placement = const HardDayPlanner().placeHardDays(
+      trainingDayIndices: sorted,
+      longRunDayIndex: lrDay,
+      qualityCount: qualityCount,
       phase: phase,
     );
 
-    // ── Step 4: Assign archetype sessions to physical days ────────────────
-    final archetypeSessions = archetype?.sessions ?? [];
-    final assignedSessions = _assignArchetypeSessions(
-      archetypeSessions: archetypeSessions,
-      slotMap: slotMap,
-      sorted: sorted,
+    // ── Step 3: Size the week (bounded allocation) ───────────────────────
+    // Scale the skeleton's un-reduced long-run target down in step with the
+    // cutback / taper reduction, then let allocate() clamp it to bounds.
+    final lrScale = weekTarget.targetKm > 0
+        ? (effectiveKm / weekTarget.targetKm)
+        : 1.0;
+    final lrTarget =
+        weekTarget.longRunKm > 0 ? weekTarget.longRunKm * lrScale : null;
+
+    final archetype = ArchetypeTable.allocate(
+      effectiveKm: effectiveKm,
+      days: n,
+      qualityCount: placement.resolvedQualityCount,
+      experience: experienceLevel,
+      phase: phase,
+      raceDistance: raceDistance,
+      longRunKmTarget: lrTarget,
+      allowMediumLong: !isCutbackWeek,
     );
 
-    // ── Step 5: Build DaySlot list, collecting ladder updates ─────────────
+    // ── Step 4: Physical slot map from the placement ────────────────────
+    final slotMap = <int, SlotType>{};
+    placement.roles.forEach((day, role) {
+      slotMap[day] = switch (role) {
+        HardDayRole.longRun => SlotType.longRun,
+        HardDayRole.quality1 => SlotType.quality1,
+        HardDayRole.quality2 => SlotType.quality2,
+        HardDayRole.easy => SlotType.easy,
+      };
+    });
+
+    // Promote the easy day furthest from the long run to mediumLong, if the
+    // archetype produced one.
+    if (archetype.hasMediumLong) {
+      final easyDays =
+          slotMap.entries
+              .where((e) => e.value == SlotType.easy)
+              .map((e) => e.key)
+              .toList()
+            ..sort(
+              (a, b) => _cyclicFromLr(
+                b,
+                lrDay,
+              ).compareTo(_cyclicFromLr(a, lrDay)),
+            );
+      if (easyDays.isNotEmpty) slotMap[easyDays.first] = SlotType.mediumLong;
+    }
+
+    // ── Step 5: Bind archetype session km to slots by role ──────────────
+    final longKm = archetype.sessions
+        .where((s) => s.type.isLong)
+        .map((s) => s.effectiveKm)
+        .toList();
+    final mlKm = archetype.sessions
+        .where((s) => s.type.isMediumLong)
+        .map((s) => s.effectiveKm)
+        .toList();
+    final qKm = archetype.sessions
+        .where((s) => s.type.isQuality)
+        .map((s) => s.effectiveKm)
+        .toList();
+    final easyKm = archetype.sessions
+        .where((s) => s.type.isEasy)
+        .map((s) => s.effectiveKm)
+        .toList();
+
+    final kmForDay = <int, double>{};
+    // Quality days in Q1 → Q2 order (cyclic offset from the long run).
+    final qDays =
+        slotMap.entries
+            .where(
+              (e) =>
+                  e.value == SlotType.quality1 ||
+                  e.value == SlotType.quality2,
+            )
+            .map((e) => e.key)
+            .toList()
+          ..sort(
+            (a, b) =>
+                _cyclicFromLr(a, lrDay).compareTo(_cyclicFromLr(b, lrDay)),
+          );
+    for (var i = 0; i < qDays.length && i < qKm.length; i++) {
+      kmForDay[qDays[i]] = qKm[i];
+    }
+    var ei = 0;
+    for (final d in sorted) {
+      switch (slotMap[d]) {
+        case SlotType.longRun:
+          if (longKm.isNotEmpty) kmForDay[d] = longKm.first;
+        case SlotType.mediumLong:
+          if (mlKm.isNotEmpty) kmForDay[d] = mlKm.first;
+        case SlotType.easy:
+          if (ei < easyKm.length) kmForDay[d] = easyKm[ei++];
+        default:
+          break;
+      }
+    }
+
+    // ── Step 6: Build DaySlot list, collecting ladder updates ───────────
     final mutableLadderPositions = Map<String, int>.from(ladderPositions);
 
     final slots = <DaySlot>[];
@@ -288,22 +397,31 @@ class WeekResolver {
         continue;
       }
 
-      final archetypeSession = assignedSessions[weekday];
-      // Intent always comes from the slot pattern, never from the archetype
-      // session type. The archetype only provides per-session distance.
-      final intent = _slotTypeToIntent(slotType, raceDistance, phase);
-
-      final (templateId, updatedPositions) = _pickTemplate(
-        intent: intent,
-        slotType: slotType,
-        raceDistance: raceDistance,
-        phase: phase,
-        weekNumber: weekNumber,
-        recentTemplateIds: recentTemplateIds,
-        ladderPositions: mutableLadderPositions,
+      final intent = _slotTypeToIntent(
+        slotType,
+        raceDistance,
+        phase,
+        experienceLevel,
       );
 
-      mutableLadderPositions.addAll(updatedPositions);
+      // A mediumLong always uses the dedicated template; everything else goes
+      // through the phase/race ladder.
+      String? templateId;
+      if (slotType == SlotType.mediumLong) {
+        templateId = 'medium_long_run';
+      } else {
+        final (picked, updatedPositions) = _pickTemplate(
+          intent: intent,
+          slotType: slotType,
+          raceDistance: raceDistance,
+          phase: phase,
+          weekNumber: weekNumber,
+          recentTemplateIds: recentTemplateIds,
+          ladderPositions: mutableLadderPositions,
+        );
+        templateId = picked;
+        mutableLadderPositions.addAll(updatedPositions);
+      }
 
       slots.add(
         DaySlot(
@@ -311,8 +429,9 @@ class WeekResolver {
           slotType: slotType,
           intent: intent,
           templateId: templateId,
+          progressionStep: sessionProgress[intent.name] ?? 0,
           label: _labelForSlot(slotType),
-          distanceKm: archetypeSession?.effectiveKm,
+          distanceKm: kmForDay[weekday],
         ),
       );
     }
@@ -323,6 +442,8 @@ class WeekResolver {
       'dayCount': n,
       'lrDay': lrDay,
       'isCutback': isCutbackWeek,
+      'qualityCount': placement.resolvedQualityCount,
+      'droppedQ2': placement.droppedQuality,
       'effectiveKm': effectiveKm.toStringAsFixed(1),
       'slots': slots
           .where((s) => s.isTraining)
@@ -341,8 +462,13 @@ class WeekResolver {
       targetKm: effectiveKm,
       weekPercentageSum: 1.0,
       updatedLadderPositions: Map.unmodifiable(mutableLadderPositions),
+      updatedSessionProgress: Map.unmodifiable(
+        Map<String, int>.from(sessionProgress),
+      ),
     );
   }
+
+  static int _cyclicFromLr(int day, int lrDay) => (day - lrDay + 7) % 7;
 
   // ==========================================================================
   // TAPER MULTIPLIER — race-aware progressive volume reduction
@@ -367,153 +493,67 @@ class WeekResolver {
   }
 
   // ==========================================================================
-  // ARCHETYPE SESSION ASSIGNMENT
-  // ==========================================================================
-
-  Map<int, ArchetypeSession> _assignArchetypeSessions({
-    required List<ArchetypeSession> archetypeSessions,
-    required Map<int, SlotType> slotMap,
-    required List<int> sorted,
-  }) {
-    if (archetypeSessions.isEmpty) return {};
-
-    final result = <int, ArchetypeSession>{};
-
-    final qualitySessions = archetypeSessions
-        .where((s) => s.type.isQuality)
-        .toList();
-    final longSessions = archetypeSessions.where((s) => s.type.isLong).toList();
-    final easySessions = archetypeSessions.where((s) => s.type.isEasy).toList();
-
-    int qualityIdx = 0;
-    int longIdx = 0;
-    int easyIdx = 0;
-
-    for (final day in sorted) {
-      final slotType = slotMap[day];
-      if (slotType == null || slotType == SlotType.rest) continue;
-
-      switch (slotType) {
-        case SlotType.longRun:
-          if (longIdx < longSessions.length) {
-            result[day] = longSessions[longIdx++];
-          }
-          break;
-        case SlotType.quality1:
-        case SlotType.quality2:
-          if (qualityIdx < qualitySessions.length) {
-            result[day] = qualitySessions[qualityIdx++];
-          }
-          break;
-        case SlotType.easy:
-          if (easyIdx < easySessions.length) {
-            result[day] = easySessions[easyIdx++];
-          }
-          break;
-        case SlotType.rest:
-          break;
-      }
-    }
-
-    return result;
-  }
-
-  // ==========================================================================
-  // SLOT PATTERN — V5 (cyclic anchor)
+  // INTENT MAPPING — single authority
   //
-  // Non-LR training days are sorted by their CYCLIC distance from the LR day
-  // (i.e. how many days after the LR they fall, wrapping around the week),
-  // then assigned roles by rank:
-  //
-  //   Rank: 0=Easy  1=Q1  2=Easy  3=Q2  4+=Easy
-  //
-  // This naturally gives:
-  //   3-day (2 non-LR): Easy, Q1
-  //   4-day (3 non-LR): Easy, Q1, Easy
-  //   5-day (4 non-LR): Easy, Q1, Easy, Q2
-  //   6-day (5 non-LR): Easy, Q1, Easy, Q2, Easy
-  //
-  // Cutback / taper: rank 3 (Q2) → Easy.  No sessions dropped.
-  // Volume reduction is handled separately by effectiveKm.
-  // ==========================================================================
-
-  Map<int, SlotType> _anchoredPattern({
-    required List<int> sorted,
-    required int lrDay,
-    required bool isCutbackWeek,
-    required TrainingPhase phase,
-  }) {
-    final result = <int, SlotType>{};
-    result[lrDay] = SlotType.longRun;
-
-    // Sort non-LR days by cyclic offset from LR day (1..6).
-    final remaining = sorted.where((d) => d != lrDay).toList()
-      ..sort((a, b) => ((a - lrDay + 7) % 7).compareTo((b - lrDay + 7) % 7));
-
-    final dropQ2 = isCutbackWeek || phase == TrainingPhase.taper;
-
-    for (int i = 0; i < remaining.length; i++) {
-      // Day immediately before LR (cyclic offset 6) must stay Easy —
-      // it buffers the LR the same way offset-1 buffers recovery after it.
-      final isPreLrDay = (remaining[i] - lrDay + 7) % 7 == 6;
-
-      result[remaining[i]] = switch (i) {
-        0 => SlotType.easy,
-        1 => SlotType.quality1,
-        2 => SlotType.easy,
-        3 => (dropQ2 || isPreLrDay) ? SlotType.easy : SlotType.quality2,
-        _ => SlotType.easy,
-      };
-    }
-
-    return result;
-  }
-
-  // ==========================================================================
-  // INTENT MAPPING
+  // Merged from the former WeekResolver._primaryQualityIntent /
+  // _secondaryQualityIntent AND SessionSelector._roleToIntent (which
+  // disagreed). Reconciled per the rework decision:
+  //   Q1 build/peak → threshold for HM & FM, vo2max for 5K & 10K.
   // ==========================================================================
 
   WorkoutIntent _slotTypeToIntent(
     SlotType slot,
     RaceDistance raceDistance,
     TrainingPhase phase,
+    ExperienceLevel experience,
   ) {
     return switch (slot) {
       SlotType.easy => WorkoutIntent.aerobicBase,
       SlotType.longRun => WorkoutIntent.endurance,
+      SlotType.mediumLong => WorkoutIntent.endurance,
       // Unreachable — resolve() short-circuits rest slots before this call.
       SlotType.rest => WorkoutIntent.aerobicBase,
-      SlotType.quality1 => _primaryQualityIntent(raceDistance, phase),
-      SlotType.quality2 => _secondaryQualityIntent(raceDistance, phase),
+      SlotType.quality1 => _primaryQualityIntent(raceDistance, phase, experience),
+      SlotType.quality2 =>
+        _secondaryQualityIntent(raceDistance, phase, experience),
     };
   }
 
-  WorkoutIntent _primaryQualityIntent(RaceDistance race, TrainingPhase phase) {
+  WorkoutIntent _primaryQualityIntent(
+    RaceDistance race,
+    TrainingPhase phase,
+    ExperienceLevel experience,
+  ) {
+    // Beginners never do VO2max/speed intervals — threshold work only.
+    if (experience == ExperienceLevel.beginner) return WorkoutIntent.threshold;
     if (phase == TrainingPhase.base || phase == TrainingPhase.taper) {
       return WorkoutIntent.threshold;
     }
+    // build / peak / maintenance.
     return switch (race) {
       RaceDistance.fiveK => WorkoutIntent.vo2max,
       RaceDistance.tenK => WorkoutIntent.vo2max,
       RaceDistance.halfMarathon => WorkoutIntent.threshold,
-      RaceDistance.marathon => WorkoutIntent.vo2max,
+      RaceDistance.marathon => WorkoutIntent.threshold,
     };
   }
 
   WorkoutIntent _secondaryQualityIntent(
     RaceDistance race,
     TrainingPhase phase,
+    ExperienceLevel experience,
   ) {
-    // Base = aerobic development + economy work (Daniels' R-pace/strides
-    // territory), not another interval session — vo2max belongs to build/peak.
+    if (experience == ExperienceLevel.beginner) return WorkoutIntent.threshold;
+    // Base = economy / R-pace work, not a second interval session.
     if (phase == TrainingPhase.base) return WorkoutIntent.speed;
+    // Peak = race-specific sharpening.
     if (phase == TrainingPhase.peak) return WorkoutIntent.raceSpecific;
+    // build / maintenance.
     return switch (race) {
-      // 5K/10K keep layering R-pace/economy work through build.
       RaceDistance.fiveK => WorkoutIntent.speed,
       RaceDistance.tenK => WorkoutIntent.speed,
       RaceDistance.halfMarathon => WorkoutIntent.vo2max,
-      RaceDistance.marathon => WorkoutIntent.threshold,
+      RaceDistance.marathon => WorkoutIntent.vo2max,
     };
   }
 
@@ -646,6 +686,7 @@ class WeekResolver {
     SlotType.quality1 => 'quality 1',
     SlotType.quality2 => 'quality 2',
     SlotType.longRun => 'long run',
+    SlotType.mediumLong => 'medium-long',
     SlotType.rest => 'rest',
   };
 
