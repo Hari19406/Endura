@@ -295,14 +295,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   int _indexOf(OPage page) => _sequence.indexOf(page);
 
-  void _animateTo(int index) {
-    debugPrint('[DBG] _animateTo index=$index total=$_total');
+  // Update _current (and everything gated on it — chrome, haptics, analytics)
+  // only AFTER the page-turn animation has fully settled, never mid-flight.
+  // Belt-and-suspenders alongside the fixed-shape Column below (see the
+  // comment on the Column's `children` in build()): that fix is what actually
+  // keeps the PageView's Element — and therefore _ctrl's ScrollPosition —
+  // alive across every navigation; this just avoids also flipping
+  // _showTopBar/_showBottom while animateToPage's scroll activity is still
+  // active, in case that timing ever matters on some future layout.
+  Future<void> _animateTo(int index) async {
     if (index < 0 || index >= _total) return;
-    _ctrl.animateToPage(
+    await _ctrl.animateToPage(
       index,
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeInOut,
     );
+    if (!mounted) return;
+    setState(() => _current = index);
+    HapticFeedback.selectionClick();
+    Analytics.onboardingStepViewed(_sequence[index].name, index);
+    // Kept here too (on top of _next()'s pre-fetch) — fingerprint-memoized so
+    // a second call is a no-op, and this is the only path that covers
+    // _resumeFromEdit()'s direct _goTo(OPage.review), which never goes
+    // through _next()'s pre-fetch.
+    if (_sequence[index] == OPage.review) _ensureProjection();
   }
 
   void _goTo(OPage page) => _animateTo(_indexOf(page));
@@ -392,9 +408,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   };
 
   void _next() {
-    debugPrint(
-      '[DBG] _next current=$_current editReturn=$_editReturn projKey=$_projectionKey',
-    );
     if (_editReturn) {
       _resumeFromEdit();
       return;
@@ -424,14 +437,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       prev--;
     }
     _animateTo(prev);
-  }
-
-  void _onPageChanged(int p) {
-    debugPrint('[DBG] _onPageChanged p=$p');
-    setState(() => _current = p);
-    HapticFeedback.selectionClick();
-    Analytics.onboardingStepViewed(_sequence[p].name, p);
-    if (_sequence[p] == OPage.review) _ensureProjection();
   }
 
   // ── Plan projection ──────────────────────────────────────────────────────
@@ -593,9 +598,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// rather than a wall.
   Future<void> _advanceFromRacePicker() async {
     final runway = _runway;
-    debugPrint(
-      '[DBG] advanceFromRacePicker raceDate=$_raceDate short=${runway.isShortNotice} current=$_current',
-    );
     if (_raceDate == null || !runway.isShortNotice) {
       _next();
       return;
@@ -817,95 +819,48 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    debugPrint(
-      '[DBG] build() current=$_current page=$_currentPage '
-      'ctrlHasClients=${_ctrl.hasClients} '
-      'ctrlPage=${_ctrl.hasClients ? _ctrl.page : "n/a"} '
-      'ctrlOffset=${_ctrl.hasClients ? _ctrl.offset : "n/a"} '
-      'viewportDim=${_ctrl.hasClients && _ctrl.position.hasViewportDimension ? _ctrl.position.viewportDimension : "n/a"}',
-    );
     return Scaffold(
       backgroundColor: EC.bg,
       body: SafeArea(
         child: Column(
+          // IMPORTANT: the top-bar and bottom-bar slots below are ALWAYS
+          // present as Column children — never `if (...) Widget(...)` in this
+          // list. Column/Flex reconciles children positionally: when an item
+          // is conditionally added or removed, every sibling after it shifts
+          // index, so Flutter compares the WRONG old/new widgets at each
+          // position and — since PageView sits at a different index whenever
+          // the bars toggle — tears down and recreates its Element instead of
+          // updating it in place. That destroys the PageView's ScrollPosition
+          // along with it, silently resetting it to page 0 on the very
+          // transition that's supposed to land on the next question. Keeping
+          // a fixed 3-slot shape (top bar, PageView, bottom bar) and toggling
+          // only each slot's INTERNAL content preserves the PageView's
+          // Element — and therefore _ctrl's scroll position — across every
+          // navigation.
           children: [
-            if (_showTopBar)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 12, 16, 0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _prev();
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 18,
-                          color: EC.textSecondary,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: LinearProgressIndicator(
-                            value: _progress,
-                            minHeight: 3,
-                            backgroundColor: EC.surface2,
-                            valueColor: const AlwaysStoppedAnimation(EC.teal),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 34),
-                  ],
-                ),
-              ),
+            _TopBarSlot(
+              visible: _showTopBar,
+              progress: _progress,
+              onBack: () {
+                HapticFeedback.lightImpact();
+                _prev();
+              },
+            ),
 
             Expanded(
               child: PageView(
                 controller: _ctrl,
-                onPageChanged: _onPageChanged,
                 physics: const NeverScrollableScrollPhysics(),
                 children: _buildPages(),
               ),
             ),
 
-            if (_showBottom)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _canContinue ? _next : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: EC.teal,
-                      foregroundColor: EC.black,
-                      disabledBackgroundColor: EC.surface2,
-                      disabledForegroundColor: EC.muted,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(ET.radius),
-                      ),
-                    ),
-                    child: Text(
-                      // "Done" while editing a single answer from the reveal —
-                      // "Continue" would imply moving forward through the flow.
-                      _editReturn ? 'Done' : 'Continue',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            _BottomBarSlot(
+              visible: _showBottom,
+              enabled: _canContinue,
+              label: _editReturn ? 'Done' : 'Continue',
+              onPressed: _next,
+            ),
           ],
         ),
       ),
@@ -1058,5 +1013,107 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onContinue: widget.onComplete,
       ),
     };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHROME SLOTS
+//
+// Always present as Column children (see build()'s comment on why) — each
+// renders SizedBox.shrink() when hidden, so the visual result is identical to
+// the old `if (...) Widget(...)` approach (zero height, nothing drawn) while
+// keeping the Column's children list a constant length and order.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TopBarSlot extends StatelessWidget {
+  final bool visible;
+  final double progress;
+  final VoidCallback onBack;
+
+  const _TopBarSlot({
+    required this.visible,
+    required this.progress,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!visible) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 16, 0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: onBack,
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: EC.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: EC.surface2,
+                  valueColor: const AlwaysStoppedAnimation(EC.teal),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 34),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomBarSlot extends StatelessWidget {
+  final bool visible;
+  final bool enabled;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _BottomBarSlot({
+    required this.visible,
+    required this.enabled,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!visible) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      child: SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: ElevatedButton(
+          onPressed: enabled ? onPressed : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: EC.teal,
+            foregroundColor: EC.black,
+            disabledBackgroundColor: EC.surface2,
+            disabledForegroundColor: EC.muted,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ET.radius),
+            ),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
   }
 }

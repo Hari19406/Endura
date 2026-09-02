@@ -53,6 +53,8 @@
 ///   FM:  beginner 60 / intermediate 75 / advanced 90
 library;
 
+import 'dart:math' as math;
+
 import '../../models/training_phase.dart';
 import '../config/workout_template_library.dart';
 
@@ -64,6 +66,7 @@ enum ArchetypeSessionType {
   recoveryEasy,
   easy,
   easyMedium,
+  mediumLong,
   tempo,
   interval,
   longRun,
@@ -79,7 +82,13 @@ extension ArchetypeSessionTypeX on ArchetypeSessionType {
       this == ArchetypeSessionType.easy ||
       this == ArchetypeSessionType.easyMedium;
 
+  /// True only for the week's single longest endurance run.
   bool get isLong => this == ArchetypeSessionType.longRun;
+
+  /// A mid-week aerobic run longer than an easy day but shorter than the long
+  /// run. Same intent as the long run; kept distinct so binding + audits can
+  /// tell them apart.
+  bool get isMediumLong => this == ArchetypeSessionType.mediumLong;
 
   WorkoutIntent get intent => switch (this) {
     // All three easy flavours are aerobicBase — this is just a naming
@@ -87,6 +96,7 @@ extension ArchetypeSessionTypeX on ArchetypeSessionType {
     ArchetypeSessionType.recoveryEasy => WorkoutIntent.aerobicBase,
     ArchetypeSessionType.easy => WorkoutIntent.aerobicBase,
     ArchetypeSessionType.easyMedium => WorkoutIntent.aerobicBase,
+    ArchetypeSessionType.mediumLong => WorkoutIntent.endurance,
     ArchetypeSessionType.tempo => WorkoutIntent.threshold,
     ArchetypeSessionType.interval => WorkoutIntent.vo2max,
     ArchetypeSessionType.longRun => WorkoutIntent.endurance,
@@ -104,6 +114,7 @@ class _Floors {
     ArchetypeSessionType.recoveryEasy => 3.0,
     ArchetypeSessionType.easy => 4.0,
     ArchetypeSessionType.easyMedium => 5.0,
+    ArchetypeSessionType.mediumLong => 8.0,
     ArchetypeSessionType.tempo => 5.0,
     ArchetypeSessionType.interval => 5.0,
     ArchetypeSessionType.longRun => 8.0,
@@ -147,6 +158,7 @@ class ArchetypeWeek {
   int get sessionCount => sessions.length;
   int get qualityCount => sessions.where((s) => s.type.isQuality).length;
   bool get hasLongRun => sessions.any((s) => s.type.isLong);
+  bool get hasMediumLong => sessions.any((s) => s.type.isMediumLong);
   double get totalKm => sessions.fold(0.0, (sum, s) => sum + s.effectiveKm);
 }
 
@@ -415,4 +427,275 @@ class ArchetypeTable {
 
   static double _round(double v) => (v * 2).round() / 2; // nearest 0.5km
   static double _roundKm(double v) => v.round().toDouble(); // nearest 1km
+
+  // ==========================================================================
+  // BOUNDED ALLOCATION (v3)
+  //
+  // Deterministic per-session km that SUMS to effectiveKm ± allocationTolerance.
+  // Differences from build():
+  //   - the long run is a BOUNDED absorber in both directions, not "weekly
+  //     minus everything";
+  //   - floors feed a reconciliation pass instead of silently inflating the
+  //     weekly total;
+  //   - quality km is phase-aware (rises base → build → peak);
+  //   - an optional medium-long aerobic run for HM/FM at 5+ days.
+  //
+  // allocate() does NOT decide tempo-vs-interval for quality slots — it emits
+  // ArchetypeSessionType.tempo as a sizing placeholder; WeekResolver assigns the
+  // real intent from the slot pattern.
+  // ==========================================================================
+
+  /// Total |Σ effectiveKm − effectiveKm| is guaranteed ≤ this.
+  static double allocationTolerance(double effectiveKm) =>
+      math.max(1.0, effectiveKm * 0.02);
+
+  static ArchetypeWeek allocate({
+    required double effectiveKm,
+    required int days,
+    required int qualityCount,
+    required ExperienceLevel experience,
+    required TrainingPhase phase,
+    required RaceDistance raceDistance,
+    double? longRunKmTarget,
+    bool allowMediumLong = false,
+  }) {
+    final wk = effectiveKm;
+    if (wk <= 0) return const ArchetypeWeek([]);
+
+    final n = days.clamp(3, 7);
+    final isTaper = phase == TrainingPhase.taper;
+    final qCount = isTaper
+        ? qualityCount.clamp(0, 1)
+        : qualityCount.clamp(0, 2);
+
+    final hasMediumLong =
+        allowMediumLong &&
+        !isTaper &&
+        n >= 5 &&
+        (raceDistance == RaceDistance.halfMarathon ||
+            raceDistance == RaceDistance.marathon);
+
+    final easyCount = (n - 1 - (hasMediumLong ? 1 : 0) - qCount).clamp(0, n);
+    final easyTypes = _easyFlavours(easyCount);
+
+    // ── Bounds ───────────────────────────────────────────────────────────────
+    final (lrMinFrac, lrMaxFrac) = _lrBounds(phase, raceDistance, n);
+    final lrMin = math.max(8.0, lrMinFrac * wk);
+    final lrMax = math.max(lrMin, lrMaxFrac * wk);
+
+    final lrTarget = longRunKmTarget ?? ((lrMinFrac + lrMaxFrac) / 2 * wk);
+    final lrKm = lrTarget.clamp(lrMin, lrMax);
+
+    final mlMax = 0.9 * lrKm;
+    final mlKm = hasMediumLong ? (0.60 * lrKm).clamp(8.0, mlMax) : 0.0;
+
+    final qMin = _Floors.forType(ArchetypeSessionType.tempo);
+    final qMax = math.max(qMin, 0.25 * wk);
+    final qEach = (_qualityFrac(phase) * wk).clamp(qMin, qMax);
+
+    // ── Easy pool ────────────────────────────────────────────────────────────
+    final easyPool = wk - lrKm - mlKm - qEach * qCount;
+    final easyWeights = easyTypes
+        .map(
+          (t) => switch (t) {
+            ArchetypeSessionType.recoveryEasy => 0.78,
+            ArchetypeSessionType.easyMedium => 1.18,
+            _ => 1.0,
+          },
+        )
+        .toList();
+    final weightSum = easyWeights.fold(0.0, (s, w) => s + w);
+    final easyMax = math.max(6.0, 0.22 * wk);
+
+    final mut = <_MutSession>[];
+    for (var i = 0; i < easyTypes.length; i++) {
+      final floor = _Floors.forType(easyTypes[i]);
+      final raw = weightSum > 0
+          ? (easyPool * easyWeights[i] / weightSum)
+          : floor;
+      mut.add(
+        _MutSession(
+          type: easyTypes[i],
+          km: _roundKm(raw.clamp(floor, easyMax)),
+          min: floor,
+          max: math.max(floor, easyMax),
+          step: 1.0,
+        ),
+      );
+    }
+    if (hasMediumLong) {
+      mut.add(
+        _MutSession(
+          type: ArchetypeSessionType.mediumLong,
+          km: _round(mlKm),
+          min: 8.0,
+          max: math.max(8.0, mlMax),
+          step: 0.5,
+        ),
+      );
+    }
+    for (var i = 0; i < qCount; i++) {
+      mut.add(
+        _MutSession(
+          type: ArchetypeSessionType.tempo,
+          km: _round(qEach),
+          min: qMin,
+          max: math.max(qMin, qMax),
+          step: 0.5,
+        ),
+      );
+    }
+    mut.add(
+      _MutSession(
+        type: ArchetypeSessionType.longRun,
+        km: _round(lrKm),
+        min: lrMin,
+        max: lrMax,
+        step: 0.5,
+      ),
+    );
+
+    _reconcile(mut, wk, allocationTolerance(wk));
+
+    return ArchetypeWeek(
+      mut
+          .map(
+            (m) => ArchetypeSession(
+              type: m.type,
+              km: m.km,
+              floorKm: _Floors.forType(m.type),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  // ── Reconciliation ─────────────────────────────────────────────────────────
+  // Drive Σ km to wk ± tol by trimming/growing sessions within their bounds,
+  // in a deliberate priority order so the long run and quality are touched last.
+  static void _reconcile(List<_MutSession> mut, double wk, double tol) {
+    double total() => mut.fold(0.0, (s, m) => s + m.km);
+
+    // Trim order: easy (largest first) → mediumLong → longRun → quality.
+    // Grow order:  longRun → easy → mediumLong → quality.
+    int rank(ArchetypeSessionType t, {required bool trimming}) {
+      final easy = t.isEasy ? 0 : 4;
+      final ml = t.isMediumLong ? 1 : 4;
+      final lr = t.isLong ? (trimming ? 2 : 0) : 4;
+      final q = t.isQuality ? 3 : 4;
+      final base = math.min(math.min(easy, ml), math.min(lr, q));
+      return trimming ? base : (t.isLong ? 0 : base + 1);
+    }
+
+    for (var iter = 0; iter < 500; iter++) {
+      final diff = total() - wk;
+      if (diff.abs() <= tol) break;
+      final trimming = diff > 0;
+
+      final ordered = [...mut]..sort((a, b) {
+        final r = rank(a.type, trimming: trimming)
+            .compareTo(rank(b.type, trimming: trimming));
+        if (r != 0) return r;
+        return trimming ? b.km.compareTo(a.km) : a.km.compareTo(b.km);
+      });
+
+      var moved = false;
+      for (final m in ordered) {
+        final room = trimming ? (m.km - m.min) : (m.max - m.km);
+        if (room < m.step) continue;
+        final want = (diff.abs() - tol);
+        final delta = math.min(room, math.max(m.step, _snap(want, m.step)));
+        m.km = trimming ? m.km - delta : m.km + delta;
+        moved = true;
+        break;
+      }
+      if (!moved) break; // fully clamped — nothing more we can do
+    }
+  }
+
+  static double _snap(double v, double step) => (v / step).round() * step;
+
+  static List<ArchetypeSessionType> _easyFlavours(int count) => switch (count) {
+    <= 0 => const [],
+    1 => const [ArchetypeSessionType.easy],
+    2 => const [
+      ArchetypeSessionType.recoveryEasy,
+      ArchetypeSessionType.easyMedium,
+    ],
+    3 => const [
+      ArchetypeSessionType.recoveryEasy,
+      ArchetypeSessionType.easy,
+      ArchetypeSessionType.easyMedium,
+    ],
+    4 => const [
+      ArchetypeSessionType.recoveryEasy,
+      ArchetypeSessionType.easy,
+      ArchetypeSessionType.easy,
+      ArchetypeSessionType.easyMedium,
+    ],
+    _ => const [
+      ArchetypeSessionType.recoveryEasy,
+      ArchetypeSessionType.easy,
+      ArchetypeSessionType.easy,
+      ArchetypeSessionType.easy,
+      ArchetypeSessionType.easyMedium,
+    ],
+  };
+
+  /// (minFraction, maxFraction) of the weekly km the long run may occupy.
+  static (double, double) _lrBounds(
+    TrainingPhase phase,
+    RaceDistance race,
+    int n,
+  ) {
+    final center = switch (n) {
+      3 => 0.48,
+      4 => 0.44,
+      5 => 0.38,
+      6 => 0.34,
+      _ => 0.30,
+    };
+    final raceAdj = switch (race) {
+      RaceDistance.fiveK => -0.03,
+      RaceDistance.tenK => -0.01,
+      RaceDistance.halfMarathon => 0.0,
+      RaceDistance.marathon => 0.02,
+    };
+    final phaseAdj = switch (phase) {
+      TrainingPhase.base => -0.02,
+      TrainingPhase.build => 0.0,
+      TrainingPhase.peak => 0.02,
+      TrainingPhase.taper => 0.0,
+      TrainingPhase.maintenance => -0.02,
+    };
+    final c = (center + raceAdj + phaseAdj).clamp(0.22, 0.52);
+    final minFrac = (c - 0.08).clamp(0.18, c);
+    final maxFrac = (c + 0.08).clamp(c, 0.55);
+    return (minFrac, maxFrac);
+  }
+
+  /// Per-quality-session fraction of the weekly km, before clamping.
+  static double _qualityFrac(TrainingPhase phase) => switch (phase) {
+    TrainingPhase.base => 0.12,
+    TrainingPhase.build => 0.16,
+    TrainingPhase.peak => 0.18,
+    TrainingPhase.taper => 0.14,
+    TrainingPhase.maintenance => 0.12,
+  };
+}
+
+class _MutSession {
+  final ArchetypeSessionType type;
+  double km;
+  final double min;
+  final double max;
+  final double step;
+
+  _MutSession({
+    required this.type,
+    required this.km,
+    required this.min,
+    required this.max,
+    required this.step,
+  });
 }

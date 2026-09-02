@@ -19,6 +19,9 @@ import 'package:run_app/onboarding/onboarding_screen.dart';
 
 const _goalTitle = 'What are you\ntraining for?';
 const _racePickerTitle = 'What race are\nyou running?';
+const _pastMonthTitle = 'How much have you\nrun in the past month?';
+const _raceGoalTitle = "What do you want\nfrom race day?";
+const _runsPerWeekTitle = 'How many days a\nweek can you run?';
 
 Future<void> _settle(WidgetTester tester) async {
   // Covers the 320ms page-slide animation plus the async RaceService call
@@ -74,29 +77,6 @@ void main() {
     await tester.tap(find.text('Use this race'));
     await _settle(tester);
 
-    // ignore: avoid_print
-    print(
-      'DIAG goalMatches=${find.text(_goalTitle).evaluate().length} '
-      'racePickerMatches=${find.text(_racePickerTitle).evaluate().length} '
-      'experienceMatches=${find.textContaining('experience?').evaluate().length}',
-    );
-    for (final el in find.text(_goalTitle).evaluate()) {
-      final ancestors = <String>[];
-      Element? cur = el;
-      while (cur != null && ancestors.length < 15) {
-        Element? parent;
-        cur.visitAncestorElements((a) {
-          parent = a;
-          return false;
-        });
-        if (parent == null) break;
-        ancestors.add(parent!.widget.runtimeType.toString());
-        cur = parent;
-      }
-      // ignore: avoid_print
-      print('DIAG ancestors: ${ancestors.join(' < ')}');
-    }
-
     // The bug report: this used to land back on the goal page instead of
     // advancing to the next question. Assert forward progress, not just
     // that the race picker itself is gone.
@@ -114,5 +94,31 @@ void main() {
     await _settle(tester);
     expect(find.textContaining('experience?'), findsOneWidget);
     expect(find.text(_goalTitle), findsNothing);
+
+    // ── Continue through Experience → PastMonth → RaceGoal → RunsPerWeek ──
+    // The requested slice: every one of these Continue taps crosses the same
+    // _showTopBar/_showBottom-driven PageView as the race-picker step above.
+    await tester.tap(find.text('Regular runner'));
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await _settle(tester);
+
+    expect(find.text(_pastMonthTitle), findsOneWidget);
+    await tester.tap(find.text('25–50 km'));
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await _settle(tester);
+
+    expect(find.text(_raceGoalTitle), findsOneWidget);
+    // 'finish' keeps _needsTargetTime false, so _next() skips OPage.targetTime
+    // entirely and lands directly on runsPerWeek — the exact requested slice.
+    await tester.tap(find.text('Just complete it'));
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await _settle(tester);
+
+    expect(find.text(_runsPerWeekTitle), findsOneWidget);
+    expect(find.text('YOUR PLAN AT A GLANCE'), findsOneWidget);
+    expect(find.text(_raceGoalTitle), findsNothing);
   });
 }
