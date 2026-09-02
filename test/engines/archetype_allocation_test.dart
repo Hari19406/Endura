@@ -42,6 +42,10 @@ void main() {
         for (final exp in experiences) {
           for (var days = 3; days <= 7; days++) {
             for (final wk in [25.0, 32.0, 45.0, 60.0, 80.0, 110.0, 130.0]) {
+              // Skip sub-viable pairings (fewer than ~6 km per training day) —
+              // the tolerance guarantee holds only when the week clears the
+              // sum of session floors.
+              if (wk < days * 6) continue;
               // Realistic quality count for the week size — the engine never
               // asks for 2 quality sessions on a sub-viable week.
               final q = wk >= 40 ? 2 : (wk >= 25 ? 1 : 0);

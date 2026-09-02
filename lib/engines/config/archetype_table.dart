@@ -183,7 +183,6 @@ class PeakWeeklyKm {
     (RaceDistance.marathon, ExperienceLevel.beginner) => 60,
     (RaceDistance.marathon, ExperienceLevel.intermediate) => 75,
     (RaceDistance.marathon, ExperienceLevel.advanced) => 90,
-    _ => 50,
   };
 }
 
@@ -419,8 +418,9 @@ class ArchetypeTable {
     required TrainingPhase phase,
     required ExperienceLevel experience,
   }) {
-    if (experience == ExperienceLevel.beginner)
+    if (experience == ExperienceLevel.beginner) {
       return ArchetypeSessionType.tempo;
+    }
     if (phase == TrainingPhase.base) return ArchetypeSessionType.tempo;
     return ArchetypeSessionType.interval;
   }
