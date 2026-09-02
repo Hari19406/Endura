@@ -12,7 +12,13 @@ import 'package:flutter/material.dart';
 
 import 'onboarding/onboarding_screen.dart' show EC;
 import 'onboarding/onboarding_pages.dart'
-    show OPageRunsPerWeek, OPagePlanStart, PlanStartOption;
+    show
+        OPageRunsPerWeek,
+        OPagePlanStart,
+        PlanStartOption,
+        OPageExperience,
+        OPageRaceGoal,
+        OPageLongRunDay;
 import 'onboarding/plan_reveal_data.dart';
 import 'onboarding/plan_reveal_page.dart';
 import 'onboarding/plan_runway.dart';
@@ -149,7 +155,7 @@ class RevealPreviewApp extends StatefulWidget {
   State<RevealPreviewApp> createState() => _RevealPreviewAppState();
 }
 
-enum _Screen { reveal, slider, planStart }
+enum _Screen { reveal, slider, planStart, experience, raceGoal, longRunDay }
 
 class _RevealPreviewAppState extends State<RevealPreviewApp> {
   int _index = 0;
@@ -157,6 +163,9 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
   _Screen _screen = _Screen.reveal;
   int _runs = 4;
   DateTime? _pickedStart;
+  String? _experiencePick;
+  String? _raceGoalPick;
+  int? _longRunPick;
 
   bool get _showSlider => _screen == _Screen.slider;
 
@@ -209,6 +218,9 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                 skeleton: _skeleton,
                 showSlider: _showSlider,
                 showStart: _screen == _Screen.planStart,
+                showExperience: _screen == _Screen.experience,
+                showRaceGoal: _screen == _Screen.raceGoal,
+                showLongRunDay: _screen == _Screen.longRunDay,
                 onPersona: (i) => setState(() => _index = i),
                 onSkeleton: (v) => setState(() => _skeleton = v),
                 onShowSlider: (v) => setState(
@@ -216,6 +228,15 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                 ),
                 onShowStart: (v) => setState(
                   () => _screen = v ? _Screen.planStart : _Screen.reveal,
+                ),
+                onShowExperience: (v) => setState(
+                  () => _screen = v ? _Screen.experience : _Screen.reveal,
+                ),
+                onShowRaceGoal: (v) => setState(
+                  () => _screen = v ? _Screen.raceGoal : _Screen.reveal,
+                ),
+                onShowLongRunDay: (v) => setState(
+                  () => _screen = v ? _Screen.longRunDay : _Screen.reveal,
                 ),
                 onShortNotice: () => showShortNoticeSheet(
                   context,
@@ -241,36 +262,49 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                     // Roughly a phone, so overflow shows up here rather than
                     // on device.
                     constraints: const BoxConstraints(maxWidth: 420),
-                    child: _screen == _Screen.slider
-                        ? OPageRunsPerWeek(
-                            runsPerWeek: _runs,
-                            baselineWeeklyKm: persona.answers.baselineWeeklyKm,
-                            goal: persona.answers.goal,
-                            experienceBridged:
-                                persona.answers.experienceBridged,
-                            onChanged: (n) => setState(() => _runs = n),
-                          )
-                        : _screen == _Screen.planStart
-                        ? OPagePlanStart(
-                            options: _startOptions(persona.answers),
-                            selectedStart: _pickedStart,
-                            goal: persona.answers.goal,
-                            runway: PlanRunway.resolve(
-                              goal: persona.answers.goal,
-                              weeksAvailable: _weeksTo(
-                                persona.answers.raceDate,
-                              ),
-                            ),
-                            onSelect: (o) =>
-                                setState(() => _pickedStart = o.startDate),
-                          )
-                        : OPagePlanReveal(
-                            key: ValueKey('$_index-$_skeleton'),
-                            answers: persona.answers,
-                            projection: projection,
-                            onEdit: (t) => _toast(context, 'Edit → ${t.name}'),
-                            onGenerate: () => _toast(context, 'Start training'),
-                          ),
+                    child: switch (_screen) {
+                      _Screen.slider => OPageRunsPerWeek(
+                        runsPerWeek: _runs,
+                        baselineWeeklyKm: persona.answers.baselineWeeklyKm,
+                        goal: persona.answers.goal,
+                        experienceBridged: persona.answers.experienceBridged,
+                        onChanged: (n) => setState(() => _runs = n),
+                      ),
+                      _Screen.planStart => OPagePlanStart(
+                        options: _startOptions(persona.answers),
+                        selectedStart: _pickedStart,
+                        goal: persona.answers.goal,
+                        runway: PlanRunway.resolve(
+                          goal: persona.answers.goal,
+                          weeksAvailable: _weeksTo(persona.answers.raceDate),
+                        ),
+                        onSelect: (o) =>
+                            setState(() => _pickedStart = o.startDate),
+                      ),
+                      _Screen.experience => OPageExperience(
+                        selected: _experiencePick,
+                        goal: persona.answers.goal,
+                        onSelect: (v) => setState(() => _experiencePick = v),
+                      ),
+                      _Screen.raceGoal => OPageRaceGoal(
+                        selected: _raceGoalPick,
+                        goal: persona.answers.goal,
+                        onSelect: (v) => setState(() => _raceGoalPick = v),
+                      ),
+                      _Screen.longRunDay => OPageLongRunDay(
+                        availableDays: persona.answers.selectedDays,
+                        selectedDayIndex:
+                            _longRunPick ?? persona.answers.longRunDayIndex,
+                        onSelect: (i) => setState(() => _longRunPick = i),
+                      ),
+                      _Screen.reveal => OPagePlanReveal(
+                        key: ValueKey('$_index-$_skeleton'),
+                        answers: persona.answers,
+                        projection: projection,
+                        onEdit: (t) => _toast(context, 'Edit → ${t.name}'),
+                        onGenerate: () => _toast(context, 'Start training'),
+                      ),
+                    },
                   ),
                 ),
               ),
@@ -294,10 +328,16 @@ class _Toolbar extends StatelessWidget {
   final bool skeleton;
   final bool showSlider;
   final bool showStart;
+  final bool showExperience;
+  final bool showRaceGoal;
+  final bool showLongRunDay;
   final ValueChanged<int> onPersona;
   final ValueChanged<bool> onSkeleton;
   final ValueChanged<bool> onShowSlider;
   final ValueChanged<bool> onShowStart;
+  final ValueChanged<bool> onShowExperience;
+  final ValueChanged<bool> onShowRaceGoal;
+  final ValueChanged<bool> onShowLongRunDay;
   final VoidCallback onShortNotice;
 
   const _Toolbar({
@@ -306,10 +346,16 @@ class _Toolbar extends StatelessWidget {
     required this.skeleton,
     required this.showSlider,
     required this.showStart,
+    required this.showExperience,
+    required this.showRaceGoal,
+    required this.showLongRunDay,
     required this.onPersona,
     required this.onSkeleton,
     required this.onShowSlider,
     required this.onShowStart,
+    required this.onShowExperience,
+    required this.onShowRaceGoal,
+    required this.onShowLongRunDay,
     required this.onShortNotice,
   });
 
@@ -339,6 +385,21 @@ class _Toolbar extends StatelessWidget {
             label: const Text('Plan start'),
             selected: showStart,
             onSelected: onShowStart,
+          ),
+          FilterChip(
+            label: const Text('Experience'),
+            selected: showExperience,
+            onSelected: onShowExperience,
+          ),
+          FilterChip(
+            label: const Text('Race goal'),
+            selected: showRaceGoal,
+            onSelected: onShowRaceGoal,
+          ),
+          FilterChip(
+            label: const Text('Long run day'),
+            selected: showLongRunDay,
+            onSelected: onShowLongRunDay,
           ),
           ActionChip(
             label: const Text('Short notice'),
