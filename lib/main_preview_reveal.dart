@@ -274,6 +274,8 @@ class _RevealPreviewAppState extends State<RevealPreviewApp> {
                         options: _startOptions(persona.answers),
                         selectedStart: _pickedStart,
                         goal: persona.answers.goal,
+                        raceName: persona.answers.raceName,
+                        raceDate: persona.answers.raceDate,
                         runway: PlanRunway.resolve(
                           goal: persona.answers.goal,
                           weeksAvailable: _weeksTo(persona.answers.raceDate),

@@ -980,6 +980,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         selectedStart: _planWeeks == null ? null : _startDate,
         runway: _runway,
         goal: _goal ?? '5k',
+        raceName: _raceName,
+        raceDate: _raceDate,
         onSelect: (opt) => setState(() {
           _startDate = opt.startDate;
           _planWeeks = opt.weeks;

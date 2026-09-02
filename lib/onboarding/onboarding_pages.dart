@@ -4863,6 +4863,11 @@ class OPagePlanStart extends StatelessWidget {
   final PlanRunway runway;
   final String goal;
 
+  /// The race this plan is actually being built for — shown so the athlete
+  /// can confirm the right race carried through before picking a start date.
+  final String? raceName;
+  final DateTime? raceDate;
+
   const OPagePlanStart({
     super.key,
     required this.options,
@@ -4870,6 +4875,8 @@ class OPagePlanStart extends StatelessWidget {
     required this.onSelect,
     required this.runway,
     required this.goal,
+    this.raceName,
+    this.raceDate,
   });
 
   /// One component, three verdicts — see PlanRunway.
@@ -4900,6 +4907,53 @@ class OPagePlanStart extends StatelessWidget {
           const _Title('When do you want\nto start?'),
           const SizedBox(height: 6),
           _Sub(_subtitle),
+          if (raceDate != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: EC.surface,
+                borderRadius: BorderRadius.circular(ET.cardRadius),
+                border: Border.all(color: EC.border, width: ET.borderWidth),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.emoji_events_outlined,
+                    size: 16,
+                    color: EC.teal,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          raceName ?? 'Your race',
+                          style: const TextStyle(
+                            color: EC.textPrimary,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_dLabel(raceDate!)} ${raceDate!.year}',
+                          style: const TextStyle(
+                            color: EC.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 28),
           ...options.map((o) {
             final sel =

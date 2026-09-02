@@ -25,7 +25,10 @@ class RaceService {
       if (country != null && country.trim().isNotEmpty) {
         query = query.ilike('country', '%${country.trim()}%');
       }
-      final rows = await query.order('race_date').limit(limit);
+      // Explicit ascending — soonest race first. Without this the picker
+      // showed the farthest-out races (2028/2029) at the top instead of
+      // genuinely upcoming ones.
+      final rows = await query.order('race_date', ascending: true).limit(limit);
       return (rows as List)
           .map((r) => RaceListing.fromJson(r as Map<String, dynamic>))
           .toList();
