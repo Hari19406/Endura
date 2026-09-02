@@ -255,6 +255,7 @@ class WeekProjectionService {
         weeklyTargetKm: weeklyTargetKm,
         weekPercentageSum: 1.0,
         plannedDistanceKm: slotDistanceKm,
+        plannedTemplateId: archetypeSlot?.templateId,
       );
 
       final selection = _selector.select(selectionContext);

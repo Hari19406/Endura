@@ -71,6 +71,12 @@ class SelectionContext {
   /// uses this instead of recomputing via VolumeCalculator.
   final double? plannedDistanceKm;
 
+  /// Template WeekResolver already chose for today (ladder-aware). When set and
+  /// valid for the resolved intent/race/phase, it is used verbatim — the
+  /// selector does NOT run its own rotation. This is what makes the shown
+  /// workout match the plan.
+  final String? plannedTemplateId;
+
   const SelectionContext({
     required this.raceDistance,
     required this.phase,
@@ -93,6 +99,7 @@ class SelectionContext {
     this.goalIntent = 'structured',
     this.weekPercentageSum = 1.0,
     this.plannedDistanceKm,
+    this.plannedTemplateId,
   });
 }
 
@@ -205,8 +212,17 @@ class SessionSelector {
       );
     }
 
-    // ── Step 5: Pick best template ────────────────────────────────────────
-    final template = _pickBestTemplate(candidates, context);
+    // ── Step 5: Pick template — honour the plan's choice if we have one ───
+    final plannedMatches = context.plannedTemplateId == null
+        ? const <WorkoutTemplate>[]
+        : candidates.where((t) => t.id == context.plannedTemplateId).toList();
+    final planned = plannedMatches.isNotEmpty ? plannedMatches.first : null;
+    final template = planned ?? _pickBestTemplate(candidates, context);
+    _log('TEMPLATE PICK', {
+      'plannedTemplateId': context.plannedTemplateId,
+      'usedPlanned': planned != null,
+      'templateId': template.id,
+    });
     final variant = WorkoutLibrary.getVariant(template, context.phase);
     final reason = _buildReason(dayRole, intent, context, intentSource);
 

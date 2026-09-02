@@ -431,6 +431,7 @@ class CoachEngine {
       goalIntent: userMetrics.goalIntent,
       weekPercentageSum: 1.0,
       plannedDistanceKm: weekResolution.slotFor(now.weekday - 1)?.distanceKm,
+      plannedTemplateId: weekResolution.templateIdForToday(now),
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
@@ -572,6 +573,7 @@ class CoachEngine {
       goalIntent: 'steady',
       weekPercentageSum: 1.0,
       plannedDistanceKm: weekResolution.slotFor(now.weekday - 1)?.distanceKm,
+      plannedTemplateId: weekResolution.templateIdForToday(now),
     );
 
     final resolverContext = _buildResolverContext(userMetrics, memory);
