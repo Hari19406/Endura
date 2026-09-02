@@ -269,7 +269,6 @@ class WeekResolver {
     final qualityCount = HardDayPlanner.qualityCountFor(
       trainingDays: n,
       phase: phase,
-      isBeginner: experienceLevel == ExperienceLevel.beginner,
       isCutback: isCutbackWeek,
     );
 

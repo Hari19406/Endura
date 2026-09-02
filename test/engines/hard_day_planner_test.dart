@@ -112,7 +112,6 @@ void main() {
         HardDayPlanner.qualityCountFor(
           trainingDays: 5,
           phase: TrainingPhase.build,
-          isBeginner: false,
         ),
         2,
       );
@@ -120,7 +119,6 @@ void main() {
         HardDayPlanner.qualityCountFor(
           trainingDays: 4,
           phase: TrainingPhase.build,
-          isBeginner: false,
         ),
         1,
       );
@@ -131,7 +129,6 @@ void main() {
         HardDayPlanner.qualityCountFor(
           trainingDays: 6,
           phase: TrainingPhase.taper,
-          isBeginner: false,
         ),
         1,
       );
@@ -139,22 +136,22 @@ void main() {
         HardDayPlanner.qualityCountFor(
           trainingDays: 6,
           phase: TrainingPhase.peak,
-          isBeginner: false,
           isCutback: true,
         ),
         1,
       );
     });
 
-    test('base beginner with few days → 0', () {
-      expect(
-        HardDayPlanner.qualityCountFor(
-          trainingDays: 3,
-          phase: TrainingPhase.base,
-          isBeginner: true,
-        ),
-        0,
-      );
+    test('base → 1 for every day count (beginner intent stays threshold)', () {
+      for (final d in [3, 4, 5, 6]) {
+        expect(
+          HardDayPlanner.qualityCountFor(
+            trainingDays: d,
+            phase: TrainingPhase.base,
+          ),
+          1,
+        );
+      }
     });
   });
 }

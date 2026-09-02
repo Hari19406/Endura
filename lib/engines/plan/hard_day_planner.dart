@@ -63,12 +63,12 @@ class HardDayPlanner {
   static int qualityCountFor({
     required int trainingDays,
     required TrainingPhase phase,
-    required bool isBeginner,
     bool isCutback = false,
   }) {
     final base = switch (phase) {
-      TrainingPhase.base =>
-        trainingDays >= 5 ? 1 : (trainingDays >= 4 ? 1 : (isBeginner ? 0 : 1)),
+      // One quality session every week, all experience levels — for a beginner
+      // the intent layer keeps it to threshold work, never intervals.
+      TrainingPhase.base => 1,
       TrainingPhase.build => trainingDays >= 5 ? 2 : 1,
       TrainingPhase.peak => trainingDays >= 4 ? 2 : 1,
       TrainingPhase.taper => 1,
