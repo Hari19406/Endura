@@ -302,6 +302,10 @@ class WorkoutResolver {
     String experienceLevel = 'intermediate',
     ScalingTier scalingTier = ScalingTier.full,
     List<String>? scalingAdjustments,
+
+    /// Weeks spent on the current ladder rung (session-level progression).
+    /// Each step adds a rep to interval work; the quality cap still applies.
+    int progressionStep = 0,
   }) {
     // Ladder and pyramid are resolved dynamically — skip standard block path.
     if (template.id == 'vo2_ladder' || template.id == 'vo2_pyramid') {
@@ -327,12 +331,27 @@ class WorkoutResolver {
     // For interval templates, compute reps from the allocated budget so the
     // workout fills close to totalDistanceKm instead of always resolving to
     // the same fixed structure regardless of what the planner assigned.
-    final dynamicReps = _computeDynamicReps(
+    var dynamicReps = _computeDynamicReps(
       template: template,
       variant: variant,
       totalDistanceKm: totalDistanceKm,
       scalingAdjustments: scalingAdjustments,
     );
+
+    // Session-level progression: same rung, one more rep each week (max +2).
+    // Only for interval-style quality — continuous work progresses by rung.
+    final stepBump = progressionStep.clamp(0, 2);
+    if (dynamicReps != null &&
+        stepBump > 0 &&
+        (intent == WorkoutIntent.threshold ||
+            intent == WorkoutIntent.vo2max ||
+            intent == WorkoutIntent.speed ||
+            intent == WorkoutIntent.raceSpecific)) {
+      dynamicReps += stepBump;
+      scalingAdjustments?.add(
+        'Progression: +$stepBump reps (week ${progressionStep + 1} on this rung)',
+      );
+    }
 
     final resolvedBlocks = <ResolvedBlock>[];
     for (final block in template.blocks) {

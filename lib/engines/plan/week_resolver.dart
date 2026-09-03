@@ -300,7 +300,10 @@ class WeekResolver {
       phase: phase,
       raceDistance: raceDistance,
       longRunKmTarget: lrTarget,
-      allowMediumLong: !isCutbackWeek,
+      // Structural 3:1 down week: a cutback keeps the medium-long (allocate
+      // gates it to HM/FM, 5+ days, non-taper) so the reduced week trades
+      // intensity for aerobic volume rather than just shrinking.
+      allowMediumLong: true,
     );
 
     // ── Step 4: Physical slot map from the placement ────────────────────
@@ -649,10 +652,12 @@ class WeekResolver {
 
     if (orderedRungs.isEmpty) return (candidates.first.id, 0);
 
+    // The rung stays put — PlanMaterializer advances it via session-progression
+    // (a rung is worked for a few weeks, getting harder, then advances). It no
+    // longer auto-cycles on every resolve() call.
     final storedIndex = ladderPositions[intent.name] ?? 0;
     final clampedIndex = storedIndex.clamp(0, orderedRungs.length - 1);
     final picked = orderedRungs[clampedIndex];
-    final nextIndex = (clampedIndex + 1) % orderedRungs.length;
 
     assert(() {
       // ignore: avoid_print
@@ -663,14 +668,13 @@ class WeekResolver {
         '\n  race: ${raceDistance.name}'
         '\n  storedIndex: $storedIndex'
         '\n  clampedIndex: $clampedIndex'
-        '\n  nextIndex: $nextIndex'
         '\n  orderedRungs: $orderedRungs'
         '\n  → picked: $picked',
       );
       return true;
     }());
 
-    return (picked, nextIndex);
+    return (picked, clampedIndex);
   }
 
   String _pickByRotation({

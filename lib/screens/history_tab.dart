@@ -160,14 +160,7 @@ class _HistoryTabState extends State<HistoryTab> {
             )
           else
             for (final section in sections) ...[
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _PinnedHeaderDelegate(
-                  height: 40,
-                  color: c.background,
-                  child: _buildMonthHeader(section),
-                ),
-              ),
+              SliverToBoxAdapter(child: _buildMonthHeader(section)),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
                 sliver: SliverList.separated(
@@ -462,8 +455,7 @@ class _HistoryTabState extends State<HistoryTab> {
     final dist = UnitUtils.displayDistance(section.totalKm, _useMiles);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-      alignment: Alignment.bottomCenter,
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: c.divider)),
       ),

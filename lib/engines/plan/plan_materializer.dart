@@ -26,6 +26,14 @@ class PlanMaterializer {
 
   static const int _recentTemplateCap = 14;
 
+  /// Weeks worked on one ladder rung before it advances (step 0,1,2 → advance).
+  static const int _maxProgressionStep = 2;
+
+  /// Top rung index per laddered intent name.
+  static final Map<String, int> _maxRung = {
+    for (final e in ladderTemplateIds.entries) e.key.name: e.value.length - 1,
+  };
+
   MaterializedPlan materialize({
     required RacePlan skeleton,
     required List<int> trainingDayIndices,
@@ -43,7 +51,7 @@ class PlanMaterializer {
         'plan_${skeleton.createdAt.millisecondsSinceEpoch}';
 
     final ladderState = <String, int>{...?previous?.ladderState};
-    var sessionProgress = <String, int>{...?previous?.sessionProgress};
+    final sessionProgress = <String, int>{...?previous?.sessionProgress};
     final recentTemplateIds = <String>[];
 
     final paceTable = PaceTable(vdot.clamp(30, 85));
@@ -90,7 +98,6 @@ class PlanMaterializer {
       );
 
       ladderState.addAll(resolution.updatedLadderPositions);
-      sessionProgress = Map<String, int>.from(resolution.updatedSessionProgress);
       if (phase == TrainingPhase.taper) taperWeekCount++;
 
       final days = <MaterializedDay>[];
@@ -120,6 +127,7 @@ class PlanMaterializer {
             phase: phase,
             intent: slot.intent ?? template.intent,
             experienceLevel: experienceStr,
+            progressionStep: slot.progressionStep,
           );
           recentTemplateIds.add(template.id);
           while (recentTemplateIds.length > _recentTemplateCap) {
@@ -149,6 +157,33 @@ class PlanMaterializer {
           days: days,
         ),
       );
+
+      // ── Advance the ladders for next week ──────────────────────────────
+      // Quality intents use session-level progression: work a rung for a few
+      // weeks (getting harder via +reps), then advance to a harder template.
+      // Endurance is distance-driven, so its long-run template just rotates
+      // each week for variety. Cutback weeks don't count toward progression.
+      if (!isCutback) {
+        final usedLadderIntents = resolution.days
+            .where((d) => !d.isRest && d.intent != null)
+            .map((d) => d.intent!.name)
+            .where(_maxRung.containsKey)
+            .toSet();
+        for (final name in usedLadderIntents) {
+          final top = _maxRung[name] ?? 0;
+          if (name == WorkoutIntent.endurance.name) {
+            ladderState[name] = ((ladderState[name] ?? 0) + 1) % (top + 1);
+            continue;
+          }
+          final step = sessionProgress[name] ?? 0;
+          if (step >= _maxProgressionStep) {
+            ladderState[name] = ((ladderState[name] ?? 0) + 1).clamp(0, top);
+            sessionProgress[name] = 0;
+          } else {
+            sessionProgress[name] = step + 1;
+          }
+        }
+      }
     }
 
     return MaterializedPlan(
