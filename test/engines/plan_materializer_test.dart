@@ -142,6 +142,78 @@ void main() {
     expect(slow, greaterThan(fast)); // more sec/km = slower
   });
 
+  test('session progression: reps rise across weeks on the same threshold rung, '
+      'then the rung advances', () {
+    // 5-day intermediate 10K: threshold Q1 in base, one quality/week.
+    final plan = const PlanMaterializer().materialize(
+      skeleton: skeleton(race: '10k', km: 45, exp: 'intermediate', weeks: 14),
+      trainingDayIndices: const [0, 2, 4, 6],
+      longRunDayIndex: 6,
+      raceDistance: RaceDistance.tenK,
+      experienceLevel: ExperienceLevel.intermediate,
+      vdot: 46,
+      inputsFingerprint: 'fp',
+      now: now,
+    );
+
+    // Walk the non-cutback quality days in order; group consecutive runs on the
+    // same templateId and check reps are non-decreasing within a group and the
+    // template changes between groups.
+    final quality = <({int week, String tpl, int reps})>[];
+    for (final w in plan.weeks) {
+      if (w.isCutback) continue;
+      for (final d in w.days) {
+        if (d.slot != MaterializedSlot.quality1) continue;
+        final main = d.workout!.blocks.firstWhere(
+          (b) => b.type == BlockType.main && b.reps != null,
+          orElse: () => d.workout!.blocks.first,
+        );
+        quality.add((week: w.weekNumber, tpl: d.templateId!, reps: main.reps ?? 0));
+      }
+    }
+
+    expect(quality.length, greaterThan(4));
+
+    // At least one rung shows a rep increase week-to-week.
+    var sawRepRise = false;
+    var sawTemplateChange = false;
+    for (var i = 1; i < quality.length; i++) {
+      if (quality[i].tpl == quality[i - 1].tpl) {
+        if (quality[i].reps > quality[i - 1].reps) sawRepRise = true;
+      } else {
+        sawTemplateChange = true;
+      }
+    }
+    expect(sawRepRise, isTrue, reason: 'reps never rose on a held rung: $quality');
+    expect(sawTemplateChange, isTrue, reason: 'rung never advanced: $quality');
+  });
+
+  test('cutback weeks keep the medium-long run for HM (structural down week)',
+      () {
+    final plan = const PlanMaterializer().materialize(
+      skeleton: skeleton(race: 'half_marathon', km: 55, exp: 'advanced'),
+      trainingDayIndices: const [0, 2, 3, 5, 6],
+      longRunDayIndex: 6,
+      raceDistance: RaceDistance.halfMarathon,
+      experienceLevel: ExperienceLevel.advanced,
+      vdot: 50,
+      inputsFingerprint: 'fp',
+      now: now,
+    );
+    // Non-taper cutbacks only — taper weeks never carry a medium-long.
+    final cutbacks = plan.weeks.where(
+      (w) => w.isCutback && !w.isFrozen && w.phase != TrainingPhase.taper,
+    );
+    expect(cutbacks, isNotEmpty);
+    for (final w in cutbacks) {
+      expect(
+        w.days.any((d) => d.slot == MaterializedSlot.mediumLong),
+        isTrue,
+        reason: 'W${w.weekNumber} cutback lost its medium-long',
+      );
+    }
+  });
+
   test('taper weeks reduce volume below the preceding peak', () {
     final plan = materialize(skeleton());
     final peak = plan.weeks
