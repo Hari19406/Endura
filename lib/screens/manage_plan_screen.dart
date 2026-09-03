@@ -80,7 +80,8 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
             vdot: memory.vdotScore,
             goalTimeSeconds: prefs.getInt('target_finish_seconds') ??
                 prefs.getInt('time_to_beat_seconds'),
-          );
+          )
+          .timeout(const Duration(seconds: 20));
       if (materialized != null) {
         await EngineMemoryService().save(
           (await EngineMemoryService().load()).copyWith(
@@ -88,10 +89,11 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
             sessionProgress: materialized.sessionProgress,
             ladderPositions: materialized.ladderState,
           ),
+          syncToCloud: false,
         );
       }
     } catch (e) {
-      debugPrint('[ManagePlan] Re-materialisation error: $e');
+      debugPrint('[ManagePlan] Re-materialisation error (non-fatal): $e');
     }
 
     if (mounted) {

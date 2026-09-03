@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import '../../services/training_days_service.dart';
 import '../../engines/planner/race_plan_builder.dart';
 import '../../engines/memory/engine_memory_service.dart';
 import '../../engines/plan/plan_materialization_coordinator.dart';
+import '../../models/race_plan.dart';
 import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
@@ -776,29 +778,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         await EngineMemoryService().saveRacePlan(plan);
         Analytics.planCreated(goal: goalRace, level: exp);
 
-        // Materialise the whole plan up front and persist it (Supabase + local
-        // cache). The runtime reads this instead of re-resolving every open.
-        try {
-          final materialized = await PlanMaterializationCoordinator.instance
-              .buildAndStore(
-                skeleton: plan,
-                trainingDayIndices: _selectedDays,
-                longRunDayIndex: _longRunDayIndex,
-                goalRace: goalRace,
-                experienceLevel: exp,
-                vdot: _vdot,
-                goalTimeSeconds: _targetFinishSec ?? _timeToBeatSec,
-              );
-          await EngineMemoryService().save(
-            (await EngineMemoryService().load()).copyWith(
-              materializedPlanId: materialized.planId,
-              sessionProgress: materialized.sessionProgress,
-              ladderPositions: materialized.ladderState,
-            ),
-          );
-        } catch (e) {
-          debugPrint('[Onboarding] Materialisation error: $e');
-        }
+        // Materialise the full plan and persist it — but NEVER block finishing
+        // onboarding on it. If it's slow or fails, the runtime materialises on
+        // demand later. Fire-and-forget with a hard timeout.
+        unawaited(
+          _materializePlanInBackground(
+            plan: plan,
+            goalRace: goalRace,
+            experienceLevel: exp,
+          ),
+        );
       } catch (e) {
         debugPrint('[Onboarding] Race plan error: $e');
       }
@@ -837,6 +826,46 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       );
     } catch (e) {
       debugPrint('[Onboarding] Save error: $e');
+    }
+  }
+
+  /// Build + persist the materialised plan off the critical path. Never awaited
+  /// by onboarding navigation; a slow network or a bug here must not trap the
+  /// user on the build screen.
+  Future<void> _materializePlanInBackground({
+    required RacePlan plan,
+    required String goalRace,
+    required String experienceLevel,
+  }) async {
+    // Let the onboarding → home transition settle before the (synchronous,
+    // CPU-heavy) full-plan build runs on the UI isolate.
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    try {
+      final materialized = await PlanMaterializationCoordinator.instance
+          .buildAndStore(
+            skeleton: plan,
+            trainingDayIndices: _selectedDays,
+            longRunDayIndex: _longRunDayIndex,
+            goalRace: goalRace,
+            experienceLevel: experienceLevel,
+            vdot: _vdot,
+            goalTimeSeconds: _targetFinishSec ?? _timeToBeatSec,
+          )
+          .timeout(const Duration(seconds: 20));
+      final mem = await EngineMemoryService().load();
+      // Local only — the engine memory was already cloud-synced by _saveAll;
+      // these three fields ride the next natural save.
+      await EngineMemoryService().save(
+        mem.copyWith(
+          materializedPlanId: materialized.planId,
+          sessionProgress: materialized.sessionProgress,
+          ladderPositions: materialized.ladderState,
+        ),
+        syncToCloud: false,
+      );
+      debugPrint('[Onboarding] Plan materialised: ${materialized.planId}');
+    } catch (e) {
+      debugPrint('[Onboarding] Materialisation error (non-fatal): $e');
     }
   }
 
