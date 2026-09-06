@@ -23,7 +23,6 @@ class EditAthleteProfileScreen extends StatefulWidget {
 
 class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
   late final TextEditingController _displayName;
-  late final TextEditingController _username;
   late final TextEditingController _bio;
   late final TextEditingController _city;
   late final TextEditingController _country;
@@ -41,7 +40,6 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
     super.initState();
     final p = widget.profile;
     _displayName = TextEditingController(text: p.displayName ?? '');
-    _username = TextEditingController(text: p.username ?? '');
     _bio = TextEditingController(text: p.bio ?? '');
     _city = TextEditingController(text: p.city ?? '');
     _country = TextEditingController(text: p.country ?? '');
@@ -93,49 +91,21 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
   @override
   void dispose() {
     _displayName.dispose();
-    _username.dispose();
     _bio.dispose();
     _city.dispose();
     _country.dispose();
     super.dispose();
   }
 
-  String? _validateUsername(String v) {
-    if (v.isEmpty) return null; // optional
-    if (!RegExp(r'^[A-Za-z0-9_]{3,30}$').hasMatch(v)) {
-      return '3–30 characters, letters, numbers and _ only';
-    }
-    return null;
-  }
-
   Future<void> _save() async {
-    final username = _username.text.trim();
-    final usernameErr = _validateUsername(username);
-    if (usernameErr != null) {
-      setState(() => _error = usernameErr);
-      return;
-    }
-
     setState(() {
       _saving = true;
       _error = null;
     });
 
-    // Pre-check uniqueness for a friendly message (DB unique index is the
-    // real guard).
-    if (username.isNotEmpty &&
-        !await ProfileService.instance.usernameAvailable(username)) {
-      setState(() {
-        _saving = false;
-        _error = '@$username is taken';
-      });
-      return;
-    }
-
     String? nullIfBlank(String s) => s.trim().isEmpty ? null : s.trim();
 
     final updated = widget.profile.copyWith(
-      username: nullIfBlank(username),
       displayName: nullIfBlank(_displayName.text),
       bio: nullIfBlank(_bio.text),
       city: nullIfBlank(_city.text),
@@ -214,17 +184,20 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
           _field(context, 'Display name', _displayName, maxLength: 40),
           _field(
             context,
-            'Username',
-            _username,
-            prefix: '@',
-            maxLength: 30,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9_]')),
-            ],
+            'Bio (optional)',
+            _bio,
+            maxLength: 160,
+            maxLines: 3,
+            hint: 'Tell other runners a bit about yourself',
           ),
-          _field(context, 'Bio', _bio, maxLength: 160, maxLines: 3),
-          _field(context, 'City', _city, maxLength: 60),
-          _field(context, 'Country', _country, maxLength: 60),
+          _field(
+            context,
+            'City (optional)',
+            _city,
+            maxLength: 60,
+            hint: 'Shown under your name to tell runners apart',
+          ),
+          _field(context, 'Country (optional)', _country, maxLength: 60),
           const SizedBox(height: 8),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
@@ -297,10 +270,9 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
     BuildContext context,
     String label,
     TextEditingController controller, {
-    String? prefix,
     int? maxLength,
     int maxLines = 1,
-    List<TextInputFormatter>? inputFormatters,
+    String? hint,
   }) {
     final c = context.colors;
     return Padding(
@@ -322,11 +294,10 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
             controller: controller,
             maxLength: maxLength,
             maxLines: maxLines,
-            inputFormatters: inputFormatters,
             style: TextStyle(color: c.textPrimary, fontSize: 15),
             decoration: InputDecoration(
-              prefixText: prefix,
-              prefixStyle: TextStyle(color: c.textSecondary, fontSize: 15),
+              hintText: hint,
+              hintStyle: TextStyle(color: c.textFaint, fontSize: 13),
               counterText: '',
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(

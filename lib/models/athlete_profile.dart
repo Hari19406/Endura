@@ -5,8 +5,7 @@
 // [UserProfile] in profile_service.dart. Both map to the same table.
 
 class AthleteProfile {
-  final String id; // == auth.users.id
-  final String? username; // unique, [A-Za-z0-9_]{3,30}
+  final String id; // == auth.users.id — the only stable athlete reference
   final String? displayName;
   final String? avatarUrl;
   final String? bio;
@@ -26,7 +25,6 @@ class AthleteProfile {
 
   const AthleteProfile({
     required this.id,
-    this.username,
     this.displayName,
     this.avatarUrl,
     this.bio,
@@ -44,11 +42,10 @@ class AthleteProfile {
 
   bool get hasPublicStats => totalRuns > 0;
 
-  /// Best-effort human label: display name → @username → "Runner".
-  String get name =>
-      (displayName != null && displayName!.trim().isNotEmpty)
+  /// Human label: display name, or "Runner" when it hasn't been set.
+  String get name => (displayName != null && displayName!.trim().isNotEmpty)
       ? displayName!.trim()
-      : (username != null && username!.isNotEmpty ? '@$username' : 'Runner');
+      : 'Runner';
 
   String? get location {
     final parts = [
@@ -60,7 +57,6 @@ class AthleteProfile {
 
   factory AthleteProfile.fromMap(Map<String, dynamic> m) => AthleteProfile(
     id: m['id'] as String,
-    username: m['username'] as String?,
     displayName: m['display_name'] as String?,
     avatarUrl: m['avatar_url'] as String?,
     bio: m['bio'] as String?,
@@ -79,7 +75,6 @@ class AthleteProfile {
   /// Only the social columns — safe to `update()` without touching coaching state.
   /// Null-valued fields are included so a user can clear their bio/city/etc.
   Map<String, dynamic> toUpdateMap() => {
-    'username': username,
     'display_name': displayName,
     'avatar_url': avatarUrl,
     'bio': bio,
@@ -90,7 +85,6 @@ class AthleteProfile {
   };
 
   AthleteProfile copyWith({
-    String? username,
     String? displayName,
     String? avatarUrl,
     String? bio,
@@ -99,7 +93,6 @@ class AthleteProfile {
     bool? isPublic,
   }) => AthleteProfile(
     id: id,
-    username: username ?? this.username,
     displayName: displayName ?? this.displayName,
     avatarUrl: avatarUrl ?? this.avatarUrl,
     bio: bio ?? this.bio,

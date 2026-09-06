@@ -349,7 +349,7 @@ class ProfileService {
       final row = await _client
           .from('profiles')
           .select(
-            'id, username, display_name, avatar_url, bio, city, country, is_public',
+            'id, display_name, avatar_url, bio, city, country, is_public',
           )
           .eq('id', _userId!)
           .maybeSingle();
@@ -361,7 +361,7 @@ class ProfileService {
   }
 
   /// Patches only the social columns. Returns true on success; false (with a
-  /// logged reason) on RLS / unique-username / check-constraint failure.
+  /// logged reason) on RLS failure or a network error.
   Future<bool> updateAthleteFields(AthleteProfile profile) async {
     if (_userId == null) return false;
     try {
@@ -429,22 +429,6 @@ class ProfileService {
     } catch (e) {
       debugPrint('[ProfileService] uploadAvatar error: $e');
       return null;
-    }
-  }
-
-  /// True if [username] is free (or already owned by the signed-in user).
-  /// Case-insensitive — the column is `citext`.
-  Future<bool> usernameAvailable(String username) async {
-    try {
-      final row = await _client
-          .from('profiles')
-          .select('id')
-          .eq('username', username)
-          .maybeSingle();
-      return row == null || row['id'] == _userId;
-    } catch (e) {
-      debugPrint('[ProfileService] usernameAvailable error: $e');
-      return false;
     }
   }
 

@@ -19,8 +19,9 @@ class SocialService {
 
   // ── Discovery ─────────────────────────────────────────────────────────────
 
-  /// Public athletes whose username or display name matches [query]
-  /// (case-insensitive substring). Empty query → empty list.
+  /// Public athletes whose display name matches [query] (case-insensitive
+  /// partial match, `ILIKE '%query%'`). Empty query → empty list. Each result
+  /// carries avatar, display name and location for the search tile.
   Future<List<AthleteProfile>> searchAthletes(String query, {int limit = 20}) async {
     final q = query.trim();
     if (q.isEmpty) return [];
@@ -30,7 +31,7 @@ class SocialService {
           .from('profiles')
           .select()
           .eq('is_public', true)
-          .or('username.ilike.%$safe%,display_name.ilike.%$safe%')
+          .ilike('display_name', '%$safe%')
           .limit(limit);
       return (rows as List)
           .map((r) => AthleteProfile.fromMap(r as Map<String, dynamic>))
@@ -53,21 +54,6 @@ class SocialService {
       return row == null ? null : AthleteProfile.fromMap(row);
     } catch (e) {
       debugPrint('[SocialService] getAthlete error: $e');
-      return null;
-    }
-  }
-
-  /// Athlete by @username (unique). Null if unknown / private.
-  Future<AthleteProfile?> getAthleteByUsername(String username) async {
-    try {
-      final row = await _client
-          .from('profiles')
-          .select()
-          .eq('username', username)
-          .maybeSingle();
-      return row == null ? null : AthleteProfile.fromMap(row);
-    } catch (e) {
-      debugPrint('[SocialService] getAthleteByUsername error: $e');
       return null;
     }
   }

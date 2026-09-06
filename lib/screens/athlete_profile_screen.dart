@@ -217,13 +217,10 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
                         letterSpacing: -0.5,
                       ),
                     ),
-                    if (p.username != null)
-                      Text(
-                        '@${p.username}',
-                        style: TextStyle(fontSize: 13, color: c.textTertiary),
-                      ),
+                    // Location sits directly under the name to tell apart
+                    // runners who share a common display name.
                     if (p.location != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
                           Icon(
@@ -232,11 +229,13 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
                             color: c.textTertiary,
                           ),
                           const SizedBox(width: 3),
-                          Text(
-                            p.location!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: c.textTertiary,
+                          Flexible(
+                            child: Text(
+                              p.location!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: c.textTertiary,
+                              ),
                             ),
                           ),
                         ],

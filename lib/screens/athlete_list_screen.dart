@@ -82,7 +82,7 @@ class _AthleteListScreenState extends State<AthleteListScreen> {
   }
 }
 
-/// A single tappable athlete row (avatar, name, @username).
+/// A single tappable athlete row (avatar, display name, location).
 class AthleteRow extends StatelessWidget {
   final AthleteProfile athlete;
   const AthleteRow({super.key, required this.athlete});
@@ -105,9 +105,9 @@ class AthleteRow extends StatelessWidget {
           color: c.textPrimary,
         ),
       ),
-      subtitle: athlete.username != null
+      subtitle: athlete.location != null
           ? Text(
-              '@${athlete.username}',
+              athlete.location!,
               style: TextStyle(color: c.textTertiary, fontSize: 12),
             )
           : null,

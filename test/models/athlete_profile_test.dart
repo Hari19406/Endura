@@ -6,22 +6,14 @@ import 'package:run_app/models/athlete_profile.dart';
 
 void main() {
   group('AthleteProfile.name', () {
-    test('prefers display name', () {
-      const p = AthleteProfile(
-        id: 'u1',
-        displayName: 'Mo Farah',
-        username: 'mo',
-      );
+    test('uses display name when set', () {
+      const p = AthleteProfile(id: 'u1', displayName: 'Mo Farah');
       expect(p.name, 'Mo Farah');
     });
 
-    test('falls back to @username, then Runner', () {
-      const withUser = AthleteProfile(id: 'u1', username: 'mo');
-      expect(withUser.name, '@mo');
-      const bare = AthleteProfile(id: 'u1');
-      expect(bare.name, 'Runner');
-      const blankDisplay = AthleteProfile(id: 'u1', displayName: '   ');
-      expect(blankDisplay.name, 'Runner');
+    test('falls back to "Runner" when display name is missing or blank', () {
+      expect(const AthleteProfile(id: 'u1').name, 'Runner');
+      expect(const AthleteProfile(id: 'u1', displayName: '   ').name, 'Runner');
     });
   });
 
@@ -44,38 +36,55 @@ void main() {
     test('fromMap reads snake_case, defaults is_public to true', () {
       final p = AthleteProfile.fromMap({
         'id': 'u1',
-        'username': 'mo',
         'display_name': 'Mo',
         'avatar_url': null,
         'bio': 'runs a lot',
         'city': 'Pune',
         'country': 'India',
       });
-      expect(p.username, 'mo');
+      expect(p.displayName, 'Mo');
       expect(p.bio, 'runs a lot');
       expect(p.isPublic, isTrue);
     });
 
+    test('has no username concept', () {
+      const p = AthleteProfile(id: 'u1', displayName: 'Mo');
+      expect(p.toUpdateMap().containsKey('username'), isFalse);
+    });
+
     test('toUpdateMap emits only social columns + updated_at', () {
-      const p = AthleteProfile(
-        id: 'u1',
-        username: 'mo',
-        displayName: 'Mo',
-        isPublic: false,
-      );
+      const p = AthleteProfile(id: 'u1', displayName: 'Mo', isPublic: false);
       final m = p.toUpdateMap();
-      expect(m.keys, containsAll(<String>['username', 'display_name', 'bio', 'city', 'country', 'is_public', 'updated_at']));
+      expect(
+        m.keys,
+        containsAll(<String>[
+          'display_name',
+          'avatar_url',
+          'bio',
+          'city',
+          'country',
+          'is_public',
+          'updated_at',
+        ]),
+      );
       expect(m.containsKey('id'), isFalse);
       expect(m.containsKey('vdot_score'), isFalse);
       expect(m['is_public'], isFalse);
     });
 
-    test('copyWith preserves id and overrides fields', () {
-      const p = AthleteProfile(id: 'u1', username: 'old');
-      final q = p.copyWith(username: 'new', isPublic: false);
+    test('copyWith preserves id + aggregates, overrides social fields', () {
+      final p = AthleteProfile.fromMap({
+        'id': 'u1',
+        'display_name': 'Old',
+        'total_runs': 12,
+        'total_distance_meters': 90000,
+      });
+      final q = p.copyWith(displayName: 'New', isPublic: false);
       expect(q.id, 'u1');
-      expect(q.username, 'new');
+      expect(q.displayName, 'New');
       expect(q.isPublic, isFalse);
+      expect(q.totalRuns, 12);
+      expect(q.totalDistanceMeters, 90000);
     });
   });
 
