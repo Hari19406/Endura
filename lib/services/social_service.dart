@@ -129,7 +129,7 @@ class SupabaseFeedStore implements FeedStore {
     if (ids.isEmpty) return {};
     final rows = await _c
         .from('profiles')
-        .select('id, display_name, avatar_url, city, country')
+        .select('id, display_name, avatar_url, city, country, is_pro')
         .inFilter('id', ids);
     return {
       for (final r in (rows as List))

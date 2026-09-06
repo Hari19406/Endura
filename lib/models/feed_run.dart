@@ -83,6 +83,7 @@ class FeedRun {
       if (parts.isNotEmpty) loc = parts.join(', ');
     }
     final name = (profileRow?['display_name'] as String?)?.trim();
+    final planName = (runRow['plan_name'] as String?)?.trim();
     return FeedRun(
       athleteId: runRow['user_id'] as String,
       displayName: (name != null && name.isNotEmpty) ? name : 'Runner',
@@ -96,6 +97,12 @@ class FeedRun {
       elevationGain: (runRow['elevation_gain'] as num?)?.toDouble() ?? 0,
       workoutType: runRow['workout_type'] as String? ?? 'easy',
       routePolyline: runRow['route_polyline'] as String? ?? '',
+      isSubscribed: profileRow?['is_pro'] as bool? ?? false,
+      planName: (planName != null && planName.isNotEmpty) ? planName : null,
+      planProgress: (runRow['plan_progress'] as String?)?.trim().isNotEmpty ==
+              true
+          ? (runRow['plan_progress'] as String).trim()
+          : null,
     );
   }
 }
