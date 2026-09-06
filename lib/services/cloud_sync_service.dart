@@ -193,6 +193,57 @@ class CloudSyncService {
     }
   }
 
+  /// Pulls the most recent [limit] cloud runs into local SQLite, de-duped by
+  /// timestamp. Used by first-login hydration on a fresh device — lighter than
+  /// [downloadAndRestoreRuns], which pulls the entire history.
+  Future<int> downloadRecentRuns({int limit = 30}) async {
+    if (!isSignedIn) return 0;
+    try {
+      final response = await _client
+          .from('runs')
+          .select()
+          .eq('user_id', _userId!)
+          .order('date', ascending: false)
+          .limit(limit);
+
+      final localDates = await DatabaseService.instance.getAllRunDates();
+      int restored = 0;
+      for (final row in (response as List)) {
+        try {
+          final cloudDate = DateTime.parse(row['date'] as String).toLocal();
+          final dup = localDates.any(
+            (d) => d.difference(cloudDate).inSeconds.abs() < 60,
+          );
+          if (dup) continue;
+          await DatabaseService.instance.insertRun(
+            RunRecord(
+              distanceKm: (row['distance_km'] as num).toDouble(),
+              averagePace: row['average_pace'] as String,
+              durationSeconds: row['duration_seconds'] as int? ?? 0,
+              date: cloudDate,
+              routePolyline: row['route_polyline'] as String? ?? '',
+              workoutType: row['workout_type'] as String? ?? 'easy',
+              syncedToCloud: true,
+              csValueAtTime: row['cs_value_at_time'] != null
+                  ? (row['cs_value_at_time'] as num).toDouble()
+                  : null,
+              rpe: row['rpe'] as int?,
+            ),
+          );
+          restored++;
+        } catch (e) {
+          debugPrint('CloudSync downloadRecentRuns: skipped a row: $e');
+        }
+      }
+      debugPrint('CloudSync: hydrated $restored recent runs');
+      return restored;
+    } catch (e, stack) {
+      debugPrint('CloudSync downloadRecentRuns error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return 0;
+    }
+  }
+
   // ── Delete all cloud runs for this user (GDPR) ────────────────────────────
 
   Future<bool> deleteAllCloudRuns() async {

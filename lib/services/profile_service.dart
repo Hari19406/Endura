@@ -4,7 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
+import '../engines/run_aggregates.dart';
 import '../models/athlete_profile.dart';
+import '../utils/database_service.dart' show RunRecord;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UserProfile model
@@ -371,6 +373,62 @@ class ProfileService {
     } catch (e) {
       debugPrint('[ProfileService] updateAthleteFields error: $e');
       return false;
+    }
+  }
+
+  /// Recomputes the denormalized run aggregates from the full local run list
+  /// and writes them to the signed-in user's `profiles` row. Called from the
+  /// run-save path so another athlete's profile can show high-level stats
+  /// without read access to the RLS-private `runs` table.
+  Future<bool> pushRunAggregates(List<RunRecord> runs) async {
+    if (_userId == null) return false;
+    try {
+      final agg = RunAggregates.fromRuns(runs);
+      await _client
+          .from('profiles')
+          .update({
+            ...agg.toMap(),
+            'stats_updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', _userId!);
+      return true;
+    } catch (e) {
+      debugPrint('[ProfileService] pushRunAggregates error: $e');
+      return false;
+    }
+  }
+
+  /// Uploads a pre-compressed avatar image to the public `avatars` bucket at
+  /// `avatars/<uid>.jpg`, points `profiles.avatar_url` at it (cache-busted),
+  /// and returns the new URL. Null on failure.
+  Future<String?> uploadAvatar(Uint8List jpegBytes) async {
+    final uid = _userId;
+    if (uid == null) return null;
+    try {
+      final path = '$uid.jpg';
+      await _client.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            jpegBytes,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+      final base = _client.storage.from('avatars').getPublicUrl(path);
+      final url = '$base?v=${DateTime.now().millisecondsSinceEpoch}';
+      await _client
+          .from('profiles')
+          .update({
+            'avatar_url': url,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', uid);
+      return url;
+    } catch (e) {
+      debugPrint('[ProfileService] uploadAvatar error: $e');
+      return null;
     }
   }
 

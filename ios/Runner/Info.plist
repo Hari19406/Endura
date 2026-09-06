@@ -55,6 +55,8 @@
     <string>Endura uses Bluetooth to connect to your heart rate monitor and cadence sensor.</string>
     <key>NSHealthShareUsageDescription</key>
     <string>Endura reads your heart rate data to show it alongside your runs.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Endura needs access to your photos so you can choose a profile picture.</string>
 	<key>NSAppTransportSecurity</key>
 <dict>
     <key>NSAllowsArbitraryLoads</key>

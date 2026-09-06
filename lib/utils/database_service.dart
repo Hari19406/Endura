@@ -240,8 +240,10 @@ class DatabaseService {
       // v7 → backfilled free-run rpe=0 rows to NULL (free runs never rate RPE)
       // v8 → added elapsed_seconds, avg/peak heart_rate, avg/peak cadence,
       //      gap_average_pace, track_samples_json
+      // v9 → added `shoes` table (offline-first shoe locker; mirrors the
+      //      Supabase `shoes` table, syncs best-effort)
       // ────────────────────────────────────────────────────────────────────
-      version: 8,
+      version: 9,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -292,6 +294,7 @@ class DatabaseService {
             tier        INTEGER NOT NULL
           )
         ''');
+        await db.execute(_createShoesTableSql);
         await db.execute('CREATE INDEX idx_runs_date ON runs(date DESC)');
         await db.execute(
           'CREATE INDEX idx_snap_date ON training_snapshots(date DESC)',
@@ -412,8 +415,90 @@ class DatabaseService {
             debugPrint('[DB] track_samples_json already exists, skipping: $e');
           }
         }
+
+        if (oldVersion < 9) {
+          // v8 → v9: offline-first shoe locker.
+          try {
+            await db.execute(_createShoesTableSql);
+          } catch (e) {
+            debugPrint('[DB] shoes table already exists, skipping: $e');
+          }
+        }
       },
     );
+  }
+
+  static const String _createShoesTableSql = '''
+    CREATE TABLE shoes (
+      id                  TEXT    PRIMARY KEY,
+      brand               TEXT    NOT NULL,
+      model               TEXT    NOT NULL,
+      nickname            TEXT,
+      distance_meters     REAL    NOT NULL DEFAULT 0,
+      max_distance_meters REAL    NOT NULL DEFAULT 800000,
+      is_default          INTEGER NOT NULL DEFAULT 0,
+      is_retired          INTEGER NOT NULL DEFAULT 0,
+      updated_at          TEXT    NOT NULL,
+      synced_to_cloud     INTEGER NOT NULL DEFAULT 0,
+      pending_delete      INTEGER NOT NULL DEFAULT 0
+    )
+  ''';
+
+  // ── CRUD: shoes (local mirror of the Supabase `shoes` table) ──────────────
+
+  Future<List<Map<String, dynamic>>> getShoeRows({bool includeDeleted = false}) async {
+    try {
+      final db = await database;
+      return db.query(
+        'shoes',
+        where: includeDeleted ? null : 'pending_delete = 0',
+        orderBy: 'is_retired ASC, distance_meters DESC',
+      );
+    } catch (e, stack) {
+      debugPrint('getShoeRows error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  Future<void> upsertShoeRow(Map<String, dynamic> row) async {
+    final db = await database;
+    await db.insert(
+      'shoes',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteShoeRow(String id) async {
+    final db = await database;
+    await db.delete('shoes', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> markShoeSynced(String id) async {
+    final db = await database;
+    await db.update(
+      'shoes',
+      {'synced_to_cloud': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedShoeRows() async {
+    final db = await database;
+    return db.query('shoes', where: 'synced_to_cloud = 0');
+  }
+
+  Future<void> replaceAllShoeRows(List<Map<String, dynamic>> rows) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('shoes');
+      for (final r in rows) {
+        await txn.insert('shoes', r,
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
   }
 
   // ── CRUD: runs ────────────────────────────────────────────────────────────

@@ -375,12 +375,7 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
   // ── Stats tab ────────────────────────────────────────────────────────────
 
   Widget _statsTab(BuildContext context) {
-    if (!_isSelf) {
-      return _Placeholder(
-        icon: Icons.lock_outline,
-        text: 'This athlete\'s activity stats are private.',
-      );
-    }
+    if (!_isSelf) return _publicStatsTab(context);
     final s = _stats;
     if (s == null || s.totalActivities == 0) {
       return _Placeholder(
@@ -483,6 +478,70 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
         ],
       ),
     );
+  }
+
+  /// Another athlete: high-level figures read from the denormalized aggregate
+  /// columns on `profiles` (the raw `runs` table stays RLS-private).
+  Widget _publicStatsTab(BuildContext context) {
+    final p = _profile!;
+    if (!p.hasPublicStats) {
+      return _Placeholder(
+        icon: Icons.timeline,
+        text: 'No public stats yet.',
+      );
+    }
+    return ValueListenableBuilder<bool>(
+      valueListenable: UnitUtils.useMilesNotifier,
+      builder: (context, useMiles, _) {
+        final unit = UnitUtils.unitLabel(useMiles);
+        final km = p.totalDistanceMeters / 1000.0;
+        final prs = <PREntry>[
+          if (p.best5kSeconds != null)
+            PREntry(label: 'Best 5K', value: _fmtClock(p.best5kSeconds!)),
+          if (p.best10kSeconds != null)
+            PREntry(label: 'Best 10K', value: _fmtClock(p.best10kSeconds!)),
+          if (p.bestHalfMarathonSeconds != null)
+            PREntry(
+              label: 'Best half',
+              value: _fmtClock(p.bestHalfMarathonSeconds!),
+            ),
+        ];
+        return ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            _cardLabel(context, 'ALL-TIME'),
+            const SizedBox(height: 12),
+            _statRow(context, [
+              _Metric(
+                UnitUtils.displayDistance(km, useMiles).toStringAsFixed(0),
+                unit,
+              ),
+              _Metric(_fmtDuration(p.totalMovingSeconds), 'time'),
+              _Metric(p.totalRuns.toString(), 'runs'),
+            ]),
+            const SizedBox(height: 12),
+            _statRow(context, [
+              _Metric(p.totalElevationMeters.toString(), 'm elev'),
+            ]),
+            if (prs.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _cardLabel(context, 'PERSONAL RECORDS'),
+              const SizedBox(height: 12),
+              ...prs.map((e) => _prRow(context, e)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  static String _fmtClock(int totalSeconds) {
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    final mm = m.toString().padLeft(h > 0 ? 2 : 1, '0');
+    final ss = s.toString().padLeft(2, '0');
+    return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
   }
 
   // ── Gear tab ─────────────────────────────────────────────────────────────

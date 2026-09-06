@@ -61,6 +61,8 @@ dependencies:
   gal: ^2.3.2
   flutter_blue_plus: ^1.35.3
   health: ^13.2.0
+  image_picker: ^1.1.2
+  image: ^4.2.0
 
 dev_dependencies:
   flutter_test:

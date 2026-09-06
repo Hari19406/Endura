@@ -41,20 +41,24 @@ class Shoe {
       ? nickname!.trim()
       : '$brand $model';
 
-  factory Shoe.fromMap(Map<String, dynamic> m) => Shoe(
+  /// Accepts both a Supabase row (bools, `user_id`) and a local SQLite row
+  /// (0/1 ints, no `user_id` column — caller passes [fallbackUserId]).
+  factory Shoe.fromMap(Map<String, dynamic> m, {String? fallbackUserId}) => Shoe(
     id: m['id'] as String?,
-    userId: m['user_id'] as String,
+    userId: (m['user_id'] as String?) ?? fallbackUserId ?? '',
     brand: m['brand'] as String,
     model: m['model'] as String,
     nickname: m['nickname'] as String?,
     distanceMeters: (m['distance_meters'] as num?)?.toDouble() ?? 0,
     maxDistanceMeters: (m['max_distance_meters'] as num?)?.toDouble() ?? 800000,
-    isDefault: m['is_default'] as bool? ?? false,
-    isRetired: m['is_retired'] as bool? ?? false,
+    isDefault: _bool(m['is_default']),
+    isRetired: _bool(m['is_retired']),
   );
 
-  /// Editable-column payload. Omits `id` (DB-generated) and `user_id` (set by
-  /// the service from the auth session).
+  static bool _bool(Object? v) => v == true || v == 1;
+
+  /// Editable-column payload for Supabase. Omits `id` (DB-generated) and
+  /// `user_id` (set by the service from the auth session).
   Map<String, dynamic> toMap() => {
     'brand': brand,
     'model': model,
@@ -63,6 +67,25 @@ class Shoe {
     'max_distance_meters': maxDistanceMeters,
     'is_default': isDefault,
     'is_retired': isRetired,
+  };
+
+  /// Full local SQLite row (bools as 0/1, includes id + sync bookkeeping).
+  Map<String, dynamic> toLocalMap({
+    required bool synced,
+    bool pendingDelete = false,
+    DateTime? updatedAt,
+  }) => {
+    'id': id,
+    'brand': brand,
+    'model': model,
+    'nickname': nickname,
+    'distance_meters': distanceMeters,
+    'max_distance_meters': maxDistanceMeters,
+    'is_default': isDefault ? 1 : 0,
+    'is_retired': isRetired ? 1 : 0,
+    'updated_at': (updatedAt ?? DateTime.now().toUtc()).toIso8601String(),
+    'synced_to_cloud': synced ? 1 : 0,
+    'pending_delete': pendingDelete ? 1 : 0,
   };
 
   Shoe copyWith({

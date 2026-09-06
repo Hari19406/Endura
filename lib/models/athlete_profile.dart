@@ -14,6 +14,16 @@ class AthleteProfile {
   final String? country;
   final bool isPublic;
 
+  // Denormalized run aggregates (written by the owner's device on run save).
+  // Read-only here — never part of [toUpdateMap].
+  final int totalDistanceMeters;
+  final int totalRuns;
+  final int totalMovingSeconds;
+  final int totalElevationMeters;
+  final int? best5kSeconds;
+  final int? best10kSeconds;
+  final int? bestHalfMarathonSeconds;
+
   const AthleteProfile({
     required this.id,
     this.username,
@@ -23,7 +33,16 @@ class AthleteProfile {
     this.city,
     this.country,
     this.isPublic = true,
+    this.totalDistanceMeters = 0,
+    this.totalRuns = 0,
+    this.totalMovingSeconds = 0,
+    this.totalElevationMeters = 0,
+    this.best5kSeconds,
+    this.best10kSeconds,
+    this.bestHalfMarathonSeconds,
   });
+
+  bool get hasPublicStats => totalRuns > 0;
 
   /// Best-effort human label: display name → @username → "Runner".
   String get name =>
@@ -48,6 +67,13 @@ class AthleteProfile {
     city: m['city'] as String?,
     country: m['country'] as String?,
     isPublic: m['is_public'] as bool? ?? true,
+    totalDistanceMeters: (m['total_distance_meters'] as num?)?.round() ?? 0,
+    totalRuns: (m['total_runs'] as num?)?.round() ?? 0,
+    totalMovingSeconds: (m['total_moving_seconds'] as num?)?.round() ?? 0,
+    totalElevationMeters: (m['total_elevation_meters'] as num?)?.round() ?? 0,
+    best5kSeconds: (m['best_5k_seconds'] as num?)?.round(),
+    best10kSeconds: (m['best_10k_seconds'] as num?)?.round(),
+    bestHalfMarathonSeconds: (m['best_half_marathon_seconds'] as num?)?.round(),
   );
 
   /// Only the social columns — safe to `update()` without touching coaching state.
@@ -80,6 +106,13 @@ class AthleteProfile {
     city: city ?? this.city,
     country: country ?? this.country,
     isPublic: isPublic ?? this.isPublic,
+    totalDistanceMeters: totalDistanceMeters,
+    totalRuns: totalRuns,
+    totalMovingSeconds: totalMovingSeconds,
+    totalElevationMeters: totalElevationMeters,
+    best5kSeconds: best5kSeconds,
+    best10kSeconds: best10kSeconds,
+    bestHalfMarathonSeconds: bestHalfMarathonSeconds,
   );
 }
 

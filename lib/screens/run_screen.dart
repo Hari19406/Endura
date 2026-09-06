@@ -18,6 +18,8 @@ import '../services/revenue_cat_service.dart';
 import '../services/audio_cue_service.dart';
 import 'dart:convert';
 import '../services/cloud_sync_service.dart';
+import '../services/shoe_service.dart';
+import '../services/profile_service.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../widgets/target_pace_indicator.dart';
 import '../engines/pace_engine.dart';
@@ -1313,6 +1315,19 @@ class _RunScreenState extends State<RunScreen>
         CloudSyncService.instance.syncPendingRuns().then(
           (r) => debugPrint('Sync: $r'),
         );
+
+        // Social/offline-first side effects — best-effort, never block the
+        // summary screen. Accrue mileage on the default shoe and refresh the
+        // denormalized run aggregates on the public profile.
+        try {
+          await ShoeService.instance.addDistanceToDefaultShoe(
+            _capturedMainDistanceM,
+          );
+          final allRuns = await DatabaseService.instance.getAllRuns();
+          await ProfileService.instance.pushRunAggregates(allRuns);
+        } catch (e) {
+          debugPrint('[run save] shoe/aggregate update skipped: $e');
+        }
         await Analytics.workoutCompleted(
           durationSeconds: _capturedMainSeconds,
           distanceKm: double.parse(

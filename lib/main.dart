@@ -18,6 +18,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'services/analytics_service.dart';
 import 'services/revenue_cat_service.dart';
 import 'services/profile_service.dart';
+import 'services/hydration_service.dart';
 import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
@@ -280,6 +281,11 @@ class _AppInitializerState extends State<AppInitializer> {
           await ThemeController.instance.applyFromRemote(profile?.themeMode);
           _savePushToken().catchError(
             (e) => debugPrint('[Auth] savePushToken error: $e'),
+          );
+          // Offline-first: hydrate local state on a fresh device + flush any
+          // queued shoe edits.
+          HydrationService.instance.hydrateOnLogin().catchError(
+            (e) => debugPrint('[Auth] hydrateOnLogin error: $e'),
           );
         }
       }
