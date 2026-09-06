@@ -6,6 +6,9 @@ import '../models/weekly_plan.dart';
 import '../models/training_phase.dart';
 import '../models/workout_type.dart';
 import '../engines/plan/week_resolver.dart';
+import '../engines/plan/materialized_plan.dart';
+import '../engines/plan/plan_store.dart';
+import '../engines/plan/plan_materialization_coordinator.dart';
 import '../engines/config/workout_template_library.dart'
     show WorkoutIntent, RaceDistance;
 import '../engines/config/archetype_table.dart' show ExperienceLevel;
@@ -25,7 +28,7 @@ import 'paywall_screen.dart';
 /// the same deterministic day shape the engine would assign. Weeks past the
 /// trial window are locked — phase + volume stay visible, the day strip
 /// does not, per the Runna-style "weekly shape only" pattern.
-class PlanOverviewScreen extends StatelessWidget {
+class PlanOverviewScreen extends StatefulWidget {
   final RacePlan racePlan;
   final WeeklyPlan? activePlan;
   final bool useMiles;
@@ -41,7 +44,87 @@ class PlanOverviewScreen extends StatelessWidget {
     this.longRunDayIndex,
   });
 
+  @override
+  State<PlanOverviewScreen> createState() => _PlanOverviewScreenState();
+}
+
+class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
   static const _resolver = WeekResolver();
+
+  /// The stored full plan, when it matches the current inputs. Each week's day
+  /// strip is read from this; otherwise it falls back to a live resolve.
+  MaterializedPlan? _materialized;
+
+  RacePlan get racePlan => widget.racePlan;
+  WeeklyPlan? get activePlan => widget.activePlan;
+  bool get useMiles => widget.useMiles;
+  List<int> get trainingDayIndices => widget.trainingDayIndices;
+  int? get longRunDayIndex => widget.longRunDayIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMaterialized();
+  }
+
+  Future<void> _loadMaterialized() async {
+    try {
+      final plan = await PlanStore.instance.load();
+      if (plan == null || !mounted) return;
+      // Only trust it if it was built for the same inputs we're showing.
+      final fp = PlanMaterializationCoordinator.fingerprint(
+        goalRace: racePlan.goalRace,
+        raceDate: racePlan.raceDate,
+        trainingDays: trainingDayIndices,
+        longRunDayIndex: longRunDayIndex,
+        experienceLevel: racePlan.experienceLevel,
+      );
+      // goalTimeSeconds is not on RacePlan; accept a fingerprint that matches
+      // ignoring the trailing goal-time segment.
+      final head = fp.substring(0, fp.lastIndexOf('|'));
+      if (plan.inputsFingerprint.startsWith(head)) {
+        setState(() => _materialized = plan);
+      }
+    } catch (_) {
+      // fall back to live resolve
+    }
+  }
+
+  /// A week's day shape — from the stored plan when we have it, else a live
+  /// resolve (unchanged legacy path).
+  WeekResolution _resolutionForWeek(WeekTarget week) {
+    final mw = _materialized?.weekByNumber(week.week);
+    if (mw != null) return _fromMaterialized(mw);
+    return _resolveShape(week);
+  }
+
+  WeekResolution _fromMaterialized(MaterializedWeek mw) => WeekResolution(
+    weekNumber: mw.weekNumber,
+    phase: mw.phase,
+    targetKm: mw.targetKm,
+    days: [
+      for (final d in mw.days)
+        DaySlot(
+          weekday: d.weekday,
+          slotType: _slotFromMaterialized(d.slot),
+          intent: d.intent,
+          templateId: d.templateId,
+          progressionStep: d.progressionStep,
+          isRest: d.isRest,
+          label: d.slot.name,
+          distanceKm: d.workout?.totalDistanceKm,
+        ),
+    ],
+  );
+
+  static SlotType _slotFromMaterialized(MaterializedSlot s) => switch (s) {
+    MaterializedSlot.easy => SlotType.easy,
+    MaterializedSlot.quality1 => SlotType.quality1,
+    MaterializedSlot.quality2 => SlotType.quality2,
+    MaterializedSlot.longRun => SlotType.longRun,
+    MaterializedSlot.mediumLong => SlotType.mediumLong,
+    MaterializedSlot.rest => SlotType.rest,
+  };
 
   RaceDistance get _raceDistance => switch (racePlan.goalRace) {
     '5k' => RaceDistance.fiveK,
@@ -118,7 +201,7 @@ class PlanOverviewScreen extends StatelessWidget {
               final isCurrent = week.week == currentWeekNumber;
               final isLocked = !isPro && week.week > currentWeekNumber;
               final weekStart = _weekStart(week.week);
-              final resolution = _resolveShape(week);
+              final resolution = _resolutionForWeek(week);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
