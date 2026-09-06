@@ -244,9 +244,11 @@ class RacePlanBuilder {
       _experienceFrom(experienceLevel),
     );
 
-    // Reachable peak given build weeks and safe gain.
+    // Reachable peak given build weeks and safe gain. Never below what the
+    // athlete already runs (they may start above the model ceiling), never
+    // above the model ceiling unless the current base already exceeds it.
     final reachable = currentWeeklyKm + (buildWeeks * maxWeeklyGain);
-    return min(ceiling, reachable).clamp(currentWeeklyKm, ceiling);
+    return max(currentWeeklyKm, min(ceiling, reachable));
   }
 
   static double _peakLongRunKm(String race, String level) {

@@ -57,7 +57,12 @@ class VolumeModel {
     final minV = minViableKm(race);
     final d = days.clamp(3, 7);
     final t = (d - 3) / 4.0;
-    final defaultKm = _lerp(minV * 1.25, peak * 0.62, t);
+    // Typical current volume climbs with day count, from a floor (~45% of peak,
+    // never below min-viable) at 3 days to ~75% of peak at 7. Always strictly
+    // increasing in days, always ≥ minV.
+    final lo = _max(minV, peak * 0.45);
+    final hi = _max(lo + 4, peak * 0.75);
+    final defaultKm = _lerp(lo, hi, t);
     return WeeklyKmRange(
       min: minV.roundToDouble(),
       max: peak.roundToDouble(),
@@ -66,4 +71,5 @@ class VolumeModel {
   }
 
   static double _lerp(double a, double b, double t) => a + (b - a) * t;
+  static double _max(double a, double b) => a > b ? a : b;
 }

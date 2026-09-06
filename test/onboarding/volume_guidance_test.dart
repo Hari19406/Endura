@@ -118,8 +118,8 @@ void main() {
     // lighter than a 6-day one and invert the whole gate.
     test('carry more volume than six-day weeks', () {
       for (final goal in const ['5k', '10k', 'half_marathon', 'marathon']) {
-        final six = VolumeGuidance.rangeFor(goal, 6);
-        final seven = VolumeGuidance.rangeFor(goal, 7);
+        final six = VolumeGuidance.rangeFor(goal, 'intermediate', 6);
+        final seven = VolumeGuidance.rangeFor(goal, 'intermediate', 7);
         expect(
           seven.defaultKm,
           greaterThan(six.defaultKm),
@@ -132,7 +132,7 @@ void main() {
       for (final goal in const ['5k', '10k', 'half_marathon', 'marathon']) {
         var previous = 0.0;
         for (var d = kMinRunsPerWeek; d <= kMaxRunsPerWeek; d++) {
-          final km = VolumeGuidance.rangeFor(goal, d).defaultKm;
+          final km = VolumeGuidance.rangeFor(goal, 'intermediate', d).defaultKm;
           expect(km, greaterThan(previous), reason: '$goal at $d days');
           previous = km;
         }
