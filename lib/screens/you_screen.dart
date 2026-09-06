@@ -14,6 +14,7 @@ import '../widgets/achievement_tile.dart';
 import 'milestones_screen.dart';
 import 'history_tab.dart';
 import 'athlete_profile_screen.dart';
+import 'athlete_discovery_screen.dart';
 
 class YouScreen extends StatefulWidget {
   const YouScreen({super.key});
@@ -207,6 +208,20 @@ class _YouScreenState extends State<YouScreen>
         backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         actions: [
+          IconButton(
+            icon: Icon(
+              Icons.search,
+              color: c.textSecondary,
+              size: 22,
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AthleteDiscoveryScreen(),
+              ),
+            ),
+            tooltip: 'Find runners',
+          ),
           IconButton(
             icon: Icon(
               Icons.person_outline,

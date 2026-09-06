@@ -83,9 +83,15 @@ class _AthleteListScreenState extends State<AthleteListScreen> {
 }
 
 /// A single tappable athlete row (avatar, display name, location).
+/// [followsYou] shows a compact "Follows you" pill next to the name.
 class AthleteRow extends StatelessWidget {
   final AthleteProfile athlete;
-  const AthleteRow({super.key, required this.athlete});
+  final bool followsYou;
+  const AthleteRow({
+    super.key,
+    required this.athlete,
+    this.followsYou = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -98,12 +104,24 @@ class AthleteRow extends StatelessWidget {
         ),
       ),
       leading: AthleteAvatar(athlete: athlete, radius: 20),
-      title: Text(
-        athlete.name,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: c.textPrimary,
-        ),
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text(
+              athlete.name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: c.textPrimary,
+              ),
+            ),
+          ),
+          if (followsYou) ...[
+            const SizedBox(width: 8),
+            const FollowsYouPill(),
+          ],
+        ],
       ),
       subtitle: athlete.location != null
           ? Text(
@@ -112,6 +130,32 @@ class AthleteRow extends StatelessWidget {
             )
           : null,
       trailing: Icon(Icons.chevron_right, color: c.textFaint, size: 20),
+    );
+  }
+}
+
+/// Compact, muted "Follows you" pill.
+class FollowsYouPill extends StatelessWidget {
+  const FollowsYouPill({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.surfaceAlt,
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        'Follows you',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: c.textTertiary,
+        ),
+      ),
     );
   }
 }

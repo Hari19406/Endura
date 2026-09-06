@@ -10,12 +10,84 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/athlete_profile.dart';
 import 'analytics_service.dart';
 
+/// The raw `follows`-table primitives, behind an interface so the follow-graph
+/// logic in [SocialService] can be unit-tested with an in-memory fake.
+abstract class FollowStore {
+  Future<bool> exists(String followerId, String followingId);
+  Future<void> add(String followerId, String followingId);
+  Future<void> remove(String followerId, String followingId);
+
+  /// Of [candidateFollowerIds], those that have a row
+  /// `follower_id = candidate AND following_id = meId`.
+  Future<Set<String>> followerIdsAmong(
+    String meId,
+    List<String> candidateFollowerIds,
+  );
+}
+
+class SupabaseFollowStore implements FollowStore {
+  SupabaseClient get _c => Supabase.instance.client;
+
+  @override
+  Future<bool> exists(String followerId, String followingId) async {
+    final row = await _c
+        .from('follows')
+        .select('follower_id')
+        .eq('follower_id', followerId)
+        .eq('following_id', followingId)
+        .maybeSingle();
+    return row != null;
+  }
+
+  @override
+  Future<void> add(String followerId, String followingId) => _c
+      .from('follows')
+      .upsert(
+        {'follower_id': followerId, 'following_id': followingId},
+        onConflict: 'follower_id,following_id',
+        ignoreDuplicates: true,
+      );
+
+  @override
+  Future<void> remove(String followerId, String followingId) => _c
+      .from('follows')
+      .delete()
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId);
+
+  @override
+  Future<Set<String>> followerIdsAmong(
+    String meId,
+    List<String> candidateFollowerIds,
+  ) async {
+    if (candidateFollowerIds.isEmpty) return {};
+    final rows = await _c
+        .from('follows')
+        .select('follower_id')
+        .eq('following_id', meId)
+        .inFilter('follower_id', candidateFollowerIds);
+    return (rows as List)
+        .map((r) => (r as Map<String, dynamic>)['follower_id'] as String)
+        .toSet();
+  }
+}
+
 class SocialService {
   static final SocialService instance = SocialService._();
-  SocialService._();
+  SocialService._() : _store = SupabaseFollowStore(), _uidOverride = null;
+
+  /// Test seam: inject a fake [FollowStore] and a fixed current-user id so the
+  /// follow-graph methods run without a live Supabase session.
+  @visibleForTesting
+  SocialService.forTest({required FollowStore store, required String uid})
+    : _store = store,
+      _uidOverride = uid;
+
+  final FollowStore _store;
+  final String? _uidOverride;
 
   SupabaseClient get _client => Supabase.instance.client;
-  String? get _uid => _client.auth.currentUser?.id;
+  String? get _uid => _uidOverride ?? _client.auth.currentUser?.id;
 
   // ── Discovery ─────────────────────────────────────────────────────────────
 
@@ -43,6 +115,27 @@ class SocialService {
     }
   }
 
+  /// Popular public athletes (by lifetime run count) for the discovery screen's
+  /// empty state. Excludes the signed-in user and rows with no display name.
+  Future<List<AthleteProfile>> suggestedAthletes({int limit = 20}) async {
+    try {
+      final rows = await _client
+          .from('profiles')
+          .select()
+          .eq('is_public', true)
+          .not('display_name', 'is', null)
+          .order('total_runs', ascending: false)
+          .limit(limit);
+      return (rows as List)
+          .map((r) => AthleteProfile.fromMap(r as Map<String, dynamic>))
+          .where((a) => a.id != _uid)
+          .toList();
+    } catch (e) {
+      debugPrint('[SocialService] suggestedAthletes error: $e');
+      return [];
+    }
+  }
+
   /// Single athlete by id. Returns null if not found or not visible to caller.
   Future<AthleteProfile?> getAthlete(String userId) async {
     try {
@@ -60,14 +153,13 @@ class SocialService {
 
   // ── Follow / unfollow ────────────────────────────────────────────────────
 
+  /// Creates the single directed edge `(me → targetUserId)`. Never touches the
+  /// reverse edge.
   Future<bool> follow(String targetUserId) async {
     final me = _uid;
     if (me == null || me == targetUserId) return false;
     try {
-      await _client.from('follows').upsert({
-        'follower_id': me,
-        'following_id': targetUserId,
-      }, onConflict: 'follower_id,following_id', ignoreDuplicates: true);
+      await _store.add(me, targetUserId);
       Analytics.capture('athlete_followed', properties: {'target': targetUserId});
       return true;
     } catch (e) {
@@ -76,16 +168,16 @@ class SocialService {
     }
   }
 
+  /// Removes the `(me → targetUserId)` edge only.
   Future<bool> unfollow(String targetUserId) async {
     final me = _uid;
     if (me == null) return false;
     try {
-      await _client
-          .from('follows')
-          .delete()
-          .eq('follower_id', me)
-          .eq('following_id', targetUserId);
-      Analytics.capture('athlete_unfollowed', properties: {'target': targetUserId});
+      await _store.remove(me, targetUserId);
+      Analytics.capture(
+        'athlete_unfollowed',
+        properties: {'target': targetUserId},
+      );
       return true;
     } catch (e) {
       debugPrint('[SocialService] unfollow error: $e');
@@ -93,22 +185,47 @@ class SocialService {
     }
   }
 
-  /// Whether the signed-in user follows [targetUserId].
+  /// Whether the signed-in user follows [targetUserId] — i.e. a row exists with
+  /// `follower_id = me AND following_id = targetUserId`.
   Future<bool> isFollowing(String targetUserId) async {
     final me = _uid;
     if (me == null) return false;
     try {
-      final row = await _client
-          .from('follows')
-          .select('follower_id')
-          .eq('follower_id', me)
-          .eq('following_id', targetUserId)
-          .maybeSingle();
-      return row != null;
+      return await _store.exists(me, targetUserId);
     } catch (e) {
       debugPrint('[SocialService] isFollowing error: $e');
       return false;
     }
+  }
+
+  /// The IDs, out of [targetUserIds], of athletes who follow the signed-in
+  /// user (rows with `following_id = me`). Batch lookup for "Follows you"
+  /// badges on a list of search results.
+  Future<Set<String>> getFollowerIdsAmong(List<String> targetUserIds) async {
+    final me = _uid;
+    if (me == null || targetUserIds.isEmpty) return {};
+    try {
+      return await _store.followerIdsAmong(me, targetUserIds);
+    } catch (e) {
+      debugPrint('[SocialService] getFollowerIdsAmong error: $e');
+      return {};
+    }
+  }
+
+  /// One-way follow toggle (Strava-style — never reciprocates):
+  /// - already following → DELETE the single `(me, target)` row
+  /// - not following     → INSERT exactly one `(me, target)` row
+  ///
+  /// Returns the resulting state (`true` = now following, `false` = now not),
+  /// or `null` if the write failed or the target is invalid / yourself.
+  Future<bool?> toggleFollow(String targetUserId) async {
+    final me = _uid;
+    if (me == null || me == targetUserId) return null;
+    final currentlyFollowing = await isFollowing(targetUserId);
+    final ok = currentlyFollowing
+        ? await unfollow(targetUserId)
+        : await follow(targetUserId);
+    return ok ? !currentlyFollowing : null;
   }
 
   // ── Counts + lists ───────────────────────────────────────────────────────

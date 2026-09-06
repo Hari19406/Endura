@@ -102,20 +102,31 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
   Future<void> _toggleFollow() async {
     final id = _profile?.id;
     if (id == null || _followBusy) return;
-    setState(() => _followBusy = true);
-    final s = SocialService.instance;
-    final ok = _isFollowing ? await s.unfollow(id) : await s.follow(id);
+
+    // Optimistic: flip the button and the follower count immediately.
+    final wasFollowing = _isFollowing;
+    final prevCounts = _counts;
+    setState(() {
+      _followBusy = true;
+      _isFollowing = !wasFollowing;
+      _counts = SocialCounts(
+        followers: (_counts.followers + (_isFollowing ? 1 : -1))
+            .clamp(0, 1 << 30),
+        following: _counts.following,
+      );
+    });
+
+    final result = await SocialService.instance.toggleFollow(id);
     if (!mounted) return;
     setState(() {
-      if (ok) {
-        _isFollowing = !_isFollowing;
-        _counts = SocialCounts(
-          followers: (_counts.followers + (_isFollowing ? 1 : -1))
-              .clamp(0, 1 << 30),
-          following: _counts.following,
-        );
-      }
       _followBusy = false;
+      if (result == null) {
+        // Write failed — roll back to the pre-tap state.
+        _isFollowing = wasFollowing;
+        _counts = prevCounts;
+      } else {
+        _isFollowing = result;
+      }
     });
   }
 
@@ -342,6 +353,8 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
       return _OutlineButton(label: 'Edit Profile', onTap: _editProfile);
     }
     final following = _isFollowing;
+    // Optimistic: the label/style flip on tap; no spinner. `_followBusy` only
+    // debounces double-taps while the write is in flight.
     return GestureDetector(
       onTap: _toggleFollow,
       child: Container(
@@ -353,20 +366,14 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
           border: Border.all(color: following ? c.border : c.accent),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: _followBusy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(
-                following ? 'Following' : 'Follow',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: following ? c.textPrimary : c.onAccent,
-                ),
-              ),
+        child: Text(
+          following ? 'Following' : 'Follow',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: following ? c.textPrimary : c.onAccent,
+          ),
+        ),
       ),
     );
   }
