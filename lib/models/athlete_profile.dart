@@ -13,6 +13,10 @@ class AthleteProfile {
   final String? country;
   final bool isPublic;
 
+  /// Has an active Endura Pro entitlement (denormalized `profiles.is_pro`).
+  /// Drives the verified badge on the feed / profile header.
+  final bool isSubscribed;
+
   // Denormalized run aggregates (written by the owner's device on run save).
   // Read-only here — never part of [toUpdateMap].
   final int totalDistanceMeters;
@@ -31,6 +35,7 @@ class AthleteProfile {
     this.city,
     this.country,
     this.isPublic = true,
+    this.isSubscribed = false,
     this.totalDistanceMeters = 0,
     this.totalRuns = 0,
     this.totalMovingSeconds = 0,
@@ -63,6 +68,7 @@ class AthleteProfile {
     city: m['city'] as String?,
     country: m['country'] as String?,
     isPublic: m['is_public'] as bool? ?? true,
+    isSubscribed: m['is_pro'] as bool? ?? false,
     totalDistanceMeters: (m['total_distance_meters'] as num?)?.round() ?? 0,
     totalRuns: (m['total_runs'] as num?)?.round() ?? 0,
     totalMovingSeconds: (m['total_moving_seconds'] as num?)?.round() ?? 0,
@@ -99,6 +105,7 @@ class AthleteProfile {
     city: city ?? this.city,
     country: country ?? this.country,
     isPublic: isPublic ?? this.isPublic,
+    isSubscribed: isSubscribed,
     totalDistanceMeters: totalDistanceMeters,
     totalRuns: totalRuns,
     totalMovingSeconds: totalMovingSeconds,

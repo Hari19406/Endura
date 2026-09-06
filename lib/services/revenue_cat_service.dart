@@ -3,12 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
+import 'profile_service.dart';
+
 class RevenueCatService {
   static const _androidKey = String.fromEnvironment('REVENUECAT_ANDROID_KEY');
   static const _iosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
 
   // Cached pro status — updated by the listener set up in init()
   static final ValueNotifier<bool> isProNotifier = ValueNotifier(false);
+
+  /// Mirror the entitlement onto `profiles.is_pro` so it can drive the verified
+  /// badge on the activity feed. Best-effort — never throws.
+  static void _syncProToProfile(bool isPro) {
+    ProfileService.instance
+        .updateField('is_pro', isPro)
+        .catchError((_) => false);
+  }
 
   static Future<void> init(String supabaseUserId) async {
     if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
@@ -20,10 +30,14 @@ class RevenueCatService {
     // Seed the cache immediately
     final info = await Purchases.getCustomerInfo();
     isProNotifier.value = info.entitlements.active.containsKey('endura_pro');
+    _syncProToProfile(isProNotifier.value);
 
     // Keep cache live — fires when subscription status changes
     Purchases.addCustomerInfoUpdateListener((info) {
-      isProNotifier.value = info.entitlements.active.containsKey('endura_pro');
+      final nowPro = info.entitlements.active.containsKey('endura_pro');
+      final changed = isProNotifier.value != nowPro;
+      isProNotifier.value = nowPro;
+      if (changed) _syncProToProfile(nowPro);
     });
   }
 

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../engines/run_aggregates.dart';
 import '../models/athlete_profile.dart';
 import '../utils/database_service.dart' show RunRecord;
+import 'revenue_cat_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UserProfile model
@@ -388,6 +389,9 @@ class ProfileService {
           .from('profiles')
           .update({
             ...agg.toMap(),
+            // Denormalized entitlement flag — drives the verified badge on the
+            // activity feed. Cheap to refresh here on every run save.
+            'is_pro': RevenueCatService.isProNotifier.value,
             'stats_updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', _userId!);

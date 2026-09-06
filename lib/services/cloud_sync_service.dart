@@ -3,6 +3,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../engines/memory/engine_memory_service.dart';
 import '../utils/database_service.dart';
 
 class CloudSyncService {
@@ -22,6 +23,7 @@ class CloudSyncService {
     if (!isSignedIn) return false;
 
     try {
+      final plan = await _planTagFor(run);
       await _client.from('runs').upsert({
         'user_id': _userId,
         'distance_km': run.distanceKm,
@@ -36,6 +38,8 @@ class CloudSyncService {
         // server-side value with NULL if it's set after the first sync.
         if (run.rpe != null) 'rpe': run.rpe,
         if (run.elapsedSeconds != null) 'elapsed_seconds': run.elapsedSeconds,
+        if (plan.$1 != null) 'plan_name': plan.$1,
+        if (plan.$2 != null) 'plan_progress': plan.$2,
       });
 
       await DatabaseService.instance.markRunSynced(run.id!);
@@ -266,6 +270,31 @@ class CloudSyncService {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  /// The `(plan_name, plan_progress)` tag to stamp on a run in the cloud, for
+  /// the activity feed. Only guided (non-free) runs made against an active race
+  /// plan get one — everything else is `(null, null)` and the columns stay NULL.
+  Future<(String?, String?)> _planTagFor(RunRecord run) async {
+    if (run.workoutType == 'free') return (null, null);
+    try {
+      final plan = (await EngineMemoryService().load()).racePlan;
+      if (plan == null) return (null, null);
+      final name = switch (plan.goalRace) {
+        '10k' => '10K Plan',
+        'half_marathon' => 'Half Marathon Plan',
+        'marathon' => 'Marathon Plan',
+        '5k' => '5K Plan',
+        _ => 'Training Plan',
+      };
+      final progress = plan.totalWeeks > 0
+          ? 'Week ${plan.currentWeekNumber(run.date)} / ${plan.totalWeeks}'
+          : null;
+      return (name, progress);
+    } catch (e) {
+      debugPrint('[CloudSync] _planTagFor error: $e');
+      return (null, null);
+    }
+  }
 
   Future<RunRecord?> _getLocalRun(int runId) async {
     try {

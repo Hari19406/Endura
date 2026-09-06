@@ -20,6 +20,18 @@ class FeedRun {
   final String workoutType;
   final String routePolyline; // app "lat,lng;lat,lng" format, may be empty
 
+  /// Athlete has an active Endura Pro entitlement → verified badge.
+  final bool isSubscribed;
+
+  /// Recording source label for the card subtitle (there's one first-party
+  /// tracker, so this is effectively a constant today).
+  final String source;
+
+  /// Training-plan tag stamped at upload time for guided runs. Both null for
+  /// free runs / runs made with no active plan — the card collapses the pill.
+  final String? planName;
+  final String? planProgress; // e.g. "Week 3 / 8"
+
   const FeedRun({
     required this.athleteId,
     required this.displayName,
@@ -33,6 +45,10 @@ class FeedRun {
     this.elevationGain = 0,
     this.workoutType = 'easy',
     this.routePolyline = '',
+    this.isSubscribed = false,
+    this.source = 'Endura Tracker',
+    this.planName,
+    this.planProgress,
   });
 
   /// Decoded `{lat, lng}` points for the route thumbnail. Empty when there's no
