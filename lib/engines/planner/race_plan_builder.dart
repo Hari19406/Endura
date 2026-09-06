@@ -1,6 +1,9 @@
 import 'dart:math';
 import '../../models/race_plan.dart';
 import '../../models/training_phase.dart';
+import '../config/archetype_table.dart' show ExperienceLevel;
+import '../config/volume_model.dart';
+import '../config/workout_template_library.dart' show RaceDistance;
 
 /// RacePlanBuilder — builds a WeekTarget list for the engine.
 ///
@@ -235,22 +238,11 @@ class RacePlanBuilder {
       _ => 2.0,
     };
 
-    // Physiological ceiling per race × experience.
-    final ceiling = switch ((goalRace, experienceLevel)) {
-      ('5k', 'beginner') => 35.0,
-      ('5k', 'intermediate') => 50.0,
-      ('5k', 'advanced') => 65.0,
-      ('10k', 'beginner') => 40.0,
-      ('10k', 'intermediate') => 60.0,
-      ('10k', 'advanced') => 80.0,
-      ('half_marathon', 'beginner') => 50.0,
-      ('half_marathon', 'intermediate') => 70.0,
-      ('half_marathon', 'advanced') => 90.0,
-      ('marathon', 'beginner') => 60.0,
-      ('marathon', 'intermediate') => 80.0,
-      ('marathon', 'advanced') => 120.0,
-      _ => 50.0,
-    };
+    // Physiological ceiling per race × experience — single source of truth.
+    final ceiling = VolumeModel.peakKm(
+      _raceDistanceFrom(goalRace),
+      _experienceFrom(experienceLevel),
+    );
 
     // Reachable peak given build weeks and safe gain.
     final reachable = currentWeeklyKm + (buildWeeks * maxWeeklyGain);
@@ -331,4 +323,18 @@ class RacePlanBuilder {
   }
 
   static double _roundHalf(double v) => (v * 2).round() / 2;
+
+  static RaceDistance _raceDistanceFrom(String goalRace) => switch (goalRace) {
+    '5k' => RaceDistance.fiveK,
+    '10k' => RaceDistance.tenK,
+    'half_marathon' => RaceDistance.halfMarathon,
+    'marathon' => RaceDistance.marathon,
+    _ => RaceDistance.tenK,
+  };
+
+  static ExperienceLevel _experienceFrom(String level) => switch (level) {
+    'beginner' => ExperienceLevel.beginner,
+    'advanced' => ExperienceLevel.advanced,
+    _ => ExperienceLevel.intermediate,
+  };
 }

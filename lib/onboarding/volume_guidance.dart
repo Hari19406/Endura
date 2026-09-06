@@ -5,30 +5,20 @@
 /// marathoner running 10 km/week can select a 113 km/week peak unchallenged.
 /// Here the ceiling also respects what the athlete actually runs today.
 ///
-/// NOTE — this deliberately lives in lib/onboarding/ rather than the engine so
-/// step 2 could ship without engine changes. It reads only public engine APIs
-/// (PeakWeeklyKm.lookup, WeeklyKmRange.forRaceAndDays, ArchetypeTable.build).
-/// See ENGINE-TODO below for what should eventually move inward.
+/// Volume numbers now come from the single source [VolumeModel]
+/// (experience-aware, defined for 3–7 days). This file is thin policy on top:
+/// how many days an athlete may pick, where RECOMMENDED sits, and whether a
+/// selection is a stretch on their current base.
 library;
 
 import '../engines/config/archetype_table.dart';
+import '../engines/config/volume_model.dart';
 import '../engines/config/workout_template_library.dart' show RaceDistance;
 import '../models/training_phase.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ENGINE-TODO (deferred — do after onboarding is fully implemented)
-//
-// 1. WeeklyVolumeResolver._ranges is private, so we cannot read the real
-//    per-distance safeCap (5K 50 / 10K 80 / HM 100 / FM 130). We approximate
-//    with PeakWeeklyKm.lookup, which is a *different* table keyed by
-//    experience. Expose the ranges and use the one source of truth.
-// 2. WeeklyKmRange.forRaceAndDays has no entry for 7 days — it silently falls
-//    back to the 4-day row, which understates a 7-day week badly. Add day 7.
-// 3. The slider floor is 3 because ArchetypeTable.build returns null below 3
-//    days. A genuine 2-day beginner week needs a 2-day archetype.
-// 4. This whole file is arguably engine policy. Once the above land, move it
-//    to lib/engines/plan/ and have both onboarding and re-planning use it.
-// ─────────────────────────────────────────────────────────────────────────────
+// ENGINE-TODO (remaining): a genuine 2-day beginner week needs a 2-day
+// archetype (ArchetypeTable returns null below 3). And this file is arguably
+// engine policy — could move to lib/engines/plan/ so re-planning shares it.
 
 /// Hard floor: ArchetypeTable cannot compose a week below 3 days.
 const int kMinRunsPerWeek = 3;
@@ -88,7 +78,7 @@ class VolumeGuidance {
 
     // Two independent ceilings, whichever binds first:
     //   what the distance and experience justify …
-    final byExperience = PeakWeeklyKm.lookup(race: race, experience: level);
+    final byExperience = VolumeModel.peakKm(race, level);
     //   … and what this athlete's current base can absorb. Roughly doubling
     //   over a full block is aggressive but survivable; the +25 floor keeps
     //   very low bases from being locked out of a real plan entirely.
@@ -98,15 +88,16 @@ class VolumeGuidance {
 
     final ceiling = _min(byExperience, byBaseline);
 
-    final maxRuns = _largestDaysWithin(goal, ceiling);
+    final maxRuns = _largestDaysWithin(goal, level, ceiling);
     final recommended = _recommendedDays(
       goal: goal,
+      experience: experienceBridged,
       baselineWeeklyKm: baselineWeeklyKm,
       maxRuns: maxRuns,
     );
 
     final runs = selectedRuns.clamp(kMinRunsPerWeek, maxRuns);
-    final range = rangeFor(goal, runs);
+    final range = rangeFor(goal, experienceBridged, runs);
 
     return VolumeGuidance(
       maxRuns: maxRuns,
@@ -139,29 +130,28 @@ class VolumeGuidance {
     return week?.qualityCount ?? (days >= 5 ? 2 : 1);
   }
 
-  /// Weekly range for a day count, working around ENGINE-TODO #2.
-  ///
-  /// `WeeklyKmRange.forRaceAndDays` has no row for 7 days and silently returns
-  /// the 4-day row, so a 7-day week reports *less* volume than a 6-day one
-  /// (marathon: 62 km at 6 days, 42 km at 7). Left alone that inverts the
-  /// safety gate — 7 days would look like the cheapest option on the slider.
-  /// Extrapolate from the 6-day row until the engine has a real 7-day entry.
-  static WeeklyKmRange rangeFor(String goal, int days) {
-    if (days <= 6) {
-      return WeeklyKmRange.forRaceAndDays(race: goal, days: days);
-    }
-    final six = WeeklyKmRange.forRaceAndDays(race: goal, days: 6);
-    return WeeklyKmRange(
-      min: six.min * 1.15,
-      max: six.max * 1.12,
-      defaultKm: six.defaultKm * 1.15,
-    );
-  }
+  /// Weekly range for a race + experience + day count — straight from
+  /// [VolumeModel] (defined for 3–7 days, experience-aware).
+  static WeeklyKmRange rangeFor(String goal, String experience, int days) =>
+      VolumeModel.onboardingRange(
+        race: _race(goal),
+        experience: _level(experience),
+        days: days,
+      );
 
-  static int _largestDaysWithin(String goal, double ceilingKm) {
+  static int _largestDaysWithin(
+    String goal,
+    ExperienceLevel level,
+    double ceilingKm,
+  ) {
     var best = kMinRunsPerWeek;
     for (var d = kMinRunsPerWeek; d <= kMaxRunsPerWeek; d++) {
-      if (rangeFor(goal, d).defaultKm <= ceilingKm) best = d;
+      final r = VolumeModel.onboardingRange(
+        race: _race(goal),
+        experience: level,
+        days: d,
+      );
+      if (r.defaultKm <= ceilingKm) best = d;
     }
     return best;
   }
@@ -170,6 +160,7 @@ class VolumeGuidance {
   /// target — a modest step up from what they run now, not a leap.
   static int _recommendedDays({
     required String goal,
+    required String experience,
     required double baselineWeeklyKm,
     required int maxRuns,
   }) {
@@ -179,7 +170,7 @@ class VolumeGuidance {
     var best = kMinRunsPerWeek;
     var bestGap = double.infinity;
     for (var d = kMinRunsPerWeek; d <= maxRuns; d++) {
-      final gap = (rangeFor(goal, d).defaultKm - target).abs();
+      final gap = (rangeFor(goal, experience, d).defaultKm - target).abs();
       if (gap < bestGap) {
         bestGap = gap;
         best = d;

@@ -57,6 +57,7 @@ import 'dart:math' as math;
 
 import '../../models/training_phase.dart';
 import '../config/workout_template_library.dart';
+import 'volume_model.dart';
 
 // ============================================================================
 // SESSION TYPE
@@ -166,24 +167,12 @@ class ArchetypeWeek {
 // PEAK WEEKLY KM TABLE
 // ============================================================================
 
+/// Kept for call-site compatibility — delegates to the single source.
 class PeakWeeklyKm {
   static double lookup({
     required RaceDistance race,
     required ExperienceLevel experience,
-  }) => switch ((race, experience)) {
-    (RaceDistance.fiveK, ExperienceLevel.beginner) => 35,
-    (RaceDistance.fiveK, ExperienceLevel.intermediate) => 45,
-    (RaceDistance.fiveK, ExperienceLevel.advanced) => 55,
-    (RaceDistance.tenK, ExperienceLevel.beginner) => 40,
-    (RaceDistance.tenK, ExperienceLevel.intermediate) => 55,
-    (RaceDistance.tenK, ExperienceLevel.advanced) => 65,
-    (RaceDistance.halfMarathon, ExperienceLevel.beginner) => 50,
-    (RaceDistance.halfMarathon, ExperienceLevel.intermediate) => 65,
-    (RaceDistance.halfMarathon, ExperienceLevel.advanced) => 75,
-    (RaceDistance.marathon, ExperienceLevel.beginner) => 60,
-    (RaceDistance.marathon, ExperienceLevel.intermediate) => 75,
-    (RaceDistance.marathon, ExperienceLevel.advanced) => 90,
-  };
+  }) => VolumeModel.peakKm(race, experience);
 }
 
 // ============================================================================
@@ -201,40 +190,24 @@ class WeeklyKmRange {
     required this.defaultKm,
   });
 
+  /// Onboarding slider band. Now delegates to [VolumeModel] — experience-aware
+  /// and defined for 3–7 days (the old table stopped at 6 and wasn't keyed by
+  /// experience). [experience] defaults to intermediate for legacy callers.
   static WeeklyKmRange forRaceAndDays({
     required String race,
     required int days,
-  }) {
-    const table = <String, Map<int, WeeklyKmRange>>{
-      '5k': {
-        3: WeeklyKmRange(min: 18, max: 35, defaultKm: 24),
-        4: WeeklyKmRange(min: 22, max: 45, defaultKm: 30),
-        5: WeeklyKmRange(min: 28, max: 55, defaultKm: 38),
-        6: WeeklyKmRange(min: 35, max: 65, defaultKm: 46),
-      },
-      '10k': {
-        3: WeeklyKmRange(min: 18, max: 38, defaultKm: 26),
-        4: WeeklyKmRange(min: 24, max: 50, defaultKm: 34),
-        5: WeeklyKmRange(min: 32, max: 60, defaultKm: 42),
-        6: WeeklyKmRange(min: 40, max: 70, defaultKm: 52),
-      },
-      'half_marathon': {
-        3: WeeklyKmRange(min: 20, max: 42, defaultKm: 28),
-        4: WeeklyKmRange(min: 28, max: 55, defaultKm: 38),
-        5: WeeklyKmRange(min: 38, max: 68, defaultKm: 46),
-        6: WeeklyKmRange(min: 48, max: 75, defaultKm: 54),
-      },
-      'marathon': {
-        3: WeeklyKmRange(min: 22, max: 48, defaultKm: 32),
-        4: WeeklyKmRange(min: 32, max: 65, defaultKm: 42),
-        5: WeeklyKmRange(min: 45, max: 80, defaultKm: 52),
-        6: WeeklyKmRange(min: 55, max: 90, defaultKm: 62),
-      },
-    };
-
-    final raceMap = table[race] ?? table['10k']!;
-    return raceMap[days] ?? raceMap[4]!;
-  }
+    ExperienceLevel experience = ExperienceLevel.intermediate,
+  }) => VolumeModel.onboardingRange(
+    race: switch (race) {
+      '5k' => RaceDistance.fiveK,
+      '10k' => RaceDistance.tenK,
+      'half_marathon' => RaceDistance.halfMarathon,
+      'marathon' => RaceDistance.marathon,
+      _ => RaceDistance.tenK,
+    },
+    experience: experience,
+    days: days,
+  );
 }
 
 // ============================================================================
