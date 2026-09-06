@@ -12,7 +12,6 @@ import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/date_format_utils.dart';
 import '../utils/unit_utils.dart';
-import '../utils/workout_type_style.dart';
 import '../widgets/route_trace_painter.dart';
 import 'athlete_discovery_screen.dart';
 import 'athlete_list_screen.dart' show AthleteAvatar;
@@ -215,8 +214,468 @@ class _FeedScreenState extends State<FeedScreen>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTIVITY CARD
+//
+// Deliberately a single (dark) look — the feed is a premium dark surface
+// regardless of the app theme, so colours here are fixed rather than tokens.
 // ─────────────────────────────────────────────────────────────────────────────
 
+class _FeedPalette {
+  static const surface = Color(0xFF12161A);
+  static const border = Color(0xFF23262B);
+  static const pill = Color(0xFF1A1F25);
+  static const mapBase = Color(0xFF0E1114);
+  static const route = Color(0xFF00B2FF);
+  static const textHigh = Color(0xFFF3F5F7);
+  static const textMid = Color(0xFF9BA3AD);
+  static const textLow = Color(0xFF6A7178);
+}
+
+class RunFeedCard extends StatefulWidget {
+  final FeedRun run;
+  final VoidCallback onTapAthlete;
+
+  const RunFeedCard({super.key, required this.run, required this.onTapAthlete});
+
+  @override
+  State<RunFeedCard> createState() => _RunFeedCardState();
+}
+
+class _RunFeedCardState extends State<RunFeedCard> {
+  bool _kudosed = false;
+  final int _comments = 0; // no comment backend yet — badge stays hidden
+
+  FeedRun get run => widget.run;
+
+  void _snack(String msg) {
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final points = run.points;
+    return Container(
+      decoration: BoxDecoration(
+        color: _FeedPalette.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _FeedPalette.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Text(
+                run.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: _FeedPalette.textHigh,
+                  letterSpacing: -0.4,
+                  height: 1.15,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _statRibbon(),
+            if (run.planName != null) ...[
+              const SizedBox(height: 12),
+              _planPill(),
+            ],
+            if (points.length > 1) ...[
+              const SizedBox(height: 14),
+              _map(points),
+            ],
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: _FeedPalette.border),
+            const SizedBox(height: 6),
+            _socialBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+
+  Widget _header() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: widget.onTapAthlete,
+          behavior: HitTestBehavior.opaque,
+          child: AthleteAvatar(
+            athlete: AthleteProfile(
+              id: run.athleteId,
+              displayName: run.displayName,
+              avatarUrl: run.avatarUrl,
+            ),
+            radius: 21,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: GestureDetector(
+            onTap: widget.onTapAthlete,
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        run.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: _FeedPalette.textHigh,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                    if (run.isSubscribed) ...[
+                      const SizedBox(width: 5),
+                      const Icon(
+                        Icons.verified,
+                        size: 14,
+                        color: _FeedPalette.route,
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${relativeTime(run.date)}  ·  ${run.source}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: _FeedPalette.textMid,
+                  ),
+                ),
+                if (run.location != null && run.location!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.public,
+                        size: 12,
+                        color: _FeedPalette.textLow,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          run.location!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: _FeedPalette.textLow,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 36,
+          height: 36,
+          child: PopupMenuButton<String>(
+            icon: const Icon(
+              Icons.more_horiz,
+              size: 20,
+              color: _FeedPalette.textMid,
+            ),
+            padding: EdgeInsets.zero,
+            color: _FeedPalette.pill,
+            onSelected: (v) {
+              if (v == 'profile') {
+                widget.onTapAthlete();
+              } else if (v == 'report') {
+                _snack('Thanks — we\'ll take a look.');
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'profile',
+                child: Text(
+                  'View profile',
+                  style: TextStyle(color: _FeedPalette.textHigh),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'report',
+                child: Text(
+                  'Report activity',
+                  style: TextStyle(color: _FeedPalette.textHigh),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── 4-stat ribbon ──────────────────────────────────────────────────────────
+
+  Widget _statRibbon() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: UnitUtils.useMilesNotifier,
+      builder: (context, useMiles, _) {
+        final cells = <(String, String)>[
+          (
+            'Distance',
+            '${UnitUtils.displayDistance(run.distanceKm, useMiles).toStringAsFixed(2)} '
+                '${UnitUtils.unitLabel(useMiles)}',
+          ),
+          ('Pace', UnitUtils.formatPaceString(run.averagePace, useMiles)),
+          ('Time', _fmtDuration(run.durationSeconds)),
+          (
+            'Elev Gain',
+            run.elevationGain > 0 ? '${run.elevationGain.round()} m' : '--',
+          ),
+        ];
+        return Row(
+          children: [
+            for (final (label, value) in cells)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: _FeedPalette.textLow,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _FeedPalette.textHigh,
+                        letterSpacing: -0.3,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ── Training-plan pill ─────────────────────────────────────────────────────
+
+  Widget _planPill() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: _FeedPalette.pill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _FeedPalette.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt, size: 16, color: _FeedPalette.route),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  run.planName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _FeedPalette.textHigh,
+                  ),
+                ),
+                if (run.planProgress != null) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    run.planProgress!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: _FeedPalette.textMid,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _snack('Plan details are coming soon.'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _FeedPalette.route.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'View',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _FeedPalette.route,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Route map ──────────────────────────────────────────────────────────────
+
+  Widget _map(List<Map<String, double>> points) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 224,
+        width: double.infinity,
+        color: _FeedPalette.mapBase,
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: RouteTracePainter(
+            points: points,
+            color: _FeedPalette.route,
+            strokeWidth: 3.5,
+            padding: 18,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Social interaction bar ─────────────────────────────────────────────────
+
+  Widget _socialBar() {
+    return Row(
+      children: [
+        Icon(
+          _kudosed
+              ? Icons.local_fire_department
+              : Icons.local_fire_department_outlined,
+          size: 18,
+          color: _kudosed ? _FeedPalette.route : _FeedPalette.textLow,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          _kudosed ? 'You reacted' : 'Be the first to react',
+          style: const TextStyle(fontSize: 12, color: _FeedPalette.textMid),
+        ),
+        const Spacer(),
+        _iconAction(Icons.ios_share, 'Sharing is coming soon.'),
+        const SizedBox(width: 4),
+        _commentAction(),
+        const SizedBox(width: 4),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          icon: Icon(
+            _kudosed ? Icons.favorite : Icons.favorite_border,
+            size: 19,
+            color: _kudosed ? _FeedPalette.route : _FeedPalette.textMid,
+          ),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            setState(() => _kudosed = !_kudosed);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _iconAction(IconData icon, String soon) => IconButton(
+    visualDensity: VisualDensity.compact,
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+    icon: Icon(icon, size: 18, color: _FeedPalette.textMid),
+    onPressed: () => _snack(soon),
+  );
+
+  Widget _commentAction() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          icon: const Icon(
+            Icons.mode_comment_outlined,
+            size: 18,
+            color: _FeedPalette.textMid,
+          ),
+          onPressed: () => _snack('Comments are coming soon.'),
+        ),
+        if (_comments > 0)
+          Positioned(
+            right: 0,
+            top: 2,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                color: _FeedPalette.route,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$_comments',
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0B0B0C),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static String _fmtDuration(int totalSeconds) {
+    if (totalSeconds <= 0) return '--';
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EMPTY / ERROR STATES
