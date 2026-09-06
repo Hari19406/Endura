@@ -13,6 +13,7 @@ import '../utils/unit_utils.dart';
 import '../widgets/achievement_tile.dart';
 import 'milestones_screen.dart';
 import 'history_tab.dart';
+import 'athlete_profile_screen.dart';
 
 class YouScreen extends StatefulWidget {
   const YouScreen({super.key});
@@ -206,6 +207,18 @@ class _YouScreenState extends State<YouScreen>
         backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         actions: [
+          IconButton(
+            icon: Icon(
+              Icons.person_outline,
+              color: c.textSecondary,
+              size: 22,
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AthleteProfileScreen()),
+            ),
+            tooltip: 'Athlete profile',
+          ),
           IconButton(
             icon: Icon(
               Icons.settings_outlined,

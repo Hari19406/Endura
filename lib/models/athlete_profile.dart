@@ -1,0 +1,92 @@
+// lib/models/athlete_profile.dart
+//
+// Public social identity for an athlete. This is the outward-facing slice of the
+// `profiles` row — distinct from the coaching-config slice held by
+// [UserProfile] in profile_service.dart. Both map to the same table.
+
+class AthleteProfile {
+  final String id; // == auth.users.id
+  final String? username; // unique, [A-Za-z0-9_]{3,30}
+  final String? displayName;
+  final String? avatarUrl;
+  final String? bio;
+  final String? city;
+  final String? country;
+  final bool isPublic;
+
+  const AthleteProfile({
+    required this.id,
+    this.username,
+    this.displayName,
+    this.avatarUrl,
+    this.bio,
+    this.city,
+    this.country,
+    this.isPublic = true,
+  });
+
+  /// Best-effort human label: display name → @username → "Runner".
+  String get name =>
+      (displayName != null && displayName!.trim().isNotEmpty)
+      ? displayName!.trim()
+      : (username != null && username!.isNotEmpty ? '@$username' : 'Runner');
+
+  String? get location {
+    final parts = [
+      city?.trim(),
+      country?.trim(),
+    ].where((p) => p != null && p.isNotEmpty).toList();
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  factory AthleteProfile.fromMap(Map<String, dynamic> m) => AthleteProfile(
+    id: m['id'] as String,
+    username: m['username'] as String?,
+    displayName: m['display_name'] as String?,
+    avatarUrl: m['avatar_url'] as String?,
+    bio: m['bio'] as String?,
+    city: m['city'] as String?,
+    country: m['country'] as String?,
+    isPublic: m['is_public'] as bool? ?? true,
+  );
+
+  /// Only the social columns — safe to `update()` without touching coaching state.
+  /// Null-valued fields are included so a user can clear their bio/city/etc.
+  Map<String, dynamic> toUpdateMap() => {
+    'username': username,
+    'display_name': displayName,
+    'avatar_url': avatarUrl,
+    'bio': bio,
+    'city': city,
+    'country': country,
+    'is_public': isPublic,
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
+
+  AthleteProfile copyWith({
+    String? username,
+    String? displayName,
+    String? avatarUrl,
+    String? bio,
+    String? city,
+    String? country,
+    bool? isPublic,
+  }) => AthleteProfile(
+    id: id,
+    username: username ?? this.username,
+    displayName: displayName ?? this.displayName,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
+    bio: bio ?? this.bio,
+    city: city ?? this.city,
+    country: country ?? this.country,
+    isPublic: isPublic ?? this.isPublic,
+  );
+}
+
+/// Follower / following tallies for an athlete.
+class SocialCounts {
+  final int followers;
+  final int following;
+  const SocialCounts({required this.followers, required this.following});
+  static const zero = SocialCounts(followers: 0, following: 0);
+}

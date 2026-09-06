@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
+import '../models/athlete_profile.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // UserProfile model
 // ─────────────────────────────────────────────────────────────────────────────
@@ -330,6 +332,60 @@ class ProfileService {
       return true;
     } catch (e) {
       debugPrint('[ProfileService] updateField error: $e');
+      return false;
+    }
+  }
+
+  // ── Social / athlete identity ────────────────────────────────────────────
+  // The `profiles` row carries both coaching config (above) and public social
+  // identity (below). These helpers touch only the social columns; see
+  // AthleteProfile and supabase/migrations/20260906000000_extend_profiles_social.
+
+  Future<AthleteProfile?> fetchAthleteProfile() async {
+    if (_userId == null) return null;
+    try {
+      final row = await _client
+          .from('profiles')
+          .select(
+            'id, username, display_name, avatar_url, bio, city, country, is_public',
+          )
+          .eq('id', _userId!)
+          .maybeSingle();
+      return row == null ? null : AthleteProfile.fromMap(row);
+    } catch (e) {
+      debugPrint('[ProfileService] fetchAthleteProfile error: $e');
+      return null;
+    }
+  }
+
+  /// Patches only the social columns. Returns true on success; false (with a
+  /// logged reason) on RLS / unique-username / check-constraint failure.
+  Future<bool> updateAthleteFields(AthleteProfile profile) async {
+    if (_userId == null) return false;
+    try {
+      await _client
+          .from('profiles')
+          .update(profile.toUpdateMap())
+          .eq('id', _userId!);
+      return true;
+    } catch (e) {
+      debugPrint('[ProfileService] updateAthleteFields error: $e');
+      return false;
+    }
+  }
+
+  /// True if [username] is free (or already owned by the signed-in user).
+  /// Case-insensitive — the column is `citext`.
+  Future<bool> usernameAvailable(String username) async {
+    try {
+      final row = await _client
+          .from('profiles')
+          .select('id')
+          .eq('username', username)
+          .maybeSingle();
+      return row == null || row['id'] == _userId;
+    } catch (e) {
+      debugPrint('[ProfileService] usernameAvailable error: $e');
       return false;
     }
   }
