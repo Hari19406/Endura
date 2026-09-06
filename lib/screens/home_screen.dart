@@ -509,12 +509,16 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onRunCompleted;
   final void Function(message.CoachMessage?)? onCoachMessageReady;
 
+  /// Coach tab → "Free Run": jump to the Record tab and start an unguided run.
+  final VoidCallback? onQuickStartFreeRun;
+
   const HomeScreen({
     super.key,
     this.onNavigateToYou,
     this.onNavigateToRun,
     this.onRunCompleted,
     this.onCoachMessageReady,
+    this.onQuickStartFreeRun,
   });
 
   @override
@@ -524,7 +528,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with AutomaticKeepAliveClientMixin
     implements Refreshable {
-  RunHistory? _lastRun;
   CoachMessage? _coachMessage;
   WorkoutDisplayModel? _workoutModel;
   UserMetrics? _userMetrics;
@@ -671,7 +674,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       _engineMemory = memory;
-      _lastRun = runs.isNotEmpty ? runs.first : null;
       _runHistory = runs;
 
       // ── Populate post-plan display fields ────────────────────────────────
@@ -1252,24 +1254,6 @@ class _HomeScreenState extends State<HomeScreen>
     return 0;
   }
 
-  double _convertDistance(double km) =>
-      _distanceUnit == 'miles' ? km * 0.621371 : km;
-
-  String get _distanceLabel => _distanceUnit == 'miles' ? 'mi' : 'km';
-
-  String _formatDate(DateTime date) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inDays == 0) {
-      return 'Today at ${DateFormat('HH:mm').format(date)}';
-    } else if (diff.inDays == 1) {
-      return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
-    } else if (diff.inDays < 7) {
-      return DateFormat('EEEE').format(date);
-    } else {
-      return DateFormat('MMM dd').format(date);
-    }
-  }
-
   selector.WorkoutId? _resolveLastWorkoutId(String lastWorkoutType) {
     switch (lastWorkoutType) {
       case 'tempo':
@@ -1381,7 +1365,16 @@ class _HomeScreenState extends State<HomeScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildSectionLabel("TODAY'S WORKOUT"),
-                  if (_weather != null) _buildWeatherChip(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_weather != null) ...[
+                        _buildWeatherChip(),
+                        const SizedBox(width: 10),
+                      ],
+                      _buildFreeRunButton(),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -1575,17 +1568,46 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildBottomCarousel() {
-    final cardWidth = MediaQuery.of(context).size.width - 40;
-    return Column(
-      children: [
-        _buildWeeklyCarouselCard(cardWidth),
-        const SizedBox(height: 12),
-        _lastRun != null
-            ? _buildLastRunCarouselCard(cardWidth)
-            : _buildFirstRunPromptCard(cardWidth),
-      ],
+  /// Quick Start — jump to the Record tab and begin an unguided Free Run.
+  Widget _buildFreeRunButton() {
+    final c = context.colors;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        widget.onQuickStartFreeRun?.call();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: c.accent.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: c.accent.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.bolt, size: 14, color: c.accent),
+            const SizedBox(width: 4),
+            Text(
+              'Free Run',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: c.accent,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildBottomCarousel() {
+    // Coach tab is execution-only: just this week's adherence circles. Raw
+    // mileage totals and the last-run recap live on the You tab now.
+    final cardWidth = MediaQuery.of(context).size.width - 40;
+    return _buildWeeklyCarouselCard(cardWidth);
   }
 
   Widget _carouselShell({required Widget child, required double width}) {
@@ -1768,190 +1790,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
     return null;
-  }
-
-  Widget _buildLastRunCarouselCard(double width) {
-    final c = context.colors;
-    return _carouselShell(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'LAST RUN',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: c.textTertiary,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            _formatDate(_lastRun!.date),
-            style: TextStyle(fontSize: 11, color: c.textTertiary),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'DIST',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: c.textTertiary,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _convertDistance(
-                            _lastRun!.distance,
-                          ).toStringAsFixed(1),
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                            color: c.textPrimary,
-                            letterSpacing: -0.5,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4, left: 3),
-                          child: Text(
-                            _distanceLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: c.textTertiary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'PACE',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: c.textTertiary,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _lastRun!.averagePace,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                            color: c.textPrimary,
-                            letterSpacing: -0.5,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4, left: 3),
-                          child: Text(
-                            '/km',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: c.textTertiary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (_lastRun!.rpe != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(
-                color: c.divider,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: c.border),
-              ),
-              child: Text(
-                'RPE ${_lastRun!.rpe}/10',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: c.textPrimary,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFirstRunPromptCard(double width) {
-    final c = context.colors;
-    return _carouselShell(
-      width: width,
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: c.divider,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.directions_run, color: c.textTertiary, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'No runs yet',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: c.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Head to the Run tab to record your first run',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: c.textTertiary,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildStartPlanCard() {

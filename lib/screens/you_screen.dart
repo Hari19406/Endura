@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/pr_engine.dart';
 import '../engines/achievement_engine.dart' as achieve;
+import '../models/athlete_profile.dart';
+import '../models/shoe.dart';
+import '../services/profile_service.dart';
+import '../services/shoe_service.dart';
+import '../services/social_service.dart';
 import 'settings_screen.dart';
 import '../utils/database_service.dart';
 import 'run_detail_screen.dart';
@@ -11,10 +17,14 @@ import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/achievement_tile.dart';
+import '../widgets/athlete_profile_header.dart';
+import '../widgets/shoe_edit_sheet.dart';
+import '../widgets/shoe_locker_view.dart';
 import 'milestones_screen.dart';
 import 'history_tab.dart';
-import 'athlete_profile_screen.dart';
+import 'athlete_list_screen.dart';
 import 'athlete_discovery_screen.dart';
+import 'edit_athlete_profile_screen.dart';
 
 class YouScreen extends StatefulWidget {
   const YouScreen({super.key});
@@ -39,10 +49,17 @@ class _YouScreenState extends State<YouScreen>
   DateTime _selectedWeekStart = DateTime.now();
   bool _useMiles = false;
 
+  // ── Athlete identity header ───────────────────────────────────────────────
+  AthleteProfile? _profile;
+  SocialCounts _counts = SocialCounts.zero;
+  List<Shoe> _shoes = [];
+  int _activityCount = 0;
+  String? get _myId => Supabase.instance.client.auth.currentUser?.id;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _selectedWeekStart = _getWeekStart(DateTime.now());
     _useMiles = UnitUtils.useMilesNotifier.value;
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
@@ -71,6 +88,14 @@ class _YouScreenState extends State<YouScreen>
       WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
+
+      // ── Athlete identity header ──────────────────────────────────────────
+      final myId = _myId;
+      final profile = await ProfileService.instance.fetchAthleteProfile();
+      final counts = myId == null
+          ? SocialCounts.zero
+          : await SocialService.instance.counts(myId);
+      final shoes = await ShoeService.instance.locker();
 
       List<Run> prRuns = runs
           .map(
@@ -133,6 +158,10 @@ class _YouScreenState extends State<YouScreen>
           _newAchievements = newlyUnlocked;
           _runRecords = records;
           _runHistory = runs;
+          _profile = profile;
+          _counts = counts;
+          _shoes = shoes;
+          _activityCount = records.length;
           _isLoading = false;
         });
       }
@@ -188,6 +217,40 @@ class _YouScreenState extends State<YouScreen>
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  Future<void> _addOrEditShoe([Shoe? existing]) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.background,
+      builder: (_) => ShoeEditSheet(existing: existing),
+    );
+    if (changed == true) {
+      final shoes = await ShoeService.instance.locker();
+      if (mounted) setState(() => _shoes = shoes);
+    }
+  }
+
+  void _openAthleteList(AthleteListMode mode) {
+    final id = _myId;
+    if (id == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AthleteListScreen(userId: id, mode: mode),
+      ),
+    );
+  }
+
+  Future<void> _editProfile() async {
+    final p = _profile;
+    if (p == null) return;
+    final updated = await Navigator.push<AthleteProfile>(
+      context,
+      MaterialPageRoute(builder: (_) => EditAthleteProfileScreen(profile: p)),
+    );
+    if (updated != null && mounted) setState(() => _profile = updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -209,11 +272,7 @@ class _YouScreenState extends State<YouScreen>
         surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.search,
-              color: c.textSecondary,
-              size: 22,
-            ),
+            icon: Icon(Icons.search, color: c.textSecondary, size: 22),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -221,18 +280,6 @@ class _YouScreenState extends State<YouScreen>
               ),
             ),
             tooltip: 'Find runners',
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.person_outline,
-              color: c.textSecondary,
-              size: 22,
-            ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AthleteProfileScreen()),
-            ),
-            tooltip: 'Athlete profile',
           ),
           IconButton(
             icon: Icon(
@@ -244,25 +291,6 @@ class _YouScreenState extends State<YouScreen>
             tooltip: 'Settings',
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: c.accent,
-          indicatorWeight: 2,
-          labelColor: c.textPrimary,
-          unselectedLabelColor: c.textTertiary,
-          labelStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: const [
-            Tab(text: 'Summary'),
-            Tab(text: 'History'),
-          ],
-        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -283,17 +311,67 @@ class _YouScreenState extends State<YouScreen>
                 ],
               ),
             )
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildSummaryTab(),
-                HistoryTab(
-                  records: _runRecords.cast<RunRecord>(),
-                  onRefresh: loadData,
-                  onOpenRun: (record) =>
-                      _openRunDetail(record.toRunHistory(), record: record),
+          : NestedScrollView(
+              headerSliverBuilder: (context, _) => [
+                if (_profile != null)
+                  SliverToBoxAdapter(
+                    child: AthleteProfileHeader(
+                      profile: _profile!,
+                      counts: _counts,
+                      isSelf: true,
+                      activityCount: _activityCount,
+                      onEditProfile: _editProfile,
+                      onTapFollowers: () =>
+                          _openAthleteList(AthleteListMode.followers),
+                      onTapFollowing: () =>
+                          _openAthleteList(AthleteListMode.following),
+                    ),
+                  ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _SliverTabBarDelegate(
+                    TabBar(
+                      controller: _tabController,
+                      indicatorColor: c.accent,
+                      indicatorWeight: 2,
+                      labelColor: c.textPrimary,
+                      unselectedLabelColor: c.textTertiary,
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      tabs: const [
+                        Tab(text: 'Stats'),
+                        Tab(text: 'History'),
+                        Tab(text: 'Gear'),
+                      ],
+                    ),
+                    c.background,
+                  ),
                 ),
               ],
+              body: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildSummaryTab(),
+                  HistoryTab(
+                    records: _runRecords.cast<RunRecord>(),
+                    onRefresh: loadData,
+                    onOpenRun: (record) =>
+                        _openRunDetail(record.toRunHistory(), record: record),
+                  ),
+                  ShoeLockerView(
+                    shoes: _shoes,
+                    editable: true,
+                    onAdd: () => _addOrEditShoe(),
+                    onEdit: (s) => _addOrEditShoe(s),
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -306,41 +384,36 @@ class _YouScreenState extends State<YouScreen>
     return RefreshIndicator(
       color: context.colors.accent,
       onRefresh: loadData,
-      child: SingleChildScrollView(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ① THIS WEEK
-              _buildWeeklySummaryCard(),
-              const SizedBox(height: 16),
+        padding: const EdgeInsets.all(24.0),
+        children: [
+          // ① THIS WEEK
+          _buildWeeklySummaryCard(),
+          const SizedBox(height: 16),
 
-              // ③ PERSONAL RECORDS
-              if (_prResults != null && _runHistory.isNotEmpty) ...[
-                _buildPersonalRecordsCard(),
-                const SizedBox(height: 16),
-              ],
+          // ③ PERSONAL RECORDS
+          if (_prResults != null && _runHistory.isNotEmpty) ...[
+            _buildPersonalRecordsCard(),
+            const SizedBox(height: 16),
+          ],
 
-              // ④ MILESTONES
-              if (_achievements.isNotEmpty) ...[
-                _buildMilestonesCard(),
-                const SizedBox(height: 16),
-              ],
+          // ④ MILESTONES
+          if (_achievements.isNotEmpty) ...[
+            _buildMilestonesCard(),
+            const SizedBox(height: 16),
+          ],
 
-              // ⑤ TRAINING STATUS
-              if (_stats != null && _stats!.totalRuns > 0) ...[
-                _buildTrainingStatusCard(),
-                const SizedBox(height: 16),
-              ],
+          // ⑤ TRAINING STATUS
+          if (_stats != null && _stats!.totalRuns > 0) ...[
+            _buildTrainingStatusCard(),
+            const SizedBox(height: 16),
+          ],
 
-              // ⑥ FEEDBACK
-              _buildFeedbackRow(),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
+          // ⑥ FEEDBACK
+          _buildFeedbackRow(),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -1067,4 +1140,30 @@ class _YouScreenState extends State<YouScreen>
     }
     return '${minutes}m';
   }
+}
+
+/// Pins the You-tab sub-tab bar below the (scroll-away) athlete profile header
+/// inside the [NestedScrollView].
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  final Color background;
+  _SliverTabBarDelegate(this.tabBar, this.background);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(color: background, child: tabBar);
+  }
+
+  @override
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) =>
+      oldDelegate.tabBar != tabBar || oldDelegate.background != background;
 }

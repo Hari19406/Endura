@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/athlete_profile.dart';
+import '../models/feed_run.dart';
 import 'analytics_service.dart';
 
 /// The raw `follows`-table primitives, behind an interface so the follow-graph
@@ -72,18 +73,92 @@ class SupabaseFollowStore implements FollowStore {
   }
 }
 
+/// The raw feed reads (follow edges + runs + profiles), behind an interface so
+/// [SocialService.fetchFriendsFeed]'s filtering/pagination logic can be
+/// unit-tested with an in-memory fake.
+abstract class FeedStore {
+  /// IDs the given user follows (`follows.following_id` where
+  /// `follower_id = me`).
+  Future<List<String>> followingIds(String me);
+
+  /// `runs` rows for [userIds], newest first, with `date < before` when [before]
+  /// is set. Returns at most [limit] rows. Returns `[]` for an empty [userIds].
+  Future<List<Map<String, dynamic>>> runsForUsers(
+    List<String> userIds, {
+    DateTime? before,
+    required int limit,
+  });
+
+  /// `profiles` rows for [ids], keyed by `id`.
+  Future<Map<String, Map<String, dynamic>>> profilesByIds(List<String> ids);
+}
+
+class SupabaseFeedStore implements FeedStore {
+  SupabaseClient get _c => Supabase.instance.client;
+
+  @override
+  Future<List<String>> followingIds(String me) async {
+    final rows = await _c
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', me);
+    return (rows as List)
+        .map((r) => (r as Map<String, dynamic>)['following_id'] as String)
+        .toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> runsForUsers(
+    List<String> userIds, {
+    DateTime? before,
+    required int limit,
+  }) async {
+    if (userIds.isEmpty) return [];
+    var query = _c.from('runs').select().inFilter('user_id', userIds);
+    if (before != null) {
+      query = query.lt('date', before.toUtc().toIso8601String());
+    }
+    final rows = await query.order('date', ascending: false).limit(limit);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>> profilesByIds(
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) return {};
+    final rows = await _c
+        .from('profiles')
+        .select('id, display_name, avatar_url, city, country')
+        .inFilter('id', ids);
+    return {
+      for (final r in (rows as List))
+        (r as Map<String, dynamic>)['id'] as String: r,
+    };
+  }
+}
+
 class SocialService {
   static final SocialService instance = SocialService._();
-  SocialService._() : _store = SupabaseFollowStore(), _uidOverride = null;
+  SocialService._()
+    : _store = SupabaseFollowStore(),
+      _feedStore = SupabaseFeedStore(),
+      _uidOverride = null;
 
-  /// Test seam: inject a fake [FollowStore] and a fixed current-user id so the
-  /// follow-graph methods run without a live Supabase session.
+  /// Test seam: inject a fake [FollowStore] / [FeedStore] and a fixed
+  /// current-user id so the follow-graph and feed methods run without a live
+  /// Supabase session.
   @visibleForTesting
-  SocialService.forTest({required FollowStore store, required String uid})
-    : _store = store,
-      _uidOverride = uid;
+  SocialService.forTest({
+    required FollowStore store,
+    required String uid,
+    FeedStore? feedStore,
+  }) : _store = store,
+       _feedStore = feedStore ?? SupabaseFeedStore(),
+       _uidOverride = uid;
 
   final FollowStore _store;
+  final FeedStore _feedStore;
   final String? _uidOverride;
 
   SupabaseClient get _client => Supabase.instance.client;
@@ -290,6 +365,49 @@ class SocialService {
           .toList();
     } catch (e) {
       debugPrint('[SocialService] _peopleVia error: $e');
+      return [];
+    }
+  }
+
+  // ── Activity feed ────────────────────────────────────────────────────────
+
+  /// Runs by athletes the signed-in user follows, newest first.
+  ///
+  /// Keyset pagination: pass the `date` of the last row you already have as
+  /// [before] to get the next page (rows strictly older than that instant).
+  /// Returns `[]` when the user follows nobody, isn't signed in, or on error.
+  Future<List<FeedRun>> fetchFriendsFeed({
+    DateTime? before,
+    int limit = 15,
+  }) async {
+    final me = _uid;
+    if (me == null) return [];
+    try {
+      final followedIds = await _feedStore.followingIds(me);
+      if (followedIds.isEmpty) return [];
+      final followed = followedIds.toSet();
+
+      final runRows = await _feedStore.runsForUsers(
+        followedIds,
+        before: before,
+        limit: limit,
+      );
+      if (runRows.isEmpty) return [];
+
+      final authorIds = runRows
+          .map((r) => r['user_id'] as String)
+          .toSet()
+          .toList();
+      final profiles = await _feedStore.profilesByIds(authorIds);
+
+      return runRows
+          // Defence in depth: never surface a run whose author we don't follow,
+          // even if the backend ever returns one.
+          .where((r) => followed.contains(r['user_id'] as String))
+          .map((r) => FeedRun.fromRows(r, profiles[r['user_id'] as String]))
+          .toList();
+    } catch (e) {
+      debugPrint('[SocialService] fetchFriendsFeed error: $e');
       return [];
     }
   }

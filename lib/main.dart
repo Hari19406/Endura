@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
-import 'screens/run_screen.dart';
-import 'screens/you_screen.dart';
+import 'screens/main_screen.dart';
 import 'services/first_run_service.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'utils/database_service.dart';
@@ -12,8 +10,6 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'screens/reset_password_screen.dart';
 import 'dart:async';
-import 'utils/refreshable.dart';
-import 'services/coach_message_builder.dart' as message;
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'services/analytics_service.dart';
 import 'services/revenue_cat_service.dart';
@@ -379,178 +375,6 @@ class _AppInitializerState extends State<AppInitializer> {
     }
 
     // ── STEP 3: All good ──
-    return const MainNavigation();
-  }
-}
-
-class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
-
-  @override
-  State<MainNavigation> createState() => _MainNavigationState();
-}
-
-class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
-  message.CoachMessage? _activeCoachMessage;
-
-  final GlobalKey<_HomeScreenWrapperState> _homeKey = GlobalKey();
-  final GlobalKey<_YouScreenWrapperState> _youKey = GlobalKey();
-
-  void _onRunCompleted() {
-    debugPrint('[MainNavigation] Run completed — refreshing data');
-    _homeKey.currentState?._refreshData();
-    _youKey.currentState?._refreshData();
-    if (_currentIndex == 1) {
-      setState(() => _currentIndex = 0);
-    }
-  }
-
-  void _navigateToYou() => setState(() => _currentIndex = 2);
-  void _navigateToRun() => setState(() => _currentIndex = 1);
-
-  void _onCoachMessageReady(message.CoachMessage? msg) {
-    if (_activeCoachMessage != msg) {
-      setState(() => _activeCoachMessage = msg);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          HomeScreenWrapper(
-            key: _homeKey,
-            onNavigateToYou: _navigateToYou,
-            onNavigateToRun: _navigateToRun,
-            onCoachMessageReady: _onCoachMessageReady,
-          ),
-          RunScreenWrapper(
-            onRunCompleted: _onRunCompleted,
-            activeCoachMessage: _activeCoachMessage,
-          ),
-          YouScreenWrapper(key: _youKey),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: context.colors.divider, width: 1),
-          ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: context.colors.surface,
-          selectedItemColor: context.colors.textPrimary,
-          unselectedItemColor: context.colors.textTertiary,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.directions_run_outlined),
-              activeIcon: Icon(Icons.directions_run),
-              label: 'Run',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'You',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class HomeScreenWrapper extends StatefulWidget {
-  final VoidCallback onNavigateToYou;
-  final VoidCallback onNavigateToRun;
-  final void Function(message.CoachMessage?) onCoachMessageReady;
-
-  const HomeScreenWrapper({
-    super.key,
-    required this.onNavigateToYou,
-    required this.onNavigateToRun,
-    required this.onCoachMessageReady,
-  });
-
-  @override
-  State<HomeScreenWrapper> createState() => _HomeScreenWrapperState();
-}
-
-class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
-  final GlobalKey<State> _childKey = GlobalKey();
-
-  void _refreshData() {
-    debugPrint('[HomeScreenWrapper] Refreshing data');
-    final childState = _childKey.currentState;
-    if (childState is Refreshable) {
-      (childState as Refreshable).loadData();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return HomeScreen(
-      key: _childKey,
-      onNavigateToYou: widget.onNavigateToYou,
-      onNavigateToRun: widget.onNavigateToRun,
-      onCoachMessageReady: widget.onCoachMessageReady,
-    );
-  }
-}
-
-class RunScreenWrapper extends StatelessWidget {
-  final VoidCallback onRunCompleted;
-  final message.CoachMessage? activeCoachMessage;
-
-  const RunScreenWrapper({
-    super.key,
-    required this.onRunCompleted,
-    this.activeCoachMessage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RunScreen(
-      onWorkoutCompleted: onRunCompleted,
-      activeCoachMessage: activeCoachMessage,
-    );
-  }
-}
-
-class YouScreenWrapper extends StatefulWidget {
-  const YouScreenWrapper({super.key});
-
-  @override
-  State<YouScreenWrapper> createState() => _YouScreenWrapperState();
-}
-
-class _YouScreenWrapperState extends State<YouScreenWrapper> {
-  final GlobalKey<State> _childKey = GlobalKey();
-
-  void _refreshData() {
-    debugPrint('[YouScreenWrapper] Refreshing data');
-    final childState = _childKey.currentState;
-    if (childState is Refreshable) {
-      (childState as Refreshable).loadData();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return YouScreen(key: _childKey);
+    return const MainScreen();
   }
 }

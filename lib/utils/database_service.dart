@@ -149,17 +149,8 @@ class RunRecord {
     workoutType: workoutType,
   );
 
-  static List<Map<String, double>> _decodePolyline(String polyline) {
-    if (polyline.isEmpty) return [];
-    try {
-      return polyline.split(';').where((s) => s.isNotEmpty).map((pair) {
-        final parts = pair.split(',');
-        return {'lat': double.parse(parts[0]), 'lng': double.parse(parts[1])};
-      }).toList();
-    } catch (_) {
-      return [];
-    }
-  }
+  static List<Map<String, double>> _decodePolyline(String polyline) =>
+      decodePolylineToPoints(polyline);
 }
 
 class TrainingStateRecord {
@@ -841,3 +832,18 @@ Future<List<RunHistory>> loadSavedRuns() async {
 /// Helper for run_screen.dart when encoding GPS route on save.
 String encodeRouteToPolyline(List<Map<String, double>> points) =>
     points.map((p) => '${p['lat']},${p['lng']}').join(';');
+
+/// Decodes the app's `"lat,lng;lat,lng"` polyline format into the
+/// `[{lat, lng}, ...]` shape used by [RouteTracePainter] and the activity feed.
+/// Returns an empty list for an empty or malformed string.
+List<Map<String, double>> decodePolylineToPoints(String polyline) {
+  if (polyline.isEmpty) return [];
+  try {
+    return polyline.split(';').where((s) => s.isNotEmpty).map((pair) {
+      final parts = pair.split(',');
+      return {'lat': double.parse(parts[0]), 'lng': double.parse(parts[1])};
+    }).toList();
+  } catch (_) {
+    return [];
+  }
+}

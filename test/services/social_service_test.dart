@@ -57,6 +57,71 @@ class InMemoryFollowStore implements FollowStore {
   }
 }
 
+/// In-memory [FeedStore]: holds follow edges, run rows, and profile rows and
+/// implements exactly the filtering/ordering the real Supabase store performs
+/// server-side, so [SocialService.fetchFriendsFeed]'s own logic is what's under
+/// test.
+class InMemoryFeedStore implements FeedStore {
+  final Set<FollowEdge> follows = {};
+  final List<Map<String, dynamic>> runs = [];
+  final Map<String, Map<String, dynamic>> profiles = {};
+
+  int runsForUsersCalls = 0;
+
+  @override
+  Future<List<String>> followingIds(String me) async => follows
+      .where((e) => e.follower == me)
+      .map((e) => e.following)
+      .toList();
+
+  @override
+  Future<List<Map<String, dynamic>>> runsForUsers(
+    List<String> userIds, {
+    DateTime? before,
+    required int limit,
+  }) async {
+    runsForUsersCalls++;
+    if (userIds.isEmpty) return [];
+    final set = userIds.toSet();
+    final rows =
+        runs
+            .where((r) => set.contains(r['user_id'] as String))
+            .where(
+              (r) =>
+                  before == null ||
+                  DateTime.parse(r['date'] as String).isBefore(before),
+            )
+            .toList()
+          ..sort(
+            (a, b) => DateTime.parse(
+              b['date'] as String,
+            ).compareTo(DateTime.parse(a['date'] as String)),
+          );
+    return rows.take(limit).toList();
+  }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>> profilesByIds(
+    List<String> ids,
+  ) async {
+    final set = ids.toSet();
+    return {
+      for (final e in profiles.entries)
+        if (set.contains(e.key)) e.key: e.value,
+    };
+  }
+}
+
+Map<String, dynamic> _runRow(String userId, DateTime date, {double km = 5}) => {
+  'user_id': userId,
+  'date': date.toUtc().toIso8601String(),
+  'distance_km': km,
+  'average_pace': '5:30',
+  'duration_seconds': 1650,
+  'workout_type': 'easy',
+  'route_polyline': '',
+};
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -140,6 +205,76 @@ void main() {
     test('empty candidate list short-circuits to empty set', () async {
       store.edges.add(const FollowEdge('C', me));
       expect(await social.getFollowerIdsAmong([]), isEmpty);
+    });
+  });
+
+  group('fetchFriendsFeed', () {
+    late InMemoryFeedStore feed;
+    late SocialService svc;
+
+    setUp(() {
+      feed = InMemoryFeedStore();
+      svc = SocialService.forTest(
+        store: InMemoryFollowStore(),
+        uid: me,
+        feedStore: feed,
+      );
+    });
+
+    test('follows nobody → empty, never queries runs', () async {
+      final result = await svc.fetchFriendsFeed();
+      expect(result, isEmpty);
+      expect(feed.runsForUsersCalls, 0);
+    });
+
+    test('only surfaces runs by athletes I follow', () async {
+      feed.follows.add(const FollowEdge(me, other)); // I follow B
+      final now = DateTime.utc(2026, 9, 1, 12);
+      feed.runs.addAll([
+        _runRow(other, now), // followed  → in
+        _runRow('stranger', now.add(const Duration(hours: 1))), // not → out
+      ]);
+      feed.profiles[other] = {'display_name': 'Bee', 'city': 'Pune'};
+
+      final result = await svc.fetchFriendsFeed();
+
+      expect(result.map((r) => r.athleteId), [other]);
+      expect(result.single.displayName, 'Bee');
+      expect(result.single.location, 'Pune');
+    });
+
+    test('newest first', () async {
+      feed.follows.add(const FollowEdge(me, other));
+      final base = DateTime.utc(2026, 9, 1);
+      feed.runs.addAll([
+        _runRow(other, base, km: 1),
+        _runRow(other, base.add(const Duration(days: 2)), km: 3),
+        _runRow(other, base.add(const Duration(days: 1)), km: 2),
+      ]);
+
+      final result = await svc.fetchFriendsFeed();
+
+      expect(result.map((r) => r.distanceKm), [3, 2, 1]);
+    });
+
+    test('keyset pagination with `before` — no overlap, limit honoured',
+        () async {
+      feed.follows.add(const FollowEdge(me, other));
+      final base = DateTime.utc(2026, 9, 1);
+      for (var i = 0; i < 3; i++) {
+        feed.runs.add(
+          _runRow(other, base.add(Duration(days: i)), km: (i + 1).toDouble()),
+        );
+      }
+
+      final page1 = await svc.fetchFriendsFeed(limit: 2);
+      expect(page1.map((r) => r.distanceKm), [3, 2]); // days 2, 1
+
+      final page2 = await svc.fetchFriendsFeed(
+        before: page1.last.date,
+        limit: 2,
+      );
+      expect(page2.map((r) => r.distanceKm), [1]); // day 0 only
     });
   });
 }

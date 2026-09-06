@@ -31,9 +31,11 @@ class CloudSyncService {
         'route_polyline': run.routePolyline,
         'workout_type': run.workoutType,
         'cs_value_at_time': run.csValueAtTime,
-        // Only include rpe when it has a value — avoids overwriting a
-        // server-side rpe with NULL if the user rates after sync.
+        'elevation_gain': run.elevationGain,
+        // Only include rpe/elapsed when they have a value — avoids overwriting a
+        // server-side value with NULL if it's set after the first sync.
         if (run.rpe != null) 'rpe': run.rpe,
+        if (run.elapsedSeconds != null) 'elapsed_seconds': run.elapsedSeconds,
       });
 
       await DatabaseService.instance.markRunSynced(run.id!);
@@ -175,6 +177,8 @@ class CloudSyncService {
                 ? (row['cs_value_at_time'] as num).toDouble()
                 : null,
             rpe: row['rpe'] as int?,
+            elevationGain: (row['elevation_gain'] as num?)?.toDouble() ?? 0,
+            elapsedSeconds: row['elapsed_seconds'] as int?,
           );
 
           await DatabaseService.instance.insertRun(run);
@@ -228,6 +232,8 @@ class CloudSyncService {
                   ? (row['cs_value_at_time'] as num).toDouble()
                   : null,
               rpe: row['rpe'] as int?,
+              elevationGain: (row['elevation_gain'] as num?)?.toDouble() ?? 0,
+              elapsedSeconds: row['elapsed_seconds'] as int?,
             ),
           );
           restored++;

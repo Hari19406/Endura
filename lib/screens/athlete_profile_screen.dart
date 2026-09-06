@@ -17,6 +17,8 @@ import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/database_service.dart';
 import '../utils/unit_utils.dart';
+import '../widgets/athlete_profile_header.dart';
+import '../widgets/shoe_edit_sheet.dart';
 import '../widgets/shoe_locker_view.dart';
 import 'athlete_list_screen.dart';
 import 'edit_athlete_profile_screen.dart';
@@ -145,7 +147,7 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: context.colors.background,
-      builder: (_) => _ShoeEditSheet(existing: existing),
+      builder: (_) => ShoeEditSheet(existing: existing),
     );
     if (changed == true) {
       final shoes = await ShoeService.instance.locker();
@@ -177,7 +179,33 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
           ? _NotFound(isSelf: _isSelf)
           : Column(
               children: [
-                _header(context),
+                AthleteProfileHeader(
+                  profile: _profile!,
+                  counts: _counts,
+                  isSelf: _isSelf,
+                  isFollowing: _isFollowing,
+                  activityCount: _isSelf ? _activityCount : null,
+                  onEditProfile: _isSelf ? _editProfile : null,
+                  onToggleFollow: _isSelf ? null : _toggleFollow,
+                  onTapFollowers: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AthleteListScreen(
+                        userId: _profile!.id,
+                        mode: AthleteListMode.followers,
+                      ),
+                    ),
+                  ),
+                  onTapFollowing: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AthleteListScreen(
+                        userId: _profile!.id,
+                        mode: AthleteListMode.following,
+                      ),
+                    ),
+                  ),
+                ),
                 TabBar(
                   controller: _tabs,
                   indicatorColor: c.accent,
@@ -198,183 +226,6 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
                 ),
               ],
             ),
-    );
-  }
-
-  // ── Header ───────────────────────────────────────────────────────────────
-
-  Widget _header(BuildContext context) {
-    final c = context.colors;
-    final p = _profile!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              AthleteAvatar(athlete: p, radius: 34),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      p.name,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: c.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    // Location sits directly under the name to tell apart
-                    // runners who share a common display name.
-                    if (p.location != null) ...[
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.place_outlined,
-                            size: 13,
-                            color: c.textTertiary,
-                          ),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(
-                              p.location!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: c.textTertiary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (p.bio != null && p.bio!.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              p.bio!.trim(),
-              style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
-            ),
-          ],
-          const SizedBox(height: 16),
-          _socialBar(context),
-          const SizedBox(height: 14),
-          _actionButton(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _socialBar(BuildContext context) {
-    final id = _profile!.id;
-    return Row(
-      children: [
-        _statCell(
-          context,
-          _counts.followers.toString(),
-          'Followers',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AthleteListScreen(
-                userId: id,
-                mode: AthleteListMode.followers,
-              ),
-            ),
-          ),
-        ),
-        _statCell(
-          context,
-          _counts.following.toString(),
-          'Following',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AthleteListScreen(
-                userId: id,
-                mode: AthleteListMode.following,
-              ),
-            ),
-          ),
-        ),
-        _statCell(
-          context,
-          _isSelf ? _activityCount.toString() : '—',
-          'Activities',
-        ),
-      ],
-    );
-  }
-
-  Widget _statCell(
-    BuildContext context,
-    String value,
-    String label, {
-    VoidCallback? onTap,
-  }) {
-    final c = context.colors;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: c.textPrimary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontSize: 11, color: c.textTertiary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _actionButton(BuildContext context) {
-    final c = context.colors;
-    if (_isSelf) {
-      return _OutlineButton(label: 'Edit Profile', onTap: _editProfile);
-    }
-    final following = _isFollowing;
-    // Optimistic: the label/style flip on tap; no spinner. `_followBusy` only
-    // debounces double-taps while the write is in flight.
-    return GestureDetector(
-      onTap: _toggleFollow,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: following ? c.surface : c.accent,
-          border: Border.all(color: following ? c.border : c.accent),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          following ? 'Following' : 'Follow',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: following ? c.textPrimary : c.onAccent,
-          ),
-        ),
-      ),
     );
   }
 
@@ -692,38 +543,6 @@ class _AthleteStats {
 
 // ── small widgets ──────────────────────────────────────────────────────────
 
-class _OutlineButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _OutlineButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: c.surface,
-          border: Border.all(color: c.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: c.textPrimary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Placeholder extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -768,242 +587,6 @@ class _NotFound extends StatelessWidget {
               : 'This profile is unavailable or private.',
           textAlign: TextAlign.center,
           style: TextStyle(color: c.textSecondary),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Add / edit shoe sheet ──────────────────────────────────────────────────
-
-class _ShoeEditSheet extends StatefulWidget {
-  final Shoe? existing;
-  const _ShoeEditSheet({this.existing});
-
-  @override
-  State<_ShoeEditSheet> createState() => _ShoeEditSheetState();
-}
-
-class _ShoeEditSheetState extends State<_ShoeEditSheet> {
-  late final TextEditingController _brand;
-  late final TextEditingController _model;
-  late final TextEditingController _nickname;
-  late final TextEditingController _startKm;
-  late final TextEditingController _maxKm;
-  late bool _isDefault;
-  late bool _isRetired;
-  bool _busy = false;
-
-  bool get _isEdit => widget.existing != null;
-
-  @override
-  void initState() {
-    super.initState();
-    final s = widget.existing;
-    _brand = TextEditingController(text: s?.brand ?? '');
-    _model = TextEditingController(text: s?.model ?? '');
-    _nickname = TextEditingController(text: s?.nickname ?? '');
-    _startKm = TextEditingController(
-      text: s == null ? '' : s.distanceKm.toStringAsFixed(0),
-    );
-    _maxKm = TextEditingController(
-      text: (s?.maxDistanceKm ?? 800).toStringAsFixed(0),
-    );
-    _isDefault = s?.isDefault ?? false;
-    _isRetired = s?.isRetired ?? false;
-  }
-
-  @override
-  void dispose() {
-    _brand.dispose();
-    _model.dispose();
-    _nickname.dispose();
-    _startKm.dispose();
-    _maxKm.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (_brand.text.trim().isEmpty || _model.text.trim().isEmpty) return;
-    setState(() => _busy = true);
-
-    final svc = ShoeService.instance;
-    final uid = Supabase.instance.client.auth.currentUser?.id ?? '';
-    final startMeters = (double.tryParse(_startKm.text.trim()) ?? 0) * 1000;
-    final maxMeters = (double.tryParse(_maxKm.text.trim()) ?? 800) * 1000;
-
-    bool ok;
-    if (_isEdit) {
-      ok = await svc.update(
-        widget.existing!.copyWith(
-          brand: _brand.text.trim(),
-          model: _model.text.trim(),
-          nickname: _nickname.text.trim().isEmpty
-              ? null
-              : _nickname.text.trim(),
-          distanceMeters: startMeters,
-          maxDistanceMeters: maxMeters,
-          isDefault: _isDefault,
-          isRetired: _isRetired,
-        ),
-      );
-    } else {
-      final created = await svc.add(
-        Shoe(
-          userId: uid,
-          brand: _brand.text.trim(),
-          model: _model.text.trim(),
-          nickname: _nickname.text.trim().isEmpty
-              ? null
-              : _nickname.text.trim(),
-          distanceMeters: startMeters,
-          maxDistanceMeters: maxMeters,
-          isDefault: _isDefault,
-        ),
-      );
-      ok = created != null;
-    }
-
-    if (!mounted) return;
-    if (ok) {
-      Navigator.pop(context, true);
-    } else {
-      setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _delete() async {
-    final id = widget.existing?.id;
-    if (id == null) return;
-    setState(() => _busy = true);
-    final ok = await ShoeService.instance.delete(id);
-    if (!mounted) return;
-    Navigator.pop(context, ok);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _isEdit ? 'Edit shoe' : 'Add a shoe',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: c.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _tf(context, 'Brand', _brand),
-          _tf(context, 'Model', _model),
-          _tf(context, 'Nickname (optional)', _nickname),
-          Row(
-            children: [
-              Expanded(child: _tf(context, 'Start dist (km)', _startKm, number: true)),
-              const SizedBox(width: 12),
-              Expanded(child: _tf(context, 'Target (km)', _maxKm, number: true)),
-            ],
-          ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            value: _isDefault,
-            onChanged: (v) => setState(() => _isDefault = v),
-            title: Text(
-              'Default shoe',
-              style: TextStyle(fontSize: 14, color: c.textPrimary),
-            ),
-            activeThumbColor: c.accent,
-          ),
-          if (_isEdit)
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              value: _isRetired,
-              onChanged: (v) => setState(() => _isRetired = v),
-              title: Text(
-                'Retired',
-                style: TextStyle(fontSize: 14, color: c.textPrimary),
-              ),
-              activeThumbColor: c.accent,
-            ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              if (_isEdit)
-                TextButton(
-                  onPressed: _busy ? null : _delete,
-                  child: Text('Delete', style: TextStyle(color: c.danger)),
-                ),
-              const Spacer(),
-              GestureDetector(
-                onTap: _busy ? null : _save,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.accent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: _busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          'Save',
-                          style: TextStyle(
-                            color: c.onAccent,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tf(
-    BuildContext context,
-    String label,
-    TextEditingController controller, {
-    bool number = false,
-  }) {
-    final c = context.colors;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: controller,
-        keyboardType: number
-            ? const TextInputType.numberWithOptions(decimal: true)
-            : TextInputType.text,
-        style: TextStyle(color: c.textPrimary, fontSize: 15),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: c.textTertiary, fontSize: 13),
-          isDense: true,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: c.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: c.accent),
-          ),
         ),
       ),
     );

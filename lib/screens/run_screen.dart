@@ -50,10 +50,15 @@ class RunScreen extends StatefulWidget {
   final message.CoachMessage? activeCoachMessage;
   final VoidCallback? onWorkoutCompleted;
 
+  /// Incremented by the shell when the Coach tab's "Free Run" button is tapped.
+  /// While this screen is in the ready state, a bump starts an unguided run.
+  final ValueNotifier<int>? freeRunSignal;
+
   const RunScreen({
     super.key,
     this.activeCoachMessage,
     this.onWorkoutCompleted,
+    this.freeRunSignal,
   });
 
   @override
@@ -315,6 +320,7 @@ class _RunScreenState extends State<RunScreen>
     _currentPhase = _hasWarmup ? RunMode.warmup : RunMode.mainSet;
     _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km';
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
+    widget.freeRunSignal?.addListener(_onExternalFreeRun);
     _loadSettings();
     _checkPermissions();
     _startCompassTracking();
@@ -1499,6 +1505,7 @@ class _RunScreenState extends State<RunScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    widget.freeRunSignal?.removeListener(_onExternalFreeRun);
     _timer?.cancel();
     _elapsedTimer?.cancel();
     _hrSub?.cancel();
@@ -2226,6 +2233,15 @@ class _RunScreenState extends State<RunScreen>
       _showRunTypeChoice = false;
     });
     _startTracking();
+  }
+
+  /// Fired by [RunScreen.freeRunSignal] when the Coach tab's "Free Run" button
+  /// is tapped. Only acts when we're idle on the ready screen — never
+  /// interrupts a run already in progress.
+  void _onExternalFreeRun() {
+    if (!mounted || _isFreeRun) return;
+    if (_runState != RunState.ready) return;
+    _onFreeRunChosen();
   }
 
   Future<void> _resetToReady() async {
