@@ -43,6 +43,62 @@ class VolumeModel {
     RaceDistance.marathon => 40,
   };
 
+  /// Hard upper bound on weekly volume for a distance, regardless of the
+  /// athlete's inputs — a safety clamp, not a training target. Absorbed from
+  /// the retired `WeeklyVolumeResolver._ranges` so VolumeModel is the single
+  /// source of truth for volume bounds.
+  static double safeCapKm(RaceDistance race) => switch (race) {
+    RaceDistance.fiveK => 50,
+    RaceDistance.tenK => 80,
+    RaceDistance.halfMarathon => 100,
+    RaceDistance.marathon => 130,
+  };
+
+  /// The comfortable weekly-volume band for a distance: below `low` a plan is
+  /// under-fuelled, above `high` returns diminish and injury risk climbs. Used
+  /// to pick a ramp rate (aggressive below the band, conservative inside it).
+  /// Absorbed from `WeeklyVolumeResolver._ranges` (sweetLow / sweetHigh).
+  static ({double low, double high}) sweetSpotKm(RaceDistance race) =>
+      switch (race) {
+        RaceDistance.fiveK => (low: 25, high: 40),
+        RaceDistance.tenK => (low: 30, high: 50),
+        RaceDistance.halfMarathon => (low: 40, high: 70),
+        RaceDistance.marathon => (low: 55, high: 90),
+      };
+
+  /// Long-run distance band for a plan: `start` is a safe week-1 long run,
+  /// `peak` the longest single run the plan should build toward. Centralised
+  /// here (was private in RacePlanBuilder) so every consumer agrees.
+  static ({double start, double peak}) longRunRangeKm({
+    required RaceDistance race,
+    required ExperienceLevel experience,
+  }) {
+    final peak = switch (race) {
+      RaceDistance.fiveK => switch (experience) {
+        ExperienceLevel.advanced => 12.0,
+        ExperienceLevel.intermediate => 10.0,
+        ExperienceLevel.beginner => 8.0,
+      },
+      RaceDistance.tenK => switch (experience) {
+        ExperienceLevel.advanced => 16.0,
+        ExperienceLevel.intermediate => 14.0,
+        ExperienceLevel.beginner => 10.0,
+      },
+      RaceDistance.halfMarathon => switch (experience) {
+        ExperienceLevel.advanced => 24.0,
+        ExperienceLevel.intermediate => 20.0,
+        ExperienceLevel.beginner => 16.0,
+      },
+      RaceDistance.marathon => switch (experience) {
+        ExperienceLevel.advanced => 35.0,
+        ExperienceLevel.intermediate => 32.0,
+        ExperienceLevel.beginner => 28.0,
+      },
+    };
+    final start = _max(5.0, minViableKm(race) * 0.30);
+    return (start: start, peak: peak);
+  }
+
   /// Sane band for what the athlete runs *now*, at onboarding.
   ///   min       — plan-viable floor for the distance
   ///   max       — their achievable peak (hard slider ceiling)

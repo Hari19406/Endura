@@ -156,6 +156,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   DateTime _startDate = DateTime.now();
   int? _planWeeks;
 
+  /// Ease weeks 1–4 in from ~75% volume. No dedicated onboarding control yet —
+  /// wired through to [RacePlanBuilder] so the capability is testable and a
+  /// future toggle only needs to flip this field.
+  final bool _gradualStart = false;
+
   // Computed
   int _vdot = 40;
   bool _vdotProvisional = true;
@@ -774,6 +779,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           goalRace: goalRace,
           raceDate: raceDate,
           experienceLevel: exp,
+          // Self-paced plans (no fixed race date) use the chosen week count
+          // verbatim; date-anchored plans still derive length from the date.
+          durationWeeks: _raceDate == null ? _effectivePlanWeeks : null,
+          gradualStart: _gradualStart,
         );
         await EngineMemoryService().saveRacePlan(plan);
         Analytics.planCreated(goal: goalRace, level: exp);

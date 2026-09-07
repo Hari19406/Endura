@@ -18,10 +18,10 @@ import 'core/vdot_calculator.dart';
 import 'core/pace_table.dart';
 import 'config/workout_template_library.dart';
 import 'config/archetype_table.dart';
+import 'config/volume_model.dart';
 import 'plan/workout_resolver.dart';
 import 'plan/session_selector.dart' as session;
 import 'plan/week_resolver.dart';
-import 'plan/weekly_volume_resolver.dart';
 import 'daily/dynamic_scaler.dart';
 
 typedef CoachMessage = message.CoachMessage;
@@ -114,18 +114,15 @@ class CoachEngine {
   final message.CoachMessageBuilder _coachMessageBuilder;
   final WorkoutResolver _workoutResolver;
   final WeekResolver _weekResolver;
-  final WeeklyVolumeResolver _volumeResolver;
 
   CoachEngine({
     message.CoachMessageBuilder? coachMessageBuilder,
     WorkoutResolver? workoutResolver,
     WeekResolver? weekResolver,
-    WeeklyVolumeResolver? volumeResolver,
   }) : _coachMessageBuilder =
            coachMessageBuilder ?? message.CoachMessageBuilder(),
        _workoutResolver = workoutResolver ?? const WorkoutResolver(),
-       _weekResolver = weekResolver ?? const WeekResolver(),
-       _volumeResolver = volumeResolver ?? WeeklyVolumeResolver();
+       _weekResolver = weekResolver ?? const WeekResolver();
 
   // ── Post-plan ─────────────────────────────────────────────────────────────
 
@@ -321,7 +318,7 @@ class CoachEngine {
           );
       finalWeeklyTargetKm = _roundHalf(adjustedTargetKm);
     } else if (memory.baselineWeeklyKm != null) {
-      finalWeeklyTargetKm = _volumeResolver.resolveWeeklyTarget(
+      finalWeeklyTargetKm = _resolveBaselineWeeklyKm(
         memory: memory,
         goalRace: _mapGoalRace(userMetrics.goalRace),
         currentWeek: weekNum,
@@ -970,6 +967,58 @@ class CoachEngine {
   }
 
   double _roundHalf(double value) => (value * 2).round() / 2;
+
+  // ── Baseline weekly volume (no active RacePlan) ──────────────────────────
+  //
+  // Ported verbatim from the retired `WeeklyVolumeResolver`. Only reachable
+  // when the athlete has a `baselineWeeklyKm` but no RacePlan (rare edge —
+  // most flows always carry a plan). Bounds come from `VolumeModel`.
+  //   • week 1 / no baseline → seed from baseline, clamp to safe cap
+  //   • later weeks          → compound previousWeekTargetKm × factor
+  //   • 3:1 cutback returns factor 1.0 — WeekResolver owns the 0.70
+  double _resolveBaselineWeeklyKm({
+    required EngineMemory memory,
+    required RaceDistance goalRace,
+    required int currentWeek,
+    required ProgressionDecision? lastDecision,
+    required bool is3to1Cutback,
+  }) {
+    final safeCap = VolumeModel.safeCapKm(goalRace);
+    final baseline = memory.baselineWeeklyKm;
+
+    if (currentWeek == 1 || baseline == null) {
+      final seed = baseline ?? VolumeModel.sweetSpotKm(goalRace).low;
+      return _roundHalf(seed.clamp(0, safeCap));
+    }
+
+    final prev = memory.previousWeekTargetKm ?? baseline;
+    final factor = _baselineVolumeFactor(
+      prev,
+      goalRace,
+      lastDecision,
+      is3to1Cutback,
+    );
+    return _roundHalf((prev * factor).clamp(0.0, safeCap));
+  }
+
+  double _baselineVolumeFactor(
+    double prev,
+    RaceDistance race,
+    ProgressionDecision? decision,
+    bool is3to1Cutback,
+  ) {
+    if (is3to1Cutback) return 1.0;
+    if (decision == ProgressionDecision.regress) return 0.80;
+    if (decision == ProgressionDecision.hold) return 1.0;
+
+    final sweet = VolumeModel.sweetSpotKm(race);
+    if (prev < VolumeModel.minViableKm(race)) return 1.10;
+    if (prev < sweet.low) return 1.10;
+    if (prev <= sweet.high) {
+      return prev < (sweet.low + sweet.high) / 2 ? 1.08 : 1.05;
+    }
+    return 1.03; // above sweet spot — hold-leaning
+  }
 
   RaceDistance _mapGoalRace(String goalRace) => switch (goalRace) {
     '5k' => RaceDistance.fiveK,

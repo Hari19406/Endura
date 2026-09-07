@@ -27,9 +27,16 @@ class RacePlanBuilder {
     required DateTime raceDate,
     required String experienceLevel,
     DateTime? now,
+    /// Explicit macrocycle length. When null the length is derived from the
+    /// race date (existing behaviour). Clamped to 1–20.
+    int? durationWeeks,
+    /// Ease weeks 1–4 in from ~75% of the ramped volume, smoothing back to
+    /// 100% by week 5. Only touches non-cutback build/base weeks.
+    bool gradualStart = false,
   }) {
     final today = now ?? DateTime.now();
-    final weeksOut = max(1, raceDate.difference(today).inDays ~/ 7);
+    final derivedWeeks = max(1, raceDate.difference(today).inDays ~/ 7);
+    final weeksOut = (durationWeeks ?? derivedWeeks).clamp(1, 20);
 
     if (weeksOut < 4) {
       return _buildMinimalPlan(
@@ -117,14 +124,19 @@ class RacePlanBuilder {
       );
       longRunKm = (longRunKm + safeLongRunIncrement).clamp(5.0, peakLongRunKm);
 
+      // Gradual start eases the *prescribed* volume for weeks 1–4 without
+      // slowing the underlying ramp — `volume` / `longRunKm` keep compounding
+      // at full rate, only the week's target is scaled down.
+      final ease = _gradualStartFactor(w, gradualStart);
+
       weeks.add(
         _buildWeek(
           week: w,
-          targetKm: volume,
+          targetKm: volume * ease,
           phase: phase,
           goalRace: goalRace,
           experienceLevel: experienceLevel,
-          longRunKm: longRunKm,
+          longRunKm: longRunKm * ease,
           isDeload: false,
         ),
       );
@@ -322,6 +334,14 @@ class RacePlanBuilder {
       experienceLevel: experienceLevel,
       weeks: weeks,
     );
+  }
+
+  /// Weeks 1–4 ramp 0.75 → ~0.94; week 5+ is 1.0. Off ⇒ always 1.0.
+  /// Mirrors `PlanConfigState.gradualStartFactorForWeek`.
+  static double _gradualStartFactor(int week, bool gradualStart) {
+    if (!gradualStart || week >= 5) return 1.0;
+    const base = 0.75;
+    return base + (1.0 - base) * ((week - 1) / 4.0);
   }
 
   static double _roundHalf(double v) => (v * 2).round() / 2;
