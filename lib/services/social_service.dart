@@ -173,16 +173,22 @@ class SocialService {
     final q = query.trim();
     if (q.isEmpty) return [];
     try {
+      final me = _uid;
       final safe = q.replaceAll('%', r'\%').replaceAll('_', r'\_');
-      final rows = await _client
+      // `profiles.is_public` is `NOT NULL DEFAULT true` (see the social-cols
+      // migration), so `.eq('is_public', true)` can't hide null rows — there
+      // are none. Exclude yourself server-side so a full page of *other*
+      // athletes comes back even when you'd have matched.
+      var filter = _client
           .from('profiles')
           .select()
           .eq('is_public', true)
-          .ilike('display_name', '%$safe%')
-          .limit(limit);
+          .ilike('display_name', '%$safe%');
+      if (me != null) filter = filter.neq('id', me);
+      final rows = await filter.limit(limit);
       return (rows as List)
           .map((r) => AthleteProfile.fromMap(r as Map<String, dynamic>))
-          .where((a) => a.id != _uid) // don't surface yourself
+          .where((a) => a.id != me) // belt-and-suspenders
           .toList();
     } catch (e) {
       debugPrint('[SocialService] searchAthletes error: $e');
@@ -194,16 +200,19 @@ class SocialService {
   /// empty state. Excludes the signed-in user and rows with no display name.
   Future<List<AthleteProfile>> suggestedAthletes({int limit = 20}) async {
     try {
-      final rows = await _client
+      final me = _uid;
+      var filter = _client
           .from('profiles')
           .select()
           .eq('is_public', true)
-          .not('display_name', 'is', null)
+          .not('display_name', 'is', null);
+      if (me != null) filter = filter.neq('id', me);
+      final rows = await filter
           .order('total_runs', ascending: false)
           .limit(limit);
       return (rows as List)
           .map((r) => AthleteProfile.fromMap(r as Map<String, dynamic>))
-          .where((a) => a.id != _uid)
+          .where((a) => a.id != me)
           .toList();
     } catch (e) {
       debugPrint('[SocialService] suggestedAthletes error: $e');
