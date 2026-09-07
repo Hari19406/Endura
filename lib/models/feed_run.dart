@@ -7,6 +7,7 @@
 import '../utils/database_service.dart' show decodePolylineToPoints;
 
 class FeedRun {
+  final int runId; // runs.id (bigint)
   final String athleteId; // == runs.user_id == profiles.id
   final String displayName;
   final String? avatarUrl;
@@ -32,7 +33,11 @@ class FeedRun {
   final String? planName;
   final String? planProgress; // e.g. "Week 3 / 8"
 
+  /// Number of comments on this run (batch-loaded by the feed query).
+  final int commentCount;
+
   const FeedRun({
+    required this.runId,
     required this.athleteId,
     required this.displayName,
     this.avatarUrl,
@@ -49,6 +54,7 @@ class FeedRun {
     this.source = 'Endura Tracker',
     this.planName,
     this.planProgress,
+    this.commentCount = 0,
   });
 
   /// Decoded `{lat, lng}` points for the route thumbnail. Empty when there's no
@@ -72,8 +78,9 @@ class FeedRun {
   /// null if the profile couldn't be loaded — falls back to "Runner").
   factory FeedRun.fromRows(
     Map<String, dynamic> runRow,
-    Map<String, dynamic>? profileRow,
-  ) {
+    Map<String, dynamic>? profileRow, {
+    int commentCount = 0,
+  }) {
     String? loc;
     if (profileRow != null) {
       final parts = [
@@ -85,6 +92,7 @@ class FeedRun {
     final name = (profileRow?['display_name'] as String?)?.trim();
     final planName = (runRow['plan_name'] as String?)?.trim();
     return FeedRun(
+      runId: (runRow['id'] as num).toInt(),
       athleteId: runRow['user_id'] as String,
       displayName: (name != null && name.isNotEmpty) ? name : 'Runner',
       avatarUrl: profileRow?['avatar_url'] as String?,
@@ -103,6 +111,7 @@ class FeedRun {
               true
           ? (runRow['plan_progress'] as String).trim()
           : null,
+      commentCount: commentCount,
     );
   }
 }

@@ -91,6 +91,9 @@ abstract class FeedStore {
 
   /// `profiles` rows for [ids], keyed by `id`.
   Future<Map<String, Map<String, dynamic>>> profilesByIds(List<String> ids);
+
+  /// Comment count per run id in [runIds] (missing key ⇒ 0).
+  Future<Map<int, int>> commentCountsFor(List<int> runIds);
 }
 
 class SupabaseFeedStore implements FeedStore {
