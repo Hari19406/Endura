@@ -246,6 +246,23 @@ class MaterializedPlan {
 
   int get totalWeeks => weeks.length;
 
+  /// The week + day at [weekNumber] / [weekdayIndex] (0 = Monday … 6 = Sunday),
+  /// bundled for a caller that just wants "today". Null when the week is not in
+  /// the plan or the day is missing. Pure — no I/O.
+  MaterializedDayContext? contextForWeekday({
+    required int weekNumber,
+    required int weekdayIndex,
+  }) {
+    final week = weekByNumber(weekNumber);
+    if (week == null) return null;
+    for (final d in week.days) {
+      if (d.weekday == weekdayIndex) {
+        return MaterializedDayContext(plan: this, week: week, day: d);
+      }
+    }
+    return null;
+  }
+
   MaterializedPlan copyWith({
     List<MaterializedWeek>? weeks,
     DateTime? builtAt,
@@ -290,4 +307,29 @@ class MaterializedPlan {
     if (raw is! Map) return const {};
     return raw.map((k, v) => MapEntry(k as String, (v as num).toInt()));
   }
+}
+
+/// A single training day resolved against its parent week + plan — what the
+/// Coach tab reads for "Today's Workout". Produced by
+/// [MaterializedPlan.contextForWeekday] / [PlanStore.getTodayDayContext].
+class MaterializedDayContext {
+  final MaterializedPlan plan;
+  final MaterializedWeek week;
+  final MaterializedDay day;
+
+  const MaterializedDayContext({
+    required this.plan,
+    required this.week,
+    required this.day,
+  });
+
+  /// True when there is nothing to run today (explicit rest slot, or a slot
+  /// with no resolved workout).
+  bool get isRest => day.isRest || day.workout == null;
+
+  /// Effective weekly volume for this week (post cutback / taper).
+  double get weeklyTargetKm => week.targetKm;
+
+  /// Whether the athlete has already logged a run against today.
+  bool get isCompleted => day.isCompleted;
 }

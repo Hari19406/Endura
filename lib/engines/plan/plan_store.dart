@@ -141,6 +141,26 @@ class PlanStore {
     await prefs.setString(_localUpdatedAtKey, at.toUtc().toIso8601String());
   }
 
+  // ── Read: today's session ────────────────────────────────────────────────
+
+  /// Load the plan and pull out today's day + its week, bundled. The caller
+  /// supplies [weekNumber] (usually `RacePlan.currentWeekNumber(now)`) so this
+  /// stays decoupled from RacePlan / EngineMemory. Returns null when no plan is
+  /// persisted yet or the plan does not cover today — the caller then shows an
+  /// explicit placeholder rather than recomputing a session.
+  Future<MaterializedDayContext?> getTodayDayContext({
+    required int weekNumber,
+    DateTime? now,
+  }) async {
+    final plan = await load();
+    if (plan == null) return null;
+    final weekdayIndex = (now ?? DateTime.now()).weekday - 1; // 0 = Monday
+    return plan.contextForWeekday(
+      weekNumber: weekNumber,
+      weekdayIndex: weekdayIndex,
+    );
+  }
+
   // ── Clear ────────────────────────────────────────────────────────────────
 
   /// Drop the cached plan (e.g. plan ended, or user signed out). Remote rows

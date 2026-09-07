@@ -4,15 +4,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/coach_engine_v2.dart';
-import '../engines/vdot_engine/run_history_service.dart';
-import '../services/workout_selector.dart' as selector;
+import '../engines/plan/plan_store.dart';
+import '../engines/plan/materialized_plan.dart';
+import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../engines/memory/engine_memory_service.dart';
 import '../engines/memory/engine_memory.dart';
 import '../utils/database_service.dart';
 import '../models/weekly_plan.dart';
-import '../models/training_phase.dart';
 import '../screens/pre_run_briefing_screen.dart';
 import '../services/consistency_service.dart';
 import '../utils/refreshable.dart';
@@ -530,14 +530,34 @@ class _HomeScreenState extends State<HomeScreen>
     implements Refreshable {
   CoachMessage? _coachMessage;
   WorkoutDisplayModel? _workoutModel;
-  UserMetrics? _userMetrics;
   bool _isLoading = true;
   bool _isFetching = false;
   String _distanceUnit = 'km';
   List<RunHistory> _runHistory = [];
   bool _isLoaded = false;
   late final CoachEngine _coachEngine;
+  final message.CoachMessageBuilder _messageBuilder =
+      message.CoachMessageBuilder();
   WeeklyPlan? _activePlan;
+
+  /// Shown when the materialised plan has not landed yet (first run after
+  /// onboarding, or a slow background materialisation). Never a recompute.
+  static const _planResolvingModel = WorkoutDisplayModel(
+    category: WorkoutCategory.easy,
+    title: 'Preparing your plan',
+    coachingReason:
+        "Max is finishing your training plan. Give it a moment and pull to "
+        "refresh — your first session will appear right here.",
+    steps: [],
+  );
+
+  static const _restDayModel = WorkoutDisplayModel(
+    category: WorkoutCategory.rest,
+    title: 'Rest Day',
+    coachingReason:
+        'Rest up today. Your next workout is already lined up.',
+    steps: [],
+  );
   List<int> _trainingDayIndices = const [];
   ConsistencyData? _consistencyData;
   EngineMemory? _engineMemory;
@@ -748,127 +768,50 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
 
+      // ── Today's session — read straight from the persisted MaterializedPlan.
+      // No ad-hoc recomputation: if the plan isn't there yet we show an
+      // explicit placeholder and let the background materialiser catch up.
       try {
-        final experienceLevel =
-            prefs.getString('experience_level') ?? 'beginner';
-        final goalRace = prefs.getString('goal_race') ?? '5k';
-        final storedRunsPerWeek = prefs.getInt('runs_per_week');
-        final runsPerWeek = _trainingDayIndices.isNotEmpty
-            ? _trainingDayIndices.length
-            : (storedRunsPerWeek ?? 4);
-
-        final paceMin = prefs.getInt('pace_minutes');
-        final paceSec = prefs.getInt('pace_seconds') ?? 0;
-        final paceDistance = prefs.getString('pace_distance') ?? '5k';
-        int? prTimeSeconds;
-        String? prDistanceStr;
-        if (paceMin != null) {
-          prTimeSeconds = paceMin * 60 + paceSec;
-          prDistanceStr = paceDistance;
-        }
-        final weeklyMileage =
-            prefs.getDouble('weekly_mileage_km') ?? _estimateWeeklyVolume(runs);
-
-        final recentRuns = runs.take(5).toList();
-        int avgEasyPace = experienceLevel == 'advanced'
-            ? 300
-            : experienceLevel == 'intermediate'
-            ? 330
-            : 360;
-        if (recentRuns.isNotEmpty) {
-          final paces = recentRuns
-              .map((r) => _paceToSeconds(r.averagePace))
-              .where((p) => p > 0)
-              .toList();
-          if (paces.isNotEmpty) {
-            avgEasyPace = (paces.reduce((a, b) => a + b) / paces.length)
-                .round();
-          }
-        }
-
-        final avgDistance = recentRuns.isEmpty
-            ? 5.0
-            : recentRuns.fold(0.0, (sum, r) => sum + r.distance) /
-                  recentRuns.length;
-
-        final goalIntent = prefs.getString('goal_intent') ?? 'improve';
-
-        _userMetrics = UserMetrics(
-          avgEasyPace: avgEasyPace,
-          tempoCapabilityPace: (avgEasyPace * 0.85).round(),
-          intervalCapabilityPace: (avgEasyPace * 0.75).round(),
-          recentAvgDistance: avgDistance,
-          recentWeeklyVolumeKm: weeklyMileage > 0
-              ? weeklyMileage
-              : avgDistance * runsPerWeek,
-          runsPerWeek: runsPerWeek,
-          goalRace: goalRace,
-          experienceLevel: experienceLevel,
-          goalIntent: goalIntent,
-          avgRpe: _averageRecentRpe(runs),
-          recentRpeTrend: _deriveRecentRpeTrend(runs),
-          lastEasyRunTooHard: _lastEasyRunTooHard(runs),
-          prTimeSeconds: prTimeSeconds,
-          prDistance: prDistanceStr,
-          weeklyMileageKm: weeklyMileage,
+        final now = DateTime.now();
+        final weekNumber = memory.racePlan?.currentWeekNumber(now) ?? 1;
+        final dayContext = await PlanStore.instance.getTodayDayContext(
+          weekNumber: weekNumber,
+          now: now,
         );
 
-        final runAnalysis = _buildRunAnalysis(runs);
-        final historicalData = _buildHistoricalData(runs);
-
-        _coachMessage = _coachEngine.getNextCoachMessage(
-          userMetrics: _userMetrics!,
-          runAnalysis: runAnalysis,
-          historicalTrainingData: historicalData,
-          lastWorkoutType: _resolveLastWorkoutId(memory.lastWorkoutType),
-          memory: _engineMemory!,
-          trainingDayIndices: _trainingDayIndices,
-        );
-
-        if (_coachMessage != null) {
-          _workoutModel = WorkoutDisplayModel.fromCoachMessage(_coachMessage!);
+        if (dayContext == null) {
+          _coachMessage = null;
+          _workoutModel = _planResolvingModel;
+        } else if (dayContext.isRest) {
+          _coachMessage = null;
+          _workoutModel = _restDayModel;
         } else {
-          _workoutModel = const WorkoutDisplayModel(
-            category: WorkoutCategory.rest,
-            title: 'Rest Day',
-            coachingReason:
-                'Your body needs recovery today. Take it easy and come back stronger tomorrow.',
-            steps: [],
+          final next = _nextPlannedSession(dayContext.week, now);
+          final built = _messageBuilder.buildMessage(
+            context: _coachContextFrom(memory, runs, now),
+            resolvedWorkout: dayContext.day.workout!,
+            phase: dayContext.week.phase,
+            weekNumber: dayContext.week.weekNumber,
+            nextPlannedIntent: next.$1,
+            nextPlannedLabel: next.$2,
           );
+          _coachMessage = built;
+          _workoutModel = WorkoutDisplayModel.fromCoachMessage(built);
         }
 
         widget.onCoachMessageReady?.call(_coachMessage);
 
-        // Revive the completion signal: record this week's planned volume so
-        // weeklyCompletionRate stops returning null. setWeeklyPlannedKm
-        // early-returns when the value is unchanged, so this is ~one write/week.
-        try {
-          final weekResolution = _coachEngine.resolveCurrentWeek(
-            userMetrics: _userMetrics!,
-            memory: _engineMemory!,
-            trainingDayIndices: _trainingDayIndices,
-          );
-          final plannedKm = weekResolution.days
-              .where((d) => d.distanceKm != null)
-              .fold<double>(0.0, (sum, d) => sum + d.distanceKm!);
-          if (plannedKm > 0) {
-            await EngineMemoryService().setWeeklyPlannedKm(plannedKm);
-          }
-        } catch (e) {
-          debugPrint('[HomeScreen] setWeeklyPlannedKm skipped: $e');
+        // Weekly planned volume comes straight off the materialised week.
+        // setWeeklyPlannedKm early-returns when unchanged (~one write/week).
+        final plannedKm = dayContext?.week.targetKm ?? 0;
+        if (plannedKm > 0) {
+          await EngineMemoryService().setWeeklyPlannedKm(plannedKm);
         }
       } catch (e, stack) {
-        debugPrint('Error generating coach message: $e');
+        debugPrint('Error reading materialised plan: $e');
         debugPrint('$stack');
         _coachMessage = null;
-        _workoutModel = const WorkoutDisplayModel(
-          category: WorkoutCategory.easy,
-          title: 'Easy Run',
-          coachingReason: 'Coach engine is recalibrating. Run easy today.',
-          duration: '30 min',
-          steps: ['Run at a comfortable, conversational pace for 30 minutes.'],
-        );
-        _userMetrics = null;
+        _workoutModel = _planResolvingModel;
         widget.onCoachMessageReady?.call(null);
       }
 
@@ -1116,17 +1059,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  double _estimateWeeklyVolume(List<RunHistory> runs) {
-    if (runs.isEmpty) return 0;
-    final now = DateTime.now();
-    final fourWeeksAgo = now.subtract(const Duration(days: 28));
-    final recentRuns = runs.where((r) => r.date.isAfter(fourWeeksAgo)).toList();
-    if (recentRuns.isEmpty) return 0;
-    final totalKm = recentRuns.fold(0.0, (sum, r) => sum + r.distance);
-    final weeks = now.difference(recentRuns.last.date).inDays / 7.0;
-    return weeks > 0 ? totalKm / weeks : totalKm;
-  }
-
   bool _planCoversThisWeek(WeeklyPlan plan) {
     final diff = DateTime.now().difference(plan.weekStartDate).inDays;
     return diff >= 0 && diff < 7;
@@ -1156,14 +1088,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  selector.RunAnalysis _buildRunAnalysis(List<RunHistory> runs) {
-    return selector.RunAnalysis(
-      avgRpe: _averageRecentRpe(runs),
-      recentRpeTrend: _deriveRecentRpeTrend(runs),
-      lastEasyRunTooHard: _lastEasyRunTooHard(runs),
-    );
-  }
-
   double? _averageRecentRpe(List<RunHistory> runs) {
     final recentRpe = [...runs]..sort((a, b) => b.date.compareTo(a.date));
     final values = recentRpe
@@ -1173,22 +1097,6 @@ class _HomeScreenState extends State<HomeScreen>
         .toList();
     if (values.isEmpty) return null;
     return values.reduce((a, b) => a + b) / values.length;
-  }
-
-  selector.RecentRpeTrend _deriveRecentRpeTrend(List<RunHistory> runs) {
-    final rpeRuns = [...runs]..sort((a, b) => b.date.compareTo(a.date));
-    final recentRpe = rpeRuns
-        .where((r) => r.rpe != null)
-        .take(4)
-        .map((r) => r.rpe!.toDouble())
-        .toList();
-    if (recentRpe.length < 4) return selector.RecentRpeTrend.unknown;
-    final latestAvg = (recentRpe[0] + recentRpe[1]) / 2.0;
-    final previousAvg = (recentRpe[2] + recentRpe[3]) / 2.0;
-    final delta = latestAvg - previousAvg;
-    if (delta >= 0.75) return selector.RecentRpeTrend.increasing;
-    if (delta <= -0.75) return selector.RecentRpeTrend.decreasing;
-    return selector.RecentRpeTrend.stable;
   }
 
   bool _lastEasyRunTooHard(List<RunHistory> runs) {
@@ -1202,48 +1110,6 @@ class _HomeScreenState extends State<HomeScreen>
     return false;
   }
 
-  HistoricalTrainingData _buildHistoricalData(List<RunHistory> runs) {
-    final now = DateTime.now();
-    final weekAgo = now.subtract(const Duration(days: 7));
-    final recentRuns = runs.where((r) => r.date.isAfter(weekAgo)).toList();
-
-    int daysSinceQuality = 999;
-    for (final run in runs) {
-      if (run.workoutType == 'tempo' || run.workoutType == 'interval') {
-        daysSinceQuality = now.difference(run.date).inDays;
-        break;
-      }
-    }
-
-    int daysSinceLong = 999;
-    for (final run in runs) {
-      if (run.workoutType == 'long') {
-        daysSinceLong = now.difference(run.date).inDays;
-        break;
-      }
-    }
-
-    final savedRuns = runs
-        .map(
-          (r) => SavedRun(
-            distance: r.distance,
-            averagePace: r.averagePace,
-            date: r.date,
-            gpsPoints: r.gpsPoints,
-            rpe: r.rpe,
-            workoutType: r.workoutType,
-          ),
-        )
-        .toList();
-
-    return HistoricalTrainingData(
-      daysSinceLastQuality: daysSinceQuality,
-      daysSinceLastLongRun: daysSinceLong,
-      weeklyVolume: recentRuns.fold(0.0, (sum, r) => sum + r.distance),
-      recentRuns: savedRuns,
-    );
-  }
-
   int _paceToSeconds(String pace) {
     try {
       final parts = pace.split(':');
@@ -1254,22 +1120,74 @@ class _HomeScreenState extends State<HomeScreen>
     return 0;
   }
 
-  selector.WorkoutId? _resolveLastWorkoutId(String lastWorkoutType) {
-    switch (lastWorkoutType) {
-      case 'tempo':
-        return selector.WorkoutId.tempoRun;
-      case 'interval':
-        return selector.WorkoutId.intervalWorkout;
-      case 'long':
-        return selector.WorkoutId.longEasy;
-      case 'recovery': // legacy data from before recovery was folded into easy
-        return selector.WorkoutId.easyRun;
-      case 'easy':
-        return selector.WorkoutId.easyRun;
-      default:
-        return null;
-    }
+  // ── Coach narrative from the persisted plan ──────────────────────────────
+
+  /// Light context for [message.CoachMessageBuilder] — real signals only, no
+  /// session recomputation. Drawn from engine memory + recent run history.
+  message.CoachContext _coachContextFrom(
+    EngineMemory memory,
+    List<RunHistory> runs,
+    DateTime now,
+  ) {
+    final lastRun = memory.lastRunDate;
+    final daysSinceLastRun = lastRun == null
+        ? 999
+        : now.difference(lastRun).inDays;
+    final pacedRuns = runs
+        .where((r) => _paceToSeconds(r.averagePace) > 0)
+        .length;
+
+    return message.CoachContext(
+      totalRunsCompleted: memory.totalRunsCompleted,
+      daysSinceLastRun: daysSinceLastRun,
+      avgRpe: _averageRecentRpe(runs),
+      highRpeRecently: memory.hasHighRpe(n: 2, threshold: 8, withinDays: 3),
+      easyRunFeltTooHard: _lastEasyRunTooHard(runs),
+      progression: _progressionSignal(memory.weeklyProgressionDecision),
+      wasDowngraded: false,
+      scalingAdjustments: const [],
+      paceTrending: false,
+      paceInsufficientData: pacedRuns < 3,
+    );
   }
+
+  message.ProgressionSignal _progressionSignal(ProgressionDecision? d) =>
+      switch (d) {
+        ProgressionDecision.progress => message.ProgressionSignal.progressing,
+        ProgressionDecision.regress => message.ProgressionSignal.steppingBack,
+        _ => message.ProgressionSignal.holding,
+      };
+
+  /// The next non-rest session later in [week], for the "up next" hint.
+  (WorkoutIntent?, String?) _nextPlannedSession(
+    MaterializedWeek week,
+    DateTime now,
+  ) {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final todayIdx = now.weekday - 1;
+    for (var i = todayIdx + 1; i < 7; i++) {
+      MaterializedDay? day;
+      for (final d in week.days) {
+        if (d.weekday == i) {
+          day = d;
+          break;
+        }
+      }
+      if (day == null || day.isRest || day.intent == null) continue;
+      final label = (i - todayIdx) == 1 ? 'Tomorrow' : names[i];
+      return (day.intent, '$label · ${_intentLabel(day.intent!)}');
+    }
+    return (null, null);
+  }
+
+  String _intentLabel(WorkoutIntent intent) => switch (intent) {
+    WorkoutIntent.aerobicBase => 'Easy Run',
+    WorkoutIntent.endurance => 'Long Run',
+    WorkoutIntent.threshold => 'Threshold Run',
+    WorkoutIntent.vo2max => 'Interval Session',
+    WorkoutIntent.speed => 'Speed Session',
+    WorkoutIntent.raceSpecific => 'Race Pace Run',
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // BUILD
