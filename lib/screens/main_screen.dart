@@ -115,8 +115,8 @@ class _MainScreenState extends State<MainScreen> {
           elevation: 0,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.explore_outlined),
-              activeIcon: Icon(Icons.explore),
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
               label: 'Feed',
             ),
             BottomNavigationBarItem(
