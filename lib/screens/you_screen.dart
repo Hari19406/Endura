@@ -56,6 +56,21 @@ class _YouScreenState extends State<YouScreen>
   int _activityCount = 0;
   String? get _myId => Supabase.instance.client.auth.currentUser?.id;
 
+  /// Minimal profile built from the auth user, for when the `profiles` row
+  /// isn't readable yet (first-time sync / missing row). Keeps the header from
+  /// ever collapsing to nothing.
+  AthleteProfile _fallbackProfile(User u) {
+    final meta = u.userMetadata ?? const {};
+    final metaName =
+        (meta['name'] ?? meta['full_name'] ?? meta['display_name']) as String?;
+    final name = (metaName != null && metaName.trim().isNotEmpty)
+        ? metaName.trim()
+        : (u.email != null && u.email!.contains('@')
+              ? u.email!.split('@').first
+              : null);
+    return AthleteProfile(id: u.id, displayName: name);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -90,12 +105,25 @@ class _YouScreenState extends State<YouScreen>
       final records = await DatabaseService.instance.getAllRuns();
 
       // ── Athlete identity header ──────────────────────────────────────────
+      // Isolated: a Supabase hiccup here must not abort the whole load and
+      // leave the header (and the rest of the You tab) blank.
       final myId = _myId;
-      final profile = await ProfileService.instance.fetchAthleteProfile();
-      final counts = myId == null
-          ? SocialCounts.zero
-          : await SocialService.instance.counts(myId);
-      final shoes = await ShoeService.instance.locker();
+      AthleteProfile? profile;
+      SocialCounts counts = SocialCounts.zero;
+      List<Shoe> shoes = const [];
+      try {
+        profile = await ProfileService.instance.fetchAthleteProfile();
+        if (myId != null) {
+          counts = await SocialService.instance.counts(myId);
+        }
+        shoes = await ShoeService.instance.locker();
+      } catch (e, st) {
+        debugPrint('[YouScreen] identity/header load failed: $e\n$st');
+      }
+      // fetchAthleteProfile() can return null on a first-time sync or a missing
+      // row — fall back to the auth user so the header always renders.
+      final authUser = Supabase.instance.client.auth.currentUser;
+      profile ??= authUser != null ? _fallbackProfile(authUser) : null;
 
       List<Run> prRuns = runs
           .map(
@@ -313,20 +341,22 @@ class _YouScreenState extends State<YouScreen>
             )
           : NestedScrollView(
               headerSliverBuilder: (context, _) => [
-                if (_profile != null)
-                  SliverToBoxAdapter(
-                    child: AthleteProfileHeader(
-                      profile: _profile!,
-                      counts: _counts,
-                      isSelf: true,
-                      activityCount: _activityCount,
-                      onEditProfile: _editProfile,
-                      onTapFollowers: () =>
-                          _openAthleteList(AthleteListMode.followers),
-                      onTapFollowing: () =>
-                          _openAthleteList(AthleteListMode.following),
-                    ),
-                  ),
+                // Always present — the header must never collapse to 0 height.
+                SliverToBoxAdapter(
+                  child: _profile != null
+                      ? AthleteProfileHeader(
+                          profile: _profile!,
+                          counts: _counts,
+                          isSelf: true,
+                          activityCount: _activityCount,
+                          onEditProfile: _editProfile,
+                          onTapFollowers: () =>
+                              _openAthleteList(AthleteListMode.followers),
+                          onTapFollowing: () =>
+                              _openAthleteList(AthleteListMode.following),
+                        )
+                      : const _ProfileHeaderSkeleton(),
+                ),
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _SliverTabBarDelegate(
@@ -1166,4 +1196,49 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) =>
       oldDelegate.tabBar != tabBar || oldDelegate.background != background;
+}
+
+/// Shown in the header slot for the brief window before the profile resolves
+/// (or if there's no auth user at all) so the layout never jumps.
+class _ProfileHeaderSkeleton extends StatelessWidget {
+  const _ProfileHeaderSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    Widget bar(double w, double h) => Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        color: c.divider,
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(radius: 34, backgroundColor: c.divider),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  bar(140, 18),
+                  const SizedBox(height: 8),
+                  bar(90, 12),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          bar(double.infinity, 40),
+          const SizedBox(height: 14),
+          bar(double.infinity, 40),
+        ],
+      ),
+    );
+  }
 }
