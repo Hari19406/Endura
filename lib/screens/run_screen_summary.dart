@@ -312,7 +312,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                       onPressed: _shareRun,
                                       tooltip: 'Share run',
                                       icon: Icon(
-                                        Icons.ios_share,
+                                        Icons.share,
                                         size: 22,
                                         color: context.colors.textPrimary,
                                       ),

@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/athlete_profile.dart';
 import '../models/feed_run.dart';
@@ -13,6 +14,7 @@ import '../theme/app_colors.dart';
 import '../utils/date_format_utils.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/route_trace_painter.dart';
+import '../widgets/run_comments_sheet.dart';
 import 'athlete_discovery_screen.dart';
 import 'athlete_list_screen.dart' show AthleteAvatar;
 import 'athlete_profile_screen.dart';
@@ -242,7 +244,7 @@ class RunFeedCard extends StatefulWidget {
 
 class _RunFeedCardState extends State<RunFeedCard> {
   bool _kudosed = false;
-  final int _comments = 0; // no comment backend yet — badge stays hidden
+  late int _comments = widget.run.commentCount;
 
   FeedRun get run => widget.run;
 
@@ -251,6 +253,29 @@ class _RunFeedCardState extends State<RunFeedCard> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openComments() async {
+    HapticFeedback.lightImpact();
+    final count = await showRunCommentsSheet(
+      context,
+      runId: run.runId,
+      initialCount: _comments,
+    );
+    if (mounted && count != _comments) setState(() => _comments = count);
+  }
+
+  Future<void> _share() async {
+    HapticFeedback.lightImpact();
+    final useMiles = UnitUtils.useMilesNotifier.value;
+    final dist =
+        '${UnitUtils.displayDistance(run.distanceKm, useMiles).toStringAsFixed(2)} '
+        '${UnitUtils.unitLabel(useMiles)}';
+    final text =
+        "Check out ${run.displayName}'s $dist run on Endura! "
+        'Time: ${_fmtDuration(run.durationSeconds)}, '
+        'Pace: ${UnitUtils.formatPaceString(run.averagePace, useMiles)}.';
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   @override
@@ -598,7 +623,17 @@ class _RunFeedCardState extends State<RunFeedCard> {
           style: const TextStyle(fontSize: 12, color: _FeedPalette.textMid),
         ),
         const Spacer(),
-        _iconAction(Icons.ios_share, 'Sharing is coming soon.'),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          icon: const Icon(
+            Icons.share,
+            size: 18,
+            color: _FeedPalette.textMid,
+          ),
+          onPressed: _share,
+        ),
         const SizedBox(width: 4),
         _commentAction(),
         const SizedBox(width: 4),
@@ -620,14 +655,6 @@ class _RunFeedCardState extends State<RunFeedCard> {
     );
   }
 
-  Widget _iconAction(IconData icon, String soon) => IconButton(
-    visualDensity: VisualDensity.compact,
-    padding: EdgeInsets.zero,
-    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-    icon: Icon(icon, size: 18, color: _FeedPalette.textMid),
-    onPressed: () => _snack(soon),
-  );
-
   Widget _commentAction() {
     return Stack(
       clipBehavior: Clip.none,
@@ -641,7 +668,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
             size: 18,
             color: _FeedPalette.textMid,
           ),
-          onPressed: () => _snack('Comments are coming soon.'),
+          onPressed: _openComments,
         ),
         if (_comments > 0)
           Positioned(

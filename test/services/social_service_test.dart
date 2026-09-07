@@ -65,6 +65,7 @@ class InMemoryFeedStore implements FeedStore {
   final Set<FollowEdge> follows = {};
   final List<Map<String, dynamic>> runs = [];
   final Map<String, Map<String, dynamic>> profiles = {};
+  final Map<int, int> commentCounts = {};
 
   int runsForUsersCalls = 0;
 
@@ -110,9 +111,21 @@ class InMemoryFeedStore implements FeedStore {
         if (set.contains(e.key)) e.key: e.value,
     };
   }
+
+  @override
+  Future<Map<int, int>> commentCountsFor(List<int> runIds) async {
+    final set = runIds.toSet();
+    return {
+      for (final e in commentCounts.entries)
+        if (set.contains(e.key)) e.key: e.value,
+    };
+  }
 }
 
+int _runSeq = 0;
+
 Map<String, dynamic> _runRow(String userId, DateTime date, {double km = 5}) => {
+  'id': ++_runSeq,
   'user_id': userId,
   'date': date.toUtc().toIso8601String(),
   'distance_km': km,
@@ -255,6 +268,21 @@ void main() {
       final result = await svc.fetchFriendsFeed();
 
       expect(result.map((r) => r.distanceKm), [3, 2, 1]);
+    });
+
+    test('batch-loads comment counts per run (0 when absent)', () async {
+      feed.follows.add(const FollowEdge(me, other));
+      final base = DateTime.utc(2026, 9, 1);
+      final withComments = _runRow(other, base.add(const Duration(days: 1)));
+      final noComments = _runRow(other, base);
+      feed.runs.addAll([withComments, noComments]);
+      feed.commentCounts[withComments['id'] as int] = 3;
+
+      final result = await svc.fetchFriendsFeed();
+
+      expect(result[0].runId, withComments['id']);
+      expect(result[0].commentCount, 3);
+      expect(result[1].commentCount, 0);
     });
 
     test('keyset pagination with `before` — no overlap, limit honoured',

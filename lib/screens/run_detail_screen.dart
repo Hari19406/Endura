@@ -233,7 +233,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                icon: const Icon(Icons.ios_share, size: 20),
+                icon: const Icon(Icons.share, size: 20),
                 label: const Text(
                   'Share',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),

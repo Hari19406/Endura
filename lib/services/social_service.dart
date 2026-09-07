@@ -7,6 +7,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/activity_comment.dart';
 import '../models/athlete_profile.dart';
 import '../models/feed_run.dart';
 import 'analytics_service.dart';
@@ -138,6 +139,23 @@ class SupabaseFeedStore implements FeedStore {
       for (final r in (rows as List))
         (r as Map<String, dynamic>)['id'] as String: r,
     };
+  }
+
+  @override
+  Future<Map<int, int>> commentCountsFor(List<int> runIds) async {
+    if (runIds.isEmpty) return {};
+    // One round trip: pull just the run_id column for the page's runs and tally
+    // client-side (a page is ~15 runs, so this stays tiny).
+    final rows = await _c
+        .from('activity_comments')
+        .select('run_id')
+        .inFilter('run_id', runIds);
+    final counts = <int, int>{};
+    for (final r in (rows as List)) {
+      final id = ((r as Map<String, dynamic>)['run_id'] as num).toInt();
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    return counts;
   }
 }
 
@@ -406,21 +424,80 @@ class SocialService {
       );
       if (runRows.isEmpty) return [];
 
-      final authorIds = runRows
-          .map((r) => r['user_id'] as String)
-          .toSet()
-          .toList();
-      final profiles = await _feedStore.profilesByIds(authorIds);
-
-      return runRows
+      final visibleRows = runRows
           // Defence in depth: never surface a run whose author we don't follow,
           // even if the backend ever returns one.
           .where((r) => followed.contains(r['user_id'] as String))
-          .map((r) => FeedRun.fromRows(r, profiles[r['user_id'] as String]))
+          .toList();
+
+      final authorIds = visibleRows
+          .map((r) => r['user_id'] as String)
+          .toSet()
+          .toList();
+      final runIds = visibleRows
+          .map((r) => (r['id'] as num).toInt())
+          .toList();
+      final profiles = await _feedStore.profilesByIds(authorIds);
+      final commentCounts = await _feedStore.commentCountsFor(runIds);
+
+      return visibleRows
+          .map(
+            (r) => FeedRun.fromRows(
+              r,
+              profiles[r['user_id'] as String],
+              commentCount: commentCounts[(r['id'] as num).toInt()] ?? 0,
+            ),
+          )
           .toList();
     } catch (e) {
       debugPrint('[SocialService] fetchFriendsFeed error: $e');
       return [];
+    }
+  }
+
+  // ── Comments ─────────────────────────────────────────────────────────────
+
+  /// All comments on [runId], oldest first, each carrying the commenter's
+  /// display name + avatar. `[]` on error or when the run isn't visible.
+  Future<List<ActivityComment>> fetchComments(int runId) async {
+    try {
+      final rows = await _client
+          .from('activity_comments')
+          .select('id, run_id, user_id, comment, created_at')
+          .eq('run_id', runId)
+          .order('created_at', ascending: true);
+      final list = (rows as List).cast<Map<String, dynamic>>();
+      if (list.isEmpty) return [];
+      final ids = list.map((r) => r['user_id'] as String).toSet().toList();
+      final profiles = await _feedStore.profilesByIds(ids);
+      return list
+          .map((r) => ActivityComment.fromRows(r, profiles[r['user_id']]))
+          .toList();
+    } catch (e) {
+      debugPrint('[SocialService] fetchComments error: $e');
+      return [];
+    }
+  }
+
+  /// Inserts a comment as the signed-in user and returns the created row
+  /// (with commenter identity filled in), or `null` on failure / empty text.
+  Future<ActivityComment?> postComment(int runId, String comment) async {
+    final text = comment.trim();
+    if (text.isEmpty) return null;
+    try {
+      final me = _uid;
+      if (me == null) return null;
+      final row = await _client
+          .from('activity_comments')
+          .insert({'run_id': runId, 'user_id': me, 'comment': text})
+          .select('id, run_id, user_id, comment, created_at')
+          .single();
+      final profiles = await _feedStore.profilesByIds([me]);
+      Analytics.capture('run_commented', properties: {'run_id': runId});
+      return ActivityComment.fromRows(row, profiles[me]);
+    } catch (e) {
+      debugPrint('[SocialService] postComment error: $e');
+      return null;
     }
   }
 }

@@ -435,7 +435,7 @@ class _RunShareSheetState extends State<_RunShareSheet> {
                 ),
                 _buildQuickAction(
                   label: 'More',
-                  icon: Icons.ios_share,
+                  icon: Icons.share,
                   color: c.textPrimary,
                   onTap: _share,
                 ),
