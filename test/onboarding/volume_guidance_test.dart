@@ -112,6 +112,44 @@ void main() {
     });
   });
 
+  group('projected distance band tracks runs-per-week', () {
+    VolumeGuidance at(int days) => _g(
+      goal: 'half_marathon',
+      experience: 'intermediate',
+      baseline: 25,
+      selected: days,
+    );
+
+    test('the band never inverts and both ends move up as days are added', () {
+      var prevLo = 0;
+      var prevHi = 0;
+      for (var d = kMinRunsPerWeek; d <= kMaxRunsPerWeek; d++) {
+        final g = at(d);
+        expect(g.loKm, lessThan(g.hiKm), reason: '$d days');
+        expect(g.loKm, greaterThanOrEqualTo(prevLo), reason: 'lo at $d days');
+        expect(g.hiKm, greaterThanOrEqualTo(prevHi), reason: 'hi at $d days');
+        prevLo = g.loKm;
+        prevHi = g.hiKm;
+      }
+    });
+
+    test('3 vs 5 vs 7 runs project meaningfully different volume', () {
+      expect(at(5).loKm, greaterThan(at(3).loKm));
+      expect(at(5).hiKm, greaterThan(at(3).hiKm));
+      expect(at(7).hiKm, greaterThan(at(5).hiKm));
+    });
+
+    test('a higher current base lifts the floor for the same day count', () {
+      int loFor(double base) => _g(
+        goal: 'half_marathon',
+        experience: 'intermediate',
+        baseline: base,
+        selected: 4,
+      ).loKm;
+      expect(loFor(45), greaterThan(loFor(15)));
+    });
+  });
+
   group('seven-day weeks', () {
     // Guards the workaround for the missing 7-day row: the raw engine table
     // returns the 4-day values for 7 days, which would make a 7-day week look

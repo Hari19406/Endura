@@ -33,11 +33,14 @@ class VolumeGuidance {
   /// Where the RECOMMENDED badge sits.
   final int recommendedRuns;
 
-  /// Weekly distance band for the currently selected runs-per-week.
+  /// Projected weekly-distance band for the *currently selected* runs-per-week —
+  /// recomputed on every slider step (see [_bandForDays]).
   final int loKm;
   final int hiKm;
 
-  /// Hard quality sessions in the selected week, straight from the archetype.
+  /// Quality sessions the archetype composes for a peak build week at this day
+  /// count. Week 1 / Base always opens at one quality — the "at a glance" card
+  /// shows the base structure (1 quality · 1 long · rest easy).
   final int qualitySessions;
 
   /// True when the selection is a big jump on what they run today. Not a
@@ -98,12 +101,18 @@ class VolumeGuidance {
 
     final runs = selectedRuns.clamp(kMinRunsPerWeek, maxRuns);
     final range = rangeFor(goal, experienceBridged, runs);
+    final band = _bandForDays(
+      goal: goal,
+      experience: experienceBridged,
+      days: runs,
+      baselineWeeklyKm: baselineWeeklyKm,
+    );
 
     return VolumeGuidance(
       maxRuns: maxRuns,
       recommendedRuns: recommended,
-      loKm: range.min.round(),
-      hiKm: range.max.round(),
+      loKm: band.lo,
+      hiKm: band.hi,
       qualitySessions: _qualityFor(
         weeklyKm: range.defaultKm,
         days: runs,
@@ -112,6 +121,35 @@ class VolumeGuidance {
       isStretch:
           baselineWeeklyKm > 0 && range.defaultKm > baselineWeeklyKm * 1.8,
     );
+  }
+
+  /// The realistic *projected weekly volume* window for a specific day count —
+  /// what the plan actually runs at that frequency, not the whole 3-to-7-day
+  /// span. Centres on the day count's typical volume ([VolumeModel]), floors it
+  /// by what the athlete already runs and the distance's min-viable, and caps
+  /// at the experience peak. Moves with every slider step.
+  static ({int lo, int hi}) _bandForDays({
+    required String goal,
+    required String experience,
+    required int days,
+    required double baselineWeeklyKm,
+  }) {
+    final race = _race(goal);
+    final level = _level(experience);
+    final typical = VolumeModel.onboardingRange(
+      race: race,
+      experience: level,
+      days: days,
+    ).defaultKm;
+    final minV = VolumeModel.minViableKm(race);
+    final peak = VolumeModel.peakKm(race, level);
+
+    var lo = _max(minV, typical * 0.82);
+    // never project below what the athlete already sustains at this frequency
+    if (baselineWeeklyKm > 0) lo = _max(lo, _min(baselineWeeklyKm, typical));
+    final hi = _max(lo + 4, _min(peak, typical * 1.28));
+
+    return (lo: lo.round(), hi: hi.round());
   }
 
   /// Ask the archetype rather than guessing. The old heuristic was

@@ -4788,10 +4788,10 @@ class OPageRunsPerWeek extends StatelessWidget {
                     const SizedBox(height: 10),
                     _planRow(
                       Icons.bolt_rounded,
-                      'Hard workouts',
-                      g.qualitySessions == 0
-                          ? 'None — all easy running'
-                          : '${g.qualitySessions} of $runsPerWeek runs',
+                      'Session mix',
+                      // Week 1 / Base structure: 1 quality, 1 long, rest easy —
+                      // keeps the 80/20 aerobic ratio at every frequency.
+                      '1 quality · 1 long · ${(runsPerWeek - 2).clamp(0, 7)} easy',
                     ),
                   ],
                 ),
