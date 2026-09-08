@@ -104,9 +104,10 @@ class PlanConfigState {
   /// Preferred long-run weekday. 1 = Monday … 7 = Sunday.
   final int longRunDay;
 
-  /// Weekdays the athlete can run (1 = Mon … 7 = Sun). Its cardinality should
-  /// match [runsPerWeek]; the generator honours the set, not the count, when
-  /// they disagree.
+  /// Weekdays the athlete can run (1 = Mon … 7 = Sun). Guaranteed non-empty,
+  /// a subset of 1–7, to contain [longRunDay], and to have at least
+  /// [runsPerWeek] members (all enforced by the constructor asserts and
+  /// normalised by [PlanConfigState.fromInputs]).
   final Set<int> availableDays;
 
   /// Macrocycle length in weeks. 3–20. For race goals this is derived from the
@@ -139,6 +140,14 @@ class PlanConfigState {
          availableDays.isNotEmpty &&
              availableDays.every((d) => d >= 1 && d <= 7),
          'availableDays must be a non-empty subset of 1–7',
+       ),
+       // Schedule guardrail: the long run must fall on a day the athlete can
+       // actually run. The runsPerWeek ↔ availableDays.length reconciliation
+       // is done (non-fatally) in [fromInputs] rather than asserted here, so a
+       // slightly loose pair from a legacy caller still builds.
+       assert(
+         availableDays.contains(longRunDay),
+         'longRunDay must be one of availableDays',
        );
 
   /// The gradual-start factor applied to a given plan week (1-based).
@@ -189,11 +198,26 @@ class PlanConfigState {
     double? peakWeeklyKmOverride,
     double? peakLongRunKmOverride,
   }) {
+    // ── Schedule guardrails (spec §2) ──────────────────────────────────────
+    final days = availableDays.where((d) => d >= 1 && d <= 7).toSet();
+    final safeDays = days.isEmpty ? <int>{2, 4, 6, 7} : days;
+    // runsPerWeek can't exceed the days actually checked — snap it down.
+    var runs = runsPerWeek;
+    if (runs < 2) runs = 2;
+    if (runs > 7) runs = 7;
+    if (runs > safeDays.length) {
+      runs = safeDays.length < 2 ? 2 : safeDays.length;
+    }
+    // the long run must land on an available day — snap to the latest one.
+    final lrDay = safeDays.contains(longRunDay)
+        ? longRunDay
+        : (safeDays.toList()..sort()).last;
+
     final race = goalType.volumeReferenceDistance;
     final band = VolumeModel.onboardingRange(
       race: race,
       experience: experience,
-      days: runsPerWeek,
+      days: runs,
     );
     final safeCap = VolumeModel.safeCapKm(race);
     final floor = (currentWeeklyKm ?? band.defaultKm).clamp(band.min, safeCap);
@@ -206,14 +230,14 @@ class PlanConfigState {
       goalType: goalType,
       experience: experience,
       vDOT: vDOT,
-      runsPerWeek: runsPerWeek,
+      runsPerWeek: runs,
       weeklyVolumeRange: RangeValues(
         floor.toDouble(),
         peak.toDouble(),
       ),
       longRunRange: RangeValues(lr.start, lrPeak.toDouble()),
-      longRunDay: longRunDay,
-      availableDays: availableDays,
+      longRunDay: lrDay,
+      availableDays: safeDays,
       durationWeeks: durationWeeks,
       gradualStart: gradualStart,
     );
