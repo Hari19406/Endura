@@ -22,6 +22,8 @@ import 'services/theme_service.dart';
 import 'utils/unit_utils.dart';
 
 import 'onboarding/onboarding_screen.dart';
+import 'onboarding/plan_reveal_data.dart';
+import 'onboarding/plan_reveal_page.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/run_screen.dart';
@@ -119,6 +121,11 @@ final List<_DevSection> _menu = [
       'Onboarding',
       (_) => OnboardingScreen(onComplete: () {}),
       subtitle: 'Full race-first onboarding sequence',
+    ),
+    _DevEntry(
+      'Plan reveal + tuning',
+      (_) => const _PlanRevealStage(),
+      subtitle: 'OPagePlanReveal with mock answers — drives the fine-tune sliders',
     ),
   ]),
   _DevSection('Screens', [
@@ -266,6 +273,69 @@ class _DevHost extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Launches straight into [OPagePlanReveal] with a realistic canned answer set
+/// so the Phase 2 fine-tune sliders + week-2 preview can be exercised without
+/// tapping through the whole questionnaire.
+class _PlanRevealStage extends StatefulWidget {
+  const _PlanRevealStage();
+
+  @override
+  State<_PlanRevealStage> createState() => _PlanRevealStageState();
+}
+
+class _PlanRevealStageState extends State<_PlanRevealStage> {
+  static final _answers = OnboardingAnswers(
+    goal: 'half_marathon',
+    raceName: 'Dev Half',
+    raceDate: DateTime.now().add(const Duration(days: 16 * 7)),
+    experienceRaw: 'regular',
+    experienceBridged: 'intermediate',
+    raceGoalRaw: 'finish',
+    pastMonthKm: 130,
+    baselineWeeklyKm: 30,
+    runsPerWeek: 4,
+    selectedDays: const [0, 2, 4, 5],
+    longRunDayIndex: 5,
+    paceDistance: 'half',
+    paceDistanceKm: 21.0975,
+    currentTimeSec: 6600, // 1:50:00
+    startDate: DateTime.now(),
+    planWeeks: 16,
+    vdot: 44,
+    vdotProvisional: false,
+  );
+
+  late final PlanProjection? _projection = _safeBuild();
+
+  static PlanProjection? _safeBuild() {
+    try {
+      return PlanProjection.build(_answers);
+    } catch (_) {
+      return null; // exercise the receipt-only + standalone-sliders path
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.colors.background,
+      body: SafeArea(
+        child: OPagePlanReveal(
+          answers: _answers,
+          projection: _projection,
+          onEdit: (t) => ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('onEdit: ${t.name}')),
+          ),
+          onGenerate: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('onGenerate — would materialise here')),
+          ),
+          onConfigChanged: (c) => debugPrint('[DevLauncher] tuned: $c'),
+        ),
       ),
     );
   }

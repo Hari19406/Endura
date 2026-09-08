@@ -95,6 +95,10 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
   PlanProjection? _tunedProjection;
   bool _tuneTracked = false;
 
+  /// True once the athlete has actually moved a control — guards the
+  /// edit-return re-synth from stomping a hand-tuned config.
+  bool _userTuned = false;
+
   PlanProjection? get _effectiveProjection =>
       _tunedProjection ?? widget.projection;
 
@@ -102,6 +106,26 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
   void initState() {
     super.initState();
     _config = widget.initialConfig ?? _synthConfig();
+    // Hand the synthesised config to onboarding straight away so `_saveAll`
+    // always has a non-null PlanConfigState, even if no slider is touched.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onConfigChanged?.call(_config);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant OPagePlanReveal old) {
+    super.didUpdateWidget(old);
+    // The athlete edited an answer from the receipt and came back. Re-seed the
+    // sliders from the new answers unless they've already hand-tuned.
+    if (!_userTuned &&
+        old.answers.fingerprint != widget.answers.fingerprint) {
+      setState(() {
+        _config = widget.initialConfig ?? _synthConfig();
+        _tunedProjection = null; // fall back to the fresh onboarding projection
+      });
+      widget.onConfigChanged?.call(_config);
+    }
   }
 
   PlanConfigState _synthConfig() {
@@ -148,10 +172,14 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
   }
 
   void _onConfigDraft(PlanConfigState next) {
-    setState(() => _config = next);
+    setState(() {
+      _config = next;
+      _userTuned = true;
+    });
   }
 
   void _onConfigCommitted() {
+    _userTuned = true;
     HapticFeedback.selectionClick();
     if (!_tuneTracked) {
       _tuneTracked = true;
@@ -208,27 +236,32 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
                       scrubIndex: _scrub,
                       onScrub: _onScrub,
                     ),
-                    const SizedBox(height: 14),
-                    _TuneControlsCard(
-                      config: _config,
-                      weeklyBounds: _clampRange(
-                        _config.weeklyVolumeRange,
-                        _weeklyBounds.min,
-                        _weeklyBounds.max,
-                      ),
-                      weeklyMin: _weeklyBounds.min,
-                      weeklyMax: _weeklyBounds.max,
-                      longRunBounds: _clampRange(
-                        _config.longRunRange,
-                        _longRunBounds.min,
-                        _longRunBounds.max,
-                      ),
-                      longRunMin: _longRunBounds.min,
-                      longRunMax: _longRunBounds.max,
-                      useMiles: useMiles,
-                      onDraft: _onConfigDraft,
-                      onCommitted: _onConfigCommitted,
+                  ],
+                  // The fine-tune controls stand on their own — they only need
+                  // the config + VolumeModel bounds — so they render even when
+                  // the projection failed to build.
+                  const SizedBox(height: 14),
+                  _TuneControlsCard(
+                    config: _config,
+                    weeklyBounds: _clampRange(
+                      _config.weeklyVolumeRange,
+                      _weeklyBounds.min,
+                      _weeklyBounds.max,
                     ),
+                    weeklyMin: _weeklyBounds.min,
+                    weeklyMax: _weeklyBounds.max,
+                    longRunBounds: _clampRange(
+                      _config.longRunRange,
+                      _longRunBounds.min,
+                      _longRunBounds.max,
+                    ),
+                    longRunMin: _longRunBounds.min,
+                    longRunMax: _longRunBounds.max,
+                    useMiles: useMiles,
+                    onDraft: _onConfigDraft,
+                    onCommitted: _onConfigCommitted,
+                  ),
+                  if (p != null) ...[
                     const SizedBox(height: 14),
                     _NextWeekPreviewCard(
                       days: p.previewWeek,
