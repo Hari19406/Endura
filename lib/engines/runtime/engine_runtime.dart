@@ -6,6 +6,7 @@ import '../config/workout_template_library.dart';
 import '../../models/workout_type.dart';
 import '../../utils/database_service.dart';
 import '../progression_decision.dart';
+import '../plan/adaptation_coordinator.dart';
 import '../../services/profile_service.dart';
 
 /// Called once after every completed run to keep all coaching state current.
@@ -128,6 +129,11 @@ class EngineRuntime {
         'phase=${updated.currentPhase.name} totalRuns=$totalRuns '
         'vdot=${updated.vdotScore} template=$templateId',
       );
+
+      // Closed-loop adaptation: reconcile the persisted MaterializedPlan against
+      // this run + accumulated history. Own try/catch inside the coordinator —
+      // never blocks or breaks run-saving.
+      await AdaptationCoordinator.instance.reconcileNow(asOfDate: runDate);
     } catch (e) {
       debugPrint('[EngineRuntime] processRun error: $e');
     }

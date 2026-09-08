@@ -6,6 +6,7 @@ import '../utils/stats.dart';
 import '../engines/coach_engine_v2.dart';
 import '../engines/plan/plan_store.dart';
 import '../engines/plan/materialized_plan.dart';
+import '../engines/plan/adaptation_coordinator.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -767,6 +768,12 @@ class _HomeScreenState extends State<HomeScreen>
           await EngineMemoryService().saveActivePlan(markedPlan);
         }
       }
+
+      // ── Silent-miss sweep: reconcile the persisted plan against reality
+      // (scheduled days that passed with no run, volume drift, vDOT moves)
+      // before we read today's session, so the card reflects any shift.
+      // Fully guarded inside the coordinator — never throws.
+      await AdaptationCoordinator.instance.reconcileNow();
 
       // ── Today's session — read straight from the persisted MaterializedPlan.
       // No ad-hoc recomputation: if the plan isn't there yet we show an

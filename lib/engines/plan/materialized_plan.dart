@@ -227,6 +227,11 @@ class MaterializedPlan {
   /// Consecutive weeks per intent on the current ladder rung.
   final Map<String, int> sessionProgress;
 
+  /// Append-only receipt of every adaptation the closed-loop engine has applied
+  /// (missed-session shifts, volume scaling, pace recalibration). Surfaced in
+  /// the "how we built your plan" / plan-overview UI.
+  final List<AdaptationLogEntry> adaptationLog;
+
   const MaterializedPlan({
     required this.planId,
     required this.builtAt,
@@ -235,6 +240,7 @@ class MaterializedPlan {
     required this.weeks,
     this.ladderState = const {},
     this.sessionProgress = const {},
+    this.adaptationLog = const [],
   });
 
   MaterializedWeek? weekByNumber(int n) {
@@ -270,6 +276,7 @@ class MaterializedPlan {
     String? inputsFingerprint,
     Map<String, int>? ladderState,
     Map<String, int>? sessionProgress,
+    List<AdaptationLogEntry>? adaptationLog,
   }) => MaterializedPlan(
     planId: planId,
     builtAt: builtAt ?? this.builtAt,
@@ -278,6 +285,7 @@ class MaterializedPlan {
     weeks: weeks ?? this.weeks,
     ladderState: ladderState ?? this.ladderState,
     sessionProgress: sessionProgress ?? this.sessionProgress,
+    adaptationLog: adaptationLog ?? this.adaptationLog,
   );
 
   Map<String, dynamic> toJson() => {
@@ -288,6 +296,8 @@ class MaterializedPlan {
     'inputsFingerprint': inputsFingerprint,
     'ladderState': ladderState,
     'sessionProgress': sessionProgress,
+    if (adaptationLog.isNotEmpty)
+      'adaptationLog': adaptationLog.map((e) => e.toJson()).toList(),
     'weeks': weeks.map((w) => w.toJson()).toList(),
   };
 
@@ -298,6 +308,10 @@ class MaterializedPlan {
     inputsFingerprint: j['inputsFingerprint'] as String,
     ladderState: _intMap(j['ladderState']),
     sessionProgress: _intMap(j['sessionProgress']),
+    adaptationLog: (j['adaptationLog'] as List?)
+            ?.map((e) => AdaptationLogEntry.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        const [],
     weeks: (j['weeks'] as List)
         .map((e) => MaterializedWeek.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -332,4 +346,42 @@ class MaterializedDayContext {
 
   /// Whether the athlete has already logged a run against today.
   bool get isCompleted => day.isCompleted;
+}
+
+/// One line of the adaptation receipt — what the closed-loop engine changed and
+/// why. Pure data.
+class AdaptationLogEntry {
+  final DateTime at;
+
+  /// Machine key, e.g. `missed_key_shifted`, `volume_shortfall_scaled`,
+  /// `missed_long_dropped_taper`, `pace_recalibrated`.
+  final String reason;
+
+  /// Human-readable one-liner for the receipt UI.
+  final String summary;
+
+  /// Plan week the change landed in (0 when plan-wide, e.g. pace recal).
+  final int weekNumber;
+
+  const AdaptationLogEntry({
+    required this.at,
+    required this.reason,
+    required this.summary,
+    this.weekNumber = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'at': at.toIso8601String(),
+    'reason': reason,
+    'summary': summary,
+    if (weekNumber != 0) 'weekNumber': weekNumber,
+  };
+
+  factory AdaptationLogEntry.fromJson(Map<String, dynamic> j) =>
+      AdaptationLogEntry(
+        at: DateTime.parse(j['at'] as String),
+        reason: j['reason'] as String,
+        summary: j['summary'] as String,
+        weekNumber: (j['weekNumber'] as num?)?.toInt() ?? 0,
+      );
 }
