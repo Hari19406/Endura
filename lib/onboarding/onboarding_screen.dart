@@ -8,6 +8,7 @@ import '../../engines/planner/race_plan_builder.dart';
 import '../../engines/memory/engine_memory_service.dart';
 import '../../engines/plan/plan_materialization_coordinator.dart';
 import '../../models/race_plan.dart';
+import '../../models/plan_config_state.dart';
 import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
@@ -699,9 +700,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _vdot = vdot;
     _vdotProvisional = provisional;
 
+    // Apply the plan-reveal fine-tune sliders, if the athlete touched them.
+    // runsPerWeek can move off the day set they picked — regenerate an evenly
+    // spread set so the schedule still lines up.
+    final tuned = _tunedConfig;
+    if (tuned != null && tuned.runsPerWeek != _runsPerWeek) {
+      _runsPerWeek = tuned.runsPerWeek;
+      _selectedDays = spreadTrainingDays(tuned.runsPerWeek, _longRunDayIndex);
+    }
+
     // Same getter the reveal uses, so the curve the athlete approved is the
-    // plan that actually gets saved.
-    final double effectiveBaselineKm = _baselineWeeklyKm;
+    // plan that actually gets saved. The tuned floor wins when present.
+    final double effectiveBaselineKm =
+        tuned?.weeklyVolumeRange.start ?? _baselineWeeklyKm;
 
     final goalRace = _goal ?? '5k';
     final exp = _bridgeExperience(_experience);
@@ -786,7 +797,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           // Self-paced plans (no fixed race date) use the chosen week count
           // verbatim; date-anchored plans still derive length from the date.
           durationWeeks: _raceDate == null ? _effectivePlanWeeks : null,
-          gradualStart: _gradualStart,
+          gradualStart: tuned?.gradualStart ?? _gradualStart,
+          peakWeeklyKmOverride: tuned?.weeklyVolumeRange.end,
+          peakLongRunKmOverride: tuned?.longRunRange.end,
         );
         await EngineMemoryService().saveRacePlan(plan);
         Analytics.planCreated(goal: goalRace, level: exp);

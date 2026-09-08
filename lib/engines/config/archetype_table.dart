@@ -459,7 +459,10 @@ class ArchetypeTable {
     final lrTarget = longRunKmTarget ?? ((lrMinFrac + lrMaxFrac) / 2 * wk);
     final lrKm = lrTarget.clamp(lrMin, lrMax);
 
-    final mlMax = 0.9 * lrKm;
+    // At very low weekly volume (e.g. 6 days on a short base plan) `0.9 * lrKm`
+    // can fall below the 8 km medium-long floor; guard it here so the clamp
+    // below (and the session `max` bound) always has lo ≤ hi.
+    final double mlMax = math.max(8.0, 0.9 * lrKm);
     final mlKm = hasMediumLong ? (0.60 * lrKm).clamp(8.0, mlMax) : 0.0;
 
     final qMin = _Floors.forType(ArchetypeSessionType.tempo);

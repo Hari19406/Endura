@@ -705,7 +705,7 @@ class _TuneControlsCard extends StatelessWidget {
             onChangeEnd: (_) => onCommitted(),
           ),
           const SizedBox(height: 6),
-          _sliderHeader('Runs per week', '${config.runsPerWeek}'),
+          _sliderHeader('Weekly runs', '${config.runsPerWeek}'),
           Slider(
             value: config.runsPerWeek.toDouble(),
             min: 2,
@@ -744,7 +744,7 @@ class _TuneControlsCard extends StatelessWidget {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             dense: true,
-            activeColor: EC.teal,
+            activeThumbColor: EC.teal,
             title: const Text(
               'Gradual start',
               style: TextStyle(
@@ -821,13 +821,7 @@ class _NextWeekPreviewCard extends StatelessWidget {
           Row(
             children: List.generate(7, (i) {
               final slot = i < days.length ? days[i] : null;
-              return Expanded(
-                child: _DayCell(
-                  slot: slot,
-                  letter: _dayLetters[i],
-                  useMiles: useMiles,
-                ),
-              );
+              return Expanded(child: _PreviewPill(slot: slot, letter: _dayLetters[i], useMiles: useMiles));
             }),
           ),
           const SizedBox(height: 12),
@@ -837,6 +831,55 @@ class _NextWeekPreviewCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Compact day pill for the preview — dot + km only, no word label, so it
+/// reads as a lighter echo of "A typical week" rather than a duplicate.
+class _PreviewPill extends StatelessWidget {
+  final DaySlot? slot;
+  final String letter;
+  final bool useMiles;
+
+  const _PreviewPill({
+    required this.slot,
+    required this.letter,
+    required this.useMiles,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isRest = slot == null || slot!.isRest;
+    final fill = isRest ? Colors.transparent : dayColorForIntent(slot!.intent);
+    final km = slot?.distanceKm;
+
+    return Column(
+      children: [
+        Text(
+          letter,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: EC.muted,
+          ),
+        ),
+        const SizedBox(height: 7),
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: fill,
+            border: isRest ? Border.all(color: EC.border, width: 1.2) : null,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          isRest ? '—' : (km == null ? '—' : _km(km, useMiles)),
+          style: const TextStyle(fontSize: 9.5, color: EC.textSecondary),
+        ),
+      ],
     );
   }
 }
