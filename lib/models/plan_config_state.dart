@@ -16,8 +16,16 @@ import '../engines/config/archetype_table.dart' show ExperienceLevel;
 import '../engines/config/volume_model.dart';
 import '../engines/config/workout_template_library.dart' show RaceDistance;
 
-/// The goal a plan is built around. Race distances taper to a date; [fitness]
-/// and [consistency] periodize volume without a race target.
+/// The goal a plan is built around.
+///
+/// Two branches for onboarding:
+///   • **Event-specific** — [fiveK] / [tenK] / [half] / [marathon]: there is a
+///     fixed race day, so the plan length is derived from the race date and the
+///     block tapers to it.
+///   • **Open-ended** — [fitness] (general fitness / speed) and [consistency]
+///     (getting started / rebuilding): no race event, so the athlete picks the
+///     plan length directly and volume is anchored to general endurance
+///     ([volumeReferenceDistance]).
 enum PlanGoalType {
   fiveK,
   tenK,
@@ -36,7 +44,13 @@ enum PlanGoalType {
     PlanGoalType.consistency => null,
   };
 
-  bool get isRace => raceDistance != null;
+  /// True for the event-specific goals — the ones that get a race-date picker
+  /// and a date-derived plan length. False for open-ended fitness goals, which
+  /// get a plan-duration slider instead.
+  bool get isRaceGoal => raceDistance != null;
+
+  /// Back-compat alias for [isRaceGoal].
+  bool get isRace => isRaceGoal;
 
   /// Distance used for volume math even for non-race goals (fitness/consistency
   /// train like a 10 K block).
@@ -140,6 +154,23 @@ class PlanConfigState {
   /// Effective volume floor once the gradual-start ease-in is applied.
   double volumeFloorForWeek(int week) =>
       weeklyVolumeRange.start * gradualStartFactorForWeek(week);
+
+  /// Macrocycle length for the two onboarding branches, always clamped to the
+  /// engine-supported 3–20 week window:
+  ///   • **race goal** ([raceDate] given) → whole weeks from [startDate] to the
+  ///     race, i.e. `raceDate.difference(startDate).inDays ~/ 7`.
+  ///   • **fitness goal** (no [raceDate]) → the plan-duration slider value
+  ///     ([sliderWeeks]) verbatim.
+  static int deriveDurationWeeks({
+    DateTime? raceDate,
+    required DateTime startDate,
+    required int sliderWeeks,
+  }) {
+    if (raceDate != null) {
+      return (raceDate.difference(startDate).inDays ~/ 7).clamp(3, 20);
+    }
+    return sliderWeeks.clamp(3, 20);
+  }
 
   /// Build a config from raw intake, sourcing every volume bound from
   /// [VolumeModel]. `peakWeeklyKmOverride` / `peakLongRunKmOverride` let an

@@ -200,6 +200,9 @@ class PlanProjection {
       raceDate: a.raceDate,
       experienceLevel: a.experienceBridged,
       now: now,
+      // Same goal-branch length onboarding will save — the reveal curve must
+      // match the plan the athlete approves.
+      durationWeeks: a.planWeeks.clamp(3, 20),
       peakWeeklyKmOverride: peakKmOverride,
       peakLongRunKmOverride: peakLongRunKmOverride,
       gradualStart: gradualStart,

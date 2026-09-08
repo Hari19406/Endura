@@ -482,7 +482,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       paceDistanceKm: _paceDistanceKm,
       currentTimeSec: _currentTimeSec,
       startDate: _startDate,
-      planWeeks: _effectivePlanWeeks,
+      planWeeks: _planDurationWeeks,
       vdot: vdot,
       vdotProvisional: provisional,
     );
@@ -693,6 +693,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   int get _effectivePlanWeeks => _planWeeks ?? 12;
 
+  /// The macrocycle length handed to the generator + reveal + saved profile.
+  /// Race goals derive it from the race date; fitness goals (no `_raceDate`)
+  /// use the chosen plan-duration weeks. Always clamped to the 3–20 window.
+  int get _planDurationWeeks => PlanConfigState.deriveDurationWeeks(
+    raceDate: _raceDate,
+    startDate: _startDate,
+    sliderWeeks: _effectivePlanWeeks,
+  );
+
   // ── Save & complete ──────────────────────────────────────────────────────
 
   Future<void> _saveAll() async {
@@ -794,9 +803,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           goalRace: goalRace,
           raceDate: raceDate,
           experienceLevel: exp,
-          // Self-paced plans (no fixed race date) use the chosen week count
-          // verbatim; date-anchored plans still derive length from the date.
-          durationWeeks: _raceDate == null ? _effectivePlanWeeks : null,
+          // Goal-branch length: race goals derive weeks from the race date,
+          // fitness goals use the chosen plan-duration slider — both clamped
+          // to 3–20 by PlanConfigState.deriveDurationWeeks.
+          durationWeeks: _planDurationWeeks,
           gradualStart: tuned?.gradualStart ?? _gradualStart,
           peakWeeklyKmOverride: tuned?.weeklyVolumeRange.end,
           peakLongRunKmOverride: tuned?.longRunRange.end,
@@ -848,7 +858,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         goal: goalRace,
         level: exp,
         runsPerWeek: _runsPerWeek,
-        planWeeks: _effectivePlanWeeks,
+        planWeeks: _planDurationWeeks,
       );
     } catch (e) {
       debugPrint('[Onboarding] Save error: $e');
@@ -1090,7 +1100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         firstName: 'Runner',
         goal: _goal ?? '5k',
         vdot: previewVdot.$1,
-        planWeeks: _effectivePlanWeeks,
+        planWeeks: _planDurationWeeks,
         experienceLevel: _bridgeExperience(_experience),
         currentTimeSec: _currentTimeSec,
         paceDistanceKm: _paceDistanceKm,
