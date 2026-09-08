@@ -376,6 +376,21 @@ String intentLabel(WorkoutIntent? intent) => switch (intent) {
   null => 'Rest',
 };
 
+/// Fill colour for a day pill. A microcycle has exactly one endurance-blue
+/// pill — the long run. A mid-week medium-long is aerobic volume, so it reads
+/// with the base/recovery colour, never a second blue next to the long run.
+Color slotFill(DaySlot? slot) {
+  if (slot == null || slot.isRest) return Colors.transparent;
+  if (slot.isMediumLong) return dayColorForIntent(WorkoutIntent.aerobicBase);
+  return dayColorForIntent(slot.intent);
+}
+
+String slotShortLabel(DaySlot? slot) {
+  if (slot == null || slot.isRest) return 'Rest';
+  if (slot.isMediumLong) return 'Med';
+  return intentLabel(slot.intent);
+}
+
 class _TypicalWeekStrip extends StatelessWidget {
   final List<DaySlot> days;
   final int weekNumber;
@@ -434,7 +449,7 @@ class _DayCell extends StatelessWidget {
     final isRest = slot == null || slot!.isRest;
     // dayColorForIntent maps rest to white, which was designed for a light
     // surface and reads as a bright blob on EC.bg. Ring it instead.
-    final fill = isRest ? Colors.transparent : dayColorForIntent(slot!.intent);
+    final fill = slotFill(slot);
     final km = slot?.distanceKm;
 
     return Column(
@@ -459,7 +474,7 @@ class _DayCell extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          isRest ? 'Rest' : intentLabel(slot!.intent),
+          slotShortLabel(slot),
           style: const TextStyle(
             fontSize: 8,
             fontWeight: FontWeight.w600,
@@ -884,7 +899,7 @@ class _PreviewPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRest = slot == null || slot!.isRest;
-    final fill = isRest ? Colors.transparent : dayColorForIntent(slot!.intent);
+    final fill = slotFill(slot);
     final km = slot?.distanceKm;
 
     return Column(

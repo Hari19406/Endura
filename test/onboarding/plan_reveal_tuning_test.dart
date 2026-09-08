@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:run_app/engines/config/workout_template_library.dart'
+    show WorkoutIntent;
+import 'package:run_app/engines/plan/week_resolver.dart' show DaySlot, SlotType;
 import 'package:run_app/models/plan_config_state.dart';
 import 'package:run_app/onboarding/plan_reveal_data.dart';
 import 'package:run_app/onboarding/plan_reveal_page.dart';
 import 'package:run_app/utils/unit_utils.dart';
+import 'package:run_app/utils/workout_type_style.dart';
 
 final _now = DateTime(2026, 1, 5); // a Monday
 
@@ -131,6 +135,30 @@ void main() {
 
       expect(find.text('PREVIEW YOUR NEXT WEEK'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('day pill colour', () {
+    DaySlot slot(SlotType t, WorkoutIntent i) =>
+        DaySlot(weekday: 0, slotType: t, intent: i);
+
+    test('a medium-long is NOT the endurance-blue long-run colour', () {
+      final ml = slot(SlotType.mediumLong, WorkoutIntent.endurance);
+      final lr = slot(SlotType.longRun, WorkoutIntent.endurance);
+      expect(slotFill(ml), isNot(slotFill(lr)));
+      expect(slotFill(ml), dayColorForIntent(WorkoutIntent.aerobicBase));
+      expect(slotFill(lr), dayColorForIntent(WorkoutIntent.endurance));
+    });
+
+    test('short label distinguishes a medium-long from the long run', () {
+      expect(
+        slotShortLabel(slot(SlotType.mediumLong, WorkoutIntent.endurance)),
+        'Med',
+      );
+      expect(
+        slotShortLabel(slot(SlotType.longRun, WorkoutIntent.endurance)),
+        'Long',
+      );
     });
   });
 }

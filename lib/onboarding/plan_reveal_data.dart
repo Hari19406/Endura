@@ -287,41 +287,58 @@ class PlanProjection {
   static int _maxI(int a, int b) => a > b ? a : b;
 }
 
-/// An evenly spread set of [count] training weekdays (0 = Mon … 6 = Sun),
-/// guaranteeing [longRunDayIndex] is included when valid. Used when the
-/// runs-per-week tuning slider moves off the day set the athlete picked.
+/// An evenly spread set of [count] training weekdays (0 = Mon … 6 = Sun).
+/// When [longRunDayIndex] is valid the spread is *anchored* on it (so the long
+/// run always lands on the chosen day) and the day immediately before it is
+/// nudged off when possible, so a mid-week medium-long / aerobic day never sits
+/// back-to-back with the long run.
+///
+/// Used when the runs-per-week tuning slider moves off the day set the athlete
+/// originally picked.
 List<int> spreadTrainingDays(int count, int? longRunDayIndex) {
   final n = count.clamp(2, 7);
   if (n >= 7) return const [0, 1, 2, 3, 4, 5, 6];
 
+  final hasLr = longRunDayIndex != null &&
+      longRunDayIndex >= 0 &&
+      longRunDayIndex < 7;
+  final anchor = hasLr ? longRunDayIndex : 6;
+
+  // Phase-shifted even spread that lands ON the anchor.
   final picks = <int>{};
   for (var i = 0; i < n; i++) {
-    picks.add((i * 7 / n).floor().clamp(0, 6));
+    picks.add((anchor + (i * 7 / n).round()) % 7);
   }
-
-  if (longRunDayIndex != null &&
-      longRunDayIndex >= 0 &&
-      longRunDayIndex < 7 &&
-      !picks.contains(longRunDayIndex)) {
-    final sorted = picks.toList()..sort();
-    var nearest = sorted.first;
-    for (final p in sorted) {
-      if ((p - longRunDayIndex).abs() < (nearest - longRunDayIndex).abs()) {
-        nearest = p;
-      }
-    }
-    picks
-      ..remove(nearest)
-      ..add(longRunDayIndex);
-  }
-
-  // Dedup from the floor() collisions can leave us short — top up.
-  for (var d = 0; picks.length < n && d < 7; d++) {
+  for (var d = 0; picks.length < n; d = (d + 1) % 7) {
     picks.add(d);
   }
+  var out = picks.toList()..sort();
 
-  final out = picks.toList()..sort();
+  // Keep a buffer before the long run: if the preceding weekday is also a
+  // training day, move it to a free day that is itself the least clustered.
+  if (hasLr && out.length == n) {
+    final before = (anchor + 6) % 7;
+    if (out.contains(before)) {
+      final free = [
+        for (var d = 0; d < 7; d++)
+          if (!out.contains(d) && d != anchor && d != before) d,
+      ]..sort(
+          (a, b) =>
+              _adjacentPickCount(a, out).compareTo(_adjacentPickCount(b, out)),
+        );
+      if (free.isNotEmpty) {
+        out = (out.where((d) => d != before).toList()..add(free.first))..sort();
+      }
+    }
+  }
+
   return out.take(n).toList();
+}
+
+int _adjacentPickCount(int day, List<int> picks) {
+  final prev = (day + 6) % 7;
+  final next = (day + 1) % 7;
+  return (picks.contains(prev) ? 1 : 0) + (picks.contains(next) ? 1 : 0);
 }
 
 // ============================================================================

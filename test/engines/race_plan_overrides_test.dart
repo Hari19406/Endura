@@ -92,6 +92,20 @@ void main() {
     test('7 days is the whole week', () {
       expect(spreadTrainingDays(7, null), [0, 1, 2, 3, 4, 5, 6]);
     });
+
+    test('keeps a buffer: the day before the long run is free (n ≤ 6)', () {
+      for (final lr in [0, 2, 3, 5, 6]) {
+        for (var n = 2; n <= 6; n++) {
+          final before = (lr + 6) % 7;
+          expect(
+            spreadTrainingDays(n, lr).contains(before),
+            isFalse,
+            reason: 'n=$n lr=$lr put a run on the day before the long run',
+          );
+          expect(spreadTrainingDays(n, lr), contains(lr));
+        }
+      }
+    });
   });
 
   group('PlanProjection tuning overrides', () {
@@ -153,6 +167,32 @@ void main() {
       final p = PlanProjection.build(answers(), now: _now);
       expect(p.previewWeekNumber, 2);
       expect(p.previewWeek, isNotEmpty);
+    });
+
+    test('preview has exactly one long run, never adjacent to a medium-long', () {
+      for (final rpw in [4, 5, 6, 7]) {
+        final p = PlanProjection.build(
+          answers(),
+          now: _now,
+          runsPerWeekOverride: rpw == 4 ? null : rpw,
+        );
+        final week = p.previewWeek;
+        expect(
+          week.where((s) => s.isLongRun).length,
+          1,
+          reason: 'rpw=$rpw: not exactly one long run',
+        );
+        for (var i = 0; i < week.length; i++) {
+          if (!week[i].isLongRun) continue;
+          // rpw 7 uses every weekday so an aerobic day must abut the long run —
+          // that case is handled by the colour, not the schedule.
+          if (rpw == 7) continue;
+          final prev = i > 0 ? week[i - 1] : null;
+          final next = i < week.length - 1 ? week[i + 1] : null;
+          expect(prev?.isMediumLong ?? false, isFalse, reason: 'rpw=$rpw');
+          expect(next?.isMediumLong ?? false, isFalse, reason: 'rpw=$rpw');
+        }
+      }
     });
   });
 }
