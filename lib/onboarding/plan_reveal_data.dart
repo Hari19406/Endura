@@ -150,6 +150,11 @@ class PlanProjection {
   final List<DaySlot> typicalWeek;
   final int typicalWeekNumber;
 
+  /// The week shown in the "preview your next week" card — week 2 (the first
+  /// full ramp week), or the last week for very short plans.
+  final List<DaySlot> previewWeek;
+  final int previewWeekNumber;
+
   final double minWeeklyKm;
   final double peakWeeklyKm;
   final int peakWeekNumber;
@@ -162,6 +167,8 @@ class PlanProjection {
     required this.weeks,
     required this.typicalWeek,
     required this.typicalWeekNumber,
+    required this.previewWeek,
+    required this.previewWeekNumber,
     required this.minWeeklyKm,
     required this.peakWeeklyKm,
     required this.peakWeekNumber,
@@ -177,18 +184,35 @@ class PlanProjection {
   ///
   /// Throws only if the underlying plan builder does; callers should guard and
   /// degrade to a receipt-only reveal rather than crashing onboarding.
-  static PlanProjection build(OnboardingAnswers a, {DateTime? now}) {
+  static PlanProjection build(
+    OnboardingAnswers a, {
+    DateTime? now,
+    // ── Live tuning overrides (plan-tuning sliders on the reveal screen) ──
+    double? baselineKmOverride,
+    double? peakKmOverride,
+    double? peakLongRunKmOverride,
+    int? runsPerWeekOverride,
+    bool gradualStart = false,
+  }) {
     final racePlan = RacePlanBuilder.build(
-      currentWeeklyKm: a.baselineWeeklyKm,
+      currentWeeklyKm: baselineKmOverride ?? a.baselineWeeklyKm,
       goalRace: a.goal,
       raceDate: a.raceDate,
       experienceLevel: a.experienceBridged,
       now: now,
+      peakWeeklyKmOverride: peakKmOverride,
+      peakLongRunKmOverride: peakLongRunKmOverride,
+      gradualStart: gradualStart,
     );
 
-    final days = a.selectedDays.isNotEmpty
+    final baseDays = a.selectedDays.isNotEmpty
         ? a.selectedDays
         : const [0, 1, 2, 3];
+    final days =
+        (runsPerWeekOverride != null &&
+            runsPerWeekOverride != baseDays.length)
+        ? spreadTrainingDays(runsPerWeekOverride, a.longRunDayIndex)
+        : baseDays;
 
     final points = <PlanWeekPoint>[];
     final resolutions = <int, WeekResolution>{};
@@ -222,11 +246,14 @@ class PlanProjection {
     }
 
     final typical = _pickTypicalWeek(points);
+    final previewNum = points.length >= 2 ? points[1].week : points.last.week;
 
     return PlanProjection(
       weeks: points,
       typicalWeek: resolutions[typical.week]?.days ?? const [],
       typicalWeekNumber: typical.week,
+      previewWeek: resolutions[previewNum]?.days ?? const [],
+      previewWeekNumber: previewNum,
       minWeeklyKm: points.map((p) => p.effectiveKm).reduce(_min),
       peakWeeklyKm: points.map((p) => p.effectiveKm).reduce(_max),
       peakWeekNumber: points
@@ -258,6 +285,43 @@ class PlanProjection {
   static double _max(double a, double b) => a > b ? a : b;
   static int _minI(int a, int b) => a < b ? a : b;
   static int _maxI(int a, int b) => a > b ? a : b;
+}
+
+/// An evenly spread set of [count] training weekdays (0 = Mon … 6 = Sun),
+/// guaranteeing [longRunDayIndex] is included when valid. Used when the
+/// runs-per-week tuning slider moves off the day set the athlete picked.
+List<int> spreadTrainingDays(int count, int? longRunDayIndex) {
+  final n = count.clamp(2, 7);
+  if (n >= 7) return const [0, 1, 2, 3, 4, 5, 6];
+
+  final picks = <int>{};
+  for (var i = 0; i < n; i++) {
+    picks.add((i * 7 / n).floor().clamp(0, 6));
+  }
+
+  if (longRunDayIndex != null &&
+      longRunDayIndex >= 0 &&
+      longRunDayIndex < 7 &&
+      !picks.contains(longRunDayIndex)) {
+    final sorted = picks.toList()..sort();
+    var nearest = sorted.first;
+    for (final p in sorted) {
+      if ((p - longRunDayIndex).abs() < (nearest - longRunDayIndex).abs()) {
+        nearest = p;
+      }
+    }
+    picks
+      ..remove(nearest)
+      ..add(longRunDayIndex);
+  }
+
+  // Dedup from the floor() collisions can leave us short — top up.
+  for (var d = 0; picks.length < n && d < 7; d++) {
+    picks.add(d);
+  }
+
+  final out = picks.toList()..sort();
+  return out.take(n).toList();
 }
 
 // ============================================================================

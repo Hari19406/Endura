@@ -33,6 +33,12 @@ class RacePlanBuilder {
     /// Ease weeks 1–4 in from ~75% of the ramped volume, smoothing back to
     /// 100% by week 5. Only touches non-cutback build/base weeks.
     bool gradualStart = false,
+    /// User-tuned peak weekly volume (from the plan-tuning sliders). Replaces
+    /// the physiological ceiling calc; still floored at [currentWeeklyKm] and
+    /// capped at the distance's safe cap.
+    double? peakWeeklyKmOverride,
+    /// User-tuned peak long-run distance. Clamped to a sane 6–46 km band.
+    double? peakLongRunKmOverride,
   }) {
     final today = now ?? DateTime.now();
     final derivedWeeks = max(1, raceDate.difference(today).inDays ~/ 7);
@@ -59,13 +65,16 @@ class RacePlanBuilder {
       experienceLevel: experienceLevel,
       currentWeeklyKm: currentWeeklyKm,
       buildWeeks: buildWeeks,
+      override: peakWeeklyKmOverride,
     );
 
     final rawIncrement = (peakVolume - currentWeeklyKm) / buildWeeks;
     final maxIncrement = currentWeeklyKm * 0.10;
     final safeIncrement = rawIncrement.clamp(-5.0, max(1.5, maxIncrement));
 
-    final peakLongRunKm = _peakLongRunKm(goalRace, experienceLevel);
+    final double peakLongRunKm = peakLongRunKmOverride != null
+        ? peakLongRunKmOverride.clamp(6.0, 46.0).toDouble()
+        : _peakLongRunKm(goalRace, experienceLevel);
     final currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
     final longRunIncrement = (peakLongRunKm - currentLongRunKm) / buildWeeks;
     final safeLongRunIncrement = longRunIncrement.clamp(
@@ -242,7 +251,18 @@ class RacePlanBuilder {
     required String experienceLevel,
     required double currentWeeklyKm,
     required int buildWeeks,
+    double? override,
   }) {
+    // User-tuned peak wins outright — the tuning slider is already bounded by
+    // VolumeModel.onboardingRange().max — but never below current or above the
+    // distance's hard safe cap.
+    if (override != null) {
+      return max(
+        currentWeeklyKm,
+        min(VolumeModel.safeCapKm(_raceDistanceFrom(goalRace)), override),
+      );
+    }
+
     // Max safe weekly gain: ~2km for beginners, ~2.5km intermediate, ~3km advanced.
     final maxWeeklyGain = switch (experienceLevel) {
       'advanced' => 3.0,
