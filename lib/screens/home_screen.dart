@@ -6,7 +6,6 @@ import '../utils/stats.dart';
 import '../engines/coach_engine_v2.dart';
 import '../engines/plan/plan_store.dart';
 import '../engines/plan/materialized_plan.dart';
-import '../engines/plan/adaptation_coordinator.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -769,15 +768,11 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
 
-      // ── Silent-miss sweep: reconcile the persisted plan against reality
-      // (scheduled days that passed with no run, volume drift, vDOT moves)
-      // before we read today's session, so the card reflects any shift.
-      // Fully guarded inside the coordinator — never throws.
-      await AdaptationCoordinator.instance.reconcileNow();
-
       // ── Today's session — read straight from the persisted MaterializedPlan.
-      // No ad-hoc recomputation: if the plan isn't there yet we show an
-      // explicit placeholder and let the background materialiser catch up.
+      // No ad-hoc recomputation, no adaptation sweep: the Coach tab shows the
+      // stored workout exactly as materialised. A missed day just stays
+      // uncompleted — nothing is reshuffled behind the athlete's back.
+      // (PlanAdaptation stays in the codebase as a pure utility, unwired.)
       try {
         final now = DateTime.now();
         final weekNumber = memory.racePlan?.currentWeekNumber(now) ?? 1;

@@ -1,10 +1,11 @@
-/// AdaptationCoordinator — the one place the app calls to run the closed-loop
-/// adaptation. Loads the persisted plan + run history + the athlete's config,
-/// hands them to the pure [PlanAdaptation.reconcile], and persists the result.
+/// AdaptationCoordinator — the integration point for the closed-loop adaptation.
+/// Loads the persisted plan + run history + the athlete's config, hands them to
+/// the pure [PlanAdaptation.reconcile], and persists the result.
 ///
-/// Called after every logged run (from [EngineRuntime.processRun]) and once per
-/// app open (a lightweight "did a scheduled day pass with no activity" sweep
-/// from HomeScreen.loadData).
+/// STATUS: intentionally **unwired**. The Coach tab currently reads the stored
+/// MaterializedPlan verbatim — no automatic reshuffles. This coordinator and
+/// [PlanAdaptation] are kept, tested, and ready for a future milestone that
+/// turns adaptation on (e.g. behind an explicit "adjust my plan" action).
 library;
 
 import 'package:flutter/foundation.dart';
