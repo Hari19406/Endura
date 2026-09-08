@@ -296,7 +296,6 @@ class _PlanRevealStageState extends State<_PlanRevealStage> {
     experienceRaw: 'regular',
     experienceBridged: 'intermediate',
     raceGoalRaw: 'finish',
-    pastMonthKm: 130,
     baselineWeeklyKm: 30,
     runsPerWeek: 4,
     selectedDays: const [0, 2, 4, 5],

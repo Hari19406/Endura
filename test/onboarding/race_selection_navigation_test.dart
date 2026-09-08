@@ -19,7 +19,7 @@ import 'package:run_app/onboarding/onboarding_screen.dart';
 
 const _goalTitle = 'What are you\ntraining for?';
 const _racePickerTitle = 'What race are\nyou running?';
-const _pastMonthTitle = 'How much have you\nrun in the past month?';
+const _weeklyVolumeTitle = 'How much do you run\nin a typical week?';
 const _raceGoalTitle = "What do you want\nfrom race day?";
 const _runsPerWeekTitle = 'How many days a\nweek can you run?';
 
@@ -103,8 +103,8 @@ void main() {
     await tester.tap(find.text('Continue'));
     await _settle(tester);
 
-    expect(find.text(_pastMonthTitle), findsOneWidget);
-    await tester.tap(find.text('25–50 km'));
+    expect(find.text(_weeklyVolumeTitle), findsOneWidget);
+    await tester.tap(find.text('20–35 km/week'));
     await tester.pump();
     await tester.tap(find.text('Continue'));
     await _settle(tester);

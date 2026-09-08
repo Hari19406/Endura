@@ -52,7 +52,7 @@ enum OPage {
   goal, // "What are you training for?" — only Upcoming race is live
   racePicker, // pick a real race (or add one manually)
   experience, // race-type experience (this flow's own 5-level vocab)
-  pastMonth, // km run in the past month
+  weeklyVolume, // typical km/week → baseline weekly volume
   raceGoal, // what's the goal for this race (this flow's own vocab)
   targetTime, // shown only for pr / target_time goals
   runsPerWeek, // slider + live plan preview
@@ -133,9 +133,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // Race-type experience — this flow's own vocab
   String? _experience;
 
-  // Past-month volume
-  String? _pastMonthBucket;
-  double _pastMonthKm = 0;
+  // Weekly-volume intake (clean km/week tiers → baseline weekly km directly)
+  String? _weeklyVolumeTier;
+  double _weeklyBaselineKm = 0;
 
   // Race goal — this flow's own vocab
   String? _raceGoal;
@@ -250,9 +250,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _longRunDayIndex =
           prefs.getInt('long_run_day_index') ?? memory.longRunDayIndex;
 
-      final lastMonthKm = prefs.getDouble('past_month_km');
-      if (lastMonthKm != null && lastMonthKm > 0) {
-        _pastMonthKm = lastMonthKm;
+      final savedTier = prefs.getString('weekly_volume_tier');
+      final savedBaseline = prefs.getDouble('weekly_baseline_km');
+      if (savedTier != null && savedTier.isNotEmpty) {
+        _weeklyVolumeTier = savedTier;
+        _weeklyBaselineKm = savedBaseline ?? _weeklyBaselineKm;
       }
 
       if (mounted) setState(() {});
@@ -268,7 +270,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   static const _shortSequence = [
     OPage.racePicker,
     OPage.experience,
-    OPage.pastMonth,
+    OPage.weeklyVolume,
     OPage.raceGoal,
     OPage.targetTime,
     OPage.runsPerWeek,
@@ -454,10 +456,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── Plan projection ──────────────────────────────────────────────────────
 
-  /// Weekly baseline the plan is seeded from. Shared by the reveal and by
-  /// _saveAll so the curve the athlete approves is the plan they get.
+  /// Weekly baseline the plan is seeded from — the chosen weekly-volume tier's
+  /// km, straight through (VolumeModel floors a 0 up to min-viable). Shared by
+  /// the reveal and by _saveAll so the curve the athlete approves is the plan
+  /// they get. Falls back to a rough estimate only if the tier is unanswered.
   double get _baselineWeeklyKm =>
-      _pastMonthKm > 0 ? _pastMonthKm / 4.345 : _runsPerWeek * 8.0;
+      _weeklyVolumeTier != null ? _weeklyBaselineKm : _runsPerWeek * 8.0;
 
   OnboardingAnswers _buildAnswers() {
     final goalRace = _goal ?? '5k';
@@ -473,7 +477,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       raceGoalRaw: _raceGoal,
       timeToBeatSec: _timeToBeatSec,
       targetFinishSec: _targetFinishSec,
-      pastMonthKm: _pastMonthKm,
       baselineWeeklyKm: _baselineWeeklyKm,
       runsPerWeek: _runsPerWeek,
       selectedDays: _selectedDays,
@@ -529,8 +532,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         return _raceDate != null && _goal != null;
       case OPage.experience:
         return _experience != null;
-      case OPage.pastMonth:
-        return _pastMonthBucket != null;
+      case OPage.weeklyVolume:
+        return _weeklyVolumeTier != null;
       case OPage.raceGoal:
         return _raceGoal != null;
       case OPage.targetTime:
@@ -755,7 +758,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       if (_targetFinishSec != null) {
         await prefs.setInt('target_finish_seconds', _targetFinishSec!);
       }
-      await prefs.setDouble('past_month_km', _pastMonthKm);
+      await prefs.setString('weekly_volume_tier', _weeklyVolumeTier ?? '');
+      await prefs.setDouble('weekly_baseline_km', _weeklyBaselineKm);
 
       // ── Schedule ───────────────────────────────────────────────────────
       await prefs.setInt('runs_per_week', _runsPerWeek);
@@ -992,11 +996,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         onSelect: (v) => setState(() => _experience = v),
       ),
 
-      OPage.pastMonth => OPagePastMonth(
-        selected: _pastMonthBucket,
-        onSelect: (bucket, km) => setState(() {
-          _pastMonthBucket = bucket;
-          _pastMonthKm = km;
+      OPage.weeklyVolume => OPageWeeklyVolume(
+        selectedKey: _weeklyVolumeTier,
+        onSelect: (tierKey, baselineKm) => setState(() {
+          _weeklyVolumeTier = tierKey;
+          _weeklyBaselineKm = baselineKm;
         }),
       ),
 

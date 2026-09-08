@@ -4243,23 +4243,26 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
 // PAST-MONTH VOLUME
 // ─────────────────────────────────────────────────────────────────────────────
 
-class OPagePastMonth extends StatelessWidget {
-  final String? selected;
-  final void Function(String bucket, double km) onSelect;
-  const OPagePastMonth({
+/// Weekly-volume intake. Replaces the old "past month" total — clean, rounded
+/// km/week tiers, each mapping straight to a baseline weekly km (no ÷4.3
+/// month-to-week conversion anywhere downstream).
+class OPageWeeklyVolume extends StatelessWidget {
+  final String? selectedKey;
+  final void Function(String tierKey, double baselineWeeklyKm) onSelect;
+  const OPageWeeklyVolume({
     super.key,
-    required this.selected,
+    required this.selectedKey,
     required this.onSelect,
   });
 
-  // (label, representative total km for the last 4 weeks)
-  static const _buckets = <(String, double)>[
-    ('0 km — just starting out', 0),
-    ('Under 25 km', 13),
-    ('25–50 km', 37.5),
-    ('50–100 km', 75),
-    ('100–150 km', 125),
-    ('150 km or more', 175),
+  // (tierKey, range label, weekly persona, baseline weekly km)
+  static const tiers = <(String, String, String, double)>[
+    ('none', '0 km/week', "I haven't been running", 0),
+    ('low', '10–20 km/week', 'A few runs here and there', 15),
+    ('moderate', '20–35 km/week', 'Consistent weekly runner', 25),
+    ('base', '35–50 km/week', 'Solid training base', 40),
+    ('high', '50–70 km/week', 'High mileage training', 60),
+    ('veryHigh', '70+ km/week', 'Very high volume', 75),
   ];
 
   @override
@@ -4272,30 +4275,30 @@ class OPagePastMonth extends StatelessWidget {
           const SizedBox(height: 32),
           const _Label('Recent training'),
           const SizedBox(height: 8),
-          const _Title('How much have you\nrun in the past month?'),
+          const _Title('How much do you run\nin a typical week?'),
           const SizedBox(height: 6),
           const _Sub(
-            'A rough total is fine. This sets a safe starting volume.',
+            'This helps us start your plan at the right level for you.',
           ),
           const SizedBox(height: 24),
           Expanded(
             child: ListView.separated(
               padding: EdgeInsets.zero,
-              itemCount: _buckets.length,
+              itemCount: tiers.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
-                final (label, km) = _buckets[i];
-                final sel = selected == label;
+                final (key, label, persona, km) = tiers[i];
+                final sel = selectedKey == key;
                 return GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    onSelect(label, km);
+                    onSelect(key, km);
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 170),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
-                      vertical: 17,
+                      vertical: 15,
                     ),
                     decoration: BoxDecoration(
                       color: sel ? EC.surface2 : EC.surface,
@@ -4307,15 +4310,30 @@ class OPagePastMonth extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: EC.textPrimary,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: EC.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                persona,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: EC.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 10),
                         if (sel)
                           const Icon(
                             Icons.check_circle_rounded,

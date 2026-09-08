@@ -50,7 +50,6 @@ class OnboardingAnswers {
   final String? raceGoalRaw; // 'pr' | 'target_time' | 'finish' | 'enjoy' | …
   final int? timeToBeatSec;
   final int? targetFinishSec;
-  final double pastMonthKm;
   final double baselineWeeklyKm;
   final int runsPerWeek;
   final List<int> selectedDays; // 0 = Mon
@@ -73,7 +72,6 @@ class OnboardingAnswers {
     this.raceGoalRaw,
     this.timeToBeatSec,
     this.targetFinishSec,
-    required this.pastMonthKm,
     required this.baselineWeeklyKm,
     required this.runsPerWeek,
     required this.selectedDays,

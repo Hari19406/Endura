@@ -24,7 +24,6 @@ OnboardingAnswers _answers({
     experienceRaw: 'regular',
     experienceBridged: experience,
     raceGoalRaw: 'finish',
-    pastMonthKm: baseline * 4.345,
     baselineWeeklyKm: baseline,
     runsPerWeek: runsPerWeek,
     selectedDays: selectedDays,

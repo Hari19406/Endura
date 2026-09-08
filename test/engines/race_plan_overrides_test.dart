@@ -114,7 +114,6 @@ void main() {
       raceDate: _now.add(const Duration(days: 16 * 7)),
       experienceRaw: 'regular',
       experienceBridged: 'intermediate',
-      pastMonthKm: 130,
       baselineWeeklyKm: 30,
       runsPerWeek: 4,
       selectedDays: const [0, 2, 4, 5],
