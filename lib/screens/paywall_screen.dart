@@ -350,12 +350,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               const _RouteMarker(2, 'WHY ENDURA'),
                               const SizedBox(height: 16),
                               const _FeatureTable(),
+                              const SizedBox(height: 24),
+                              const _TrainingProofRow(),
                               const SizedBox(height: 36),
-                              const _RouteMarker(3, 'WHAT RUNNERS ARE SAYING'),
-                              const SizedBox(height: 16),
-                              const _TestimonialCarousel(),
-                              const SizedBox(height: 36),
-                              const _RouteMarker(4, 'OUR COMMITMENT'),
+                              const _RouteMarker(3, 'OUR COMMITMENT'),
                               const SizedBox(height: 16),
                               _GuaranteeCard(colors: c),
                               const SizedBox(height: 20),
@@ -441,13 +439,24 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                           )
                                         : Text(
                                             hasTrial
-                                                ? 'Start free trial'
-                                                : 'Subscribe',
+                                                ? 'Start 14-day free trial'
+                                                : 'Continue',
                                             style: const TextStyle(
                                               fontSize: 17,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  hasTrial
+                                      ? 'No commitment. Cancel anytime in Google Play before your trial ends.'
+                                      : 'Auto-renews. Cancel anytime in Google Play.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: c.textTertiary,
+                                    fontSize: 12,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -1133,132 +1142,88 @@ class _FeatureTable extends StatelessWidget {
   }
 }
 
-// ---- Testimonials -----------------------------------------------------
+// ---- Training proof row: core training pillars --------------------------
 //
-// PLACEHOLDER CONTENT — Endura has no real reviews yet. These three are
-// sample copy only, written to illustrate the tone/format, and MUST be
-// swapped for real runner feedback before this ships to the store.
+// A lightweight, honest alternative to testimonials — three compact cards
+// stating what the product actually does, with the gold "premium" accent
+// on the icons only.
 
-class _Testimonial {
-  final String name;
-  final String context;
-  final String quote;
-  const _Testimonial(this.name, this.context, this.quote);
+class _TrainingPillar {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _TrainingPillar(this.icon, this.title, this.subtitle);
 }
 
-const _kTestimonials = [
-  _Testimonial(
-    'Priya R.',
-    'Training for a half marathon',
-    'The plan flexes around my week instead of the other way around — Max actually adjusts when I miss a run instead of just guilt-tripping me.',
-  ),
-  _Testimonial(
-    'Arjun K.',
-    'First marathon block',
-    "I've tried generic PDF plans before. This is the first one that felt like it was actually built around my pace and schedule.",
-  ),
-  _Testimonial(
-    'Meera S.',
-    'Chasing a sub-2 half',
-    'Race week pacing finally makes sense — I know exactly what pace to hold in each segment and why.',
-  ),
+const _kTrainingPillars = [
+  _TrainingPillar(Icons.bolt_rounded, 'Adaptive', 'VDOT pace matching'),
+  _TrainingPillar(Icons.volume_up_rounded, 'Audio Cues', 'Live pace coaching'),
+  _TrainingPillar(Icons.lock_open_rounded, 'No Lock-in', 'Cancel anytime'),
 ];
 
-class _TestimonialCarousel extends StatefulWidget {
-  const _TestimonialCarousel();
-
-  @override
-  State<_TestimonialCarousel> createState() => _TestimonialCarouselState();
-}
-
-class _TestimonialCarouselState extends State<_TestimonialCarousel> {
-  final _controller = PageController(viewportFraction: 1);
-  int _page = 0;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class _TrainingProofRow extends StatelessWidget {
+  const _TrainingProofRow();
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 184,
-          child: PageView.builder(
-            controller: _controller,
-            itemCount: _kTestimonials.length,
-            onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (_, i) {
-              final t = _kTestimonials[i];
-              return Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: c.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '"${t.quote}"',
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 14,
-                        height: 1.4,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      t.name,
-                      style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      t.context,
-                      style: const TextStyle(color: _kBrand, fontSize: 12),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            _kTestimonials.length,
-            (i) => AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: i == _page ? 18 : 6,
-              height: 6,
+        for (int i = 0; i < _kTrainingPillars.length; i++) ...[
+          if (i != 0) const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 16,
+              ),
               decoration: BoxDecoration(
-                color: i == _page ? _kBrand : c.border,
-                borderRadius: BorderRadius.circular(3),
+                color: c.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: c.border),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _kGold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _kTrainingPillars[i].icon,
+                      color: _kGold,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _kTrainingPillars[i].title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _kTrainingPillars[i].subtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: c.textTertiary,
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
