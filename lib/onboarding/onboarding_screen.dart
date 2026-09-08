@@ -1108,6 +1108,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         experienceLevel: _bridgeExperience(_experience),
         currentTimeSec: _currentTimeSec,
         paceDistanceKm: _paceDistanceKm,
+        runsPerWeek: _runsPerWeek,
+        baselineWeeklyKm: _baselineWeeklyKm,
+        raceDate: _raceDate,
         onContinue: widget.onComplete,
       ),
     };

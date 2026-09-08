@@ -2753,10 +2753,13 @@ class OPageWelcome extends StatelessWidget {
   final String experienceLevel;
   final int currentTimeSec;
   final double paceDistanceKm;
+  final int runsPerWeek;
+  final double baselineWeeklyKm;
+  final DateTime? raceDate;
   final VoidCallback onContinue;
 
   static const _distanceKeys = ['5k', '10k', 'half_marathon', 'marathon'];
-  static const _distanceLabels = ['5K', '10K', '21.1', '42.2'];
+  static const _distanceLabels = ['5K', '10K', 'Half', 'Marathon'];
   static const _distanceColors = [EC.teal, EC.violet, EC.orange, EC.red];
 
   const OPageWelcome({
@@ -2768,6 +2771,9 @@ class OPageWelcome extends StatelessWidget {
     required this.experienceLevel,
     required this.currentTimeSec,
     required this.paceDistanceKm,
+    required this.runsPerWeek,
+    required this.baselineWeeklyKm,
+    required this.raceDate,
     required this.onContinue,
   });
 
@@ -2813,6 +2819,60 @@ class OPageWelcome extends StatelessWidget {
     return '$sign${m}m ${s}s';
   }
 
+  Widget _infoChip(IconData icon, String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: EC.surface2,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: EC.border, width: ET.borderWidth),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: EC.textSecondary),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: EC.textPrimary,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _distChip(String label, Color color, String time) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.10),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          time,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: EC.textPrimary,
+          ),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final proj = _RaceProjection(
@@ -2824,6 +2884,14 @@ class OPageWelcome extends StatelessWidget {
 
     final goalCurrent = proj.currentSec(_goalDistKey);
     final goalProjected = proj.projectedSec(_goalDistKey);
+    final goalDelta = proj.deltaSec(_goalDistKey);
+
+    final vg = VolumeGuidance.resolve(
+      goal: goal,
+      experienceBridged: experienceLevel,
+      baselineWeeklyKm: baselineWeeklyKm,
+      selectedRuns: runsPerWeek,
+    );
 
     return SingleChildScrollView(
       padding: ET.pagePad,
@@ -2858,7 +2926,7 @@ class OPageWelcome extends StatelessWidget {
               height: 1.6,
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -2892,107 +2960,82 @@ class OPageWelcome extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'PROJECTED TARGET',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: EC.muted,
-                        letterSpacing: 1.1,
+                    const Flexible(
+                      child: Text(
+                        'PROJECTED FINISH',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: EC.muted,
+                          letterSpacing: 1.1,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
+                Text(
+                  _fmt(goalProjected),
+                  style: const TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w800,
+                    color: EC.teal,
+                    height: 1.0,
+                    letterSpacing: -1,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'NOW',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: EC.muted,
-                            letterSpacing: 1,
-                          ),
+                    Flexible(
+                      child: Text(
+                        'from ${_fmt(goalCurrent)} today',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: EC.textSecondary,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _fmt(goalCurrent),
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: EC.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 1.5,
-                            color: EC.teal.withOpacity(0.4),
-                          ),
-                          const Icon(
-                            Icons.directions_run_rounded,
-                            size: 18,
-                            color: EC.teal,
-                          ),
-                          Container(
-                            width: 28,
-                            height: 1.5,
-                            color: EC.teal.withOpacity(0.4),
-                          ),
-                        ],
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'IN $planWeeks WEEKS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: EC.muted,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _fmt(goalProjected),
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: EC.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                        horizontal: 8,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
                         color: EC.teal.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        _fmtDelta(proj.deltaSec(_goalDistKey)),
+                        _fmtDelta(goalDelta),
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: EC.teal,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: EC.border, height: 1),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (raceDate != null)
+                      _infoChip(Icons.event_outlined, _dLabel(raceDate!)),
+                    _infoChip(Icons.calendar_month_outlined, '$planWeeks weeks'),
+                    _infoChip(
+                      Icons.directions_run_rounded,
+                      '$runsPerWeek runs/week',
+                    ),
+                    _infoChip(
+                      Icons.route_outlined,
+                      '~${vg.loKm}–${vg.hiKm} km/wk',
                     ),
                   ],
                 ),
@@ -3002,7 +3045,7 @@ class OPageWelcome extends StatelessWidget {
           const SizedBox(height: 16),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: EC.surface,
               borderRadius: BorderRadius.circular(ET.cardRadius),
@@ -3011,154 +3054,38 @@ class OPageWelcome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Text(
+                  'ALSO WITHIN REACH',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: EC.muted,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const SizedBox(width: 52),
-                    Expanded(
-                      child: Text(
-                        'Current',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: EC.muted,
-                          letterSpacing: 0.5,
+                    for (var i = 0; i < _distanceKeys.length; i++)
+                      if (_distanceKeys[i] != _goalDistKey)
+                        _distChip(
+                          _distanceLabels[i],
+                          _distanceColors[i],
+                          _fmt(proj.projectedSec(_distanceKeys[i])),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 32),
-                    Expanded(
-                      child: Text(
-                        'In $planWeeks weeks',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: EC.teal,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                const Divider(color: EC.border, height: 1),
-                const SizedBox(height: 14),
-                ...List.generate(_distanceKeys.length, (i) {
-                  final key = _distanceKeys[i];
-                  final label = _distanceLabels[i];
-                  final color = _distanceColors[i];
-                  final curSec = proj.currentSec(key);
-                  final projSec = proj.projectedSec(key);
-                  final delta = proj.deltaSec(key);
-                  final isGoal = key == _goalDistKey;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Center(
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: color,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _fmt(curSec),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: isGoal ? EC.textPrimary : EC.textSecondary,
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 32,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _dot(EC.muted),
-                              const SizedBox(width: 2),
-                              const Icon(
-                                Icons.directions_run_rounded,
-                                size: 12,
-                                color: EC.teal,
-                              ),
-                              const SizedBox(width: 2),
-                              _dot(EC.muted),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                _fmt(projSec),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: isGoal
-                                      ? EC.textPrimary
-                                      : EC.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _fmtDelta(delta),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: EC.teal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const Divider(color: EC.border, height: 1),
                 const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.info_outline_rounded,
-                      size: 13,
-                      color: EC.muted,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Projected after consistent plan completion. '
-                        'Times are calculated using your vDOT $vdot '
-                        'and Riegel race equivalence formula.',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: EC.muted,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Projected after consistent plan completion — vDOT $vdot, '
+                  'Riegel race equivalence.',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: EC.muted,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -3189,11 +3116,6 @@ class OPageWelcome extends StatelessWidget {
     );
   }
 
-  Widget _dot(Color c) => Container(
-    width: 3,
-    height: 3,
-    decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-  );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -3324,6 +3246,13 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
   @override
   void initState() {
     super.initState();
+    // Seed with the always-available popular races so the list is never empty
+    // on the first frame, and default the distance filter to the goal the
+    // athlete already chose (if any).
+    _all = RaceService.instance.popularRaces;
+    if (const {'5k', '10k', 'half_marathon', 'marathon'}.contains(widget.goal)) {
+      _fDistance = widget.goal;
+    }
     _load();
   }
 
@@ -3343,8 +3272,16 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
       limit: 250,
     );
     if (!mounted) return;
+    // Merge: live rows first, then any popular preset not already present by
+    // name. Never leaves the picker empty, and a distance filter always has
+    // recognisable races to show.
+    final presets = RaceService.instance.popularRaces;
+    final seen = {for (final r in rows) r.name.toLowerCase()};
     setState(() {
-      _all = rows;
+      _all = [
+        ...rows,
+        ...presets.where((p) => !seen.contains(p.name.toLowerCase())),
+      ]..sort((a, b) => a.raceDate.compareTo(b.raceDate));
       _loading = false;
     });
   }
@@ -3576,7 +3513,9 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
   }
 
   Widget _list() {
-    if (_loading) {
+    // _all is seeded with popular races in initState, so we only ever show the
+    // spinner in the (impossible) case of nothing at all to display.
+    if (_loading && _all.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: EC.teal, strokeWidth: 2),
       );
