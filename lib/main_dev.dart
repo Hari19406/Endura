@@ -21,6 +21,8 @@ import 'theme/app_colors.dart';
 import 'services/theme_service.dart';
 import 'utils/unit_utils.dart';
 
+import 'engines/config/archetype_table.dart' show ExperienceLevel;
+import 'models/plan_config_state.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'onboarding/plan_reveal_data.dart';
 import 'onboarding/plan_reveal_page.dart';
@@ -120,12 +122,19 @@ final List<_DevSection> _menu = [
     _DevEntry(
       'Onboarding',
       (_) => OnboardingScreen(onComplete: () {}),
-      subtitle: 'Full race-first onboarding sequence',
+      subtitle: 'Full race-first onboarding sequence (starts at the goal page)',
     ),
     _DevEntry(
-      'Plan reveal + tuning',
+      'Test Half Marathon Onboarding',
+      (_) => OnboardingScreen(shortenedMode: true, onComplete: () {}),
+      subtitle: 'Straight into the race path — pick "Half Marathon" at the '
+          'picker, then every screen through to the Reveal',
+    ),
+    _DevEntry(
+      'Preview Reveal Screen (Half Marathon 12-wk)',
       (_) => const _PlanRevealStage(),
-      subtitle: 'OPagePlanReveal with mock answers — drives the fine-tune sliders',
+      subtitle: '12-wk HM · 4 runs/wk · 25 km base · Sat long run — jumps '
+          'straight to OPagePlanReveal for tuning',
     ),
   ]),
   _DevSection('Screens', [
@@ -278,9 +287,9 @@ class _DevHost extends StatelessWidget {
   }
 }
 
-/// Launches straight into [OPagePlanReveal] with a realistic canned answer set
-/// so the Phase 2 fine-tune sliders + week-2 preview can be exercised without
-/// tapping through the whole questionnaire.
+/// Jumps straight to [OPagePlanReveal] with a pre-populated 12-week Half
+/// Marathon config (4 runs/wk · 25 km base · Saturday long run) so the fine-tune
+/// sliders + week-2 preview can be inspected without tapping through onboarding.
 class _PlanRevealStage extends StatefulWidget {
   const _PlanRevealStage();
 
@@ -289,24 +298,37 @@ class _PlanRevealStage extends StatefulWidget {
 }
 
 class _PlanRevealStageState extends State<_PlanRevealStage> {
+  static final _raceDate = DateTime.now().add(const Duration(days: 12 * 7));
+
   static final _answers = OnboardingAnswers(
     goal: 'half_marathon',
     raceName: 'Dev Half',
-    raceDate: DateTime.now().add(const Duration(days: 16 * 7)),
+    raceDate: _raceDate,
     experienceRaw: 'regular',
     experienceBridged: 'intermediate',
     raceGoalRaw: 'finish',
-    baselineWeeklyKm: 30,
+    baselineWeeklyKm: 25,
     runsPerWeek: 4,
-    selectedDays: const [0, 2, 4, 5],
-    longRunDayIndex: 5,
+    selectedDays: const [0, 2, 4, 5], // Mon / Wed / Fri / Sat
+    longRunDayIndex: 5, // Saturday
     paceDistance: 'half',
     paceDistanceKm: 21.0975,
     currentTimeSec: 6600, // 1:50:00
     startDate: DateTime.now(),
-    planWeeks: 16,
+    planWeeks: 12,
     vdot: 44,
     vdotProvisional: false,
+  );
+
+  static final PlanConfigState _config = PlanConfigState.fromInputs(
+    goalType: PlanGoalType.half,
+    experience: ExperienceLevel.intermediate,
+    vDOT: 44,
+    runsPerWeek: 4,
+    longRunDay: 6, // Saturday (1 = Mon … 7 = Sun)
+    availableDays: const {1, 3, 5, 6},
+    durationWeeks: 12,
+    currentWeeklyKm: 25,
   );
 
   late final PlanProjection? _projection = _safeBuild();
@@ -327,6 +349,7 @@ class _PlanRevealStageState extends State<_PlanRevealStage> {
         child: OPagePlanReveal(
           answers: _answers,
           projection: _projection,
+          initialConfig: _config,
           onEdit: (t) => ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('onEdit: ${t.name}')),
           ),
