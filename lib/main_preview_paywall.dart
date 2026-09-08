@@ -12,10 +12,10 @@ const _offeringContext = PresentedOfferingContext('default', null, null);
 final _annualIntro = const IntroductoryPrice(
   0,
   'Free',
-  'P7D',
+  'P14D',
   1,
   PeriodUnit.day,
-  7,
+  14,
 );
 
 final _annualPackage = Package(

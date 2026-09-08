@@ -175,26 +175,55 @@ class _PaywallScreenState extends State<PaywallScreen> {
     return intro;
   }
 
-  int _trialDays(IntroductoryPrice intro) {
+  /// Best-effort trial length in days. Prefers RevenueCat's structured
+  /// period fields; falls back to parsing the ISO 8601 duration string
+  /// ("P14D", "P2W", "P1M"). Returns null when neither yields a sane
+  /// positive number — callers then show a generic "free trial" string.
+  int? _trialDays(IntroductoryPrice intro) {
     final n = intro.periodNumberOfUnits;
-    switch (intro.periodUnit) {
-      case PeriodUnit.week:
-        return n * 7;
-      case PeriodUnit.month:
-        return n * 30;
-      case PeriodUnit.day:
-      default:
-        return n;
+    if (n > 0) {
+      switch (intro.periodUnit) {
+        case PeriodUnit.day:
+          return n;
+        case PeriodUnit.week:
+          return n * 7;
+        case PeriodUnit.month:
+          return n * 30;
+        case PeriodUnit.year:
+          return n * 365;
+        default:
+          break;
+      }
     }
+    return _trialDaysFromIso(intro.period);
   }
 
+  /// Parse an ISO 8601 duration like "P14D" / "P2W" / "P1M" into a day count.
+  int? _trialDaysFromIso(String? period) {
+    if (period == null || period.isEmpty) return null;
+    final m = RegExp(
+      r'^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?$',
+    ).firstMatch(period.trim());
+    if (m == null) return null;
+    final years = int.tryParse(m.group(1) ?? '') ?? 0;
+    final months = int.tryParse(m.group(2) ?? '') ?? 0;
+    final weeks = int.tryParse(m.group(3) ?? '') ?? 0;
+    final days = int.tryParse(m.group(4) ?? '') ?? 0;
+    final total = years * 365 + months * 30 + weeks * 7 + days;
+    return total > 0 ? total : null;
+  }
+
+  /// Effective monthly cost of an annual plan. Prefers the store-provided
+  /// `pricePerMonthString` (already localized and rounded by the store);
+  /// falls back to price / 12 rounded to a whole unit.
   String _monthlyEquivalent(Package pkg) {
-    final price = pkg.storeProduct.price;
+    final provided = pkg.storeProduct.pricePerMonthString;
+    if (provided != null && provided.trim().isNotEmpty) return provided.trim();
     final symbol = pkg.storeProduct.priceString
         .replaceAll(RegExp(r'[\d.,\s]'), '')
         .trim();
-    final monthly = price / 12;
-    return '$symbol${monthly.toStringAsFixed(2)}';
+    final monthly = pkg.storeProduct.price / 12;
+    return '$symbol${monthly.round()}';
   }
 
   int? _savingsPercent() {
@@ -216,6 +245,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final busy = _purchasingId != null;
     final intro = _introOf(_selected);
     final hasTrial = intro != null;
+    final trialDays = intro != null ? _trialDays(intro) : null;
 
     return Scaffold(
       backgroundColor: c.background,
@@ -406,7 +436,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   selected: _selected!,
                                   isAnnual: _selectedIsAnnual,
                                   hasTrial: hasTrial,
-                                  trialDays: hasTrial ? _trialDays(intro) : 0,
+                                  trialDays: trialDays,
                                 ),
                                 const SizedBox(height: 12),
                                 SizedBox(
@@ -439,8 +469,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                           )
                                         : Text(
                                             hasTrial
-                                                ? 'Start 14-day free trial'
-                                                : 'Continue',
+                                                ? (trialDays != null
+                                                      ? 'Start $trialDays-day free trial'
+                                                      : 'Start free trial')
+                                                : (_selectedIsAnnual
+                                                      ? 'Continue with Annual'
+                                                      : 'Continue with Monthly'),
                                             style: const TextStyle(
                                               fontSize: 17,
                                               fontWeight: FontWeight.bold,
@@ -752,7 +786,7 @@ class _InlinePlanSelector extends StatelessWidget {
   final int? savingsPercent;
   final String? monthlyEquivalent;
   final IntroductoryPrice? Function(Package?) introOf;
-  final int Function(IntroductoryPrice) trialDaysOf;
+  final int? Function(IntroductoryPrice) trialDaysOf;
   final ValueChanged<Package> onPick;
 
   const _InlinePlanSelector({
@@ -777,13 +811,16 @@ class _InlinePlanSelector extends StatelessWidget {
             colors: c,
             title: 'Annual',
             price: monthlyEquivalent != null
-                ? '$monthlyEquivalent/mo'
+                ? '$monthlyEquivalent/month'
                 : annual!.storeProduct.priceString,
-            subtitle: savingsPercent != null
-                ? 'Save $savingsPercent% vs monthly · billed annually'
-                : 'Billed annually',
+            priceCaption: monthlyEquivalent != null
+                ? '${annual!.storeProduct.priceString}/year'
+                : null,
+            subtitle: 'Billed annually · cancel anytime',
             highlight: 'Best for staying on track to race day',
-            badge: 'BEST VALUE',
+            badge: savingsPercent != null
+                ? 'SAVE $savingsPercent%'
+                : 'BEST VALUE',
             trialTag: _trialTag(annual),
             isSelected: selected == annual,
             onTap: () => onPick(annual!),
@@ -793,7 +830,7 @@ class _InlinePlanSelector extends StatelessWidget {
           _PlanCard(
             colors: c,
             title: 'Monthly',
-            price: '${monthly!.storeProduct.priceString}/mo',
+            price: '${monthly!.storeProduct.priceString}/month',
             subtitle: 'Billed monthly · cancel anytime',
             badge: null,
             trialTag: _trialTag(monthly),
@@ -807,7 +844,8 @@ class _InlinePlanSelector extends StatelessWidget {
   String? _trialTag(Package? pkg) {
     final intro = introOf(pkg);
     if (intro == null) return null;
-    return '${trialDaysOf(intro)}-day free trial';
+    final d = trialDaysOf(intro);
+    return d != null ? '$d-day free trial' : 'Free trial';
   }
 }
 
@@ -815,6 +853,7 @@ class _PlanCard extends StatelessWidget {
   final AppColors colors;
   final String title;
   final String price;
+  final String? priceCaption;
   final String subtitle;
   final String? highlight;
   final String? badge;
@@ -826,6 +865,7 @@ class _PlanCard extends StatelessWidget {
     required this.colors,
     required this.title,
     required this.price,
+    this.priceCaption,
     required this.subtitle,
     this.highlight,
     required this.badge,
@@ -934,7 +974,27 @@ class _PlanCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(price, style: _numeralStyle(c.textPrimary, fontSize: 17)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      price,
+                      style: _numeralStyle(c.textPrimary, fontSize: 17),
+                    ),
+                    if (priceCaption != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        priceCaption!,
+                        style: _numeralStyle(
+                          c.textTertiary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
             if (trialTag != null) ...[
@@ -1356,7 +1416,7 @@ class _PriceSummary extends StatelessWidget {
   final Package selected;
   final bool isAnnual;
   final bool hasTrial;
-  final int trialDays;
+  final int? trialDays;
 
   const _PriceSummary({
     required this.colors,
@@ -1373,7 +1433,9 @@ class _PriceSummary extends StatelessWidget {
     final period = isAnnual ? 'year' : 'month';
 
     final headline = hasTrial
-        ? '$trialDays days free, then $price/$period'
+        ? (trialDays != null
+              ? '$trialDays days free, then $price/$period'
+              : 'Free trial, then $price/$period')
         : '$price/$period · auto-renews';
 
     return Text(
