@@ -156,10 +156,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   DateTime _startDate = DateTime.now();
   int? _planWeeks;
 
-  /// Ease weeks 1–4 in from ~75% volume. No dedicated onboarding control yet —
-  /// wired through to [RacePlanBuilder] so the capability is testable and a
-  /// future toggle only needs to flip this field.
+  /// Ease weeks 1–4 in from ~75% volume. The plan-reveal fine-tune switch
+  /// feeds this via [_tunedConfig]; this field is the pre-tune default.
   final bool _gradualStart = false;
+
+  /// Set by the plan-reveal fine-tune sliders (weekly range, long-run range,
+  /// runs/week, gradual start). Null until the athlete touches a control;
+  /// `_saveAll` then builds the plan from these instead of the raw answers.
+  PlanConfigState? _tunedConfig;
 
   // Computed
   int _vdot = 40;
@@ -1056,6 +1060,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         projection: _projection,
         onEdit: _startEdit,
         onGenerate: _next,
+        initialConfig: _tunedConfig,
+        onConfigChanged: (c) => _tunedConfig = c,
       ),
 
       OPage.buildPlan => OPageBuildPlan(

@@ -12,8 +12,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../engines/config/volume_model.dart';
 import '../engines/config/workout_template_library.dart' show WorkoutIntent;
 import '../engines/plan/week_resolver.dart' show DaySlot;
+import '../models/plan_config_state.dart';
 import '../services/analytics_service.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
@@ -59,12 +61,22 @@ class OPagePlanReveal extends StatefulWidget {
   final void Function(PlanEditTarget target) onEdit;
   final VoidCallback onGenerate;
 
+  /// Seed for the fine-tune sliders. When null it is synthesised from
+  /// [answers]. Passed by tests / the preview harness.
+  final PlanConfigState? initialConfig;
+
+  /// Fires (on slider release / switch toggle) with the tuned config so
+  /// onboarding can feed it into `_saveAll` before materialising the plan.
+  final ValueChanged<PlanConfigState>? onConfigChanged;
+
   const OPagePlanReveal({
     super.key,
     required this.answers,
     required this.projection,
     required this.onEdit,
     required this.onGenerate,
+    this.initialConfig,
+    this.onConfigChanged,
   });
 
   @override
@@ -75,12 +87,99 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
   int? _scrub;
   bool _scrubTracked = false;
 
+  late PlanConfigState _config;
+
+  /// Projection rebuilt from the tuned config. Null until the first slider
+  /// move (or if a rebuild threw) — then [_effectiveProjection] falls back to
+  /// the one onboarding computed.
+  PlanProjection? _tunedProjection;
+  bool _tuneTracked = false;
+
+  PlanProjection? get _effectiveProjection =>
+      _tunedProjection ?? widget.projection;
+
+  @override
+  void initState() {
+    super.initState();
+    _config = widget.initialConfig ?? _synthConfig();
+  }
+
+  PlanConfigState _synthConfig() {
+    final a = widget.answers;
+    final days = a.selectedDays.isNotEmpty
+        ? a.selectedDays.map((d) => d + 1).toSet()
+        : <int>{2, 4, 6, 7};
+    return PlanConfigState.fromInputs(
+      goalType: PlanGoalType.fromGoalRaceKey(a.goal),
+      experience: a.experienceLevel,
+      vDOT: a.vdot.toDouble(),
+      runsPerWeek: a.runsPerWeek.clamp(2, 7),
+      longRunDay: ((a.longRunDayIndex ?? 6) + 1).clamp(1, 7),
+      availableDays: days,
+      durationWeeks: a.planWeeks.clamp(3, 20),
+      currentWeeklyKm: a.baselineWeeklyKm,
+    );
+  }
+
+  // ── Fine-tune slider bounds (from VolumeModel — the single source) ────────
+
+  ({double min, double max}) get _weeklyBounds {
+    final a = widget.answers;
+    final band = VolumeModel.onboardingRange(
+      race: a.raceDistance,
+      experience: a.experienceLevel,
+      days: _config.runsPerWeek,
+    );
+    return (min: band.min, max: VolumeModel.safeCapKm(a.raceDistance));
+  }
+
+  ({double min, double max}) get _longRunBounds {
+    final a = widget.answers;
+    final lr = VolumeModel.longRunRangeKm(
+      race: a.raceDistance,
+      experience: a.experienceLevel,
+    );
+    return (min: 5.0, max: (lr.peak * 1.3).clamp(12.0, 46.0));
+  }
+
+  RangeValues _clampRange(RangeValues v, double lo, double hi) {
+    final s = v.start.clamp(lo, hi);
+    return RangeValues(s, v.end.clamp(s, hi));
+  }
+
+  void _onConfigDraft(PlanConfigState next) {
+    setState(() => _config = next);
+  }
+
+  void _onConfigCommitted() {
+    HapticFeedback.selectionClick();
+    if (!_tuneTracked) {
+      _tuneTracked = true;
+      Analytics.planRevealCurveScrubbed();
+    }
+    PlanProjection? rebuilt;
+    try {
+      rebuilt = PlanProjection.build(
+        widget.answers,
+        baselineKmOverride: _config.weeklyVolumeRange.start,
+        peakKmOverride: _config.weeklyVolumeRange.end,
+        peakLongRunKmOverride: _config.longRunRange.end,
+        runsPerWeekOverride: _config.runsPerWeek,
+        gradualStart: _config.gradualStart,
+      );
+    } catch (_) {
+      rebuilt = null; // degrade to the onboarding-computed projection
+    }
+    setState(() => _tunedProjection = rebuilt ?? _tunedProjection);
+    widget.onConfigChanged?.call(_config);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: UnitUtils.useMilesNotifier,
       builder: (context, useMiles, _) {
-        final p = widget.projection;
+        final p = _effectiveProjection;
         return Column(
           children: [
             Expanded(
@@ -108,6 +207,33 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
                       useMiles: useMiles,
                       scrubIndex: _scrub,
                       onScrub: _onScrub,
+                    ),
+                    const SizedBox(height: 14),
+                    _TuneControlsCard(
+                      config: _config,
+                      weeklyBounds: _clampRange(
+                        _config.weeklyVolumeRange,
+                        _weeklyBounds.min,
+                        _weeklyBounds.max,
+                      ),
+                      weeklyMin: _weeklyBounds.min,
+                      weeklyMax: _weeklyBounds.max,
+                      longRunBounds: _clampRange(
+                        _config.longRunRange,
+                        _longRunBounds.min,
+                        _longRunBounds.max,
+                      ),
+                      longRunMin: _longRunBounds.min,
+                      longRunMax: _longRunBounds.max,
+                      useMiles: useMiles,
+                      onDraft: _onConfigDraft,
+                      onCommitted: _onConfigCommitted,
+                    ),
+                    const SizedBox(height: 14),
+                    _NextWeekPreviewCard(
+                      days: p.previewWeek,
+                      weekNumber: p.previewWeekNumber,
+                      useMiles: useMiles,
                     ),
                   ],
                   const SizedBox(height: 14),
@@ -510,6 +636,204 @@ class _VolumeCurveCard extends StatelessWidget {
               ),
               duration: Duration.zero,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// FINE-TUNE CONTROLS
+// ============================================================================
+
+class _TuneControlsCard extends StatelessWidget {
+  final PlanConfigState config;
+  final RangeValues weeklyBounds;
+  final double weeklyMin;
+  final double weeklyMax;
+  final RangeValues longRunBounds;
+  final double longRunMin;
+  final double longRunMax;
+  final bool useMiles;
+  final ValueChanged<PlanConfigState> onDraft;
+  final VoidCallback onCommitted;
+
+  const _TuneControlsCard({
+    required this.config,
+    required this.weeklyBounds,
+    required this.weeklyMin,
+    required this.weeklyMax,
+    required this.longRunBounds,
+    required this.longRunMin,
+    required this.longRunMax,
+    required this.useMiles,
+    required this.onDraft,
+    required this.onCommitted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final unit = UnitUtils.unitLabel(useMiles);
+    final w = weeklyBounds;
+    final lr = longRunBounds;
+
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardLabel('FINE-TUNE'),
+          const SizedBox(height: 6),
+          _sliderHeader(
+            'Weekly distance',
+            '${_km(w.start, useMiles)}–${_km(w.end, useMiles)} $unit',
+          ),
+          RangeSlider(
+            values: w,
+            min: weeklyMin,
+            max: weeklyMax,
+            divisions: (weeklyMax - weeklyMin).round().clamp(1, 200),
+            activeColor: EC.teal,
+            inactiveColor: EC.surface2,
+            labels: RangeLabels(
+              _km(w.start, useMiles),
+              _km(w.end, useMiles),
+            ),
+            onChanged: (v) => onDraft(
+              config.copyWith(weeklyVolumeRange: v),
+            ),
+            onChangeEnd: (_) => onCommitted(),
+          ),
+          const SizedBox(height: 6),
+          _sliderHeader('Runs per week', '${config.runsPerWeek}'),
+          Slider(
+            value: config.runsPerWeek.toDouble(),
+            min: 2,
+            max: 7,
+            divisions: 5,
+            activeColor: EC.teal,
+            inactiveColor: EC.surface2,
+            label: '${config.runsPerWeek}',
+            onChanged: (v) => onDraft(
+              config.copyWith(runsPerWeek: v.round()),
+            ),
+            onChangeEnd: (_) => onCommitted(),
+          ),
+          const SizedBox(height: 6),
+          _sliderHeader(
+            'Long run distance',
+            '${_km(lr.start, useMiles)}–${_km(lr.end, useMiles)} $unit',
+          ),
+          RangeSlider(
+            values: lr,
+            min: longRunMin,
+            max: longRunMax,
+            divisions: (longRunMax - longRunMin).round().clamp(1, 200),
+            activeColor: EC.teal,
+            inactiveColor: EC.surface2,
+            labels: RangeLabels(
+              _km(lr.start, useMiles),
+              _km(lr.end, useMiles),
+            ),
+            onChanged: (v) => onDraft(
+              config.copyWith(longRunRange: v),
+            ),
+            onChangeEnd: (_) => onCommitted(),
+          ),
+          const SizedBox(height: 4),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            activeColor: EC.teal,
+            title: const Text(
+              'Gradual start',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: EC.textPrimary,
+              ),
+            ),
+            subtitle: const Text(
+              'Reduces mileage in weeks 1–4 to help you ease into the plan '
+              'gradually.',
+              style: TextStyle(fontSize: 11.5, color: EC.textSecondary),
+            ),
+            value: config.gradualStart,
+            onChanged: (v) {
+              onDraft(config.copyWith(gradualStart: v));
+              onCommitted();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sliderHeader(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 2),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: EC.textPrimary,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: EC.teal,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ============================================================================
+// NEXT-WEEK PREVIEW
+// ============================================================================
+
+class _NextWeekPreviewCard extends StatelessWidget {
+  final List<DaySlot> days;
+  final int weekNumber;
+  final bool useMiles;
+
+  const _NextWeekPreviewCard({
+    required this.days,
+    required this.weekNumber,
+    required this.useMiles,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardLabel('PREVIEW YOUR NEXT WEEK'),
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(7, (i) {
+              final slot = i < days.length ? days[i] : null;
+              return Expanded(
+                child: _DayCell(
+                  slot: slot,
+                  letter: _dayLetters[i],
+                  useMiles: useMiles,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Week $weekNumber · updates as you tune above',
+            style: const TextStyle(fontSize: 11, color: EC.muted),
           ),
         ],
       ),
