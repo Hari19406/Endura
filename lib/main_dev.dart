@@ -22,10 +22,12 @@ import 'services/theme_service.dart';
 import 'utils/unit_utils.dart';
 
 import 'engines/config/archetype_table.dart' show ExperienceLevel;
+import 'models/activity_telemetry.dart';
 import 'models/plan_config_state.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'onboarding/plan_reveal_data.dart';
 import 'onboarding/plan_reveal_page.dart';
+import 'screens/activity_detail_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/run_screen.dart';
@@ -142,6 +144,12 @@ final List<_DevSection> _menu = [
     _DevEntry('Home', (_) => const HomeScreen()),
     _DevEntry('Run', (_) => const RunScreen()),
     _DevEntry('You', (_) => const YouScreen()),
+    _DevEntry(
+      'Activity Detail (telemetry)',
+      (_) => ActivityDetailScreen(activity: ActivityDetail.mock()),
+      subtitle: '11.73 km progression run — summary grid, route, training '
+          'impact, km splits, scrubbable pace/elevation/HR-zones/cadence charts',
+    ),
     _DevEntry('Paywall', (_) => const PaywallScreen()),
     _DevEntry('Settings', (_) => const SettingsScreen()),
     _DevEntry('Notifications', (_) => const NotificationsScreen()),
