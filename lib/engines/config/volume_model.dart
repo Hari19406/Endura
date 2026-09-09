@@ -50,20 +50,27 @@ class VolumeModel {
   static ({double min, double max}) peakBandKm(RaceDistance race) =>
       RaceArchetypeEnvelope.of(race).peakKm;
 
+  /// Distances whose peak ceiling is driven by the tuned envelope band scaled
+  /// by run frequency (rather than the experience-only [peakKm] table).
+  static const Set<RaceDistance> _runsScaledPeak = {
+    RaceDistance.fiveK,
+    RaceDistance.tenK,
+  };
+
   /// Peak weekly volume as a function of run frequency.
   ///
-  /// For the 5K this is the envelope's `peakKm` band (45–55 km/wk) interpolated
-  /// by [runsPerWeek] and nudged by experience — a runner doing 6 easy-heavy
-  /// days peaks higher than one squeezing the same load into 3. Other distances
-  /// keep their experience-only [peakKm] for now (runs-scaling is 5K-only until
-  /// their envelopes are tuned).
+  /// For a tuned distance (5K, 10K) this is the envelope's `peakKm` band
+  /// interpolated by [runsPerWeek] and nudged by experience — a runner doing 6
+  /// easy-heavy days peaks higher than one squeezing the same load into 3.
+  /// Other distances keep their experience-only [peakKm] until their envelopes
+  /// are tuned.
   static double peakKmForRuns({
     required RaceDistance race,
     required ExperienceLevel experience,
     required int runsPerWeek,
   }) {
-    if (race != RaceDistance.fiveK) return peakKm(race, experience);
-    final env = RaceArchetypeEnvelope.fiveK;
+    if (!_runsScaledPeak.contains(race)) return peakKm(race, experience);
+    final env = RaceArchetypeEnvelope.of(race);
     final byRuns = env.peakForRuns(runsPerWeek);
     final expFactor = switch (experience) {
       ExperienceLevel.beginner => 0.85,

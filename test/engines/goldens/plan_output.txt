@@ -84,66 +84,66 @@ W9 base target=25.0km
   Sun longRun    endurance    long_steady                8.0km @ 6:51/km
 
 === P3_10K_5day_40km_intermediate ===
-W1 base target=42.0km
-  Mon easy       aerobicBase  easy_strides               6.0km @ 6:51/km
+W1 base target=42.5km
+  Mon easy       aerobicBase  easy_strides               7.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
   Thu easy       aerobicBase  easy_strides               8.0km @ 6:51/km
-  Sat easy       aerobicBase  easy_strides               8.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               14.0km @ 6:51/km
-W2 base target=44.0km
+  Sat easy       aerobicBase  easy_strides               9.0km @ 6:51/km
+  Sun longRun    endurance    long_steady               13.0km @ 6:51/km
+W2 base target=44.5km
   Mon easy       aerobicBase  easy_aerobic               7.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
   Thu easy       aerobicBase  easy_aerobic               9.0km @ 6:51/km
   Sat easy       aerobicBase  easy_aerobic               9.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               13.0km @ 6:51/km
-W3 base target=46.0km
-  Mon easy       aerobicBase  easy_steady                7.0km @ 6:51/km
+  Sun longRun    endurance    long_steady               13.5km @ 6:51/km
+W3 base target=47.0km
+  Mon easy       aerobicBase  easy_steady                8.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
   Thu easy       aerobicBase  easy_steady                9.0km @ 6:51/km
   Sat easy       aerobicBase  easy_steady                9.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               15.0km @ 6:51/km
-W4 base [cutback] target=46.0km
+  Sun longRun    endurance    long_steady               15.5km @ 6:51/km
+W4 base [cutback] target=47.0km
   Mon easy       aerobicBase  easy_progressive           5.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
   Thu easy       aerobicBase  easy_progressive           6.0km @ 6:51/km
   Sat easy       aerobicBase  easy_progressive           7.0km @ 6:51/km
-  Sun longRun    endurance    long_steady                9.5km @ 6:51/km
-W5 build target=48.0km
+  Sun longRun    endurance    long_steady               10.0km @ 6:51/km
+W5 build target=49.0km
   Mon easy       aerobicBase  easy_hilly                 7.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    6.0km @ 4:38/km
+  Wed quality1   threshold    cruise_intervals_400       6.5km @ 5:15/km
   Thu easy       aerobicBase  easy_hilly                 9.0km @ 6:51/km
   Sat easy       aerobicBase  easy_hilly                10.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               15.0km @ 6:51/km
-W6 build target=50.0km
+  Sun longRun    endurance    long_steady               15.5km @ 6:51/km
+W6 build target=51.5km
   Mon easy       aerobicBase  easy_hilly                 8.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    6.5km @ 4:38/km
-  Thu easy       aerobicBase  easy_hilly                10.0km @ 6:51/km
-  Sat easy       aerobicBase  easy_hilly                10.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               15.0km @ 6:51/km
-W7 build target=52.0km
-  Mon easy       aerobicBase  easy_hilly                 8.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    7.0km @ 4:38/km
+  Wed quality1   threshold    cruise_intervals_400       6.5km @ 5:15/km
   Thu easy       aerobicBase  easy_hilly                10.0km @ 6:51/km
   Sat easy       aerobicBase  easy_hilly                10.0km @ 6:51/km
   Sun longRun    endurance    long_steady               16.0km @ 6:51/km
-W8 peak [cutback] target=52.0km
-  Mon easy       aerobicBase  easy_hilly                 5.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    5.5km @ 4:38/km
-  Thu easy       aerobicBase  easy_hilly                 7.0km @ 6:51/km
-  Sat easy       aerobicBase  easy_hilly                 8.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               11.0km @ 6:51/km
-W9 peak target=54.0km
+W7 peak target=53.5km
   Mon easy       aerobicBase  easy_hilly                 8.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    8.0km @ 4:38/km
+  Wed quality1   threshold    cruise_intervals_800       8.0km @ 5:15/km
   Thu easy       aerobicBase  easy_hilly                10.0km @ 6:51/km
   Sat easy       aerobicBase  easy_hilly                11.0km @ 6:51/km
   Sun longRun    endurance    long_steady               16.0km @ 6:51/km
-W10 taper target=58.0km
+W8 peak [cutback] target=53.5km
+  Mon easy       aerobicBase  easy_hilly                 5.0km @ 6:51/km
+  Wed quality1   threshold    cruise_intervals_800       5.5km @ 5:15/km
+  Thu easy       aerobicBase  easy_hilly                 7.0km @ 6:51/km
+  Sat easy       aerobicBase  easy_hilly                 8.0km @ 6:51/km
+  Sun longRun    endurance    long_steady               11.0km @ 6:51/km
+W9 taper target=58.0km
   Mon easy       aerobicBase  easy_hilly                 7.0km @ 6:51/km
   Wed quality1   threshold    tempo_continuous           5.0km @ 5:15/km
   Thu easy       aerobicBase  easy_hilly                 9.0km @ 6:51/km
   Sat easy       aerobicBase  easy_hilly                 9.0km @ 6:51/km
   Sun longRun    endurance    long_steady               13.0km @ 6:51/km
+W10 taper target=58.0km
+  Mon easy       aerobicBase  easy_hilly                 5.0km @ 6:51/km
+  Wed quality1   threshold    tempo_continuous           5.0km @ 5:15/km
+  Thu easy       aerobicBase  easy_hilly                 6.0km @ 6:51/km
+  Sat easy       aerobicBase  easy_hilly                 7.0km @ 6:51/km
+  Sun longRun    endurance    long_steady                9.5km @ 6:51/km
 W11 base target=40.0km
   Mon easy       aerobicBase  easy_hilly                 6.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
@@ -182,46 +182,46 @@ W4 base [cutback] target=80.0km
   Sun longRun    endurance    long_steady               17.0km @ 5:52/km
 W5 build target=80.0km
   Mon easy       aerobicBase  easy_steady                9.0km @ 5:52/km
-  Tue quality1   vo2max       vo2_400                   10.5km @ 3:50/km
+  Tue quality1   threshold    cruise_intervals_400      10.5km @ 4:21/km
   Wed easy       aerobicBase  easy_steady               12.0km @ 5:52/km
-  Fri quality2   speed        hill_repeats              10.5km @ 3:33/km
+  Fri quality2   vo2max       vo2_400                   10.5km @ 3:50/km
   Sat easy       aerobicBase  easy_aerobic              14.0km @ 5:52/km
   Sun longRun    endurance    long_steady               24.0km @ 5:52/km
 W6 build target=80.0km
   Mon easy       aerobicBase  easy_aerobic               9.0km @ 5:52/km
-  Tue quality1   vo2max       vo2_400                   10.5km @ 3:50/km
+  Tue quality1   threshold    cruise_intervals_400      10.5km @ 4:21/km
   Wed easy       aerobicBase  easy_aerobic              12.0km @ 5:52/km
-  Fri quality2   speed        speed_hills               10.5km @ 3:33/km
+  Fri quality2   vo2max       vo2_400                   10.5km @ 3:50/km
   Sat easy       aerobicBase  easy_aerobic              14.0km @ 5:52/km
   Sun longRun    endurance    long_steady               24.0km @ 5:52/km
-W7 build target=80.0km
-  Mon easy       aerobicBase  easy_aerobic               9.0km @ 5:52/km
-  Tue quality1   vo2max       vo2_400                   10.5km @ 3:50/km
-  Wed easy       aerobicBase  easy_aerobic              12.0km @ 5:52/km
-  Fri quality2   speed        speed_reps                10.5km @ 3:33/km
-  Sat easy       aerobicBase  easy_aerobic              14.0km @ 5:52/km
-  Sun longRun    endurance    long_steady               24.0km @ 5:52/km
-W8 peak [cutback] target=80.0km
-  Mon easy       aerobicBase  easy_aerobic               6.0km @ 5:52/km
-  Tue easy       aerobicBase  easy_aerobic               8.0km @ 5:52/km
-  Wed quality1   vo2max       vo2_400                    8.5km @ 3:50/km
-  Fri easy       aerobicBase  easy_aerobic               8.0km @ 5:52/km
-  Sat easy       aerobicBase  easy_aerobic               9.0km @ 5:52/km
-  Sun longRun    endurance    long_steady               17.0km @ 5:52/km
-W9 peak target=80.0km
+W7 peak target=80.0km
   Mon easy       aerobicBase  easy_aerobic               8.0km @ 5:52/km
-  Tue quality1   vo2max       vo2_400                   12.0km @ 3:50/km
+  Tue quality1   threshold    cruise_intervals_800      12.0km @ 4:21/km
   Wed easy       aerobicBase  easy_aerobic              11.0km @ 5:52/km
   Fri quality2   raceSpecific race_gp_intervals         12.0km @ 5:10/km
   Sat easy       aerobicBase  easy_aerobic              13.0km @ 5:52/km
   Sun longRun    endurance    long_steady               24.0km @ 5:52/km
-W10 taper target=80.0km
+W8 peak [cutback] target=80.0km
+  Mon easy       aerobicBase  easy_aerobic               6.0km @ 5:52/km
+  Tue easy       aerobicBase  easy_aerobic               8.0km @ 5:52/km
+  Wed quality1   threshold    cruise_intervals_800       8.5km @ 4:21/km
+  Fri easy       aerobicBase  easy_aerobic               8.0km @ 5:52/km
+  Sat easy       aerobicBase  easy_aerobic               9.0km @ 5:52/km
+  Sun longRun    endurance    long_steady               17.0km @ 5:52/km
+W9 taper target=80.0km
   Mon easy       aerobicBase  easy_steady                7.0km @ 5:52/km
   Tue easy       aerobicBase  easy_steady                9.0km @ 5:52/km
   Wed quality1   threshold    tempo_continuous           7.0km @ 4:21/km
   Fri easy       aerobicBase  easy_steady                9.0km @ 5:52/km
   Sat easy       aerobicBase  easy_steady               10.0km @ 5:52/km
   Sun longRun    endurance    long_steady               18.0km @ 5:52/km
+W10 taper target=80.0km
+  Mon easy       aerobicBase  easy_steady                5.0km @ 5:52/km
+  Tue easy       aerobicBase  easy_steady                6.0km @ 5:52/km
+  Wed quality1   threshold    tempo_continuous           5.5km @ 4:21/km
+  Fri easy       aerobicBase  easy_steady                6.0km @ 5:52/km
+  Sat easy       aerobicBase  easy_steady                8.0km @ 5:52/km
+  Sun longRun    endurance    long_steady               13.0km @ 5:52/km
 W11 base target=80.0km
   Mon easy       aerobicBase  easy_steady                9.0km @ 5:52/km
   Tue easy       aerobicBase  easy_steady               12.0km @ 5:52/km

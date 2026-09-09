@@ -504,8 +504,10 @@ class WeekResolver {
   //
   // Merged from the former WeekResolver._primaryQualityIntent /
   // _secondaryQualityIntent AND SessionSelector._roleToIntent (which
-  // disagreed). Reconciled per the rework decision:
-  //   Q1 build/peak → threshold for HM & FM, vo2max for 5K & 10K.
+  // disagreed). Reconciled per the rework decision, then refined per the
+  // archetype envelopes:
+  //   Q1 build/peak → vo2max for 5K; threshold for 10K, HM & FM.
+  //   Q2 build      → speed for 5K; vo2max for 10K, HM & FM.
   // ==========================================================================
 
   WorkoutIntent _slotTypeToIntent(
@@ -539,7 +541,9 @@ class WeekResolver {
     // build / peak / maintenance.
     return switch (race) {
       RaceDistance.fiveK => WorkoutIntent.vo2max,
-      RaceDistance.tenK => WorkoutIntent.vo2max,
+      // 10K is threshold-led — cruise intervals / tempo at 10K–threshold pace
+      // are the primary quality stimulus; VO2 work is the Q2 sharpener.
+      RaceDistance.tenK => WorkoutIntent.threshold,
       RaceDistance.halfMarathon => WorkoutIntent.threshold,
       RaceDistance.marathon => WorkoutIntent.threshold,
     };
@@ -558,7 +562,9 @@ class WeekResolver {
     // build / maintenance.
     return switch (race) {
       RaceDistance.fiveK => WorkoutIntent.speed,
-      RaceDistance.tenK => WorkoutIntent.speed,
+      // 10K Q2 is the VO2 / sub-threshold sharpener that complements the
+      // threshold-led Q1.
+      RaceDistance.tenK => WorkoutIntent.vo2max,
       RaceDistance.halfMarathon => WorkoutIntent.vo2max,
       RaceDistance.marathon => WorkoutIntent.vo2max,
     };

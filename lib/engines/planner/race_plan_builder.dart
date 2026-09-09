@@ -82,9 +82,10 @@ class RacePlanBuilder {
         ? peakLongRunKmOverride.clamp(6.0, 46.0).toDouble()
         : _peakLongRunKm(goalRace, experienceLevel);
     var currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
-    // 5K: the long run is a supporting run — never let a high current base or a
-    // tuned override push it past the envelope's 10–12 km ceiling.
-    if (raceDist == RaceDistance.fiveK) {
+    // 5K / 10K: the long run is a supporting run — never let a high current base
+    // or a tuned override push it past the envelope's absolute ceiling
+    // (12 km / 16 km).
+    if (raceDist == RaceDistance.fiveK || raceDist == RaceDistance.tenK) {
       final cap = VolumeModel.envelope(raceDist).longRunMaxKm;
       peakLongRunKm = min(peakLongRunKm, cap);
       currentLongRunKm = min(currentLongRunKm, cap);
@@ -332,7 +333,7 @@ class RacePlanBuilder {
 
   static int _taperWeeksFor(String race) => switch (race) {
     '5k' => 1,
-    '10k' => 1,
+    '10k' => 2, // 1 deload week + 1 sharpening race week
     'half_marathon' => 2,
     'marathon' => 3,
     _ => 1,

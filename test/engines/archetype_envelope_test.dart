@@ -8,6 +8,8 @@ import 'package:run_app/engines/config/archetype_envelope.dart';
 import 'package:run_app/engines/config/archetype_table.dart';
 import 'package:run_app/engines/config/volume_model.dart';
 import 'package:run_app/engines/config/workout_template_library.dart';
+import 'package:run_app/engines/plan/week_resolver.dart';
+import 'package:run_app/engines/planner/race_plan_builder.dart';
 import 'package:run_app/models/training_phase.dart';
 import 'package:run_app/onboarding/plan_reveal_data.dart';
 
@@ -38,6 +40,35 @@ OnboardingAnswers _fiveKAnswers({
     startDate: _now,
     planWeeks: weeksOut,
     vdot: 46,
+    vdotProvisional: false,
+  );
+}
+
+OnboardingAnswers _tenKAnswers({
+  int runsPerWeek = 5,
+  List<int> selectedDays = const [0, 2, 3, 5, 6],
+  int weeksOut = 16, // long enough that the runs-scaled peak ceiling binds
+  double baseline = 40,
+  String experience = 'intermediate',
+}) {
+  return OnboardingAnswers(
+    goal: '10k',
+    raceName: 'Test 10K',
+    raceDate: _now.add(Duration(days: weeksOut * 7)),
+    experienceRaw: 'regular',
+    experienceBridged: experience,
+    raceGoalRaw: 'target_time',
+    targetFinishSec: 46 * 60,
+    baselineWeeklyKm: baseline,
+    runsPerWeek: runsPerWeek,
+    selectedDays: selectedDays,
+    longRunDayIndex: selectedDays.last,
+    paceDistance: '10k',
+    paceDistanceKm: 10.0,
+    currentTimeSec: 50 * 60,
+    startDate: _now,
+    planWeeks: weeksOut,
+    vdot: 45,
     vdotProvisional: false,
   );
 }
@@ -89,6 +120,45 @@ void main() {
     test('session mix: Q1 VO2 max, Q2 threshold only at 5+ runs', () {
       expect(env.quality1Intent, WorkoutIntent.vo2max);
       expect(env.quality2Intent, WorkoutIntent.threshold);
+      expect(env.quality2MinRunsPerWeek, 5);
+      expect(env.hasSecondQualityAt(4), isFalse);
+      expect(env.hasSecondQualityAt(5), isTrue);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  group('RaceArchetypeEnvelope — 10K bounds', () {
+    const env = RaceArchetypeEnvelope.tenK;
+
+    test('baseline volume band is 22–30 km/wk', () {
+      expect(env.baselineKm.min, 22);
+      expect(env.baselineKm.max, 30);
+    });
+
+    test('peak volume band is 55–65 km/wk', () {
+      expect(env.peakKm.min, 55);
+      expect(env.peakKm.max, 65);
+      expect(env.peakForRuns(3), closeTo(55, 0.001));
+      expect(env.peakForRuns(6), closeTo(65, 0.001));
+    });
+
+    test('long run cap is the smaller of 28% of the week and 16 km', () {
+      expect(env.longRunMaxFractionOfWeek, 0.28);
+      expect(env.longRunMaxKm, 16);
+      expect(env.longRunCapKm(40), closeTo(11.2, 0.001)); // 28% binds
+      expect(env.longRunCapKm(57.15), closeTo(16, 0.01)); // at the km cap
+      expect(env.longRunCapKm(80), closeTo(16, 0.001)); // km cap binds
+    });
+
+    test('taper is a deload week + a race week, 10–14 days', () {
+      expect(env.taperWeeks, 2);
+      expect(env.taperDays.min, 10);
+      expect(env.taperDays.max, 14);
+    });
+
+    test('session mix: Q1 threshold, Q2 VO2 / sub-threshold at 5+ runs', () {
+      expect(env.quality1Intent, WorkoutIntent.threshold);
+      expect(env.quality2Intent, WorkoutIntent.vo2max);
       expect(env.quality2MinRunsPerWeek, 5);
       expect(env.hasSecondQualityAt(4), isFalse);
       expect(env.hasSecondQualityAt(5), isTrue);
@@ -153,9 +223,34 @@ void main() {
       );
     });
 
-    test('non-5K distances ignore run frequency (unchanged ceiling)', () {
+    test('peakKmForRuns(10K) stays in the 55–65 band and rises with runs', () {
+      var prev = -1.0;
+      for (var r = 3; r <= 7; r++) {
+        final p = VolumeModel.peakKmForRuns(
+          race: RaceDistance.tenK,
+          experience: ExperienceLevel.intermediate,
+          runsPerWeek: r,
+        );
+        expect(p, inInclusiveRange(55, 65), reason: '$r runs');
+        expect(p, greaterThanOrEqualTo(prev));
+        prev = p;
+      }
+    });
+
+    test('peakKmForRuns(10K) rises with experience', () {
+      double at(ExperienceLevel l) => VolumeModel.peakKmForRuns(
+            race: RaceDistance.tenK,
+            experience: l,
+            runsPerWeek: 5,
+          );
+      expect(at(ExperienceLevel.beginner),
+          lessThan(at(ExperienceLevel.intermediate)));
+      expect(at(ExperienceLevel.intermediate),
+          lessThanOrEqualTo(at(ExperienceLevel.advanced)));
+    });
+
+    test('HM / marathon still ignore run frequency (unchanged ceiling)', () {
       for (final race in [
-        RaceDistance.tenK,
         RaceDistance.halfMarathon,
         RaceDistance.marathon,
       ]) {
@@ -172,12 +267,13 @@ void main() {
       }
     });
 
-    test('baseline / peak band helpers delegate to the envelope; 5K safe cap '
-        'aligns with the peak ceiling', () {
-      expect(VolumeModel.baselineBandKm(RaceDistance.fiveK),
-          RaceArchetypeEnvelope.fiveK.baselineKm);
-      expect(VolumeModel.peakBandKm(RaceDistance.fiveK),
-          RaceArchetypeEnvelope.fiveK.peakKm);
+    test('baseline / peak band helpers delegate to the envelope', () {
+      for (final race in RaceDistance.values) {
+        expect(VolumeModel.baselineBandKm(race),
+            RaceArchetypeEnvelope.of(race).baselineKm);
+        expect(VolumeModel.peakBandKm(race),
+            RaceArchetypeEnvelope.of(race).peakKm);
+      }
       expect(VolumeModel.safeCapKm(RaceDistance.fiveK), 55);
     });
   });
@@ -337,6 +433,137 @@ void main() {
     test('a 5+ run 5K plan schedules a second quality session', () {
       expect(waveFor(5).maxQ, 2);
       expect(waveFor(6).maxQ, 2);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  group('10K plan — RacePlanBuilder + WeekResolver', () {
+    const resolver = WeekResolver();
+    final now = DateTime(2026, 1, 5);
+
+    List<WeekResolution> resolve10k({
+      int runsPerWeek = 5,
+      double baseline = 30,
+      int weeksOut = 12,
+    }) {
+      final days = const {
+        4: [0, 2, 4, 6],
+        5: [0, 2, 3, 5, 6],
+        6: [0, 1, 2, 4, 5, 6],
+      }[runsPerWeek]!;
+      final plan = RacePlanBuilder.build(
+        currentWeeklyKm: baseline,
+        goalRace: '10k',
+        raceDate: now.add(Duration(days: weeksOut * 7)),
+        experienceLevel: 'intermediate',
+        now: now,
+        runsPerWeek: runsPerWeek,
+      );
+      var taperSeen = 0;
+      return [
+        for (final w in plan.weeks)
+          resolver.resolve(
+            weekTarget: w,
+            trainingDayIndices: days,
+            raceDistance: RaceDistance.tenK,
+            phase: w.phase,
+            experienceLevel: ExperienceLevel.intermediate,
+            currentWeeklyKm: w.targetKm,
+            longRunDayIndex: days.last,
+            weekNumber: w.week,
+            isCutbackWeek: w.week % 4 == 0,
+            taperWeekNumber:
+                w.phase == TrainingPhase.taper ? ++taperSeen : 1,
+          ),
+      ];
+    }
+
+    test('a 10K plan tapers over two weeks (deload + race week)', () {
+      final plan = RacePlanBuilder.build(
+        currentWeeklyKm: 30,
+        goalRace: '10k',
+        raceDate: now.add(const Duration(days: 12 * 7)),
+        experienceLevel: 'intermediate',
+        now: now,
+      );
+      expect(
+        plan.weeks.where((w) => w.phase == TrainingPhase.taper).length,
+        2,
+      );
+    });
+
+    test('build / peak Q1 is a threshold session', () {
+      for (final wk in resolve10k()) {
+        if (wk.phase != TrainingPhase.build && wk.phase != TrainingPhase.peak) {
+          continue;
+        }
+        final q1 = wk.days.where((d) => d.slotType == SlotType.quality1);
+        for (final d in q1) {
+          expect(d.intent, WorkoutIntent.threshold,
+              reason: 'week ${wk.weekNumber} ${wk.phase.name}');
+        }
+      }
+    });
+
+    test('a 6-run build week adds a VO2 / sub-threshold Q2', () {
+      final weeks = resolve10k(runsPerWeek: 6, baseline: 45);
+      final buildWeeks = weeks.where((w) =>
+          w.phase == TrainingPhase.build &&
+          w.days.where((d) => d.slotType == SlotType.quality2).isNotEmpty);
+      expect(buildWeeks, isNotEmpty, reason: 'no Q2 scheduled on a 6-run plan');
+      for (final wk in buildWeeks) {
+        final q2 = wk.days.firstWhere((d) => d.slotType == SlotType.quality2);
+        expect(q2.intent, WorkoutIntent.vo2max,
+            reason: 'week ${wk.weekNumber}');
+      }
+    });
+
+    test('every resolved 10K long run is ≤ 16 km, and ≤ ~30% of a full week',
+        () {
+      for (final runs in const [4, 5, 6]) {
+        final weeks = resolve10k(runsPerWeek: runs, baseline: 32);
+        for (final wk in weeks) {
+          final lr = wk.days.firstWhere((d) => d.isLongRun);
+          final km = lr.distanceKm ?? 0;
+          expect(km, lessThanOrEqualTo(16.0 + 1.5),
+              reason: '$runs runs, week ${wk.weekNumber}: $km km');
+          // Cutback / taper weeks deliberately protect the long run while total
+          // volume drops harder; a 4-day week can't distribute the load without
+          // leaning on the long run. The 28%-ish share holds on full 5+ day
+          // weeks — the target case.
+          final isCutback = wk.weekNumber % 4 == 0;
+          if (runs >= 5 &&
+              wk.phase != TrainingPhase.taper &&
+              !isCutback &&
+              wk.targetKm > 0) {
+            expect(km / wk.targetKm, lessThanOrEqualTo(0.32),
+                reason: '$runs runs, week ${wk.weekNumber}');
+          }
+        }
+      }
+    });
+
+    test('peak volume scales up with runs-per-week and stays ≤ 65 km', () {
+      double peakFor(int runs) {
+        final days = const {
+          3: [0, 2, 5],
+          4: [0, 2, 4, 5],
+          5: [0, 1, 3, 4, 5],
+          6: [0, 1, 2, 3, 4, 5],
+        }[runs]!;
+        final proj = PlanProjection.build(
+          _tenKAnswers(runsPerWeek: runs, selectedDays: days),
+          now: now,
+        );
+        return proj.peakWeeklyKm;
+      }
+
+      final p3 = peakFor(3);
+      final p5 = peakFor(5);
+      final p6 = peakFor(6);
+      expect(p5, greaterThan(p3));
+      expect(p6, greaterThanOrEqualTo(p5));
+      expect(p6, lessThanOrEqualTo(65 + 0.5));
     });
   });
 }

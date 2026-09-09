@@ -217,10 +217,16 @@ class WeeklyKmRange {
 class ArchetypeTable {
   const ArchetypeTable._();
 
-  /// Operational upper bound on the 5K long run as a fraction of the week —
-  /// softer than the declared 25% target so the reconciler still has room on a
-  /// tight week, but far below the generic ~0.55 ceiling.
-  static const double _fiveKLongRunMaxFrac = 0.33;
+  /// Operational upper bound on the long run as a fraction of the week for the
+  /// shorter, speed-biased distances — softer than each envelope's declared
+  /// target (5K 25%, 10K 28%) so the reconciler still has room on a tight week,
+  /// but far below the generic ~0.55 ceiling. Longer distances keep the generic
+  /// fractional bound.
+  static double? _shortRaceLongRunMaxFrac(RaceDistance race) => switch (race) {
+        RaceDistance.fiveK => 0.33,
+        RaceDistance.tenK => 0.33,
+        _ => null,
+      };
 
   /// Build a week's session list.
   ///
@@ -674,12 +680,13 @@ class ArchetypeTable {
     final c = (center + raceAdj + phaseAdj).clamp(0.22, 0.52);
     var minFrac = (c - 0.08).clamp(0.18, c);
     var maxFrac = (c + 0.08).clamp(c, 0.55);
-    // 5K long run is capped tighter — it is a supporting aerobic run, not the
-    // week's centrepiece. Operational bound (0.33); the declared target is 25%
-    // (RaceArchetypeEnvelope.fiveK) and the absolute 10–12 km ceiling is applied
-    // to the skeleton long-run target in RacePlanBuilder.
-    if (race == RaceDistance.fiveK) {
-      maxFrac = math.min(maxFrac, _fiveKLongRunMaxFrac);
+    // 5K / 10K long run is capped tighter — it is a supporting aerobic run, not
+    // the week's centrepiece. Operational bound; the declared target (25% / 28%)
+    // and the absolute km ceiling (12 / 16 km) are applied to the skeleton
+    // long-run target in RacePlanBuilder.
+    final shortCap = _shortRaceLongRunMaxFrac(race);
+    if (shortCap != null) {
+      maxFrac = math.min(maxFrac, shortCap);
       minFrac = math.min(minFrac, maxFrac);
     }
     return (minFrac, maxFrac);

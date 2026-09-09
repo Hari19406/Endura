@@ -127,21 +127,22 @@ class RaceArchetypeEnvelope {
     sessionMixSummary: '1 VO2 max · 1 threshold (5+ runs) · rest easy aerobic',
   );
 
-  /// 10K — VO2/threshold blend, moderate volume.
+  /// 10K — threshold-led, moderate volume, two-week taper (deload + race week).
   static const tenK = RaceArchetypeEnvelope(
     race: RaceDistance.tenK,
-    baselineKm: (min: 25, max: 35),
-    peakKm: (min: 42, max: 78),
-    longRunMaxFractionOfWeek: 0.30,
-    longRunMaxKm: 18,
-    taperDays: (min: 7, max: 10),
-    taperWeeks: 1,
-    quality1Intent: WorkoutIntent.vo2max,
-    quality1Label: 'VO2 max — 600 m–1.2 km repeats',
-    quality2Intent: WorkoutIntent.threshold,
-    quality2Label: 'Threshold / cruise intervals',
+    baselineKm: (min: 22, max: 30),
+    peakKm: (min: 55, max: 65),
+    longRunMaxFractionOfWeek: 0.28,
+    longRunMaxKm: 16,
+    taperDays: (min: 10, max: 14),
+    taperWeeks: 2,
+    quality1Intent: WorkoutIntent.threshold,
+    quality1Label: 'Threshold / cruise intervals — 4×2 km or 3×3 km at 10K pace',
+    quality2Intent: WorkoutIntent.vo2max,
+    quality2Label: 'Sub-threshold tempo or VO2 max sharpening',
     quality2MinRunsPerWeek: 5,
-    sessionMixSummary: '1 VO2 max · 1 threshold (5+ runs) · rest easy aerobic',
+    sessionMixSummary:
+        '1 threshold · 1 VO2 / tempo (5+ runs) · rest easy aerobic',
   );
 
   /// Half marathon — threshold-led, higher volume, two-week taper.
