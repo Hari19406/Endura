@@ -346,7 +346,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// bookkeeping as [_animateTo].
   void _jumpTo(int index) {
     if (index < 0 || index >= _total) return;
-    _ctrl.jumpToPage(index);
+    // Only ever invoked from a user tap on the mounted reveal, so the PageView
+    // is on screen and `_ctrl` has a position — but guard anyway: jumpToPage
+    // throws synchronously if the controller has no clients, and swallowing a
+    // stray call is better than taking down the frame.
+    if (_ctrl.hasClients) {
+      _ctrl.jumpToPage(index);
+    }
     if (!mounted) return;
     setState(() => _current = index);
     HapticFeedback.selectionClick();
