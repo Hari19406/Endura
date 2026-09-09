@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/pr_engine.dart';
 import '../engines/achievement_engine.dart' as achieve;
+import '../models/activity_telemetry.dart';
 import '../models/athlete_profile.dart';
 import '../models/shoe.dart';
 import '../services/profile_service.dart';
@@ -12,7 +13,7 @@ import '../services/shoe_service.dart';
 import '../services/social_service.dart';
 import 'settings_screen.dart';
 import '../utils/database_service.dart';
-import 'run_detail_screen.dart';
+import 'activity_detail_screen.dart';
 import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
@@ -203,10 +204,20 @@ class _YouScreenState extends State<YouScreen>
     }
   }
 
-  void _openRunDetail(dynamic run, {dynamic record}) async {
+  void _openRunDetail(RunRecord record) async {
+    final id = record.id;
     final deleted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => RunDetailScreen(run: run, record: record),
+        builder: (_) => ActivityDetailScreen(
+          activity: ActivityDetail.fromRunRecord(
+            record,
+            runnerName: _profile?.displayName ?? 'You',
+            avatarUrl: _profile?.avatarUrl,
+          ),
+          onDelete: id == null
+              ? null
+              : () => DatabaseService.instance.deleteRun(id),
+        ),
       ),
     );
     if (deleted == true) loadData();
@@ -303,9 +314,7 @@ class _YouScreenState extends State<YouScreen>
             icon: Icon(Icons.search, color: c.textSecondary, size: 22),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const AthleteDiscoveryScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const AthleteDiscoveryScreen()),
             ),
             tooltip: 'Find runners',
           ),
@@ -391,8 +400,7 @@ class _YouScreenState extends State<YouScreen>
                   HistoryTab(
                     records: _runRecords.cast<RunRecord>(),
                     onRefresh: loadData,
-                    onOpenRun: (record) =>
-                        _openRunDetail(record.toRunHistory(), record: record),
+                    onOpenRun: _openRunDetail,
                   ),
                   ShoeLockerView(
                     shoes: _shoes,

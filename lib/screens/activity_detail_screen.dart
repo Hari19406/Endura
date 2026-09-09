@@ -18,11 +18,22 @@ import '../widgets/run_comments_sheet.dart';
 /// Every data-driven section renders conditionally so the screen degrades
 /// gracefully on partial production payloads (no HR strap, no barometer, …).
 ///
-/// Fed today by [ActivityDetail.mock] via the Dev Launcher.
+/// Reached from the Activity Feed ([ActivityDetail.fromFeedRun]) and the
+/// You / History tab ([ActivityDetail.fromRunRecord]); also from the Dev
+/// Launcher via [ActivityDetail.mock].
 class ActivityDetailScreen extends StatefulWidget {
   final ActivityDetail activity;
 
-  const ActivityDetailScreen({super.key, required this.activity});
+  /// Supplied only for the viewer's own recorded runs — enables the app-bar
+  /// delete action. Runs the deletion, after which the screen pops `true`
+  /// (the History tab refreshes on that result).
+  final Future<void> Function()? onDelete;
+
+  const ActivityDetailScreen({
+    super.key,
+    required this.activity,
+    this.onDelete,
+  });
 
   @override
   State<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
@@ -37,13 +48,74 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   @override
   void initState() {
     super.initState();
-    Analytics.capture('activity_detail_viewed', properties: {
-      'distance_km': widget.activity.distanceKm,
-      'source': widget.activity.source,
-    });
+    Analytics.capture(
+      'activity_detail_viewed',
+      properties: {
+        'distance_km': widget.activity.distanceKm,
+        'source': widget.activity.source,
+      },
+    );
   }
 
   ActivityDetail get a => widget.activity;
+
+  /// MET-based estimate (assumes 70 kg — we don't collect weight). Mirrors
+  /// `RunDetailScreen._estimateCalories` so history parity is kept when the
+  /// record carries no stored value.
+  int _estimateCalories(double distanceKm, int durationSeconds) {
+    if (durationSeconds <= 0 || distanceKm <= 0) return 0;
+    final speedKmh = distanceKm / (durationSeconds / 3600);
+    final met = speedKmh >= 16
+        ? 16.0
+        : speedKmh >= 14
+        ? 14.5
+        : speedKmh >= 12
+        ? 12.8
+        : speedKmh >= 10
+        ? 11.0
+        : speedKmh >= 8
+        ? 9.8
+        : 7.0;
+    const assumedWeightKg = 70.0;
+    return (met * assumedWeightKg * (durationSeconds / 3600)).round();
+  }
+
+  int? get _displayCalories {
+    if (a.calories != null) return a.calories;
+    final est = _estimateCalories(a.distanceKm, a.movingTime.inSeconds);
+    return est > 0 ? est : null;
+  }
+
+  Future<void> _confirmDelete() async {
+    HapticFeedback.lightImpact();
+    final c = context.colors;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: c.surface,
+        title: const Text('Delete workout?'),
+        content: const Text(
+          "This run will be permanently removed from your history. This can't be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(dctx, true);
+            },
+            child: Text('Delete', style: TextStyle(color: c.danger)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await widget.onDelete!.call();
+    if (mounted) Navigator.pop(context, true);
+  }
 
   // ── social actions (shared with the Feed tab) ────────────────────────────
 
@@ -57,7 +129,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text("Comments aren't available for this run yet.")),
+          const SnackBar(
+            content: Text("Comments aren't available for this run yet."),
+          ),
         );
       return;
     }
@@ -84,10 +158,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         'Time: ${_fmtDuration(a.movingTime)}, '
         'Pace: ${UnitUtils.formatPaceString(a.avgPace, useMiles)}.';
     await SharePlus.instance.share(ShareParams(text: text));
-    Analytics.capture('activity_shared', properties: {
-      if (a.runId != null) 'run_id': a.runId!,
-      'source': 'activity_detail',
-    });
+    Analytics.capture(
+      'activity_shared',
+      properties: {
+        if (a.runId != null) 'run_id': a.runId!,
+        'source': 'activity_detail',
+      },
+    );
   }
 
   // ── formatting helpers ─────────────────────────────────────────────────────
@@ -104,8 +181,18 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   String _fmtTimestamp(DateTime t) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final hh = t.hour.toString().padLeft(2, '0');
     final mm = t.minute.toString().padLeft(2, '0');
@@ -143,6 +230,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               ),
             ),
             actions: [
+              if (widget.onDelete != null)
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: c.textPrimary,
+                    size: 20,
+                  ),
+                  tooltip: 'Delete workout',
+                  onPressed: _confirmDelete,
+                ),
               IconButton(
                 icon: Icon(Icons.ios_share, color: c.textPrimary, size: 20),
                 tooltip: 'Share',
@@ -162,13 +259,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   const SizedBox(height: 16),
                   _routeCard(c),
                   const SizedBox(height: 16),
-                  _splitsCard(c),
-                  const SizedBox(height: 16),
+                  if (a.splits.isNotEmpty) ...[
+                    _splitsCard(c),
+                    const SizedBox(height: 16),
+                  ],
                   if (a.avgGapPace != null) ...[
                     _gapBlock(c),
                     const SizedBox(height: 16),
                   ],
-                  if (a.telemetrySeries.length >= 2) ...[
+                  if (a.hasPaceSeries) ...[
                     _paceCard(c),
                     const SizedBox(height: 16),
                   ],
@@ -180,7 +279,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     _HrZonesCard(activity: a),
                     const SizedBox(height: 16),
                   ],
-                  if (a.telemetrySeries.length >= 2) _cadenceCard(c),
+                  if (a.hasCadenceSeries) _cadenceCard(c),
                 ],
               ),
             ),
@@ -288,52 +387,52 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   Widget _summaryGrid(AppColors c) {
     Widget cell(String label, String value, String unit) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: c.textTertiary,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 6),
-              RichText(
-                text: TextSpan(
-                  text: value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: c.textPrimary,
-                    letterSpacing: -0.5,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                  children: [
-                    if (unit.isNotEmpty)
-                      TextSpan(
-                        text: ' $unit',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.textTertiary,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: c.textTertiary,
+              letterSpacing: 1.2,
+            ),
           ),
-        );
+          const SizedBox(height: 6),
+          RichText(
+            text: TextSpan(
+              text: value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: c.textPrimary,
+                letterSpacing: -0.5,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+              children: [
+                if (unit.isNotEmpty)
+                  TextSpan(
+                    text: ' $unit',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: c.textTertiary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
 
     Widget divider() => Container(
-          width: 1,
-          height: 40,
-          color: c.border,
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-        );
+      width: 1,
+      height: 40,
+      color: c.border,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -367,9 +466,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 a.elevationGainM == null ? '' : 'm',
               ),
               divider(),
-              cell('CALORIES', a.calories.toString(), 'kcal'),
+              cell(
+                'CALORIES',
+                _displayCalories?.toString() ?? '—',
+                _displayCalories == null ? '' : 'kcal',
+              ),
               divider(),
-              cell('AVG HR', a.avgHr.toString(), 'bpm'),
+              cell(
+                'AVG HR',
+                a.effectiveAvgHr?.toString() ?? '—',
+                a.effectiveAvgHr == null ? '' : 'bpm',
+              ),
             ],
           ),
         ],
@@ -402,8 +509,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 : Container(
                     color: const Color(0xFF0A0A0A),
                     child: const Center(
-                      child: Icon(Icons.map_outlined,
-                          color: Colors.white12, size: 56),
+                      child: Icon(
+                        Icons.map_outlined,
+                        color: Colors.white12,
+                        size: 56,
+                      ),
                     ),
                   ),
           ),
@@ -426,7 +536,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 _socialPill(
                   c,
                   icon: Icons.mode_comment_outlined,
-                  label: _commentCount > 0 ? 'Comment · $_commentCount' : 'Comment',
+                  label: _commentCount > 0
+                      ? 'Comment · $_commentCount'
+                      : 'Comment',
                   onTap: _openComments,
                 ),
                 _socialPill(
@@ -459,9 +571,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon,
-                  size: 17,
-                  color: active ? c.chartAccent : c.textSecondary),
+              Icon(
+                icon,
+                size: 17,
+                color: active ? c.chartAccent : c.textSecondary,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -623,6 +737,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Widget _splitsCard(AppColors c) {
     final fastest = a.fastestSplitSeconds;
     final slowest = a.slowestSplitSeconds;
+    final showElev = a.anySplitHasElevation;
+    final showHr = a.anySplitHasHr;
     return _card(
       c,
       title: 'KILOMETRE SPLITS',
@@ -635,9 +751,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               const SizedBox(width: 10),
               _splitHeaderCell(c, 'PACE', width: 44),
               const Expanded(child: SizedBox()),
-              _splitHeaderCell(c, 'ELEV', width: 46, alignEnd: true),
-              const SizedBox(width: 10),
-              _splitHeaderCell(c, 'HR', width: 38, alignEnd: true),
+              if (showElev) ...[
+                _splitHeaderCell(c, 'ELEV', width: 46, alignEnd: true),
+                const SizedBox(width: 10),
+              ],
+              if (showHr) _splitHeaderCell(c, 'HR', width: 38, alignEnd: true),
             ],
           ),
           const SizedBox(height: 6),
@@ -681,40 +799,47 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                         value: (0.12 + frac * 0.88).clamp(0.0, 1.0),
                         minHeight: 7,
                         backgroundColor: c.divider,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(c.chartAccent),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          c.chartAccent,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 46,
-                    child: Text(
-                      '${s.elevationChangeM >= 0 ? '+' : ''}'
-                      '${s.elevationChangeM.round()}',
-                      textAlign: TextAlign.end,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: c.textSecondary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                  if (showElev) ...[
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 46,
+                      child: Text(
+                        s.elevationChangeM == null
+                            ? '—'
+                            : '${s.elevationChangeM! >= 0 ? '+' : ''}'
+                                  '${s.elevationChangeM!.round()}',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: c.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 38,
-                    child: Text(
-                      '${s.avgHr}',
-                      textAlign: TextAlign.end,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: c.danger,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                  ],
+                  if (showHr) ...[
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 38,
+                      child: Text(
+                        s.avgHr == null ? '—' : '${s.avgHr}',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: c.danger,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             );
@@ -730,8 +855,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  Widget _splitHeaderCell(AppColors c, String t,
-      {required double width, bool alignEnd = false}) {
+  Widget _splitHeaderCell(
+    AppColors c,
+    String t, {
+    required double width,
+    bool alignEnd = false,
+  }) {
     return SizedBox(
       width: width,
       child: Text(
@@ -752,7 +881,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Widget _paceCard(AppColors c) {
     final spots = [
       for (final s in a.telemetrySeries)
-        FlSpot(s.distanceKm, -s.paceSeconds.toDouble()),
+        if (s.paceSeconds != null)
+          FlSpot(s.distanceKm, -s.paceSeconds!.toDouble()),
     ];
     return _card(
       c,
@@ -774,11 +904,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   // ── 5b. Elevation profile ────────────────────────────────────────────────
 
   Widget _elevationCard(AppColors c) {
-    final elevs = a.telemetrySeries.map((s) => s.elevationM).toList();
+    final elevs = a.telemetrySeries
+        .map((s) => s.elevationM)
+        .whereType<double>()
+        .toList();
     final lo = elevs.reduce(math.min);
     final hi = elevs.reduce(math.max);
     final spots = [
-      for (final s in a.telemetrySeries) FlSpot(s.distanceKm, s.elevationM),
+      for (final s in a.telemetrySeries)
+        if (s.elevationM != null) FlSpot(s.distanceKm, s.elevationM!),
     ];
     return _card(
       c,
@@ -808,15 +942,31 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   // ── 5d. Cadence profile ──────────────────────────────────────────────────
 
   Widget _cadenceCard(AppColors c) {
+    final cadences = a.telemetrySeries
+        .map((s) => s.cadenceSpm)
+        .whereType<int>()
+        .toList();
     final spots = [
       for (final s in a.telemetrySeries)
-        FlSpot(s.distanceKm, s.cadenceSpm.toDouble()),
+        if (s.cadenceSpm != null)
+          FlSpot(s.distanceKm, s.cadenceSpm!.toDouble()),
     ];
+    final avgCad =
+        a.avgCadence ??
+        (cadences.isEmpty
+            ? null
+            : (cadences.reduce((x, y) => x + y) / cadences.length).round());
+    final peakCad =
+        a.peakCadence ?? (cadences.isEmpty ? null : cadences.reduce(math.max));
     return _card(
       c,
       title: 'CADENCE',
       trailing: Text(
-        'avg ${a.avgCadence} · peak ${a.peakCadence} spm',
+        [
+              if (avgCad != null) 'avg $avgCad',
+              if (peakCad != null) 'peak $peakCad',
+            ].join(' · ') +
+            (avgCad != null || peakCad != null ? ' spm' : ''),
         style: TextStyle(fontSize: 10.5, color: c.textTertiary),
       ),
       child: SizedBox(
@@ -972,8 +1122,10 @@ class _ScrubLineChart extends StatelessWidget {
     final c = context.colors;
     if (spots.length < 2) {
       return Center(
-        child: Text('Not enough data',
-            style: TextStyle(fontSize: 12, color: c.textTertiary)),
+        child: Text(
+          'Not enough data',
+          style: TextStyle(fontSize: 12, color: c.textTertiary),
+        ),
       );
     }
 
@@ -999,10 +1151,12 @@ class _ScrubLineChart extends StatelessWidget {
               FlLine(color: c.divider, strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
-          topTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           rightTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -1070,7 +1224,8 @@ class _ScrubLineChart extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: fillGradient ??
+                colors:
+                    fillGradient ??
                     [color.withOpacity(0.22), color.withOpacity(0.0)],
               ),
             ),
@@ -1112,9 +1267,10 @@ class _HrZonesCardState extends State<_HrZonesCard> {
     final c = context.colors;
     final a = widget.activity;
     final spots = [
-      for (final s in a.telemetrySeries) FlSpot(s.distanceKm, s.hrBpm.toDouble()),
+      for (final s in a.telemetrySeries)
+        if (s.hrBpm != null) FlSpot(s.distanceKm, s.hrBpm!.toDouble()),
     ];
-    final hrs = a.telemetrySeries.map((s) => s.hrBpm).toList();
+    final hrs = a.telemetrySeries.map((s) => s.hrBpm).whereType<int>().toList();
     final minHr = hrs.isEmpty ? 100 : hrs.reduce(math.min);
     final maxHr = hrs.isEmpty ? 180 : hrs.reduce(math.max);
     final xMax = spots.isEmpty ? 1.0 : spots.last.x;
@@ -1143,7 +1299,8 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                 ),
               ),
               Text(
-                'avg ${a.avgHr} · peak ${a.peakHr} bpm',
+                'avg ${a.effectiveAvgHr ?? '—'} · '
+                'peak ${a.effectivePeakHr ?? '—'} bpm',
                 style: TextStyle(fontSize: 10.5, color: c.textTertiary),
               ),
             ],
@@ -1153,9 +1310,10 @@ class _HrZonesCardState extends State<_HrZonesCard> {
             height: 150,
             child: spots.length < 2
                 ? Center(
-                    child: Text('Not enough data',
-                        style:
-                            TextStyle(fontSize: 12, color: c.textTertiary)),
+                    child: Text(
+                      'Not enough data',
+                      style: TextStyle(fontSize: 12, color: c.textTertiary),
+                    ),
                   )
                 : LineChart(
                     LineChartData(
@@ -1178,15 +1336,19 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                       gridData: const FlGridData(show: false),
                       titlesData: FlTitlesData(
                         topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         leftTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         rightTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 40,
                             interval: math.max(
-                                1, ((maxHr + 8) - (minHr - 8)) / 3),
+                              1,
+                              ((maxHr + 8) - (minHr - 8)) / 3,
+                            ),
                             getTitlesWidget: (value, meta) {
                               if (value <= meta.min || value >= meta.max) {
                                 return const SizedBox.shrink();
@@ -1199,7 +1361,7 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                                     fontSize: 9.5,
                                     color: c.textTertiary,
                                     fontFeatures: const [
-                                      FontFeature.tabularFigures()
+                                      FontFeature.tabularFigures(),
                                     ],
                                   ),
                                 ),
@@ -1223,7 +1385,9 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                                 child: Text(
                                   '${value.toStringAsFixed(1)} km',
                                   style: TextStyle(
-                                      fontSize: 9.5, color: c.textTertiary),
+                                    fontSize: 9.5,
+                                    color: c.textTertiary,
+                                  ),
                                 ),
                               );
                             },
@@ -1233,7 +1397,8 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                       borderData: FlBorderData(
                         show: true,
                         border: Border(
-                            bottom: BorderSide(color: c.border, width: 1)),
+                          bottom: BorderSide(color: c.border, width: 1),
+                        ),
                       ),
                       lineTouchData: _scrubTouchData(
                         c,
@@ -1267,7 +1432,7 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                   ),
           ),
           const SizedBox(height: 16),
-          _segmentedZoneBar(c, a),
+          _segmentedZoneBar(c, a, a.effectiveAvgHr ?? (minHr + maxHr) ~/ 2),
           const SizedBox(height: 12),
           InkWell(
             onTap: () {
@@ -1316,15 +1481,14 @@ class _HrZonesCardState extends State<_HrZonesCard> {
 
   /// 5 equal-width colored segments (Z1 gray → Z5 red) with a white marker
   /// pinned at the average heart rate, captioned "Avg X bpm • Z{N}".
-  Widget _segmentedZoneBar(AppColors c, ActivityDetail a) {
+  Widget _segmentedZoneBar(AppColors c, ActivityDetail a, int avgHr) {
     final lo = a.hrZones.first.bpmLow;
     final hi = a.hrZones.last.bpmHigh;
-    final frac =
-        hi <= lo ? 0.5 : ((a.avgHr - lo) / (hi - lo)).clamp(0.0, 1.0);
+    final frac = hi <= lo ? 0.5 : ((avgHr - lo) / (hi - lo)).clamp(0.0, 1.0);
 
     var activeZone = a.hrZones.first.zone;
     for (final z in a.hrZones) {
-      if (a.avgHr >= z.bpmLow) activeZone = z.zone;
+      if (avgHr >= z.bpmLow) activeZone = z.zone;
     }
 
     return Column(
@@ -1333,8 +1497,10 @@ class _HrZonesCardState extends State<_HrZonesCard> {
         LayoutBuilder(
           builder: (context, cons) {
             const markerW = 3.0;
-            final x = (frac * cons.maxWidth - markerW / 2)
-                .clamp(0.0, cons.maxWidth - markerW);
+            final x = (frac * cons.maxWidth - markerW / 2).clamp(
+              0.0,
+              cons.maxWidth - markerW,
+            );
             return SizedBox(
               height: 26,
               child: Stack(
@@ -1398,7 +1564,7 @@ class _HrZonesCardState extends State<_HrZonesCard> {
             ),
             const SizedBox(width: 6),
             Text(
-              'Avg ${a.avgHr} bpm • Z$activeZone',
+              'Avg $avgHr bpm • Z$activeZone',
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
@@ -1534,9 +1700,9 @@ class _RoutePreviewPainter extends CustomPainter {
     final offY = padding + (drawH - latRange * scale) / 2;
 
     Offset toOffset(Map<String, double> p) => Offset(
-          offX + (p['lng']! - minLng) * scale,
-          offY + (maxLat - p['lat']!) * scale,
-        );
+      offX + (p['lng']! - minLng) * scale,
+      offY + (maxLat - p['lat']!) * scale,
+    );
 
     final path = Path()
       ..moveTo(toOffset(points.first).dx, toOffset(points.first).dy);
@@ -1565,7 +1731,10 @@ class _RoutePreviewPainter extends CustomPainter {
     );
 
     canvas.drawCircle(
-        toOffset(points.first), 5, Paint()..color = const Color(0xFF4CAF50));
+      toOffset(points.first),
+      5,
+      Paint()..color = const Color(0xFF4CAF50),
+    );
     canvas.drawCircle(toOffset(points.last), 5, Paint()..color = lineColor);
   }
 

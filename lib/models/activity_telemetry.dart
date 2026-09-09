@@ -4,12 +4,16 @@
 // screen (header + summary grid, route preview, training impact, km splits, and
 // the scrubbable pace / elevation / heart-rate / cadence charts).
 //
-// These are plain value types with no Supabase coupling. Today the screen is
-// fed by [ActivityDetail.mock] (see the Dev Launcher entry); a real
-// `fromRows` factory can be added when the `runs` table grows the matching
-// per-sample columns.
+// The value types carry no Supabase coupling; the hydration factories at the
+// bottom ([ActivityDetail.fromFeedRun], [ActivityDetail.fromRunRecord]) do the
+// app-model → view-model mapping and are the only part that imports app types.
+// Every per-sample / per-split field that a basic GPS-only or manual run may
+// lack is nullable so the screen can omit the sections it can't populate.
 
 import 'dart:math' as math;
+
+import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
+import 'feed_run.dart';
 
 /// One finished kilometre (or the final partial km) of a run.
 class KmSplit {
@@ -20,16 +24,18 @@ class KmSplit {
   final int paceSeconds;
 
   /// Net elevation change across the split, in metres (may be negative).
-  final double elevationChangeM;
+  /// Null when the run had no altitude track.
+  final double? elevationChangeM;
 
-  /// Average heart rate held during the split, in bpm.
-  final int avgHr;
+  /// Average heart rate held during the split, in bpm. Null when the run had
+  /// no HR source.
+  final int? avgHr;
 
   const KmSplit({
     required this.km,
     required this.paceSeconds,
-    required this.elevationChangeM,
-    required this.avgHr,
+    this.elevationChangeM,
+    this.avgHr,
   });
 
   /// "m:ss" per-km label.
@@ -38,20 +44,21 @@ class KmSplit {
 }
 
 /// A single point on the high-resolution telemetry trace, keyed by cumulative
-/// distance so every series shares one X axis.
+/// distance so every series shares one X axis. Any metric channel may be null
+/// for a given sample (e.g. HR strap dropped, no barometer).
 class TelemetrySample {
   final double distanceKm;
-  final int paceSeconds; // instantaneous pace, sec/km
-  final int hrBpm;
-  final double elevationM;
-  final int cadenceSpm; // steps per minute (both feet)
+  final int? paceSeconds; // instantaneous pace, sec/km
+  final int? hrBpm;
+  final double? elevationM;
+  final int? cadenceSpm; // steps per minute (both feet)
 
   const TelemetrySample({
     required this.distanceKm,
-    required this.paceSeconds,
-    required this.hrBpm,
-    required this.elevationM,
-    required this.cadenceSpm,
+    this.paceSeconds,
+    this.hrBpm,
+    this.elevationM,
+    this.cadenceSpm,
   });
 }
 
@@ -126,18 +133,18 @@ class ActivityDetail {
   /// Total ascent in metres. Null when the recording had no barometric/GPS
   /// altitude — the Elevation Profile card is omitted in that case.
   final double? elevationGainM;
-  final int calories;
 
   // ── Series ────────────────────────────────────────────────────────────────
   final List<KmSplit> splits;
   final List<TelemetrySample> telemetrySeries;
   final List<HrZone> hrZones;
 
-  // ── Aggregates ────────────────────────────────────────────────────────────
-  final int avgCadence;
-  final int peakCadence;
-  final int avgHr;
-  final int peakHr;
+  // ── Aggregates (null when the run carries no such data) ──────────────────
+  final int? calories;
+  final int? avgCadence;
+  final int? peakCadence;
+  final int? avgHr;
+  final int? peakHr;
 
   /// Grade-adjusted average pace, "m:ss" per km. Null when there's no elevation
   /// track to adjust against — the GAP block is omitted in that case.
@@ -161,15 +168,15 @@ class ActivityDetail {
     required this.movingTime,
     this.elapsedTime,
     this.elevationGainM,
-    required this.calories,
+    this.calories,
     required this.splits,
     required this.telemetrySeries,
     required this.hrZones,
-    required this.avgCadence,
-    required this.peakCadence,
-    required this.avgHr,
-    required this.peakHr,
-    required this.avgGapPace,
+    this.avgCadence,
+    this.peakCadence,
+    this.avgHr,
+    this.peakHr,
+    this.avgGapPace,
     this.routePoints = const [],
   });
 
@@ -195,25 +202,241 @@ class ActivityDetail {
     return gap - raw;
   }
 
-  /// True when there's usable heart-rate data (zones + a non-flat trace).
-  bool get hasHrData =>
-      hrZones.isNotEmpty && telemetrySeries.any((s) => s.hrBpm > 0);
+  int _channelCount(bool Function(TelemetrySample) has) =>
+      telemetrySeries.where(has).length;
 
-  /// True when there's a usable elevation track for the profile chart.
+  /// ≥ 2 samples carry an instantaneous pace → the Pace chart can render.
+  bool get hasPaceSeries => _channelCount((s) => s.paceSeconds != null) >= 2;
+
+  /// ≥ 2 samples carry a cadence reading → the Cadence chart can render.
+  bool get hasCadenceSeries => _channelCount((s) => s.cadenceSpm != null) >= 2;
+
+  /// Zones + ≥ 2 HR samples → the Heart Rate & Zones card can render.
+  bool get hasHrData =>
+      hrZones.isNotEmpty && _channelCount((s) => s.hrBpm != null) >= 2;
+
+  /// A gain figure plus ≥ 2 altitude samples → the Elevation Profile can render.
   bool get hasElevationData =>
-      elevationGainM != null &&
-      telemetrySeries.length >= 2 &&
-      telemetrySeries.any((s) => s.elevationM != 0);
+      elevationGainM != null && _channelCount((s) => s.elevationM != null) >= 2;
+
+  /// Mean HR over the trace — display fallback when [avgHr] wasn't supplied.
+  int? get seriesAvgHr {
+    final v = telemetrySeries
+        .map((s) => s.hrBpm)
+        .whereType<int>()
+        .toList(growable: false);
+    if (v.isEmpty) return null;
+    return (v.reduce((a, b) => a + b) / v.length).round();
+  }
+
+  int? get seriesPeakHr {
+    final v = telemetrySeries.map((s) => s.hrBpm).whereType<int>();
+    return v.isEmpty ? null : v.reduce(math.max);
+  }
+
+  int? get effectiveAvgHr => avgHr ?? seriesAvgHr;
+  int? get effectivePeakHr => peakHr ?? seriesPeakHr;
+
+  bool get anySplitHasElevation =>
+      splits.any((s) => s.elevationChangeM != null);
+  bool get anySplitHasHr => splits.any((s) => s.avgHr != null);
 
   /// Fastest split's pace in seconds — the reference the splits-bar lengths are
   /// measured against. Falls back to the slowest value when there are no splits.
-  int get fastestSplitSeconds => splits.isEmpty
-      ? 0
-      : splits.map((s) => s.paceSeconds).reduce(math.min);
+  int get fastestSplitSeconds =>
+      splits.isEmpty ? 0 : splits.map((s) => s.paceSeconds).reduce(math.min);
 
-  int get slowestSplitSeconds => splits.isEmpty
-      ? 0
-      : splits.map((s) => s.paceSeconds).reduce(math.max);
+  int get slowestSplitSeconds =>
+      splits.isEmpty ? 0 : splits.map((s) => s.paceSeconds).reduce(math.max);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  //  Hydration factories
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Builds a view-model from an activity-feed row. Feed payloads are
+  /// summary-only (no splits, no telemetry, no calories), so the detail screen
+  /// renders just the header, summary grid, GAP block (if the row has GAP),
+  /// route preview and the social row — every chart section is skipped.
+  factory ActivityDetail.fromFeedRun(FeedRun run) {
+    final elapsed = run.elapsedSeconds;
+    return ActivityDetail(
+      runId: run.runId,
+      athleteId: run.athleteId,
+      commentCount: run.commentCount,
+      runnerName: run.displayName,
+      timestamp: run.date.toLocal(),
+      source: run.source,
+      location: run.location ?? '',
+      title: run.title,
+      avatarUrl: run.avatarUrl,
+      distanceKm: run.distanceKm,
+      avgPace: run.averagePace,
+      movingTime: Duration(seconds: run.durationSeconds),
+      elapsedTime: (elapsed != null && elapsed > run.durationSeconds)
+          ? Duration(seconds: elapsed)
+          : null,
+      elevationGainM: run.elevationGain > 0 ? run.elevationGain : null,
+      calories: null,
+      splits: const [],
+      telemetrySeries: const [],
+      hrZones: const [],
+      routePoints: run.points,
+    );
+  }
+
+  /// Builds a view-model from a locally-recorded [RunRecord] (You / History
+  /// tab). Splits and the fine-grained telemetry trace are mapped when the run
+  /// carries them; per-split elevation/HR and the HR zone breakdown are derived
+  /// from the trace. Basic GPS-only or manual runs (no `trackSamples`) still
+  /// hydrate cleanly — they just yield empty series and the screen omits those
+  /// sections.
+  factory ActivityDetail.fromRunRecord(
+    RunRecord record, {
+    required String runnerName,
+    String? avatarUrl,
+    String? location,
+    int? estimatedCalories,
+  }) {
+    final ts = record.trackSamples;
+
+    final samples = <TelemetrySample>[];
+    for (final m in ts) {
+      final d = (m['d'] as num?)?.toDouble();
+      if (d == null) continue;
+      samples.add(
+        TelemetrySample(
+          distanceKm: d / 1000.0,
+          paceSeconds: (m['pace'] as num?)?.round(),
+          hrBpm: (m['hr'] as num?)?.round(),
+          elevationM: (m['alt'] as num?)?.toDouble(),
+          cadenceSpm: (m['cad'] as num?)?.round(),
+        ),
+      );
+    }
+
+    final splits = <KmSplit>[];
+    for (final m in record.splits) {
+      final km = (m['km'] as num?)?.toInt();
+      final sec = (m['seconds'] as num?)?.toInt();
+      if (km == null || sec == null) continue;
+      final lo = (km - 1) * 1000.0;
+      final hi = km * 1000.0;
+      final seg = ts.where((s) {
+        final d = (s['d'] as num?)?.toDouble();
+        return d != null && d >= lo && d <= hi;
+      });
+      final alts = seg
+          .map((s) => (s['alt'] as num?)?.toDouble())
+          .whereType<double>()
+          .toList(growable: false);
+      final hrs = seg
+          .map((s) => (s['hr'] as num?)?.toDouble())
+          .whereType<double>()
+          .toList(growable: false);
+      splits.add(
+        KmSplit(
+          km: km,
+          paceSeconds: sec,
+          elevationChangeM: alts.length >= 2 ? alts.last - alts.first : null,
+          avgHr: hrs.isEmpty
+              ? null
+              : (hrs.reduce((a, b) => a + b) / hrs.length).round(),
+        ),
+      );
+    }
+
+    final hrSamples = samples
+        .map((s) => s.hrBpm)
+        .whereType<int>()
+        .toList(growable: false);
+    final avgHr =
+        record.avgHeartRate ??
+        (hrSamples.isEmpty
+            ? null
+            : (hrSamples.reduce((a, b) => a + b) / hrSamples.length).round());
+    final hrZones = hrSamples.isNotEmpty
+        ? _zonesFromSamples(hrSamples, record.durationSeconds)
+        : const <HrZone>[];
+
+    final elapsed = record.elapsedSeconds;
+
+    return ActivityDetail(
+      runId: record.id,
+      commentCount: 0,
+      runnerName: runnerName,
+      timestamp: record.date.toLocal(),
+      source: 'Endura Tracker',
+      location: location ?? '',
+      title: _titleForWorkout(record.workoutType),
+      avatarUrl: avatarUrl,
+      distanceKm: record.distanceKm,
+      avgPace: record.averagePace,
+      movingTime: Duration(seconds: record.durationSeconds),
+      elapsedTime: (elapsed != null && elapsed > record.durationSeconds)
+          ? Duration(seconds: elapsed)
+          : null,
+      elevationGainM: record.elevationGain > 0 ? record.elevationGain : null,
+      calories: estimatedCalories,
+      splits: splits,
+      telemetrySeries: samples,
+      hrZones: hrZones,
+      avgCadence: record.avgCadence,
+      peakCadence: record.peakCadence,
+      avgHr: avgHr,
+      peakHr: record.peakHeartRate,
+      avgGapPace: record.gapAveragePace,
+      routePoints: decodePolylineToPoints(record.routePolyline),
+    );
+  }
+
+  static String _titleForWorkout(String type) => switch (type) {
+    'easy' => 'Easy Run',
+    'tempo' => 'Tempo Run',
+    'interval' => 'Interval Workout',
+    'long' => 'Long Run',
+    'race' || 'race_pace' || 'raceSpecific' => 'Race Pace Run',
+    'recovery' => 'Recovery Run',
+    'free' || 'free_run' || 'freeRun' => 'Free Run',
+    _ => 'Run',
+  };
+
+  /// Derives a Z1–Z5 breakdown from raw HR samples using %-of-max bands
+  /// (max HR estimated from the observed peak, floored at 190).
+  static List<HrZone> _zonesFromSamples(List<int> hr, int movingSeconds) {
+    final maxHr = math.max(hr.reduce(math.max) + 4, 190);
+    const defs = <({int z, String label, double lo, double hi})>[
+      (z: 1, label: 'Recovery', lo: 0.50, hi: 0.60),
+      (z: 2, label: 'Easy', lo: 0.60, hi: 0.70),
+      (z: 3, label: 'Aerobic', lo: 0.70, hi: 0.80),
+      (z: 4, label: 'Threshold', lo: 0.80, hi: 0.90),
+      (z: 5, label: 'VO₂ Max', lo: 0.90, hi: 1.0),
+    ];
+    final counts = <int, int>{for (var z = 1; z <= 5; z++) z: 0};
+    for (final v in hr) {
+      final frac = v / maxHr;
+      var z = 1;
+      for (final d in defs) {
+        if (frac >= d.lo) z = d.z;
+      }
+      counts[z] = counts[z]! + 1;
+    }
+    final total = hr.length;
+    return [
+      for (final d in defs)
+        HrZone(
+          zone: d.z,
+          label: d.label,
+          durationSeconds: total == 0
+              ? 0
+              : (counts[d.z]! / total * movingSeconds).round(),
+          percentage: total == 0
+              ? 0
+              : double.parse((counts[d.z]! / total).toStringAsFixed(3)),
+          bpmLow: (d.lo * maxHr).round(),
+          bpmHigh: (d.hi * maxHr).round(),
+        ),
+    ];
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   //  Mock fixture
@@ -241,34 +464,39 @@ class ActivityDetail {
       final pace = (base + hill + kick + noise).round().clamp(255, 360);
 
       // Rolling terrain: a climb into the mid-run hill, then net downhill.
-      final grade = math.sin(t * math.pi * 2.2) * 3.4 +
+      final grade =
+          math.sin(t * math.pi * 2.2) * 3.4 +
           6 * math.exp(-math.pow((t - 0.45) * 5, 2).toDouble());
       elev += grade * step * 4 + (rng.nextDouble() - 0.5) * 1.2;
 
       // HR drifts up with effort + cardiac drift, spikes on the hill.
-      final hr = (150 +
-              22 * t +
-              10 * math.exp(-math.pow((t - 0.47) * 6, 2).toDouble()) +
-              (kick != 0 ? 6 : 0) +
-              (rng.nextDouble() - 0.5) * 4)
-          .round()
-          .clamp(132, 184);
+      final hr =
+          (150 +
+                  22 * t +
+                  10 * math.exp(-math.pow((t - 0.47) * 6, 2).toDouble()) +
+                  (kick != 0 ? 6 : 0) +
+                  (rng.nextDouble() - 0.5) * 4)
+              .round()
+              .clamp(132, 184);
 
-      final cad = (176 +
-              4 * t +
-              (kick != 0 ? 5 : 0) -
-              (hill > 6 ? 3 : 0) +
-              (rng.nextDouble() - 0.5) * 4)
-          .round()
-          .clamp(164, 190);
+      final cad =
+          (176 +
+                  4 * t +
+                  (kick != 0 ? 5 : 0) -
+                  (hill > 6 ? 3 : 0) +
+                  (rng.nextDouble() - 0.5) * 4)
+              .round()
+              .clamp(164, 190);
 
-      samples.add(TelemetrySample(
-        distanceKm: double.parse(d.clamp(0, totalKm).toStringAsFixed(3)),
-        paceSeconds: pace,
-        hrBpm: hr,
-        elevationM: double.parse(elev.toStringAsFixed(1)),
-        cadenceSpm: cad,
-      ));
+      samples.add(
+        TelemetrySample(
+          distanceKm: double.parse(d.clamp(0, totalKm).toStringAsFixed(3)),
+          paceSeconds: pace,
+          hrBpm: hr,
+          elevationM: double.parse(elev.toStringAsFixed(1)),
+          cadenceSpm: cad,
+        ),
+      );
     }
 
     // ── Km splits: average the trace over each 1 km bucket ──────────────────
@@ -277,24 +505,28 @@ class ActivityDetail {
     for (var k = 1; k <= kmCount; k++) {
       final lo = (k - 1).toDouble();
       final hi = math.min(k.toDouble(), totalKm);
-      final inBucket =
-          samples.where((s) => s.distanceKm >= lo && s.distanceKm <= hi).toList();
+      final inBucket = samples
+          .where((s) => s.distanceKm >= lo && s.distanceKm <= hi)
+          .toList();
       if (inBucket.isEmpty) continue;
-      final avgPaceSec = (inBucket.map((s) => s.paceSeconds).reduce((a, b) => a + b) /
-              inBucket.length)
-          .round();
+      final avgPaceSec =
+          (inBucket.map((s) => s.paceSeconds!).reduce((a, b) => a + b) /
+                  inBucket.length)
+              .round();
       final spanKm = hi - lo;
-      final elevChange =
-          inBucket.last.elevationM - inBucket.first.elevationM;
-      final avgHr = (inBucket.map((s) => s.hrBpm).reduce((a, b) => a + b) /
-              inBucket.length)
-          .round();
-      splits.add(KmSplit(
-        km: k,
-        paceSeconds: (avgPaceSec * spanKm).round(),
-        elevationChangeM: double.parse(elevChange.toStringAsFixed(1)),
-        avgHr: avgHr,
-      ));
+      final elevChange = inBucket.last.elevationM! - inBucket.first.elevationM!;
+      final avgHr =
+          (inBucket.map((s) => s.hrBpm!).reduce((a, b) => a + b) /
+                  inBucket.length)
+              .round();
+      splits.add(
+        KmSplit(
+          km: k,
+          paceSeconds: (avgPaceSec * spanKm).round(),
+          elevationChangeM: double.parse(elevChange.toStringAsFixed(1)),
+          avgHr: avgHr,
+        ),
+      );
     }
 
     // ── HR zones (est. max 188) ────────────────────────────────────────────
@@ -311,7 +543,7 @@ class ActivityDetail {
     for (final s in samples) {
       var z = 1;
       for (final e in zoneDefs.entries) {
-        if (s.hrBpm >= e.value.lo) z = e.key;
+        if (s.hrBpm! >= e.value.lo) z = e.key;
       }
       counts[z] = counts[z]! + 1;
     }
@@ -321,19 +553,21 @@ class ActivityDetail {
     for (var z = 1; z <= 5; z++) {
       final frac = totalSamples == 0 ? 0.0 : counts[z]! / totalSamples;
       final def = zoneDefs[z]!;
-      hrZones.add(HrZone(
-        zone: z,
-        label: def.label,
-        durationSeconds: (frac * movingSeconds).round(),
-        percentage: double.parse(frac.toStringAsFixed(3)),
-        bpmLow: def.lo,
-        bpmHigh: def.hi,
-      ));
+      hrZones.add(
+        HrZone(
+          zone: z,
+          label: def.label,
+          durationSeconds: (frac * movingSeconds).round(),
+          percentage: double.parse(frac.toStringAsFixed(3)),
+          bpmLow: def.lo,
+          bpmHigh: def.hi,
+        ),
+      );
     }
 
     final elevGain = _cumulativeGain(samples);
-    final hrValues = samples.map((s) => s.hrBpm).toList();
-    final cadValues = samples.map((s) => s.cadenceSpm).toList();
+    final hrValues = samples.map((s) => s.hrBpm!).toList();
+    final cadValues = samples.map((s) => s.cadenceSpm!).toList();
 
     return ActivityDetail(
       runId: 1173,
@@ -354,8 +588,8 @@ class ActivityDetail {
       splits: splits,
       telemetrySeries: samples,
       hrZones: hrZones,
-      avgCadence:
-          (cadValues.reduce((a, b) => a + b) / cadValues.length).round(),
+      avgCadence: (cadValues.reduce((a, b) => a + b) / cadValues.length)
+          .round(),
       peakCadence: cadValues.reduce(math.max),
       avgHr: (hrValues.reduce((a, b) => a + b) / hrValues.length).round(),
       peakHr: hrValues.reduce(math.max),
@@ -367,7 +601,10 @@ class ActivityDetail {
   static double _cumulativeGain(List<TelemetrySample> s) {
     double gain = 0;
     for (var i = 1; i < s.length; i++) {
-      final d = s[i].elevationM - s[i - 1].elevationM;
+      final a = s[i].elevationM;
+      final b = s[i - 1].elevationM;
+      if (a == null || b == null) continue;
+      final d = a - b;
       if (d > 0) gain += d;
     }
     return double.parse(gain.toStringAsFixed(0));
@@ -383,7 +620,8 @@ class ActivityDetail {
     for (var i = 0; i < n; i++) {
       final a = i / n * math.pi * 2;
       // Wobbly radius so it reads like streets, not a circle.
-      final r = 0.010 +
+      final r =
+          0.010 +
           0.004 * math.sin(a * 3) +
           0.0018 * math.sin(a * 7) +
           (rng.nextDouble() - 0.5) * 0.0009;

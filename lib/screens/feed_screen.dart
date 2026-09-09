@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../models/activity_telemetry.dart';
 import '../models/athlete_profile.dart';
 import '../models/feed_run.dart';
 import '../services/social_service.dart';
@@ -15,6 +16,7 @@ import '../utils/date_format_utils.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/route_trace_painter.dart';
 import '../widgets/run_comments_sheet.dart';
+import 'activity_detail_screen.dart';
 import 'athlete_discovery_screen.dart';
 import 'athlete_list_screen.dart' show AthleteAvatar;
 import 'athlete_profile_screen.dart';
@@ -109,6 +111,17 @@ class _FeedScreenState extends State<FeedScreen>
     );
   }
 
+  void _openActivity(FeedRun run) {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ActivityDetailScreen(activity: ActivityDetail.fromFeedRun(run)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -197,6 +210,7 @@ class _FeedScreenState extends State<FeedScreen>
           padding: const EdgeInsets.only(bottom: 12),
           child: RunFeedCard(
             run: _runs[i],
+            onOpen: () => _openActivity(_runs[i]),
             onTapAthlete: () {
               HapticFeedback.lightImpact();
               Navigator.push(
@@ -236,7 +250,17 @@ class RunFeedCard extends StatefulWidget {
   final FeedRun run;
   final VoidCallback onTapAthlete;
 
-  const RunFeedCard({super.key, required this.run, required this.onTapAthlete});
+  /// Opens the full activity detail view — fired for taps anywhere on the card
+  /// that a more specific handler (athlete row, overflow menu, social-bar
+  /// buttons) doesn't already claim.
+  final VoidCallback? onOpen;
+
+  const RunFeedCard({
+    super.key,
+    required this.run,
+    required this.onTapAthlete,
+    this.onOpen,
+  });
 
   @override
   State<RunFeedCard> createState() => _RunFeedCardState();
@@ -281,50 +305,54 @@ class _RunFeedCardState extends State<RunFeedCard> {
   @override
   Widget build(BuildContext context) {
     final points = run.points;
-    return Container(
-      decoration: BoxDecoration(
-        color: _FeedPalette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _FeedPalette.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _header(),
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Text(
-                run.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: _FeedPalette.textHigh,
-                  letterSpacing: -0.4,
-                  height: 1.15,
+    return GestureDetector(
+      onTap: widget.onOpen,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: _FeedPalette.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _FeedPalette.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _header(),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Text(
+                  run.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: _FeedPalette.textHigh,
+                    letterSpacing: -0.4,
+                    height: 1.15,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            _statRibbon(),
-            if (run.planName != null) ...[
-              const SizedBox(height: 12),
-              _planPill(),
-            ],
-            if (points.length > 1) ...[
               const SizedBox(height: 14),
-              _map(points),
+              _statRibbon(),
+              if (run.planName != null) ...[
+                const SizedBox(height: 12),
+                _planPill(),
+              ],
+              if (points.length > 1) ...[
+                const SizedBox(height: 14),
+                _map(points),
+              ],
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: _FeedPalette.border),
+              const SizedBox(height: 6),
+              _socialBar(),
             ],
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: _FeedPalette.border),
-            const SizedBox(height: 6),
-            _socialBar(),
-          ],
+          ),
         ),
       ),
     );
@@ -627,11 +655,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          icon: const Icon(
-            Icons.share,
-            size: 18,
-            color: _FeedPalette.textMid,
-          ),
+          icon: const Icon(Icons.share, size: 18, color: _FeedPalette.textMid),
           onPressed: _share,
         ),
         const SizedBox(width: 4),
@@ -766,10 +790,7 @@ class _EmptyFeed extends StatelessWidget {
                   ),
                   child: const Text(
                     'Find Runners',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
