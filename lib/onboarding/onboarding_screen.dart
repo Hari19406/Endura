@@ -330,13 +330,31 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     HapticFeedback.selectionClick();
     Analytics.onboardingStepViewed(_sequence[index].name, index);
     // Kept here too (on top of _next()'s pre-fetch) — fingerprint-memoized so
-    // a second call is a no-op, and this is the only path that covers
-    // _resumeFromEdit()'s direct _goTo(OPage.review), which never goes
-    // through _next()'s pre-fetch.
+    // a second call is a no-op. The edit round-trip's return to OPage.review
+    // goes through _jumpTo(), which pre-fetches there itself; this just keeps
+    // the normal forward path covered.
     if (_sequence[index] == OPage.review) _ensureProjection();
   }
 
-  void _goTo(OPage page) => _animateTo(_indexOf(page));
+  /// Instant page swap — no scroll through the pages in between.
+  ///
+  /// Used for the edit round-trip from the plan reveal: the target intake
+  /// screen can be a dozen pages back, and `animateToPage` would whip
+  /// backward across every one of them (dizzying). `jumpToPage` cuts
+  /// straight there. The PageView already uses NeverScrollableScrollPhysics,
+  /// so there is no in-between state to preserve. Runs the same post-jump
+  /// bookkeeping as [_animateTo].
+  void _jumpTo(int index) {
+    if (index < 0 || index >= _total) return;
+    _ctrl.jumpToPage(index);
+    if (!mounted) return;
+    setState(() => _current = index);
+    HapticFeedback.selectionClick();
+    Analytics.onboardingStepViewed(_sequence[index].name, index);
+    if (_sequence[index] == OPage.review) _ensureProjection();
+  }
+
+  void _goToInstant(OPage page) => _jumpTo(_indexOf(page));
 
   /// Jump to the question that owns a receipt row, remembering to come back.
   void _startEdit(PlanEditTarget target) {
@@ -347,7 +365,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _editingTarget = target;
       _fingerprintAtEditStart = _projectionKey;
     });
-    _goTo(page);
+    _goToInstant(page);
   }
 
   OPage _pageForEditTarget(PlanEditTarget target) => switch (target) {
@@ -387,7 +405,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
 
     if (followUp != null) {
-      _goTo(_pageForFollowUp(followUp));
+      _goToInstant(_pageForFollowUp(followUp));
       return;
     }
 
@@ -398,7 +416,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       changed: _projectionKey != _fingerprintAtEditStart,
     );
     _clearEditState();
-    _goTo(OPage.review);
+    _goToInstant(OPage.review);
   }
 
   void _clearEditState() {
@@ -444,7 +462,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // walking backwards through the questionnaire.
     if (_editReturn) {
       _clearEditState();
-      _goTo(OPage.review);
+      _goToInstant(OPage.review);
       return;
     }
     int prev = _current - 1;
@@ -952,7 +970,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _BottomBarSlot(
               visible: _showBottom,
               enabled: _canContinue,
-              label: _editReturn ? 'Done' : 'Continue',
+              label: _editReturn ? 'Back to plan' : 'Continue',
               onPressed: _next,
             ),
           ],

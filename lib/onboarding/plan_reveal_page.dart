@@ -263,10 +263,30 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
                   ),
                   if (p != null) ...[
                     const SizedBox(height: 14),
-                    _NextWeekPreviewCard(
-                      days: p.previewWeek,
-                      weekNumber: p.previewWeekNumber,
-                      useMiles: useMiles,
+                    // Cross-fade the strip when its contents actually change
+                    // (an edit came back, or the sliders were released) so it
+                    // doesn't pop. The card is a fixed shape — label, 7 pills,
+                    // caption — so a pure opacity swap never reflows the list.
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeOut,
+                      child: _NextWeekPreviewCard(
+                        key: ValueKey(
+                          Object.hash(
+                            p.previewWeekNumber,
+                            useMiles,
+                            Object.hashAll([
+                              for (final d in p.previewWeek)
+                                '${slotShortLabel(d)}:'
+                                    '${d.distanceKm?.round() ?? 0}',
+                            ]),
+                          ),
+                        ),
+                        days: p.previewWeek,
+                        weekNumber: p.previewWeekNumber,
+                        useMiles: useMiles,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 14),
@@ -682,7 +702,15 @@ class _VolumeCurveCard extends StatelessWidget {
                   },
                 ),
               ),
-              duration: Duration.zero,
+              // Morph the line when the underlying projection changes — an
+              // edit came back from an intake screen, or the fine-tune
+              // sliders were released — so the curve eases into its new
+              // shape instead of snapping. Stay instant while a finger is
+              // scrubbing, otherwise the crosshair lags the touch.
+              duration: scrubIndex != null
+                  ? Duration.zero
+                  : const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
             ),
           ),
         ],
@@ -853,6 +881,7 @@ class _NextWeekPreviewCard extends StatelessWidget {
   final bool useMiles;
 
   const _NextWeekPreviewCard({
+    super.key,
     required this.days,
     required this.weekNumber,
     required this.useMiles,
