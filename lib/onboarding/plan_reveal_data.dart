@@ -204,6 +204,8 @@ class PlanProjection {
       peakWeeklyKmOverride: peakKmOverride,
       peakLongRunKmOverride: peakLongRunKmOverride,
       gradualStart: gradualStart,
+      // Runs-per-week scales the 5K volume wave's peak ceiling.
+      runsPerWeek: runsPerWeekOverride ?? a.runsPerWeek,
     );
 
     final baseDays = a.selectedDays.isNotEmpty

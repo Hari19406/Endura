@@ -39,6 +39,10 @@ class RacePlanBuilder {
     double? peakWeeklyKmOverride,
     /// User-tuned peak long-run distance. Clamped to a sane 6–46 km band.
     double? peakLongRunKmOverride,
+    /// Planned run frequency. When supplied, the peak-volume ceiling scales with
+    /// it (a 5K peaks higher on 6 easy-heavy days than on 3). Null ⇒ the legacy
+    /// experience-only ceiling.
+    int? runsPerWeek,
   }) {
     final today = now ?? DateTime.now();
     final derivedWeeks = max(1, raceDate.difference(today).inDays ~/ 7);
@@ -66,16 +70,25 @@ class RacePlanBuilder {
       currentWeeklyKm: currentWeeklyKm,
       buildWeeks: buildWeeks,
       override: peakWeeklyKmOverride,
+      runsPerWeek: runsPerWeek,
     );
 
     final rawIncrement = (peakVolume - currentWeeklyKm) / buildWeeks;
     final maxIncrement = currentWeeklyKm * 0.10;
     final safeIncrement = rawIncrement.clamp(-5.0, max(1.5, maxIncrement));
 
-    final double peakLongRunKm = peakLongRunKmOverride != null
+    final raceDist = _raceDistanceFrom(goalRace);
+    var peakLongRunKm = peakLongRunKmOverride != null
         ? peakLongRunKmOverride.clamp(6.0, 46.0).toDouble()
         : _peakLongRunKm(goalRace, experienceLevel);
-    final currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
+    var currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
+    // 5K: the long run is a supporting run — never let a high current base or a
+    // tuned override push it past the envelope's 10–12 km ceiling.
+    if (raceDist == RaceDistance.fiveK) {
+      final cap = VolumeModel.envelope(raceDist).longRunMaxKm;
+      peakLongRunKm = min(peakLongRunKm, cap);
+      currentLongRunKm = min(currentLongRunKm, cap);
+    }
     final longRunIncrement = (peakLongRunKm - currentLongRunKm) / buildWeeks;
     final safeLongRunIncrement = longRunIncrement.clamp(
       -2.0,
@@ -252,6 +265,7 @@ class RacePlanBuilder {
     required double currentWeeklyKm,
     required int buildWeeks,
     double? override,
+    int? runsPerWeek,
   }) {
     // User-tuned peak wins outright — the tuning slider is already bounded by
     // VolumeModel.onboardingRange().max — but never below current or above the
@@ -271,10 +285,17 @@ class RacePlanBuilder {
     };
 
     // Physiological ceiling per race × experience — single source of truth.
-    final ceiling = VolumeModel.peakKm(
-      _raceDistanceFrom(goalRace),
-      _experienceFrom(experienceLevel),
-    );
+    // When run frequency is known, let it scale the ceiling (5K only for now).
+    final ceiling = runsPerWeek != null
+        ? VolumeModel.peakKmForRuns(
+            race: _raceDistanceFrom(goalRace),
+            experience: _experienceFrom(experienceLevel),
+            runsPerWeek: runsPerWeek,
+          )
+        : VolumeModel.peakKm(
+            _raceDistanceFrom(goalRace),
+            _experienceFrom(experienceLevel),
+          );
 
     // Reachable peak given build weeks and safe gain. Never below what the
     // athlete already runs (they may start above the model ceiling), never

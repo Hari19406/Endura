@@ -9,6 +9,7 @@
 /// Everything now derives from `peakKm(race, experience)` + `minViableKm(race)`.
 library;
 
+import 'archetype_envelope.dart';
 import 'archetype_table.dart' show ExperienceLevel, WeeklyKmRange;
 import 'workout_template_library.dart' show RaceDistance;
 
@@ -34,6 +35,44 @@ class VolumeModel {
         (RaceDistance.marathon, ExperienceLevel.advanced) => 112,
       };
 
+  /// The declarative physiological envelope for a distance — volume band, long-
+  /// run ceiling, taper length, session mix. The 5K envelope is authoritative;
+  /// [peakKmForRuns] and the 5K long-run cap in [ArchetypeTable] read from it.
+  static RaceArchetypeEnvelope envelope(RaceDistance race) =>
+      RaceArchetypeEnvelope.of(race);
+
+  /// Suggested band for the athlete's *current* weekly volume when starting a
+  /// plan for [race] (onboarding baseline).
+  static ({double min, double max}) baselineBandKm(RaceDistance race) =>
+      RaceArchetypeEnvelope.of(race).baselineKm;
+
+  /// The peak-volume ceiling band for [race].
+  static ({double min, double max}) peakBandKm(RaceDistance race) =>
+      RaceArchetypeEnvelope.of(race).peakKm;
+
+  /// Peak weekly volume as a function of run frequency.
+  ///
+  /// For the 5K this is the envelope's `peakKm` band (45–55 km/wk) interpolated
+  /// by [runsPerWeek] and nudged by experience — a runner doing 6 easy-heavy
+  /// days peaks higher than one squeezing the same load into 3. Other distances
+  /// keep their experience-only [peakKm] for now (runs-scaling is 5K-only until
+  /// their envelopes are tuned).
+  static double peakKmForRuns({
+    required RaceDistance race,
+    required ExperienceLevel experience,
+    required int runsPerWeek,
+  }) {
+    if (race != RaceDistance.fiveK) return peakKm(race, experience);
+    final env = RaceArchetypeEnvelope.fiveK;
+    final byRuns = env.peakForRuns(runsPerWeek);
+    final expFactor = switch (experience) {
+      ExperienceLevel.beginner => 0.85,
+      ExperienceLevel.intermediate => 1.0,
+      ExperienceLevel.advanced => 1.12,
+    };
+    return (byRuns * expFactor).clamp(env.peakKm.min, env.peakKm.max);
+  }
+
   /// Below this weekly volume a plan can only sharpen existing fitness, not
   /// build new fitness for the distance. Used as the onboarding slider floor.
   static double minViableKm(RaceDistance race) => switch (race) {
@@ -48,7 +87,7 @@ class VolumeModel {
   /// the retired `WeeklyVolumeResolver._ranges` so VolumeModel is the single
   /// source of truth for volume bounds.
   static double safeCapKm(RaceDistance race) => switch (race) {
-    RaceDistance.fiveK => 50,
+    RaceDistance.fiveK => 55, // aligned with RaceArchetypeEnvelope.fiveK.peakKm.max
     RaceDistance.tenK => 80,
     RaceDistance.halfMarathon => 100,
     RaceDistance.marathon => 130,

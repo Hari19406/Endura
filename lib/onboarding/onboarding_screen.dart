@@ -838,6 +838,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           gradualStart: tuned?.gradualStart ?? _gradualStart,
           peakWeeklyKmOverride: tuned?.weeklyVolumeRange.end,
           peakLongRunKmOverride: tuned?.longRunRange.end,
+          runsPerWeek: _runsPerWeek,
         );
         await EngineMemoryService().saveRacePlan(plan);
         Analytics.planCreated(goal: goalRace, level: exp);

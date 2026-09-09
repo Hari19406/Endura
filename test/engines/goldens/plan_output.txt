@@ -20,11 +20,11 @@ W5 build target=21.0km
   Thu easy       aerobicBase  easy_steady                8.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W6 peak target=22.5km
-  Mon quality1   threshold    cruise_intervals_800       5.0km @ 6:25/km
+  Mon quality1   threshold    cruise_intervals_800       5.5km @ 6:25/km
   Thu easy       aerobicBase  easy_steady                8.0km @ 8:09/km
-  Sat longRun    endurance    long_steady                8.5km @ 8:09/km
+  Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W7 peak target=24.0km
-  Mon quality1   threshold    cruise_intervals_800       5.0km @ 6:25/km
+  Mon quality1   threshold    cruise_intervals_800       6.0km @ 6:25/km
   Thu easy       aerobicBase  easy_steady                8.0km @ 8:09/km
   Sat longRun    endurance    long_steady               10.0km @ 8:09/km
 W8 taper [cutback] target=29.0km
@@ -43,15 +43,15 @@ W1 base target=27.5km
   Fri easy       aerobicBase  easy_hilly                 8.0km @ 6:51/km
   Sun longRun    endurance    long_steady                8.5km @ 6:51/km
 W2 base target=30.0km
-  Mon easy       aerobicBase  easy_strides               6.0km @ 6:51/km
+  Mon easy       aerobicBase  easy_strides               7.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
   Fri easy       aerobicBase  easy_strides               8.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               10.0km @ 6:51/km
+  Sun longRun    endurance    long_steady                9.9km @ 6:51/km
 W3 base target=32.5km
-  Mon easy       aerobicBase  easy_progressive           7.0km @ 6:51/km
+  Mon easy       aerobicBase  easy_progressive           8.0km @ 6:51/km
   Wed quality1   threshold    cruise_intervals_400       5.0km @ 5:15/km
   Fri easy       aerobicBase  easy_progressive           8.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               11.5km @ 6:51/km
+  Sun longRun    endurance    long_steady               10.7km @ 6:51/km
 W4 build [cutback] target=32.5km
   Mon easy       aerobicBase  easy_steady                4.0km @ 6:51/km
   Wed quality1   vo2max       vo2_400                    5.0km @ 4:38/km
@@ -59,19 +59,19 @@ W4 build [cutback] target=32.5km
   Sun longRun    endurance    long_steady                8.0km @ 6:51/km
 W5 build target=35.0km
   Mon easy       aerobicBase  easy_steady                8.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    5.0km @ 4:38/km
+  Wed quality1   vo2max       vo2_400                    6.5km @ 4:38/km
   Fri easy       aerobicBase  easy_steady                8.0km @ 6:51/km
-  Sun longRun    endurance    long_steady               13.0km @ 6:51/km
+  Sun longRun    endurance    long_steady               11.6km @ 6:51/km
 W6 peak target=37.5km
   Mon easy       aerobicBase  easy_steady                8.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    5.5km @ 4:38/km
-  Fri quality2   raceSpecific race_gp_intervals          5.5km @ 6:06/km
-  Sun longRun    endurance    long_steady               17.5km @ 6:51/km
+  Wed quality1   vo2max       vo2_400                    9.4km @ 4:38/km
+  Fri quality2   raceSpecific race_gp_intervals          7.0km @ 6:06/km
+  Sun longRun    endurance    long_steady               12.5km @ 6:51/km
 W7 peak target=40.0km
   Mon easy       aerobicBase  easy_steady                8.0km @ 6:51/km
-  Wed quality1   vo2max       vo2_400                    6.0km @ 4:38/km
-  Fri quality2   raceSpecific race_gp_intervals          6.0km @ 6:06/km
-  Sun longRun    endurance    long_steady               19.0km @ 6:51/km
+  Wed quality1   vo2max       vo2_400                   10.0km @ 4:38/km
+  Fri quality2   raceSpecific race_gp_intervals          8.0km @ 6:06/km
+  Sun longRun    endurance    long_steady               13.0km @ 6:51/km
 W8 taper [cutback] target=42.5km
   Mon easy       aerobicBase  easy_steady                4.0km @ 6:51/km
   Wed quality1   threshold    tempo_continuous           5.0km @ 5:15/km

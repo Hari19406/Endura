@@ -138,6 +138,12 @@ final List<_DevSection> _menu = [
       subtitle: '12-wk HM · 4 runs/wk · 25 km base · Sat long run — jumps '
           'straight to OPagePlanReveal for tuning',
     ),
+    _DevEntry(
+      'Preview Reveal Screen (5K 8-wk)',
+      (_) => const _PlanRevealStage.fiveK(),
+      subtitle: '8-wk 5K · 5 runs/wk · 22 km base · Sat long run — inspect the '
+          '5K volume wave, long-run cap and VO2/threshold session mix',
+    ),
   ]),
   _DevSection('Screens', [
     _DevEntry('Auth', (_) => AuthScreen(onAuthenticated: () {})),
@@ -295,53 +301,95 @@ class _DevHost extends StatelessWidget {
   }
 }
 
-/// Jumps straight to [OPagePlanReveal] with a pre-populated 12-week Half
-/// Marathon config (4 runs/wk · 25 km base · Saturday long run) so the fine-tune
-/// sliders + week-2 preview can be inspected without tapping through onboarding.
+enum _RevealVariant { halfMarathon12, fiveK8 }
+
+/// Jumps straight to [OPagePlanReveal] with a pre-populated config so the
+/// fine-tune sliders + week-2 preview can be inspected without tapping through
+/// onboarding. Two variants:
+///   • [_RevealVariant.halfMarathon12] — 12-wk HM · 4 runs/wk · 25 km base
+///   • [_RevealVariant.fiveK8]        — 8-wk 5K · 5 runs/wk · 22 km base
 class _PlanRevealStage extends StatefulWidget {
-  const _PlanRevealStage();
+  final _RevealVariant variant;
+  const _PlanRevealStage() : variant = _RevealVariant.halfMarathon12;
+
+  const _PlanRevealStage.fiveK() : variant = _RevealVariant.fiveK8;
 
   @override
   State<_PlanRevealStage> createState() => _PlanRevealStageState();
 }
 
 class _PlanRevealStageState extends State<_PlanRevealStage> {
-  static final _raceDate = DateTime.now().add(const Duration(days: 12 * 7));
+  late final bool _is5k = widget.variant == _RevealVariant.fiveK8;
+  late final int _planWeeks = _is5k ? 8 : 12;
+  late final DateTime _raceDate =
+      DateTime.now().add(Duration(days: _planWeeks * 7));
 
-  static final _answers = OnboardingAnswers(
-    goal: 'half_marathon',
-    raceName: 'Dev Half',
-    raceDate: _raceDate,
-    experienceRaw: 'regular',
-    experienceBridged: 'intermediate',
-    raceGoalRaw: 'finish',
-    baselineWeeklyKm: 25,
-    runsPerWeek: 4,
-    selectedDays: const [0, 2, 4, 5], // Mon / Wed / Fri / Sat
-    longRunDayIndex: 5, // Saturday
-    paceDistance: 'half',
-    paceDistanceKm: 21.0975,
-    currentTimeSec: 6600, // 1:50:00
-    startDate: DateTime.now(),
-    planWeeks: 12,
-    vdot: 44,
-    vdotProvisional: false,
-  );
+  late final OnboardingAnswers _answers = _is5k
+      ? OnboardingAnswers(
+          goal: '5k',
+          raceName: 'Dev 5K',
+          raceDate: _raceDate,
+          experienceRaw: 'regular',
+          experienceBridged: 'intermediate',
+          raceGoalRaw: 'target_time',
+          targetFinishSec: 22 * 60, // 22:00
+          baselineWeeklyKm: 22,
+          runsPerWeek: 5,
+          selectedDays: const [0, 1, 3, 4, 5], // Mon/Tue/Thu/Fri/Sat
+          longRunDayIndex: 5, // Saturday
+          paceDistance: '5k',
+          paceDistanceKm: 5.0,
+          currentTimeSec: 24 * 60, // 24:00 now → 22:00 goal
+          startDate: DateTime.now(),
+          planWeeks: 8,
+          vdot: 46,
+          vdotProvisional: false,
+        )
+      : OnboardingAnswers(
+          goal: 'half_marathon',
+          raceName: 'Dev Half',
+          raceDate: _raceDate,
+          experienceRaw: 'regular',
+          experienceBridged: 'intermediate',
+          raceGoalRaw: 'finish',
+          baselineWeeklyKm: 25,
+          runsPerWeek: 4,
+          selectedDays: const [0, 2, 4, 5], // Mon / Wed / Fri / Sat
+          longRunDayIndex: 5, // Saturday
+          paceDistance: 'half',
+          paceDistanceKm: 21.0975,
+          currentTimeSec: 6600, // 1:50:00
+          startDate: DateTime.now(),
+          planWeeks: 12,
+          vdot: 44,
+          vdotProvisional: false,
+        );
 
-  static final PlanConfigState _config = PlanConfigState.fromInputs(
-    goalType: PlanGoalType.half,
-    experience: ExperienceLevel.intermediate,
-    vDOT: 44,
-    runsPerWeek: 4,
-    longRunDay: 6, // Saturday (1 = Mon … 7 = Sun)
-    availableDays: const {1, 3, 5, 6},
-    durationWeeks: 12,
-    currentWeeklyKm: 25,
-  );
+  late final PlanConfigState _config = _is5k
+      ? PlanConfigState.fromInputs(
+          goalType: PlanGoalType.fiveK,
+          experience: ExperienceLevel.intermediate,
+          vDOT: 46,
+          runsPerWeek: 5,
+          longRunDay: 6, // Saturday (1 = Mon … 7 = Sun)
+          availableDays: const {1, 2, 4, 5, 6},
+          durationWeeks: 8,
+          currentWeeklyKm: 22,
+        )
+      : PlanConfigState.fromInputs(
+          goalType: PlanGoalType.half,
+          experience: ExperienceLevel.intermediate,
+          vDOT: 44,
+          runsPerWeek: 4,
+          longRunDay: 6, // Saturday (1 = Mon … 7 = Sun)
+          availableDays: const {1, 3, 5, 6},
+          durationWeeks: 12,
+          currentWeeklyKm: 25,
+        );
 
   late final PlanProjection? _projection = _safeBuild();
 
-  static PlanProjection? _safeBuild() {
+  PlanProjection? _safeBuild() {
     try {
       return PlanProjection.build(_answers);
     } catch (_) {
