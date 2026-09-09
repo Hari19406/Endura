@@ -94,6 +94,18 @@ class HrZone {
 
 /// Everything the Activity Detail View needs to render one run.
 class ActivityDetail {
+  // ── Identity ──────────────────────────────────────────────────────────────
+  /// Backing `runs.id`. Null for fixtures with no persisted row — the social
+  /// actions (comments) degrade gracefully in that case.
+  final int? runId;
+
+  /// Owning athlete's id (`runs.user_id`). Used for share-link building.
+  final String? athleteId;
+
+  /// Comments already on this activity, for the pill badge. The comment sheet
+  /// fetches the live list itself.
+  final int commentCount;
+
   // ── Header ────────────────────────────────────────────────────────────────
   final String runnerName;
   final DateTime timestamp;
@@ -135,6 +147,9 @@ class ActivityDetail {
   final List<Map<String, double>> routePoints;
 
   const ActivityDetail({
+    this.runId,
+    this.athleteId,
+    this.commentCount = 0,
     required this.runnerName,
     required this.timestamp,
     required this.source,
@@ -321,6 +336,9 @@ class ActivityDetail {
     final cadValues = samples.map((s) => s.cadenceSpm).toList();
 
     return ActivityDetail(
+      runId: 1173,
+      athleteId: 'mock-athlete-aditya',
+      commentCount: 3,
       runnerName: 'Aditya Rao',
       timestamp: DateTime(2026, 9, 7, 6, 42),
       source: 'Garmin',

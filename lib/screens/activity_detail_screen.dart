@@ -3,10 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/activity_telemetry.dart';
 import '../services/analytics_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/unit_utils.dart';
+import '../widgets/run_comments_sheet.dart';
 
 /// Modern running-telemetry detail view: header + summary grid, route preview,
 /// kilometre splits, a grade-adjusted-pace block, and up to four scrubbable
@@ -26,7 +29,10 @@ class ActivityDetailScreen extends StatefulWidget {
 }
 
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
+  // The feed has no server-side reaction store yet (see RunFeedCard._kudosed),
+  // so this mirrors its local-only toggle until one exists.
   bool _reacted = false;
+  late int _commentCount = widget.activity.commentCount;
 
   @override
   void initState() {
@@ -38,6 +44,51 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   ActivityDetail get a => widget.activity;
+
+  // ── social actions (shared with the Feed tab) ────────────────────────────
+
+  /// Opens the same comments bottom sheet the feed uses
+  /// ([showRunCommentsSheet]) for this activity's backing run.
+  Future<void> _openComments() async {
+    HapticFeedback.lightImpact();
+    final id = a.runId;
+    if (id == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text("Comments aren't available for this run yet.")),
+        );
+      return;
+    }
+    final count = await showRunCommentsSheet(
+      context,
+      runId: id,
+      initialCount: _commentCount,
+    );
+    if (mounted && count != _commentCount) {
+      setState(() => _commentCount = count);
+    }
+  }
+
+  /// Same share payload the feed's [RunFeedCard._share] builds — a one-line
+  /// run summary via `share_plus`.
+  Future<void> _share() async {
+    HapticFeedback.lightImpact();
+    final useMiles = UnitUtils.useMilesNotifier.value;
+    final dist =
+        '${UnitUtils.displayDistance(a.distanceKm, useMiles).toStringAsFixed(2)} '
+        '${UnitUtils.unitLabel(useMiles)}';
+    final text =
+        "Check out ${a.runnerName}'s $dist run on Endura! "
+        'Time: ${_fmtDuration(a.movingTime)}, '
+        'Pace: ${UnitUtils.formatPaceString(a.avgPace, useMiles)}.';
+    await SharePlus.instance.share(ShareParams(text: text));
+    Analytics.capture('activity_shared', properties: {
+      if (a.runId != null) 'run_id': a.runId!,
+      'source': 'activity_detail',
+    });
+  }
 
   // ── formatting helpers ─────────────────────────────────────────────────────
 
@@ -91,6 +142,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 fontSize: 16,
               ),
             ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.ios_share, color: c.textPrimary, size: 20),
+                tooltip: 'Share',
+                onPressed: _share,
+              ),
+            ],
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -368,24 +426,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 _socialPill(
                   c,
                   icon: Icons.mode_comment_outlined,
-                  label: 'Comment',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Comments — coming soon')),
-                    );
-                  },
+                  label: _commentCount > 0 ? 'Comment · $_commentCount' : 'Comment',
+                  onTap: _openComments,
                 ),
                 _socialPill(
                   c,
                   icon: Icons.share_outlined,
                   label: 'Share',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Share sheet — coming soon')),
-                    );
-                  },
+                  onTap: _share,
                 ),
               ],
             ),
