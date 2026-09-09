@@ -37,6 +37,10 @@ class RaceArchetypeEnvelope {
   /// is picked inside this band by runs/week — see [peakForRuns].
   final KmBand peakKm;
 
+  /// Run-frequency anchors for [peakForRuns]: `lo` runs → `peakKm.min`,
+  /// `hi` runs → `peakKm.max`. Shorter races anchor 3→6; the marathon 4→7.
+  final ({int lo, int hi}) peakRunsBand;
+
   /// The long run may never exceed this fraction of the week's volume …
   final double longRunMaxFractionOfWeek;
 
@@ -66,6 +70,7 @@ class RaceArchetypeEnvelope {
     required this.race,
     required this.baselineKm,
     required this.peakKm,
+    this.peakRunsBand = (lo: 3, hi: 6),
     required this.longRunMaxFractionOfWeek,
     required this.longRunMaxKm,
     required this.taperDays,
@@ -80,11 +85,12 @@ class RaceArchetypeEnvelope {
 
   // ── Derived helpers ───────────────────────────────────────────────────────
 
-  /// Peak weekly volume for [runsPerWeek], linearly across [peakKm] from 3
-  /// runs (`min`) to 6+ runs (`max`).
+  /// Peak weekly volume for [runsPerWeek], linearly across [peakKm] between the
+  /// [peakRunsBand] anchors (clamped outside them).
   double peakForRuns(int runsPerWeek) {
-    final r = runsPerWeek.clamp(3, 6);
-    final t = (r - 3) / 3.0;
+    final r = runsPerWeek.clamp(peakRunsBand.lo, peakRunsBand.hi);
+    final span = peakRunsBand.hi - peakRunsBand.lo;
+    final t = span == 0 ? 0.0 : (r - peakRunsBand.lo) / span;
     return peakKm.min + (peakKm.max - peakKm.min) * t;
   }
 
@@ -163,21 +169,25 @@ class RaceArchetypeEnvelope {
         '1 threshold · 1 VO2 / race-pace (5+ runs) · long run · rest easy',
   );
 
-  /// Marathon — endurance-led, highest volume, three-week taper.
+  /// Marathon — endurance-led, highest volume, strict 34 km long-run ceiling,
+  /// three-week taper (deload ~80% → ~60% → race week ~40%).
   static const marathon = RaceArchetypeEnvelope(
     race: RaceDistance.marathon,
-    baselineKm: (min: 40, max: 55),
-    peakKm: (min: 60, max: 112),
+    baselineKm: (min: 40, max: 50),
+    peakKm: (min: 75, max: 100),
+    peakRunsBand: (lo: 4, hi: 7),
     longRunMaxFractionOfWeek: 0.35,
-    longRunMaxKm: 38,
-    taperDays: (min: 14, max: 21),
+    longRunMaxKm: 34, // strict — soft-tissue / glycogen-depletion ceiling
+    taperDays: (min: 21, max: 21),
     taperWeeks: 3,
     quality1Intent: WorkoutIntent.threshold,
-    quality1Label: 'Threshold — marathon-pace & tempo blocks',
-    quality2Intent: WorkoutIntent.raceSpecific,
-    quality2Label: 'Race-pace long intervals',
+    quality1Label:
+        'Marathon-pace (MP) blocks / sustained sub-threshold stamina',
+    quality2Intent: WorkoutIntent.threshold,
+    quality2Label: 'Mid-week semi-long or threshold cruise intervals',
     quality2MinRunsPerWeek: 5,
     sessionMixSummary:
-        '1 threshold · 1 race-pace (5+ runs) · long run · rest easy aerobic',
+        '1 MP / sub-threshold · 1 semi-long or cruise (5+ runs) · long run · '
+        'rest easy aerobic',
   );
 }

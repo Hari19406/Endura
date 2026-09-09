@@ -82,10 +82,13 @@ class RacePlanBuilder {
         ? peakLongRunKmOverride.clamp(6.0, 46.0).toDouble()
         : _peakLongRunKm(goalRace, experienceLevel);
     var currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
-    // 5K / 10K: the long run is a supporting run — never let a high current base
-    // or a tuned override push it past the envelope's absolute ceiling
-    // (12 km / 16 km).
-    if (raceDist == RaceDistance.fiveK || raceDist == RaceDistance.tenK) {
+    // 5K / 10K / marathon: clamp the long run to the envelope's absolute ceiling
+    // (12 / 16 / 34 km) so a high current base or a tuned override can't push it
+    // past what the archetype allows — for the marathon this is the strict
+    // soft-tissue / glycogen-depletion ceiling.
+    if (raceDist == RaceDistance.fiveK ||
+        raceDist == RaceDistance.tenK ||
+        raceDist == RaceDistance.marathon) {
       final cap = VolumeModel.envelope(raceDist).longRunMaxKm;
       peakLongRunKm = min(peakLongRunKm, cap);
       currentLongRunKm = min(currentLongRunKm, cap);

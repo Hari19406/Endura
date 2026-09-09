@@ -73,6 +73,35 @@ OnboardingAnswers _tenKAnswers({
   );
 }
 
+OnboardingAnswers _marathonAnswers({
+  int runsPerWeek = 5,
+  List<int> selectedDays = const [0, 2, 3, 5, 6],
+  int weeksOut = 18,
+  double baseline = 55,
+  String experience = 'intermediate',
+}) {
+  return OnboardingAnswers(
+    goal: 'marathon',
+    raceName: 'Test Marathon',
+    raceDate: _now.add(Duration(days: weeksOut * 7)),
+    experienceRaw: 'regular',
+    experienceBridged: experience,
+    raceGoalRaw: 'target_time',
+    targetFinishSec: 210 * 60,
+    baselineWeeklyKm: baseline,
+    runsPerWeek: runsPerWeek,
+    selectedDays: selectedDays,
+    longRunDayIndex: selectedDays.last,
+    paceDistance: 'marathon',
+    paceDistanceKm: 42.195,
+    currentTimeSec: 225 * 60,
+    startDate: _now,
+    planWeeks: weeksOut,
+    vdot: 44,
+    vdotProvisional: false,
+  );
+}
+
 void main() {
   // ──────────────────────────────────────────────────────────────────────────
   group('RaceArchetypeEnvelope — 5K bounds', () {
@@ -166,6 +195,49 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  group('RaceArchetypeEnvelope — Marathon bounds', () {
+    const env = RaceArchetypeEnvelope.marathon;
+
+    test('baseline volume band is 40–50 km/wk', () {
+      expect(env.baselineKm.min, 40);
+      expect(env.baselineKm.max, 50);
+    });
+
+    test('peak volume band is 75–100 km/wk, anchored 4→7 runs', () {
+      expect(env.peakKm.min, 75);
+      expect(env.peakKm.max, 100);
+      expect(env.peakRunsBand, (lo: 4, hi: 7));
+      expect(env.peakForRuns(4), closeTo(75, 0.001));
+      expect(env.peakForRuns(7), closeTo(100, 0.001));
+      expect(env.peakForRuns(3), env.peakForRuns(4)); // clamp
+      expect(env.peakForRuns(9), env.peakForRuns(7)); // clamp
+    });
+
+    test('long run cap is the smaller of 35% of the week and a strict 34 km', () {
+      expect(env.longRunMaxFractionOfWeek, 0.35);
+      expect(env.longRunMaxKm, 34);
+      expect(env.longRunCapKm(80), closeTo(28, 0.001)); // 35% binds
+      expect(env.longRunCapKm(97.15), closeTo(34, 0.05)); // at the km cap
+      expect(env.longRunCapKm(120), closeTo(34, 0.001)); // km cap binds
+    });
+
+    test('taper is 3 weeks / 21 days', () {
+      expect(env.taperWeeks, 3);
+      expect(env.taperDays.min, 21);
+      expect(env.taperDays.max, 21);
+    });
+
+    test('session mix: Q1 MP / sub-threshold, Q2 semi-long / cruise at 5+ runs',
+        () {
+      expect(env.quality1Intent, WorkoutIntent.threshold);
+      expect(env.quality2Intent, WorkoutIntent.threshold);
+      expect(env.quality2MinRunsPerWeek, 5);
+      expect(env.hasSecondQualityAt(4), isFalse);
+      expect(env.hasSecondQualityAt(5), isTrue);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   group('RaceArchetypeEnvelope — registry', () {
     test('every race distance has a well-formed envelope', () {
       for (final race in RaceDistance.values) {
@@ -249,20 +321,39 @@ void main() {
           lessThanOrEqualTo(at(ExperienceLevel.advanced)));
     });
 
-    test('HM / marathon still ignore run frequency (unchanged ceiling)', () {
-      for (final race in [
-        RaceDistance.halfMarathon,
-        RaceDistance.marathon,
-      ]) {
-        for (final l in ExperienceLevel.values) {
-          for (var r = 3; r <= 7; r++) {
-            expect(
-              VolumeModel.peakKmForRuns(
-                  race: race, experience: l, runsPerWeek: r),
-              VolumeModel.peakKm(race, l),
-              reason: '$race $l $r',
-            );
-          }
+    test('peakKmForRuns(marathon) stays in the 75–100 band, anchored 4→7 runs',
+        () {
+      double at(int r) => VolumeModel.peakKmForRuns(
+            race: RaceDistance.marathon,
+            experience: ExperienceLevel.intermediate,
+            runsPerWeek: r,
+          );
+      expect(at(4), closeTo(75, 0.001));
+      expect(at(7), closeTo(100, 0.001));
+      var prev = -1.0;
+      for (var r = 4; r <= 7; r++) {
+        expect(at(r), inInclusiveRange(75, 100), reason: '$r runs');
+        expect(at(r), greaterThanOrEqualTo(prev));
+        prev = at(r);
+      }
+      // rises with experience
+      double byExp(ExperienceLevel l) => VolumeModel.peakKmForRuns(
+          race: RaceDistance.marathon, experience: l, runsPerWeek: 6);
+      expect(byExp(ExperienceLevel.beginner),
+          lessThan(byExp(ExperienceLevel.intermediate)));
+      expect(byExp(ExperienceLevel.intermediate),
+          lessThanOrEqualTo(byExp(ExperienceLevel.advanced)));
+    });
+
+    test('HM still ignores run frequency (unchanged ceiling)', () {
+      for (final l in ExperienceLevel.values) {
+        for (var r = 3; r <= 7; r++) {
+          expect(
+            VolumeModel.peakKmForRuns(
+                race: RaceDistance.halfMarathon, experience: l, runsPerWeek: r),
+            VolumeModel.peakKm(RaceDistance.halfMarathon, l),
+            reason: 'HM $l $r',
+          );
         }
       }
     });
@@ -564,6 +655,133 @@ void main() {
       expect(p5, greaterThan(p3));
       expect(p6, greaterThanOrEqualTo(p5));
       expect(p6, lessThanOrEqualTo(65 + 0.5));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  group('Marathon plan — RacePlanBuilder + WeekResolver', () {
+    const resolver = WeekResolver();
+    final now = DateTime(2026, 1, 5);
+
+    List<WeekResolution> resolveMarathon({
+      int runsPerWeek = 5,
+      double baseline = 45,
+      int weeksOut = 18,
+    }) {
+      final days = const {
+        5: [0, 2, 3, 5, 6],
+        6: [0, 1, 2, 4, 5, 6],
+        7: [0, 1, 2, 3, 4, 5, 6],
+      }[runsPerWeek]!;
+      final plan = RacePlanBuilder.build(
+        currentWeeklyKm: baseline,
+        goalRace: 'marathon',
+        raceDate: now.add(Duration(days: weeksOut * 7)),
+        experienceLevel: 'intermediate',
+        now: now,
+        runsPerWeek: runsPerWeek,
+      );
+      var taperSeen = 0;
+      return [
+        for (final w in plan.weeks)
+          resolver.resolve(
+            weekTarget: w,
+            trainingDayIndices: days,
+            raceDistance: RaceDistance.marathon,
+            phase: w.phase,
+            experienceLevel: ExperienceLevel.intermediate,
+            currentWeeklyKm: w.targetKm,
+            longRunDayIndex: days.last,
+            weekNumber: w.week,
+            isCutbackWeek: w.week % 4 == 0,
+            taperWeekNumber:
+                w.phase == TrainingPhase.taper ? ++taperSeen : 1,
+          ),
+      ];
+    }
+
+    test('a marathon plan tapers over three weeks', () {
+      final plan = RacePlanBuilder.build(
+        currentWeeklyKm: 45,
+        goalRace: 'marathon',
+        raceDate: now.add(const Duration(days: 18 * 7)),
+        experienceLevel: 'intermediate',
+        now: now,
+      );
+      expect(
+        plan.weeks.where((w) => w.phase == TrainingPhase.taper).length,
+        3,
+      );
+    });
+
+    test('the 3-week taper steps down ~80% → ~60% → ~40%', () {
+      final weeks = resolveMarathon();
+      final taper = [
+        for (final w in weeks)
+          if (w.phase == TrainingPhase.taper) w
+      ];
+      expect(taper.length, 3);
+      // Un-reduced target is the same peak each taper week; the resolved
+      // targetKm carries the multiplier.
+      final peak = taper.first.targetKm / 0.80;
+      expect(taper[0].targetKm / peak, closeTo(0.80, 0.03));
+      expect(taper[1].targetKm / peak, closeTo(0.60, 0.03));
+      expect(taper[2].targetKm / peak, closeTo(0.40, 0.03));
+    });
+
+    test('build / peak Q1 and Q2 are both sub-threshold (MP / cruise)', () {
+      for (final wk in resolveMarathon(runsPerWeek: 6, baseline: 60)) {
+        if (wk.phase != TrainingPhase.build) continue;
+        for (final d in wk.days.where((d) =>
+            d.slotType == SlotType.quality1 ||
+            d.slotType == SlotType.quality2)) {
+          expect(d.intent, WorkoutIntent.threshold,
+              reason: 'week ${wk.weekNumber} ${d.slotType}');
+        }
+      }
+    });
+
+    test('every resolved marathon long run is ≤ 34 km and ≤ ~35% of a full week',
+        () {
+      for (final runs in const [5, 6, 7]) {
+        for (final wk in resolveMarathon(runsPerWeek: runs, baseline: 55)) {
+          final lr = wk.days.firstWhere((d) => d.isLongRun);
+          final km = lr.distanceKm ?? 0;
+          expect(km, lessThanOrEqualTo(34.0 + 0.001),
+              reason: '$runs runs, week ${wk.weekNumber}: $km km');
+          final isCutback = wk.weekNumber % 4 == 0;
+          if (wk.phase != TrainingPhase.taper &&
+              !isCutback &&
+              wk.targetKm > 0) {
+            expect(km / wk.targetKm, lessThanOrEqualTo(0.39),
+                reason: '$runs runs, week ${wk.weekNumber}');
+          }
+        }
+      }
+    });
+
+    test('peak volume scales with runs-per-week and stays within 75–100 km', () {
+      double peakFor(int runs) {
+        final days = const {
+          4: [0, 2, 4, 6],
+          5: [0, 2, 3, 5, 6],
+          6: [0, 1, 2, 4, 5, 6],
+          7: [0, 1, 2, 3, 4, 5, 6],
+        }[runs]!;
+        final proj = PlanProjection.build(
+          _marathonAnswers(runsPerWeek: runs, selectedDays: days),
+          now: now,
+        );
+        return proj.peakWeeklyKm;
+      }
+
+      final p4 = peakFor(4);
+      final p6 = peakFor(6);
+      final p7 = peakFor(7);
+      expect(p6, greaterThan(p4));
+      expect(p7, greaterThanOrEqualTo(p6));
+      expect(p7, lessThanOrEqualTo(100 + 0.5));
+      expect(p4, greaterThanOrEqualTo(70)); // still a real marathon build
     });
   });
 }

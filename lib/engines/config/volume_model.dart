@@ -9,6 +9,8 @@
 /// Everything now derives from `peakKm(race, experience)` + `minViableKm(race)`.
 library;
 
+import 'dart:math' as math;
+
 import 'archetype_envelope.dart';
 import 'archetype_table.dart' show ExperienceLevel, WeeklyKmRange;
 import 'workout_template_library.dart' show RaceDistance;
@@ -55,6 +57,7 @@ class VolumeModel {
   static const Set<RaceDistance> _runsScaledPeak = {
     RaceDistance.fiveK,
     RaceDistance.tenK,
+    RaceDistance.marathon,
   };
 
   /// Peak weekly volume as a function of run frequency.
@@ -77,7 +80,11 @@ class VolumeModel {
       ExperienceLevel.intermediate => 1.0,
       ExperienceLevel.advanced => 1.12,
     };
-    return (byRuns * expFactor).clamp(env.peakKm.min, env.peakKm.max);
+    // Low clamp: a beginner on few runs can sit below the band's own floor
+    // (this matters for the marathon, where peakKm.min is 75); never below the
+    // baseline ceiling.
+    final lowClamp = math.min(env.peakKm.min, env.baselineKm.max);
+    return (byRuns * expFactor).clamp(lowClamp, env.peakKm.max);
   }
 
   /// Below this weekly volume a plan can only sharpen existing fitness, not

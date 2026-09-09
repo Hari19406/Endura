@@ -483,7 +483,7 @@ class WeekResolver {
   // 5K:  1 taper week  → 0.55
   // 10K: 2 taper weeks → W1: 0.75, W2: 0.55
   // HM:  2 taper weeks → W1: 0.78, W2: 0.55
-  // FM:  3 taper weeks → W1: 0.85, W2: 0.65, W3: 0.40
+  // FM:  3 taper weeks → deload 1 ~80%, deload 2 ~60%, race week ~40%
   // ==========================================================================
 
   static double _taperMultiplier(RaceDistance race, int taperWeekNumber) {
@@ -493,8 +493,8 @@ class WeekResolver {
       (RaceDistance.tenK, _) => 0.55,
       (RaceDistance.halfMarathon, 1) => 0.78,
       (RaceDistance.halfMarathon, _) => 0.55,
-      (RaceDistance.marathon, 1) => 0.85,
-      (RaceDistance.marathon, 2) => 0.65,
+      (RaceDistance.marathon, 1) => 0.80,
+      (RaceDistance.marathon, 2) => 0.60,
       (RaceDistance.marathon, _) => 0.40,
     };
   }
@@ -507,7 +507,7 @@ class WeekResolver {
   // disagreed). Reconciled per the rework decision, then refined per the
   // archetype envelopes:
   //   Q1 build/peak → vo2max for 5K; threshold for 10K, HM & FM.
-  //   Q2 build      → speed for 5K; vo2max for 10K, HM & FM.
+  //   Q2 build      → speed for 5K; vo2max for 10K & HM; threshold for FM.
   // ==========================================================================
 
   WorkoutIntent _slotTypeToIntent(
@@ -566,7 +566,9 @@ class WeekResolver {
       // threshold-led Q1.
       RaceDistance.tenK => WorkoutIntent.vo2max,
       RaceDistance.halfMarathon => WorkoutIntent.vo2max,
-      RaceDistance.marathon => WorkoutIntent.vo2max,
+      // Marathon Q2 is a second sub-threshold stimulus (cruise intervals /
+      // MP-blend) rather than VO2 work — specificity over top-end power.
+      RaceDistance.marathon => WorkoutIntent.threshold,
     };
   }
 

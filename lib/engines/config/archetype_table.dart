@@ -217,14 +217,14 @@ class WeeklyKmRange {
 class ArchetypeTable {
   const ArchetypeTable._();
 
-  /// Operational upper bound on the long run as a fraction of the week for the
-  /// shorter, speed-biased distances — softer than each envelope's declared
-  /// target (5K 25%, 10K 28%) so the reconciler still has room on a tight week,
-  /// but far below the generic ~0.55 ceiling. Longer distances keep the generic
-  /// fractional bound.
-  static double? _shortRaceLongRunMaxFrac(RaceDistance race) => switch (race) {
+  /// Operational upper bound on the long run as a fraction of the week, per
+  /// race — a little softer than each envelope's declared target (5K 25%,
+  /// 10K 28%, FM 35%) so the reconciler keeps room on a tight week, but well
+  /// below the generic ~0.55 ceiling. HM keeps the generic fractional bound.
+  static double? _raceLongRunMaxFrac(RaceDistance race) => switch (race) {
         RaceDistance.fiveK => 0.33,
         RaceDistance.tenK => 0.33,
+        RaceDistance.marathon => 0.38,
         _ => null,
       };
 
@@ -680,13 +680,12 @@ class ArchetypeTable {
     final c = (center + raceAdj + phaseAdj).clamp(0.22, 0.52);
     var minFrac = (c - 0.08).clamp(0.18, c);
     var maxFrac = (c + 0.08).clamp(c, 0.55);
-    // 5K / 10K long run is capped tighter — it is a supporting aerobic run, not
-    // the week's centrepiece. Operational bound; the declared target (25% / 28%)
-    // and the absolute km ceiling (12 / 16 km) are applied to the skeleton
-    // long-run target in RacePlanBuilder.
-    final shortCap = _shortRaceLongRunMaxFrac(race);
-    if (shortCap != null) {
-      maxFrac = math.min(maxFrac, shortCap);
+    // Per-race operational long-run cap (5K/10K supporting run; marathon 35%
+    // ceiling). The declared target and the absolute km ceiling are applied to
+    // the skeleton long-run target in RacePlanBuilder.
+    final raceCap = _raceLongRunMaxFrac(race);
+    if (raceCap != null) {
+      maxFrac = math.min(maxFrac, raceCap);
       minFrac = math.min(minFrac, maxFrac);
     }
     return (minFrac, maxFrac);
