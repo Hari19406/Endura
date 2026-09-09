@@ -9,8 +9,11 @@ import '../services/analytics_service.dart';
 import '../theme/app_colors.dart';
 
 /// Modern running-telemetry detail view: header + summary grid, route preview,
-/// training impact, kilometre splits, and four scrubbable fl_chart panels
-/// (pace, elevation, heart rate + zones, cadence).
+/// kilometre splits, a grade-adjusted-pace block, and up to four scrubbable
+/// fl_chart panels (pace, elevation, heart rate + zones, cadence).
+///
+/// Every data-driven section renders conditionally so the screen degrades
+/// gracefully on partial production payloads (no HR strap, no barometer, …).
 ///
 /// Fed today by [ActivityDetail.mock] via the Dev Launcher.
 class ActivityDetailScreen extends StatefulWidget {
@@ -101,17 +104,25 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   const SizedBox(height: 16),
                   _routeCard(c),
                   const SizedBox(height: 16),
-                  _impactCard(c),
-                  const SizedBox(height: 16),
                   _splitsCard(c),
                   const SizedBox(height: 16),
-                  _paceCard(c),
-                  const SizedBox(height: 16),
-                  _elevationCard(c),
-                  const SizedBox(height: 16),
-                  _HrZonesCard(activity: a),
-                  const SizedBox(height: 16),
-                  _cadenceCard(c),
+                  if (a.avgGapPace != null) ...[
+                    _gapBlock(c),
+                    const SizedBox(height: 16),
+                  ],
+                  if (a.telemetrySeries.length >= 2) ...[
+                    _paceCard(c),
+                    const SizedBox(height: 16),
+                  ],
+                  if (a.hasElevationData) ...[
+                    _elevationCard(c),
+                    const SizedBox(height: 16),
+                  ],
+                  if (a.hasHrData) ...[
+                    _HrZonesCard(activity: a),
+                    const SizedBox(height: 16),
+                  ],
+                  if (a.telemetrySeries.length >= 2) _cadenceCard(c),
                 ],
               ),
             ),
@@ -290,7 +301,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           ),
           Row(
             children: [
-              cell('ELEV GAIN', a.elevationGainM.round().toString(), 'm'),
+              cell(
+                'ELEV GAIN',
+                a.elevationGainM == null
+                    ? '—'
+                    : a.elevationGainM!.round().toString(),
+                a.elevationGainM == null ? '' : 'm',
+              ),
               divider(),
               cell('CALORIES', a.calories.toString(), 'kcal'),
               divider(),
@@ -413,68 +430,92 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  // ── 3. Training & fitness impact ──────────────────────────────────────────
+  // ── 3. Grade-adjusted pace + moving/elapsed time ─────────────────────────
 
-  Widget _impactCard(AppColors c) {
-    final ti = a.trainingImpact;
-    final fitnessColor = c.chartAccent;
-    final fatigueColor = c.elevationAccent;
+  Widget _gapBlock(AppColors c) {
+    final delta = a.gapDeltaSeconds; // GAP − raw, negative = GAP faster
+    final elapsed = a.elapsedTime;
+    final hasStops = elapsed != null && elapsed > a.movingTime;
+
+    Widget deltaPill() {
+      if (delta == null || delta == 0) {
+        return _pill(c, 'matches raw pace', c.textTertiary);
+      }
+      final faster = delta < 0;
+      final mag = _paceFromSeconds(delta.abs());
+      return _pill(
+        c,
+        '${faster ? '−' : '+'}$mag /km than raw pace',
+        faster ? c.success : c.danger,
+      );
+    }
 
     return _card(
       c,
-      title: 'TRAINING & FITNESS IMPACT',
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: c.accent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          '+${ti.impactScore}',
-          style: TextStyle(
-            color: c.onAccent,
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-          ),
-        ),
-      ),
+      title: 'GRADE-ADJUSTED PACE',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _impactValue(c, 'FITNESS', ti.fitnessImpact, fitnessColor),
-              Container(width: 1, height: 40, color: c.border),
-              _impactValue(c, 'FATIGUE', ti.fatigueImpact, fatigueColor),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: (ti.fitnessRatio * 1000).round().clamp(1, 999),
-                  child: Container(height: 10, color: fitnessColor),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AVG GAP',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: c.textTertiary,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    RichText(
+                      text: TextSpan(
+                        text: a.avgGapPace,
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          color: c.textPrimary,
+                          letterSpacing: -1,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                        children: [
+                          TextSpan(
+                            text: ' /km',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: c.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    deltaPill(),
+                  ],
                 ),
-                Expanded(
-                  flex: ((1 - ti.fitnessRatio) * 1000).round().clamp(1, 999),
-                  child: Container(height: 10, color: fatigueColor),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Aerobic base',
-                style: TextStyle(fontSize: 10.5, color: c.textTertiary),
               ),
-              Text(
-                'Acute load',
-                style: TextStyle(fontSize: 10.5, color: c.textTertiary),
+              const SizedBox(width: 16),
+              Container(width: 1, height: 66, color: c.border),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _timeRow(c, 'MOVING', _fmtDuration(a.movingTime)),
+                  const SizedBox(height: 10),
+                  _timeRow(
+                    c,
+                    'ELAPSED',
+                    elapsed == null ? '—' : _fmtDuration(elapsed),
+                    dim: !hasStops,
+                  ),
+                ],
               ),
             ],
           ),
@@ -483,31 +524,48 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  Widget _impactValue(AppColors c, String label, double v, Color color) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: c.textTertiary,
-              letterSpacing: 1.2,
-            ),
+  Widget _timeRow(AppColors c, String label, String value, {bool dim = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: c.textTertiary,
+            letterSpacing: 1.2,
           ),
-          const SizedBox(height: 6),
-          Text(
-            '${v >= 0 ? '+' : ''}${v.toStringAsFixed(1)}',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: color,
-              letterSpacing: -0.5,
-            ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: dim ? c.textTertiary : c.textPrimary,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _pill(AppColors c, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
     );
   }
@@ -678,7 +736,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       c,
       title: 'ELEVATION PROFILE',
       trailing: Text(
-        '▲ ${(hi - lo).round()} m range · ${a.elevationGainM.round()} m gain',
+        '▲ ${(hi - lo).round()} m range · ${a.elevationGainM!.round()} m gain',
         style: TextStyle(fontSize: 10.5, color: c.textTertiary),
       ),
       child: SizedBox(
@@ -768,6 +826,74 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Shared chart-scrub styling
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Black or white, whichever reads better on [bg].
+Color _readableOn(Color bg) =>
+    bg.computeLuminance() > 0.55 ? const Color(0xFF0B0B0C) : Colors.white;
+
+/// A [LineTouchData] with a clean vertical cursor line, a filled thumb dot, and
+/// a floating colored pill badge showing the scrubbed value + distance.
+LineTouchData _scrubTouchData(
+  AppColors c, {
+  required Color pinColor,
+  required String Function(LineBarSpot spot) label,
+  required String xUnitLabel,
+}) {
+  final onPin = _readableOn(pinColor);
+  return LineTouchData(
+    enabled: true,
+    getTouchedSpotIndicator: (bar, indexes) => indexes
+        .map(
+          (_) => TouchedSpotIndicatorData(
+            FlLine(color: c.textTertiary.withOpacity(0.9), strokeWidth: 1.5),
+            FlDotData(
+              getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                radius: 5,
+                color: pinColor,
+                strokeWidth: 3,
+                strokeColor: c.surface,
+              ),
+            ),
+          ),
+        )
+        .toList(),
+    touchTooltipData: LineTouchTooltipData(
+      tooltipBgColor: pinColor,
+      tooltipRoundedRadius: 20,
+      tooltipBorder: BorderSide.none,
+      tooltipPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      fitInsideHorizontally: true,
+      fitInsideVertically: true,
+      getTooltipItems: (touchedSpots) => touchedSpots
+          .map(
+            (spot) => LineTooltipItem(
+              '${label(spot)}  ',
+              TextStyle(
+                color: onPin,
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+              children: [
+                TextSpan(
+                  text: '@ ${spot.x.toStringAsFixed(2)} $xUnitLabel',
+                  style: TextStyle(
+                    color: onPin.withOpacity(0.75),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          )
+          .toList(),
+    ),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -876,56 +1002,11 @@ class _ScrubLineChart extends StatelessWidget {
           show: true,
           border: Border(bottom: BorderSide(color: c.border, width: 1)),
         ),
-        lineTouchData: LineTouchData(
-          enabled: true,
-          getTouchedSpotIndicator: (bar, indexes) => indexes
-              .map(
-                (_) => TouchedSpotIndicatorData(
-                  FlLine(color: color.withOpacity(0.55), strokeWidth: 1.5),
-                  FlDotData(
-                    getDotPainter: (spot, percent, bar, index) =>
-                        FlDotCirclePainter(
-                      radius: 4,
-                      color: c.surface,
-                      strokeWidth: 2.5,
-                      strokeColor: color,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          touchTooltipData: LineTouchTooltipData(
-            tooltipBgColor: c.surfaceAlt,
-            tooltipRoundedRadius: 8,
-            tooltipBorder: BorderSide(color: c.border),
-            tooltipPadding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            fitInsideHorizontally: true,
-            fitInsideVertically: true,
-            getTooltipItems: (touchedSpots) => touchedSpots
-                .map(
-                  (spot) => LineTooltipItem(
-                    '${formatY(spot.y)} $yUnitLabel\n',
-                    TextStyle(
-                      color: c.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    children: [
-                      TextSpan(
-                        text:
-                            '${spot.x.toStringAsFixed(2)} $xUnitLabel',
-                        style: TextStyle(
-                          color: c.textTertiary,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-                .toList(),
-          ),
+        lineTouchData: _scrubTouchData(
+          c,
+          pinColor: color,
+          label: (spot) => '${formatY(spot.y)} $yUnitLabel',
+          xUnitLabel: xUnitLabel,
         ),
         lineBarsData: [
           LineChartBarData(
@@ -1106,59 +1187,11 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                         border: Border(
                             bottom: BorderSide(color: c.border, width: 1)),
                       ),
-                      lineTouchData: LineTouchData(
-                        enabled: true,
-                        getTouchedSpotIndicator: (bar, indexes) => indexes
-                            .map(
-                              (_) => TouchedSpotIndicatorData(
-                                FlLine(
-                                    color: c.danger.withOpacity(0.55),
-                                    strokeWidth: 1.5),
-                                FlDotData(
-                                  getDotPainter:
-                                      (spot, percent, bar, index) =>
-                                          FlDotCirclePainter(
-                                    radius: 4,
-                                    color: c.surface,
-                                    strokeWidth: 2.5,
-                                    strokeColor: c.danger,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        touchTooltipData: LineTouchTooltipData(
-                          tooltipBgColor: c.surfaceAlt,
-                          tooltipRoundedRadius: 8,
-                          tooltipBorder: BorderSide(color: c.border),
-                          tooltipPadding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          fitInsideHorizontally: true,
-                          fitInsideVertically: true,
-                          getTooltipItems: (touchedSpots) => touchedSpots
-                              .map(
-                                (spot) => LineTooltipItem(
-                                  '${spot.y.round()} bpm\n',
-                                  TextStyle(
-                                    color: c.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text:
-                                          '${spot.x.toStringAsFixed(2)} km',
-                                      style: TextStyle(
-                                        color: c.textTertiary,
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                              .toList(),
-                        ),
+                      lineTouchData: _scrubTouchData(
+                        c,
+                        pinColor: c.danger,
+                        label: (spot) => '${spot.y.round()} bpm',
+                        xUnitLabel: 'km',
                       ),
                       lineBarsData: [
                         LineChartBarData(
@@ -1185,21 +1218,9 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                     ),
                   ),
           ),
-          const SizedBox(height: 14),
-          // Zone distribution stacked bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Row(
-              children: [
-                for (final z in a.hrZones)
-                  Expanded(
-                    flex: math.max(1, (z.percentage * 1000).round()),
-                    child: Container(height: 10, color: _zoneColor(z.zone)),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
+          _segmentedZoneBar(c, a),
+          const SizedBox(height: 12),
           InkWell(
             onTap: () {
               HapticFeedback.selectionClick();
@@ -1242,6 +1263,113 @@ class _HrZonesCardState extends State<_HrZonesCard> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 5 equal-width colored segments (Z1 gray → Z5 red) with a white marker
+  /// pinned at the average heart rate, captioned "Avg X bpm • Z{N}".
+  Widget _segmentedZoneBar(AppColors c, ActivityDetail a) {
+    final lo = a.hrZones.first.bpmLow;
+    final hi = a.hrZones.last.bpmHigh;
+    final frac =
+        hi <= lo ? 0.5 : ((a.avgHr - lo) / (hi - lo)).clamp(0.0, 1.0);
+
+    var activeZone = a.hrZones.first.zone;
+    for (final z in a.hrZones) {
+      if (a.avgHr >= z.bpmLow) activeZone = z.zone;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, cons) {
+            const markerW = 3.0;
+            final x = (frac * cons.maxWidth - markerW / 2)
+                .clamp(0.0, cons.maxWidth - markerW);
+            return SizedBox(
+              height: 26,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 7,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Row(
+                        children: [
+                          for (var i = 0; i < a.hrZones.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 2),
+                            Expanded(
+                              child: Container(
+                                height: 12,
+                                color: _zoneColor(a.hrZones[i].zone),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: x,
+                    top: 0,
+                    child: Container(
+                      width: markerW,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.35),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: c.border),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Avg ${a.avgHr} bpm • Z$activeZone',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: c.textPrimary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '$lo–$hi bpm',
+              style: TextStyle(
+                fontSize: 10.5,
+                color: c.textTertiary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

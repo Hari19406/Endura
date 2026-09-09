@@ -92,32 +92,6 @@ class HrZone {
   String get percentLabel => '${(percentage * 100).round()}%';
 }
 
-/// Coaching-engine read on what the run did to the athlete's model.
-class TrainingImpact {
-  /// Bump to the long-term fitness (CTL-like) track, e.g. +0.6.
-  final double fitnessImpact;
-
-  /// Bump to short-term fatigue (ATL-like) track, e.g. +3.6.
-  final double fatigueImpact;
-
-  /// Headline training-load score for the session, e.g. +27.
-  final int impactScore;
-
-  const TrainingImpact({
-    required this.fitnessImpact,
-    required this.fatigueImpact,
-    required this.impactScore,
-  });
-
-  /// Share of the fitness+fatigue split that is "fitness", 0.0–1.0. Used to
-  /// size the horizontal split-ratio bar.
-  double get fitnessRatio {
-    final total = fitnessImpact.abs() + fatigueImpact.abs();
-    if (total <= 0) return 0.5;
-    return (fitnessImpact.abs() / total).clamp(0.0, 1.0);
-  }
-}
-
 /// Everything the Activity Detail View needs to render one run.
 class ActivityDetail {
   // ── Header ────────────────────────────────────────────────────────────────
@@ -132,11 +106,15 @@ class ActivityDetail {
   final double distanceKm;
   final String avgPace; // "m:ss" per km
   final Duration movingTime;
-  final double elevationGainM;
-  final int calories;
 
-  // ── Training impact ───────────────────────────────────────────────────────
-  final TrainingImpact trainingImpact;
+  /// Wall-clock time including pauses. Null when the source didn't report it
+  /// (or it equals [movingTime] — no stops).
+  final Duration? elapsedTime;
+
+  /// Total ascent in metres. Null when the recording had no barometric/GPS
+  /// altitude — the Elevation Profile card is omitted in that case.
+  final double? elevationGainM;
+  final int calories;
 
   // ── Series ────────────────────────────────────────────────────────────────
   final List<KmSplit> splits;
@@ -148,7 +126,10 @@ class ActivityDetail {
   final int peakCadence;
   final int avgHr;
   final int peakHr;
-  final String avgGapPace; // grade-adjusted, "m:ss" per km
+
+  /// Grade-adjusted average pace, "m:ss" per km. Null when there's no elevation
+  /// track to adjust against — the GAP block is omitted in that case.
+  final String? avgGapPace;
 
   /// Decoded `{lat, lng}` points for the route preview. May be empty.
   final List<Map<String, double>> routePoints;
@@ -163,9 +144,9 @@ class ActivityDetail {
     required this.distanceKm,
     required this.avgPace,
     required this.movingTime,
-    required this.elevationGainM,
+    this.elapsedTime,
+    this.elevationGainM,
     required this.calories,
-    required this.trainingImpact,
     required this.splits,
     required this.telemetrySeries,
     required this.hrZones,
@@ -176,6 +157,38 @@ class ActivityDetail {
     required this.avgGapPace,
     this.routePoints = const [],
   });
+
+  /// Parses a "m:ss" pace label into seconds. Null on empty/malformed input.
+  static int? paceLabelToSeconds(String? label) {
+    if (label == null) return null;
+    final parts = label.split(':');
+    if (parts.length != 2) return null;
+    final m = int.tryParse(parts[0].trim());
+    final s = int.tryParse(parts[1].trim());
+    if (m == null || s == null) return null;
+    return m * 60 + s;
+  }
+
+  int? get avgPaceSeconds => paceLabelToSeconds(avgPace);
+  int? get avgGapSeconds => paceLabelToSeconds(avgGapPace);
+
+  /// GAP minus raw pace, in seconds/km. Negative → GAP is faster than raw.
+  int? get gapDeltaSeconds {
+    final raw = avgPaceSeconds;
+    final gap = avgGapSeconds;
+    if (raw == null || gap == null) return null;
+    return gap - raw;
+  }
+
+  /// True when there's usable heart-rate data (zones + a non-flat trace).
+  bool get hasHrData =>
+      hrZones.isNotEmpty && telemetrySeries.any((s) => s.hrBpm > 0);
+
+  /// True when there's a usable elevation track for the profile chart.
+  bool get hasElevationData =>
+      elevationGainM != null &&
+      telemetrySeries.length >= 2 &&
+      telemetrySeries.any((s) => s.elevationM != 0);
 
   /// Fastest split's pace in seconds — the reference the splits-bar lengths are
   /// measured against. Falls back to the slowest value when there are no splits.
@@ -317,13 +330,9 @@ class ActivityDetail {
       distanceKm: totalKm,
       avgPace: '4:58',
       movingTime: const Duration(seconds: 3491),
+      elapsedTime: const Duration(seconds: 3611), // ~2 min stopped
       elevationGainM: elevGain,
       calories: 812,
-      trainingImpact: const TrainingImpact(
-        fitnessImpact: 0.6,
-        fatigueImpact: 3.6,
-        impactScore: 27,
-      ),
       splits: splits,
       telemetrySeries: samples,
       hrZones: hrZones,
