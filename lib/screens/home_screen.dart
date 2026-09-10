@@ -7,6 +7,8 @@ import '../engines/coach_engine_v2.dart';
 import '../engines/plan/plan_store.dart';
 import '../engines/plan/materialized_plan.dart';
 import '../services/plan_adaptation_coordinator.dart';
+import '../services/workout_compliance_coordinator.dart';
+import '../services/workout_compliance_matcher.dart';
 import '../widgets/plan_adaptation_card.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
@@ -118,6 +120,12 @@ class WorkoutDisplayModel {
   final String phaseLabel;
   final String feelHint;
 
+  /// Set when a logged run has been matched to this scheduled day
+  /// (WorkoutComplianceMatcher). The card then shows the actual stats + a
+  /// completed badge instead of the Start-Run CTA.
+  final bool completed;
+  final String? completedStats;
+
   const WorkoutDisplayModel({
     required this.category,
     required this.title,
@@ -132,9 +140,14 @@ class WorkoutDisplayModel {
     this.feelText = '',
     this.phaseLabel = '',
     this.feelHint = '',
+    this.completed = false,
+    this.completedStats,
   });
 
-  factory WorkoutDisplayModel.fromCoachMessage(CoachMessage msg) {
+  factory WorkoutDisplayModel.fromCoachMessage(
+    CoachMessage msg, {
+    DayCompletion? completion,
+  }) {
     final displayStyle = _workoutDisplayStyle(msg.workoutIntent);
     final workout = msg.resolvedWorkout;
 
@@ -195,6 +208,13 @@ class WorkoutDisplayModel {
       feelText: msg.feelText,
       phaseLabel: msg.phaseLabel,
       feelHint: feelHint,
+      completed: completion != null,
+      completedStats: completion == null
+          ? null
+          : WorkoutComplianceMatcher.completedStatsLabel(
+              completion,
+              useMiles: UnitUtils.useMilesNotifier.value,
+            ),
     );
   }
 
@@ -411,62 +431,111 @@ class WorkoutCard extends StatelessWidget {
                   ),
                 ),
             ] else ...[
-              Text(
-                workout.title,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: c.textPrimary,
-                  letterSpacing: -0.8,
-                  height: 1.1,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      workout.title,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                        letterSpacing: -0.8,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                  if (workout.completed) ...[
+                    const SizedBox(width: 12),
+                    _CompletedBadge(),
+                  ],
+                ],
               ),
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  if (workout.distance != null)
-                    _chipWidget(context, Icons.straighten, workout.distance!),
-                  const Spacer(),
-                  if (!_isEmpty && onTap != null)
-                    GestureDetector(
-                      onTap: onTap == null
-                          ? null
-                          : () {
-                              HapticFeedback.mediumImpact();
-                              onTap!();
-                            },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: c.accent,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'View Workout',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: c.onAccent,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 13,
-                              color: c.onAccent,
-                            ),
-                          ],
+              if (workout.completed) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: c.success,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        workout.completedStats ?? 'Completed',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: c.textPrimary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
-                ],
-              ),
+                    if (onTap != null)
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onTap!();
+                        },
+                        child: Text(
+                          'View',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: c.textSecondary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ] else
+                Row(
+                  children: [
+                    if (workout.distance != null)
+                      _chipWidget(context, Icons.straighten, workout.distance!),
+                    const Spacer(),
+                    if (!_isEmpty && onTap != null)
+                      GestureDetector(
+                        onTap: onTap == null
+                            ? null
+                            : () {
+                                HapticFeedback.mediumImpact();
+                                onTap!();
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: c.accent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'View Workout',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: c.onAccent,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 13,
+                                color: c.onAccent,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
             ],
           ],
         ),
@@ -493,6 +562,38 @@ class WorkoutCard extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: c.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small green "COMPLETED" pill shown on the WorkoutCard when a logged run has
+/// been matched to today's scheduled session.
+class _CompletedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.success.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_rounded, size: 13, color: c.success),
+          const SizedBox(width: 5),
+          Text(
+            'COMPLETED',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: c.success,
             ),
           ),
         ],
@@ -784,6 +885,13 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
 
+      // ── Post-run compliance matching (additive only) ───────────────────────
+      // Link runs the athlete already logged back to the day they were
+      // scheduled for, so the Coach card / calendar can show them ticked off.
+      // Never moves or rewrites a workout — that is PlanAdaptation's job, which
+      // stays unwired.
+      await WorkoutComplianceCoordinator.instance.sync();
+
       // ── Today's session — read straight from the persisted MaterializedPlan.
       // No ad-hoc recomputation, no adaptation sweep: the Coach tab shows the
       // stored workout exactly as materialised. A missed day just stays
@@ -814,7 +922,10 @@ class _HomeScreenState extends State<HomeScreen>
             nextPlannedLabel: next.$2,
           );
           _coachMessage = built;
-          _workoutModel = WorkoutDisplayModel.fromCoachMessage(built);
+          _workoutModel = WorkoutDisplayModel.fromCoachMessage(
+            built,
+            completion: dayContext.day.completion,
+          );
         }
 
         widget.onCoachMessageReady?.call(_coachMessage);
