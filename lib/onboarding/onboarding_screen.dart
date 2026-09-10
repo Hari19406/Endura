@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/training_days_service.dart';
 import '../../engines/planner/race_plan_builder.dart';
+import '../../engines/config/archetype_envelope.dart';
 import '../../engines/memory/engine_memory_service.dart';
 import '../../engines/plan/plan_materialization_coordinator.dart';
 import '../../engines/plan/plan_store.dart' show PlanSyncOutcome;
@@ -143,6 +144,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int? _timeToBeatSec; // for 'pr'
   int? _targetFinishSec; // for 'target_time'
 
+  /// Set when the athlete picks a "Train for your first …" goal. Forces the
+  /// completion-focused path: experience → beginner, race goal → finish, no
+  /// target-time step, baseline anchored to the distance's safe minimum, and
+  /// the race picker / experience / weekly-volume / race-goal pages skipped.
+  bool _isFirstTimeRunner = false;
+
   // Training days
   int _runsPerWeek = 4;
   List<int> _selectedDays = TrainingDaysService.defaultsFor(4);
@@ -263,6 +270,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _weeklyBaselineKm = savedBaseline ?? _weeklyBaselineKm;
       }
 
+      _isFirstTimeRunner = prefs.getBool('is_first_time_runner') ?? false;
+
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('[Onboarding] Prefill error: $e');
@@ -296,6 +305,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   OPage get _currentPage => _sequence[_current];
 
   bool get _needsTargetTime => _raceGoal == 'pr' || _raceGoal == 'target_time';
+
+  /// Pages the wizard walks past without stopping. `targetTime` is skipped
+  /// unless the race goal needs it; a first-time runner has already answered
+  /// (implicitly) the race-picker, experience, weekly-volume and race-goal
+  /// questions, so those are skipped too.
+  bool _isSkipped(OPage p) {
+    if (p == OPage.targetTime && !_needsTargetTime) return true;
+    if (_isFirstTimeRunner &&
+        (p == OPage.racePicker ||
+            p == OPage.experience ||
+            p == OPage.weeklyVolume ||
+            p == OPage.raceGoal)) {
+      return true;
+    }
+    return false;
+  }
 
   bool get _showTopBar =>
       _currentPage != OPage.racePicker &&
@@ -452,15 +477,39 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _ => null,
   };
 
+  /// The athlete tapped a "Train for your first …" option on the goal page.
+  /// Lock in the completion-focused path and advance — `_isSkipped` then walks
+  /// the wizard past race-picker / experience / weekly-volume / race-goal.
+  void _selectFirstTimer(String distanceKey) {
+    setState(() {
+      _goal = distanceKey;
+      _isFirstTimeRunner = true;
+      // First timer ⇒ new to the distance. Force the beginner archetype (the
+      // engine already routes beginners to threshold-only quality — no VO2 max
+      // or hard intervals) and a "just finish" race goal (no target-time step).
+      _experience = 'just_starting';
+      _raceGoal = 'finish';
+      _timeToBeatSec = null;
+      _targetFinishSec = null;
+      // No specific race — the plan builder falls back to a synthetic race
+      // date from the chosen start + plan length.
+      _raceId = null;
+      _raceName = null;
+      _raceCity = null;
+      _raceDate = null;
+      _paceDistance = _paceDistFor(distanceKey);
+    });
+    Analytics.onboardingStepViewed('goal_first_timer_$distanceKey', _current);
+    _next();
+  }
+
   void _next() {
     if (_editReturn) {
       _resumeFromEdit();
       return;
     }
     int next = _current + 1;
-    if (next < _total &&
-        _sequence[next] == OPage.targetTime &&
-        !_needsTargetTime) {
+    while (next < _total && _isSkipped(_sequence[next])) {
       next++;
     }
     // Have the projection ready before the slide finishes, so the reveal never
@@ -478,7 +527,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
     int prev = _current - 1;
-    if (prev >= 0 && _sequence[prev] == OPage.targetTime && !_needsTargetTime) {
+    while (prev >= 0 && _isSkipped(_sequence[prev])) {
       prev--;
     }
     _animateTo(prev);
@@ -490,8 +539,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// km, straight through (VolumeModel floors a 0 up to min-viable). Shared by
   /// the reveal and by _saveAll so the curve the athlete approves is the plan
   /// they get. Falls back to a rough estimate only if the tier is unanswered.
-  double get _baselineWeeklyKm =>
-      _weeklyVolumeTier != null ? _weeklyBaselineKm : _runsPerWeek * 8.0;
+  ///
+  /// First-time runners skip the weekly-volume question, so their baseline is
+  /// anchored to the safe minimum of the distance's [RaceArchetypeEnvelope] —
+  /// the gentlest honest starting point for the ramp.
+  double get _baselineWeeklyKm {
+    if (_isFirstTimeRunner) {
+      final dist = PlanMaterializationCoordinator.raceDistanceFrom(
+        _goal ?? '5k',
+      );
+      return RaceArchetypeEnvelope.of(dist).baselineKm.min;
+    }
+    return _weeklyVolumeTier != null ? _weeklyBaselineKm : _runsPerWeek * 8.0;
+  }
 
   OnboardingAnswers _buildAnswers() {
     final goalRace = _goal ?? '5k';
@@ -790,6 +850,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       }
       await prefs.setString('weekly_volume_tier', _weeklyVolumeTier ?? '');
       await prefs.setDouble('weekly_baseline_km', _weeklyBaselineKm);
+      await prefs.setBool('is_first_time_runner', _isFirstTimeRunner);
 
       // ── Schedule ───────────────────────────────────────────────────────
       await prefs.setInt('runs_per_week', _runsPerWeek);
@@ -1012,7 +1073,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildPage(OPage page, (int, bool) previewVdot) {
     return switch (page) {
-      OPage.goal => OPageGoal(selected: _goal, onOpenRaceFunnel: _next),
+      OPage.goal => OPageGoal(
+        selected: _goal,
+        onOpenRaceFunnel: () {
+          // Re-entering the race funnel abandons a prior first-timer pick.
+          if (_isFirstTimeRunner) setState(() => _isFirstTimeRunner = false);
+          _next();
+        },
+        onSelectFirstTimer: _selectFirstTimer,
+      ),
 
       OPage.racePicker => OPageRacePicker(
         raceName: _raceName,

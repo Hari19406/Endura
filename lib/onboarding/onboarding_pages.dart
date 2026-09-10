@@ -247,10 +247,17 @@ class OPageGoal extends StatelessWidget {
   /// Called when the user taps the (only live) "Upcoming race" row.
   final VoidCallback onOpenRaceFunnel;
 
+  /// Called when the user picks a "Train for your first …" option. Passes the
+  /// race-distance key ('5k' | '10k' | 'half_marathon' | 'marathon'); the
+  /// onboarding flow marks the run as first-time / completion-focused and skips
+  /// the race picker, experience, weekly-volume and race-goal questions.
+  final void Function(String distanceKey) onSelectFirstTimer;
+
   const OPageGoal({
     super.key,
     required this.selected,
     required this.onOpenRaceFunnel,
+    required this.onSelectFirstTimer,
   });
 
   @override
@@ -303,28 +310,43 @@ class OPageGoal extends StatelessWidget {
         const SizedBox(height: 12),
         _upcomingRaceRow(),
         const SizedBox(height: 10),
-        const _ComingSoonRow(
-          icon: Icons.workspace_premium_outlined,
-          iconBg: Color(0xFF1E1040),
-          iconFg: EC.violet,
-          label: 'Train for your first half',
-          sub: 'Build to 13.1 with a gradual ramp and one speed day per week.',
-        ),
-        const SizedBox(height: 10),
-        const _ComingSoonRow(
-          icon: Icons.military_tech_outlined,
-          iconBg: Color(0xFF3D0000),
-          iconFg: EC.red,
-          label: 'Train for your first marathon',
-          sub: 'A 16+ week buildup designed for first-time marathoners.',
-        ),
-        const SizedBox(height: 10),
-        const _ComingSoonRow(
+        _firstTimerRow(
+          distanceKey: '5k',
           icon: Icons.flag_outlined,
-          iconBg: Color(0xFF003D35),
+          iconBg: const Color(0xFF003D35),
           iconFg: EC.teal,
           label: 'Train for your first 5K',
-          sub: 'Lower-volume plan with one speed workout per week.',
+          sub: 'Lower-volume plan, one steady tempo a week — built to get you '
+              'to the finish.',
+        ),
+        const SizedBox(height: 10),
+        _firstTimerRow(
+          distanceKey: '10k',
+          icon: Icons.explore_outlined,
+          iconBg: const Color(0xFF10202E),
+          iconFg: EC.teal,
+          label: 'Train for your first 10K',
+          sub: 'Gentle mileage ramp — easy aerobic runs plus one controlled '
+              'tempo.',
+        ),
+        const SizedBox(height: 10),
+        _firstTimerRow(
+          distanceKey: 'half_marathon',
+          icon: Icons.workspace_premium_outlined,
+          iconBg: const Color(0xFF1E1040),
+          iconFg: EC.violet,
+          label: 'Train for your first half',
+          sub: 'Build to 13.1 with a gradual ramp and time-on-feet long runs.',
+        ),
+        const SizedBox(height: 10),
+        _firstTimerRow(
+          distanceKey: 'marathon',
+          icon: Icons.military_tech_outlined,
+          iconBg: const Color(0xFF3D0000),
+          iconFg: EC.red,
+          label: 'Train for your first marathon',
+          sub: 'A 16+ week buildup for first-time marathoners — easy pace, '
+              'long-run focus.',
         ),
         const SizedBox(height: 26),
         const _SectionHeader(
@@ -380,6 +402,21 @@ class OPageGoal extends StatelessWidget {
       ],
     );
   }
+
+  Widget _firstTimerRow({
+    required String distanceKey,
+    required IconData icon,
+    required Color iconBg,
+    required Color iconFg,
+    required String label,
+    required String sub,
+  }) => _Row(
+    leading: _iconBox(iconBg, icon, iconFg),
+    label: label,
+    sub: sub,
+    selected: selected == distanceKey,
+    onTap: () => onSelectFirstTimer(distanceKey),
+  );
 
   Widget _upcomingRaceRow() => _Row(
     leading: Container(

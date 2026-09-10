@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:run_app/engines/config/archetype_envelope.dart';
 import 'package:run_app/engines/config/workout_template_library.dart';
 import 'package:run_app/engines/planner/race_plan_builder.dart';
 import 'package:run_app/models/training_phase.dart';
@@ -249,6 +250,62 @@ void main() {
       expect(call(edited: PlanEditTarget.currentTime), isNull);
       expect(call(edited: PlanEditTarget.planStart), isNull);
       expect(call(edited: PlanEditTarget.longRunDay), isNull);
+    });
+  });
+
+  group('first-time runner (beginner, no race) projection', () {
+    // Mirrors what onboarding feeds the reveal after a "Train for your first
+    // 5K" pick: beginner archetype, baseline anchored to the 5K envelope's safe
+    // minimum, a synthetic race date from start + plan length.
+    OnboardingAnswers firstTimer5k() {
+      final planWeeks = 10;
+      return OnboardingAnswers(
+        goal: '5k',
+        raceDate: _now.add(Duration(days: planWeeks * 7)),
+        experienceRaw: 'just_starting',
+        experienceBridged: 'beginner',
+        raceGoalRaw: 'finish',
+        baselineWeeklyKm: RaceArchetypeEnvelope.fiveK.baselineKm.min,
+        runsPerWeek: 3,
+        selectedDays: const [1, 3, 5],
+        longRunDayIndex: 5,
+        paceDistance: '5k',
+        paceDistanceKm: 5.0,
+        currentTimeSec: 0,
+        startDate: _now,
+        planWeeks: planWeeks,
+        vdot: 40,
+        vdotProvisional: true,
+      );
+    }
+
+    test('builds a full projection without throwing', () {
+      final p = PlanProjection.build(firstTimer5k(), now: _now);
+      expect(p.weeks, isNotEmpty);
+      expect(p.weeks.first.week, 1);
+    });
+
+    test('no VO2 max / speed / hard-interval sessions anywhere in the plan', () {
+      final p = PlanProjection.build(firstTimer5k(), now: _now);
+      final slots = [...p.typicalWeek, ...p.previewWeek];
+      expect(slots, isNotEmpty);
+      for (final s in slots) {
+        expect(
+          s.intent,
+          isNot(anyOf(WorkoutIntent.vo2max, WorkoutIntent.speed)),
+          reason: 'first-timer weeks must stay aerobic / threshold only',
+        );
+      }
+      // Beginner keeps at most one quality touch per week.
+      expect(p.maxQuality, lessThanOrEqualTo(1));
+    });
+
+    test('baseline sits at the envelope safe minimum', () {
+      final p = PlanProjection.build(firstTimer5k(), now: _now);
+      expect(
+        p.minWeeklyKm,
+        lessThanOrEqualTo(RaceArchetypeEnvelope.fiveK.baselineKm.min + 1),
+      );
     });
   });
 }
