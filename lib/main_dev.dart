@@ -145,6 +145,12 @@ final List<_DevSection> _menu = [
           '5K volume wave, long-run cap and VO2/threshold session mix',
     ),
     _DevEntry(
+      'Preview Reveal Screen (5K 12-wk)',
+      (_) => const _PlanRevealStage.fiveK12(),
+      subtitle: '12-wk 5K · 5 runs/wk · 24 km base · Sat long run — inspect the '
+          '3:1 wave (deloads W4/W8), build/peak W9–11 and the W12 taper',
+    ),
+    _DevEntry(
       'Preview Reveal Screen (10K 10-wk)',
       (_) => const _PlanRevealStage.tenK(),
       subtitle: '10-wk 10K · 5 runs/wk · 28 km base · Sun long run — inspect the '
@@ -314,13 +320,14 @@ class _DevHost extends StatelessWidget {
   }
 }
 
-enum _RevealVariant { halfMarathon12, fiveK8, tenK10, marathon16 }
+enum _RevealVariant { halfMarathon12, fiveK8, fiveK12, tenK10, marathon16 }
 
 /// Jumps straight to [OPagePlanReveal] with a pre-populated config so the
 /// fine-tune sliders + week-2 preview can be inspected without tapping through
 /// onboarding. Variants:
 ///   • [_RevealVariant.halfMarathon12] — 12-wk HM · 4 runs/wk · 25 km base
 ///   • [_RevealVariant.fiveK8]         — 8-wk 5K · 5 runs/wk · 22 km base
+///   • [_RevealVariant.fiveK12]        — 12-wk 5K · 5 runs/wk · 24 km base
 ///   • [_RevealVariant.tenK10]         — 10-wk 10K · 5 runs/wk · 28 km base
 ///   • [_RevealVariant.marathon16]     — 16-wk FM · 5 runs/wk · 45 km base
 class _PlanRevealStage extends StatefulWidget {
@@ -328,6 +335,8 @@ class _PlanRevealStage extends StatefulWidget {
   const _PlanRevealStage() : variant = _RevealVariant.halfMarathon12;
 
   const _PlanRevealStage.fiveK() : variant = _RevealVariant.fiveK8;
+
+  const _PlanRevealStage.fiveK12() : variant = _RevealVariant.fiveK12;
 
   const _PlanRevealStage.tenK() : variant = _RevealVariant.tenK10;
 
@@ -339,6 +348,26 @@ class _PlanRevealStage extends StatefulWidget {
 
 class _PlanRevealStageState extends State<_PlanRevealStage> {
   late final OnboardingAnswers _answers = switch (widget.variant) {
+    _RevealVariant.fiveK12 => OnboardingAnswers(
+        goal: '5k',
+        raceName: 'Dev 5K (12-wk)',
+        raceDate: DateTime.now().add(const Duration(days: 12 * 7)),
+        experienceRaw: 'regular',
+        experienceBridged: 'intermediate',
+        raceGoalRaw: 'target_time',
+        targetFinishSec: 21 * 60, // 21:00
+        baselineWeeklyKm: 24,
+        runsPerWeek: 5,
+        selectedDays: const [0, 1, 3, 4, 5], // Mon/Tue/Thu/Fri/Sat
+        longRunDayIndex: 5, // Saturday
+        paceDistance: '5k',
+        paceDistanceKm: 5.0,
+        currentTimeSec: 23 * 60, // 23:00 now → 21:00 goal
+        startDate: DateTime.now(),
+        planWeeks: 12,
+        vdot: 47,
+        vdotProvisional: false,
+      ),
     _RevealVariant.fiveK8 => OnboardingAnswers(
         goal: '5k',
         raceName: 'Dev 5K',
@@ -421,6 +450,16 @@ class _PlanRevealStageState extends State<_PlanRevealStage> {
   };
 
   late final PlanConfigState _config = switch (widget.variant) {
+    _RevealVariant.fiveK12 => PlanConfigState.fromInputs(
+        goalType: PlanGoalType.fiveK,
+        experience: ExperienceLevel.intermediate,
+        vDOT: 47,
+        runsPerWeek: 5,
+        longRunDay: 6, // Saturday (1 = Mon … 7 = Sun)
+        availableDays: const {1, 2, 4, 5, 6},
+        durationWeeks: 12,
+        currentWeeklyKm: 24,
+      ),
     _RevealVariant.fiveK8 => PlanConfigState.fromInputs(
         goalType: PlanGoalType.fiveK,
         experience: ExperienceLevel.intermediate,

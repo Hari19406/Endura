@@ -7,6 +7,7 @@ import '../../services/training_days_service.dart';
 import '../../engines/planner/race_plan_builder.dart';
 import '../../engines/memory/engine_memory_service.dart';
 import '../../engines/plan/plan_materialization_coordinator.dart';
+import '../../engines/plan/plan_store.dart' show PlanSyncOutcome;
 import '../../models/race_plan.dart';
 import '../../models/plan_config_state.dart';
 import '../../engines/core/vdot_calculator.dart';
@@ -165,6 +166,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// runs/week, gradual start). Null until the athlete touches a control;
   /// `_saveAll` then builds the plan from these instead of the raw answers.
   PlanConfigState? _tunedConfig;
+
+  /// The race-plan skeleton built in [_saveAll]. Held so the build screen's
+  /// [_persistMaterializedPlan] can materialise + persist the full plan and
+  /// await the result, rather than firing it off unawaited.
+  RacePlan? _builtSkeleton;
 
   // Computed
   int _vdot = 40;
@@ -843,17 +849,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         await EngineMemoryService().saveRacePlan(plan);
         Analytics.planCreated(goal: goalRace, level: exp);
 
-        // Materialise the full plan and persist it — but NEVER block finishing
-        // onboarding on it. If it's slow or fails, the runtime materialises on
-        // demand later. Fire-and-forget with a hard timeout.
-        unawaited(
-          _materializePlanInBackground(
-            plan: plan,
-            goalRace: goalRace,
-            experienceLevel: exp,
-          ),
-        );
+        // Hand the skeleton to the build screen, which materialises + persists
+        // the full plan (local cache + Supabase) and awaits the write so it can
+        // show a retry if only the on-device copy landed. See
+        // [_persistMaterializedPlan].
+        _builtSkeleton = plan;
       } catch (e) {
+        _builtSkeleton = null;
         debugPrint('[Onboarding] Race plan error: $e');
       }
 
@@ -894,25 +896,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
-  /// Build + persist the materialised plan off the critical path. Never awaited
-  /// by onboarding navigation; a slow network or a bug here must not trap the
-  /// user on the build screen.
-  Future<void> _materializePlanInBackground({
-    required RacePlan plan,
-    required String goalRace,
-    required String experienceLevel,
-  }) async {
-    // Let the onboarding → home transition settle before the (synchronous,
-    // CPU-heavy) full-plan build runs on the UI isolate.
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
+  /// Materialise the full plan from the skeleton [_saveAll] built and persist it
+  /// (local cache + Supabase), awaiting the cloud write so the build screen can
+  /// offer a retry when only the on-device copy landed.
+  ///
+  /// Returns:
+  ///   * [PlanSyncOutcome.syncedRemote]  — local + Supabase both written
+  ///   * [PlanSyncOutcome.savedNoRemote] — local written, no signed-in user to
+  ///     sync to (or the skeleton was never built); not retry-worthy
+  ///   * [PlanSyncOutcome.savedLocalOnly] — local written, cloud push failed or
+  ///     timed out; the build screen surfaces a retry
+  Future<PlanSyncOutcome> _persistMaterializedPlan() async {
+    final skeleton = _builtSkeleton;
+    if (skeleton == null) return PlanSyncOutcome.savedNoRemote;
+
+    final goalRace = _goal ?? '5k';
+    final exp = _bridgeExperience(_experience);
     try {
-      final materialized = await PlanMaterializationCoordinator.instance
-          .buildAndStore(
-            skeleton: plan,
+      final result = await PlanMaterializationCoordinator.instance
+          .buildAndPersist(
+            skeleton: skeleton,
             trainingDayIndices: _selectedDays,
             longRunDayIndex: _longRunDayIndex,
             goalRace: goalRace,
-            experienceLevel: experienceLevel,
+            experienceLevel: exp,
             vdot: _vdot,
             goalTimeSeconds: _targetFinishSec ?? _timeToBeatSec,
           )
@@ -922,15 +929,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // these three fields ride the next natural save.
       await EngineMemoryService().save(
         mem.copyWith(
-          materializedPlanId: materialized.planId,
-          sessionProgress: materialized.sessionProgress,
-          ladderPositions: materialized.ladderState,
+          materializedPlanId: result.plan.planId,
+          sessionProgress: result.plan.sessionProgress,
+          ladderPositions: result.plan.ladderState,
         ),
         syncToCloud: false,
       );
-      debugPrint('[Onboarding] Plan materialised: ${materialized.planId}');
+      debugPrint(
+        '[Onboarding] Plan materialised: ${result.plan.planId} '
+        '(${result.sync.name})',
+      );
+      return result.sync;
+    } on TimeoutException {
+      debugPrint('[Onboarding] Materialisation timed out — local copy only');
+      return PlanSyncOutcome.savedLocalOnly;
     } catch (e) {
+      // An engine failure here won't clear on retry and the runtime still
+      // materialises on demand later, so don't trap the user behind a retry.
       debugPrint('[Onboarding] Materialisation error (non-fatal): $e');
+      return PlanSyncOutcome.savedNoRemote;
     }
   }
 
@@ -1121,6 +1138,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         goal: _goal ?? '5k',
         onComplete: () async {
           await _saveAll();
+          final outcome = await _persistMaterializedPlan();
+          // Only a failed cloud sync is retry-worthy — a local-only save with
+          // no signed-in user (savedNoRemote) is expected and proceeds.
+          final ok = outcome != PlanSyncOutcome.savedLocalOnly;
+          if (ok && mounted) _next();
+          return ok;
+        },
+        onContinueAnyway: () {
+          // The plan is already in the local cache; the cloud copy rides the
+          // next natural sync. Let the user into the app.
           if (mounted) _next();
         },
       ),

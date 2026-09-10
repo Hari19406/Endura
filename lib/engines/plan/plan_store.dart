@@ -18,6 +18,23 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'materialized_plan.dart';
 
+/// Outcome of [PlanStore.saveAndSync] — lets a caller (onboarding's "building
+/// your plan" screen) tell "safely in the cloud" from "only on this device,
+/// retry later".
+enum PlanSyncOutcome {
+  /// Local cache written AND the Supabase row confirmed.
+  syncedRemote,
+
+  /// Local cache written, but the remote push failed (offline / server error).
+  /// The plan is safe on-device and will ride the next natural sync; the UI
+  /// should offer a retry.
+  savedLocalOnly,
+
+  /// Local cache written; there is no remote to sync to (signed out, or
+  /// Supabase not initialised). Not an error.
+  savedNoRemote,
+}
+
 class PlanStore {
   static final PlanStore instance = PlanStore._();
   PlanStore._();
@@ -46,19 +63,33 @@ class PlanStore {
   /// the background. Returns once the local write completes.
   Future<void> save(MaterializedPlan plan) async {
     final now = DateTime.now().toUtc();
-    final json = jsonEncode(plan.toJson());
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_localKey, json);
-    await prefs.setString(_localUpdatedAtKey, now.toIso8601String());
-
-    unawaited(_pushRemote(plan, now));
+    await _writeLocal(plan, now);
+    unawaited(_upsertRemote(plan, now));
   }
 
-  Future<void> _pushRemote(MaterializedPlan plan, DateTime updatedAt) async {
+  /// Like [save], but awaits the Supabase write and reports whether it landed.
+  /// Onboarding's plan-build screen uses the result to offer a retry when only
+  /// the on-device copy could be written.
+  Future<PlanSyncOutcome> saveAndSync(MaterializedPlan plan) async {
+    final now = DateTime.now().toUtc();
+    await _writeLocal(plan, now);
+
     final client = _client;
     final user = _user;
-    if (client == null || user == null) return;
+    if (client == null || user == null) return PlanSyncOutcome.savedNoRemote;
+
+    final ok = await _upsertRemote(plan, now);
+    return ok ? PlanSyncOutcome.syncedRemote : PlanSyncOutcome.savedLocalOnly;
+  }
+
+  /// Upsert this plan's row, then supersede every *other* plan for the user by
+  /// deleting it — the app keeps exactly one live materialised plan per user,
+  /// which is what lets [_loadRemote] use `maybeSingle()`. Returns whether the
+  /// upsert itself succeeded; the supersede sweep is best-effort.
+  Future<bool> _upsertRemote(MaterializedPlan plan, DateTime updatedAt) async {
+    final client = _client;
+    final user = _user;
+    if (client == null || user == null) return false;
     try {
       await client.from(_table).upsert({
         'user_id': user.id,
@@ -71,7 +102,18 @@ class PlanStore {
       }, onConflict: 'user_id,plan_id');
     } catch (e) {
       debugPrint('[PlanStore] remote push failed: $e');
+      return false;
     }
+    try {
+      await client
+          .from(_table)
+          .delete()
+          .eq('user_id', user.id)
+          .neq('plan_id', plan.planId);
+    } catch (e) {
+      debugPrint('[PlanStore] superseded-plan sweep failed: $e');
+    }
+    return true;
   }
 
   // ── Load ─────────────────────────────────────────────────────────────────
@@ -118,10 +160,15 @@ class PlanStore {
     final user = _user;
     if (client == null || user == null) return (null, null);
     try {
+      // Order + limit defensively: a fresh plan's row and the one it supersedes
+      // co-exist for the moment between the upsert and the sweep in
+      // [_upsertRemote], and a bare maybeSingle() throws on two rows.
       final row = await client
           .from(_table)
           .select('payload, updated_at')
           .eq('user_id', user.id)
+          .order('updated_at', ascending: false)
+          .limit(1)
           .maybeSingle();
       if (row == null) return (null, null);
       final plan = MaterializedPlan.fromJson(

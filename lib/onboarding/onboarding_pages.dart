@@ -2164,13 +2164,23 @@ class OPageRaceDay extends StatelessWidget {
 
 class OPageBuildPlan extends StatefulWidget {
   final String firstName, goal;
-  final Future<void> Function() onComplete;
+
+  /// Runs the save + materialise + persist. Returns `true` once the plan is
+  /// safely stored (in the cloud, or locally when there's no account to sync
+  /// to); `false` when only the on-device copy landed and a retry is worth
+  /// offering. The parent handles navigation on `true`.
+  final Future<bool> Function() onComplete;
+
+  /// "Continue anyway" from the retry state — the local plan is already saved,
+  /// so the parent just advances into the app.
+  final VoidCallback onContinueAnyway;
 
   const OPageBuildPlan({
     super.key,
     required this.firstName,
     required this.goal,
     required this.onComplete,
+    required this.onContinueAnyway,
   });
 
   @override
@@ -2181,6 +2191,11 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
     with SingleTickerProviderStateMixin {
   late AnimationController _ring;
   int _stage = 0;
+
+  /// The cloud write failed — show the retry affordance instead of hanging at
+  /// 100%.
+  bool _failed = false;
+  bool _saving = false;
 
   static const _steps = [
     'Analysing your profile...',
@@ -2206,10 +2221,48 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) setState(() => _stage = 3);
     });
-    Future.delayed(const Duration(milliseconds: 3400), () async {
+    Future.delayed(const Duration(milliseconds: 3400), () {
       if (mounted) setState(() => _stage = 4);
-      await widget.onComplete();
+      _runSave();
     });
+  }
+
+  Future<void> _runSave() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
+    bool ok = false;
+    try {
+      ok = await widget.onComplete();
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    // ok == true means the parent has already navigated away from this screen.
+    if (ok) return;
+    setState(() {
+      _saving = false;
+      _failed = true;
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: EC.surface2,
+          content: const Text(
+            "Couldn't sync your plan — check your connection.",
+            style: TextStyle(color: EC.textPrimary),
+          ),
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: EC.teal,
+            onPressed: _runSave,
+          ),
+        ),
+      );
   }
 
   @override
@@ -2220,8 +2273,11 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
 
   @override
   Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).size.height * 0.25;
-    return Padding(
+    // Shrink the hero gap once the retry block is showing so the extra content
+    // still fits on shorter screens.
+    final topPad =
+        MediaQuery.of(context).size.height * (_failed ? 0.08 : 0.25);
+    return SingleChildScrollView(
       padding: ET.pagePad,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
@@ -2300,6 +2356,64 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
               ),
             );
           }),
+          if (_failed) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: const [
+                Icon(Icons.cloud_off_rounded, size: 18, color: EC.textSecondary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Your plan is saved on this device but we couldn’t '
+                    'sync it to the cloud yet.',
+                    style: TextStyle(fontSize: 13, color: EC.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _runSave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: EC.teal,
+                  foregroundColor: EC.black,
+                  disabledBackgroundColor: EC.surface2,
+                  disabledForegroundColor: EC.muted,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ET.radius),
+                  ),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(EC.black),
+                        ),
+                      )
+                    : const Text(
+                        'Try again',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: _saving ? null : widget.onContinueAnyway,
+              child: const Text(
+                'Continue anyway',
+                style: TextStyle(fontSize: 14, color: EC.textSecondary),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -10,6 +10,7 @@ import 'package:run_app/engines/config/volume_model.dart';
 import 'package:run_app/engines/config/workout_template_library.dart';
 import 'package:run_app/engines/plan/week_resolver.dart';
 import 'package:run_app/engines/planner/race_plan_builder.dart';
+import 'package:run_app/models/race_plan.dart' show WeekTarget;
 import 'package:run_app/models/training_phase.dart';
 import 'package:run_app/onboarding/plan_reveal_data.dart';
 
@@ -782,6 +783,130 @@ void main() {
       expect(p7, greaterThanOrEqualTo(p6));
       expect(p7, lessThanOrEqualTo(100 + 0.5));
       expect(p4, greaterThanOrEqualTo(70)); // still a real marathon build
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  group('5K custom durations — 12-week 3:1 build', () {
+    const resolver = WeekResolver();
+    final now = DateTime(2026, 1, 5);
+    const days = [0, 1, 3, 4, 5]; // Mon/Tue/Thu/Fri/Sat
+
+    ({List<WeekTarget> raw, List<WeekResolution> resolved}) build5k({
+      required int durationWeeks,
+      double baseline = 24,
+      int runsPerWeek = 5,
+    }) {
+      final plan = RacePlanBuilder.build(
+        currentWeeklyKm: baseline,
+        goalRace: '5k',
+        raceDate: now.add(Duration(days: durationWeeks * 7)),
+        experienceLevel: 'intermediate',
+        now: now,
+        durationWeeks: durationWeeks,
+        runsPerWeek: runsPerWeek,
+      );
+      final resolved = [
+        for (final w in plan.weeks)
+          resolver.resolve(
+            weekTarget: w,
+            trainingDayIndices: days,
+            raceDistance: RaceDistance.fiveK,
+            phase: w.phase,
+            experienceLevel: ExperienceLevel.intermediate,
+            currentWeeklyKm: w.targetKm,
+            longRunDayIndex: 5,
+            weekNumber: w.week,
+            isCutbackWeek:
+                w.week % 4 == 0 && w.phase != TrainingPhase.taper,
+            taperWeekNumber: 1,
+          ),
+      ];
+      return (raw: plan.weeks, resolved: resolved);
+    }
+
+    test('duration clamp honours 6…16+ weeks for a 5K — no 8-week cutoff', () {
+      for (final d in const [6, 8, 10, 12, 14, 16, 18]) {
+        final p = build5k(durationWeeks: d);
+        expect(p.raw.length, d, reason: '$d-week plan');
+        expect(p.raw.where((w) => w.phase == TrainingPhase.taper).length, 1,
+            reason: '$d-week plan keeps a single 5K taper week');
+        expect(p.raw.last.phase, TrainingPhase.taper);
+        expect(p.raw.take(d - 1).every((w) => w.phase != TrainingPhase.taper),
+            isTrue);
+      }
+    });
+
+    test('12-week plan lays out two 3:1 cycles + build/peak + a taper week', () {
+      final p = build5k(durationWeeks: 12);
+      expect(p.raw.length, 12);
+
+      // Deload weeks are the 3:1 cutbacks at W4 and W8 (0-indexed 3, 7).
+      for (final di in const [3, 7]) {
+        final prev = p.raw[di - 1].targetKm;
+        expect(p.raw[di].targetKm, lessThanOrEqualTo(prev + 0.01),
+            reason: 'W${di + 1} pauses the load ramp');
+        // resolver applies the ~0.70 cutback multiplier
+        expect(p.resolved[di].targetKm,
+            lessThan(p.resolved[di - 1].targetKm * 0.85),
+            reason: 'W${di + 1} effective volume drops');
+        // and the ramp recovers the week after
+        expect(p.raw[di + 1].targetKm, greaterThan(p.raw[di].targetKm),
+            reason: 'W${di + 2} resumes loading');
+      }
+
+      // W9–W11 are pure load (build/peak, no cutback); W12 is the taper.
+      expect(p.raw[8].phase, anyOf(TrainingPhase.build, TrainingPhase.peak));
+      expect(p.raw[9].phase, TrainingPhase.peak);
+      expect(p.raw[10].phase, TrainingPhase.peak);
+      expect(p.raw[11].phase, TrainingPhase.taper);
+      expect(p.resolved[11].targetKm, lessThan(p.resolved[10].targetKm),
+          reason: 'taper week sheds volume');
+    });
+
+    test('load weeks ramp < 10% week-over-week', () {
+      final p = build5k(durationWeeks: 12);
+      // consecutive weeks where neither is a deload nor the taper
+      const loadPairs = [(0, 1), (1, 2), (4, 5), (5, 6), (8, 9), (9, 10)];
+      for (final (a, b) in loadPairs) {
+        final ratio = p.raw[b].targetKm / p.raw[a].targetKm;
+        expect(ratio, lessThanOrEqualTo(1.10 + 1e-6),
+            reason: 'W${a + 1}→W${b + 1} jump = '
+                '${((ratio - 1) * 100).toStringAsFixed(1)}%');
+        expect(ratio, greaterThan(1.0));
+      }
+    });
+
+    test('peak volume stays inside the 5K envelope ceiling', () {
+      final p = build5k(durationWeeks: 12);
+      final peakEff = p.resolved
+          .map((r) => r.targetKm)
+          .reduce((x, y) => x > y ? x : y);
+      expect(peakEff,
+          lessThanOrEqualTo(RaceArchetypeEnvelope.fiveK.peakKm.max + 0.5));
+    });
+
+    test('every long run is clamped to min(25% of week, 12 km)', () {
+      final p = build5k(durationWeeks: 12);
+
+      // The skeleton — what the reveal curve reads — is the hard guarantee.
+      for (final w in p.raw) {
+        expect(w.longRunKm, lessThanOrEqualTo(12.0 + 0.001),
+            reason: 'skeleton W${w.week}: ${w.longRunKm} km');
+      }
+
+      // The resolved workout may drift up to the 0.33 operational fraction on a
+      // tight week, but never far past the 12 km ceiling.
+      for (final r in p.resolved) {
+        final km = r.days.firstWhere((d) => d.isLongRun).distanceKm ?? 0;
+        expect(km, lessThanOrEqualTo(12.0 + 1.5),
+            reason: 'resolved W${r.weekNumber}: $km km');
+        final isCutback = r.weekNumber % 4 == 0;
+        if (r.phase != TrainingPhase.taper && !isCutback && r.targetKm > 0) {
+          expect(km / r.targetKm, lessThanOrEqualTo(0.34),
+              reason: 'W${r.weekNumber}');
+        }
+      }
     });
   });
 }

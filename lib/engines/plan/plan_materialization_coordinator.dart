@@ -31,7 +31,62 @@ class PlanMaterializationCoordinator {
     MaterializedPlan? previous,
     DateTime? now,
   }) async {
-    final plan = _materializer.materialize(
+    final plan = _build(
+      skeleton: skeleton,
+      trainingDayIndices: trainingDayIndices,
+      longRunDayIndex: longRunDayIndex,
+      goalRace: goalRace,
+      experienceLevel: experienceLevel,
+      vdot: vdot,
+      goalTimeSeconds: goalTimeSeconds,
+      previous: previous,
+      now: now,
+    );
+    await PlanStore.instance.save(plan);
+    return plan;
+  }
+
+  /// Same build as [buildAndStore], but awaits the cloud write and hands back
+  /// its outcome so the caller can surface a retry. Used by onboarding's plan
+  /// build screen, which must know whether the plan reached Supabase.
+  Future<({MaterializedPlan plan, PlanSyncOutcome sync})> buildAndPersist({
+    required RacePlan skeleton,
+    required List<int> trainingDayIndices,
+    required int? longRunDayIndex,
+    required String goalRace,
+    required String experienceLevel,
+    required int vdot,
+    int? goalTimeSeconds,
+    MaterializedPlan? previous,
+    DateTime? now,
+  }) async {
+    final plan = _build(
+      skeleton: skeleton,
+      trainingDayIndices: trainingDayIndices,
+      longRunDayIndex: longRunDayIndex,
+      goalRace: goalRace,
+      experienceLevel: experienceLevel,
+      vdot: vdot,
+      goalTimeSeconds: goalTimeSeconds,
+      previous: previous,
+      now: now,
+    );
+    final sync = await PlanStore.instance.saveAndSync(plan);
+    return (plan: plan, sync: sync);
+  }
+
+  MaterializedPlan _build({
+    required RacePlan skeleton,
+    required List<int> trainingDayIndices,
+    required int? longRunDayIndex,
+    required String goalRace,
+    required String experienceLevel,
+    required int vdot,
+    int? goalTimeSeconds,
+    MaterializedPlan? previous,
+    DateTime? now,
+  }) {
+    return _materializer.materialize(
       skeleton: skeleton,
       trainingDayIndices: trainingDayIndices,
       longRunDayIndex: longRunDayIndex,
@@ -49,8 +104,6 @@ class PlanMaterializationCoordinator {
       previous: previous,
       now: now,
     );
-    await PlanStore.instance.save(plan);
-    return plan;
   }
 
   /// Reload from PlanStore, keep frozen weeks, re-resolve the rest, save.
