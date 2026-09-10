@@ -6,6 +6,8 @@ import '../utils/stats.dart';
 import '../engines/coach_engine_v2.dart';
 import '../engines/plan/plan_store.dart';
 import '../engines/plan/materialized_plan.dart';
+import '../services/plan_adaptation_coordinator.dart';
+import '../widgets/plan_adaptation_card.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -562,6 +564,20 @@ class _HomeScreenState extends State<HomeScreen>
   ConsistencyData? _consistencyData;
   EngineMemory? _engineMemory;
 
+  // ── Plan adaptation (inline coach banner) ─────────────────────────────────
+  /// A missed-block recalibration the athlete has not yet accepted or
+  /// dismissed. Null when there is nothing to review.
+  AdaptationPrompt? _adaptationPrompt;
+
+  /// The `rangeKey` the athlete last accepted or dismissed — persisted so the
+  /// same gap never re-prompts (a longer gap gets a new key and still can).
+  String? _adaptationHandledKey;
+
+  /// True while the accept write is in flight.
+  bool _adaptationBusy = false;
+
+  static const _adaptationHandledKeyPref = 'plan_adaptation_handled_key';
+
   // ── Greeting / header state ───────────────────────────────────────────────
   String _userName = '';
   DateTime? _raceDate;
@@ -817,6 +833,41 @@ class _HomeScreenState extends State<HomeScreen>
         widget.onCoachMessageReady?.call(null);
       }
 
+      // ── Missed-block detection → inline coach banner ────────────────────
+      // Opt-in only: PlanAdaptationCoordinator computes what changed and the
+      // athlete reviews it. Nothing is applied until they tap "Review &
+      // Accept". Failure here never blocks the dashboard.
+      try {
+        _adaptationHandledKey = prefs.getString(_adaptationHandledKeyPref);
+        final materialized = await PlanStore.instance.load();
+        if (materialized != null && !_showPlanComplete) {
+          final now = DateTime.now();
+          final weeksToRace = _raceDate != null
+              ? _raceDate!.difference(now).inDays ~/ 7
+              : materialized.totalWeeks;
+          final prompt = const PlanAdaptationCoordinator().detect(
+            plan: materialized,
+            completedRunDates: runs.map((r) => r.date),
+            now: now,
+            remainingWeeksToRace: weeksToRace < 0 ? 0 : weeksToRace,
+          );
+          final fresh =
+              prompt != null && prompt.rangeKey != _adaptationHandledKey;
+          if (fresh && _adaptationPrompt?.rangeKey != prompt.rangeKey) {
+            Analytics.capture('plan_adaptation_shown', properties: {
+              'window': prompt.missedWindow.name,
+              'missed_sessions': prompt.missedSessions,
+            });
+          }
+          _adaptationPrompt = fresh ? prompt : null;
+        } else {
+          _adaptationPrompt = null;
+        }
+      } catch (e) {
+        debugPrint('[HomeScreen] adaptation detect failed: $e');
+        _adaptationPrompt = null;
+      }
+
       _consistencyData = await ConsistencyService.compute();
     } catch (e) {
       debugPrint('Error loading data: $e');
@@ -892,6 +943,52 @@ class _HomeScreenState extends State<HomeScreen>
     'marathon' => 'Marathon',
     _ => '5K',
   };
+
+  // ── Plan adaptation banner actions ───────────────────────────────────────
+
+  /// "Review & Accept" — persist the recalibrated plan and refresh the
+  /// dashboard off it. The range is also marked handled so it never re-prompts.
+  Future<void> _onAcceptAdaptation() async {
+    final prompt = _adaptationPrompt;
+    if (prompt == null || _adaptationBusy) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _adaptationBusy = true);
+    try {
+      await PlanStore.instance.saveAndSync(prompt.recalibration.updatedPlan);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_adaptationHandledKeyPref, prompt.rangeKey);
+      _adaptationHandledKey = prompt.rangeKey;
+      Analytics.capture('plan_adaptation_accepted', properties: {
+        'window': prompt.missedWindow.name,
+        'missed_sessions': prompt.missedSessions,
+      });
+    } catch (e) {
+      debugPrint('[HomeScreen] adaptation accept failed: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _adaptationBusy = false;
+      _adaptationPrompt = null;
+    });
+    await loadData();
+  }
+
+  /// "Dismiss" — remember this specific missed range so it stops nagging, but
+  /// leave the plan untouched.
+  Future<void> _onDismissAdaptation() async {
+    final prompt = _adaptationPrompt;
+    if (prompt == null) return;
+    HapticFeedback.lightImpact();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_adaptationHandledKeyPref, prompt.rangeKey);
+    _adaptationHandledKey = prompt.rangeKey;
+    Analytics.capture('plan_adaptation_dismissed', properties: {
+      'window': prompt.missedWindow.name,
+      'missed_sessions': prompt.missedSessions,
+    });
+    if (!mounted) return;
+    setState(() => _adaptationPrompt = null);
+  }
 
   // ── Cloud / profile helpers (unchanged) ───────────────────────────────────
 
@@ -1298,6 +1395,22 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
               const SizedBox(height: 10),
+
+              // ── Inline coach banner: missed-block recalibration ──────────
+              // Sits above the daily workout card. Opt-in — the plan only
+              // changes if the athlete taps "Review & Accept".
+              if (!_showPlanComplete &&
+                  _engineMemory?.hasRacePlan == true &&
+                  _adaptationPrompt != null) ...[
+                PlanAdaptationCard(
+                  explanation: _adaptationPrompt!.coachExplanation,
+                  window: _adaptationPrompt!.missedWindow,
+                  busy: _adaptationBusy,
+                  onReviewAccept: _onAcceptAdaptation,
+                  onDismiss: _onDismissAdaptation,
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // ── Plan complete card OR no-plan CTA OR normal workout card ──
               if (_showPlanComplete && _engineMemory != null)
