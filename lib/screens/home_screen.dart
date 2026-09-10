@@ -960,7 +960,9 @@ class _HomeScreenState extends State<HomeScreen>
         debugPrint('$stack');
         _coachMessage = null;
         _workoutModel = _planResolvingModel;
+        _scheduledContext = null;
         widget.onCoachMessageReady?.call(null);
+        widget.onScheduledContextReady?.call(null);
       }
 
       // ── Missed-block detection → inline coach banner ────────────────────
@@ -1589,6 +1591,7 @@ class _HomeScreenState extends State<HomeScreen>
                                           coachMessage: scaled,
                                           onGoToRun: () =>
                                               widget.onNavigateToRun?.call(),
+                                          scheduledContext: _scheduledContext,
                                         ),
                                       ),
                                     ),

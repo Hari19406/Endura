@@ -2188,7 +2188,10 @@ class _RunScreenState extends State<RunScreen>
             WorkoutStepHud(
               stepIndex: _stepIndex.clamp(0, _sched!.blocks.length - 1),
               blocks: _sched!.blocks,
-              rollingPaceSecPerKm: _paceSnapshot.smoothedPaceSecondsPerKm,
+              rollingPaceSecPerKm:
+                  _paceSnapshot.smoothedPaceSecondsPerKm > 0
+                  ? _paceSnapshot.smoothedPaceSecondsPerKm.round()
+                  : null,
               onNextStep: _advanceStep,
             ),
           ],

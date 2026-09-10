@@ -11,6 +11,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/coach_message_builder.dart' as message;
+import '../models/scheduled_workout_context.dart';
 import '../theme/app_colors.dart';
 import '../utils/refreshable.dart';
 import 'feed_screen.dart';
@@ -33,6 +34,7 @@ class _MainScreenState extends State<MainScreen> {
 
   int _currentIndex = _coachTab;
   message.CoachMessage? _activeCoachMessage;
+  ScheduledWorkoutContext? _scheduledContext;
 
   /// Bumped to ask the Record tab to start an unguided Free Run immediately
   /// (from the Coach tab's Quick Start button).
@@ -74,6 +76,12 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  void _onScheduledContextReady(ScheduledWorkoutContext? ctx) {
+    if (!identical(_scheduledContext, ctx)) {
+      setState(() => _scheduledContext = ctx);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,11 +94,13 @@ class _MainScreenState extends State<MainScreen> {
             onNavigateToYou: _navigateToYou,
             onNavigateToRun: _navigateToRun,
             onCoachMessageReady: _onCoachMessageReady,
+            onScheduledContextReady: _onScheduledContextReady,
             onQuickStartFreeRun: _startFreeRun,
           ),
           RunScreenWrapper(
             onRunCompleted: _onRunCompleted,
             activeCoachMessage: _activeCoachMessage,
+            scheduledContext: _scheduledContext,
             freeRunSignal: _freeRunSignal,
           ),
           YouScreenWrapper(key: _youKey),
@@ -151,6 +161,7 @@ class HomeScreenWrapper extends StatefulWidget {
   final VoidCallback onNavigateToRun;
   final VoidCallback onQuickStartFreeRun;
   final void Function(message.CoachMessage?) onCoachMessageReady;
+  final void Function(ScheduledWorkoutContext?) onScheduledContextReady;
 
   const HomeScreenWrapper({
     super.key,
@@ -158,6 +169,7 @@ class HomeScreenWrapper extends StatefulWidget {
     required this.onNavigateToRun,
     required this.onQuickStartFreeRun,
     required this.onCoachMessageReady,
+    required this.onScheduledContextReady,
   });
 
   @override
@@ -182,6 +194,7 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
       onNavigateToYou: widget.onNavigateToYou,
       onNavigateToRun: widget.onNavigateToRun,
       onCoachMessageReady: widget.onCoachMessageReady,
+      onScheduledContextReady: widget.onScheduledContextReady,
       onQuickStartFreeRun: widget.onQuickStartFreeRun,
     );
   }
@@ -190,6 +203,7 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
 class RunScreenWrapper extends StatelessWidget {
   final VoidCallback onRunCompleted;
   final message.CoachMessage? activeCoachMessage;
+  final ScheduledWorkoutContext? scheduledContext;
   final ValueNotifier<int> freeRunSignal;
 
   const RunScreenWrapper({
@@ -197,6 +211,7 @@ class RunScreenWrapper extends StatelessWidget {
     required this.onRunCompleted,
     required this.freeRunSignal,
     this.activeCoachMessage,
+    this.scheduledContext,
   });
 
   @override
@@ -204,6 +219,7 @@ class RunScreenWrapper extends StatelessWidget {
     return RunScreen(
       onWorkoutCompleted: onRunCompleted,
       activeCoachMessage: activeCoachMessage,
+      scheduledContext: scheduledContext,
       freeRunSignal: freeRunSignal,
     );
   }

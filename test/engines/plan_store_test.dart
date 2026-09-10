@@ -185,4 +185,77 @@ void main() {
       },
     );
   });
+
+  group('markDayCompleted', () {
+    test('stamps a completion onto the matching plan day and persists it',
+        () async {
+      await PlanStore.instance.save(planWith(id: 'p'));
+
+      final ok = await PlanStore.instance.markDayCompleted(
+        weekNumber: 1,
+        weekday: 6, // the long-run day in planWith()
+        actualKm: 12.4,
+        actualPaceSecPerKm: 305,
+        runId: '42',
+        completedAt: DateTime.parse('2026-09-11T07:30:00.000Z'),
+      );
+      expect(ok, isTrue);
+
+      final loaded = await PlanStore.instance.load();
+      final day = loaded!.weeks.single.days[6];
+      expect(day.isCompleted, isTrue);
+      expect(day.completion!.actualKm, 12.4);
+      expect(day.completion!.actualPaceSecPerKm, 305);
+      expect(day.completion!.runId, '42');
+    });
+
+    test('returns false when the day is already completed', () async {
+      await PlanStore.instance.save(planWith(id: 'p'));
+      await PlanStore.instance.markDayCompleted(
+        weekNumber: 1,
+        weekday: 6,
+        actualKm: 10,
+      );
+      final second = await PlanStore.instance.markDayCompleted(
+        weekNumber: 1,
+        weekday: 6,
+        actualKm: 11,
+      );
+      expect(second, isFalse);
+      // The first completion is untouched.
+      final loaded = await PlanStore.instance.load();
+      expect(loaded!.weeks.single.days[6].completion!.actualKm, 10);
+    });
+
+    test('returns false when the week or weekday is not in the plan', () async {
+      await PlanStore.instance.save(planWith(id: 'p'));
+      expect(
+        await PlanStore.instance.markDayCompleted(
+          weekNumber: 9,
+          weekday: 6,
+          actualKm: 8,
+        ),
+        isFalse,
+      );
+      expect(
+        await PlanStore.instance.markDayCompleted(
+          weekNumber: 1,
+          weekday: 3,
+          actualKm: 8,
+        ),
+        isTrue, // day 3 exists (a rest slot) — still linkable
+      );
+    });
+
+    test('returns false when no plan is stored', () async {
+      expect(
+        await PlanStore.instance.markDayCompleted(
+          weekNumber: 1,
+          weekday: 0,
+          actualKm: 5,
+        ),
+        isFalse,
+      );
+    });
+  });
 }
