@@ -22,6 +22,9 @@ import '../services/shoe_service.dart';
 import '../services/profile_service.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../widgets/target_pace_indicator.dart';
+import '../widgets/workout_step_hud.dart';
+import '../models/scheduled_workout_context.dart';
+import '../engines/plan/plan_store.dart';
 import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/analytics_service.dart';
@@ -50,6 +53,12 @@ class RunScreen extends StatefulWidget {
   final message.CoachMessage? activeCoachMessage;
   final VoidCallback? onWorkoutCompleted;
 
+  /// The plan slot this run fulfils, when started from a scheduled workout.
+  /// Null for ad-hoc / free runs (bottom-nav quick start) — see
+  /// [ScheduledWorkoutContext]. Drives the in-run step HUD and the completion
+  /// link written on save.
+  final ScheduledWorkoutContext? scheduledContext;
+
   /// Incremented by the shell when the Coach tab's "Free Run" button is tapped.
   /// While this screen is in the ready state, a bump starts an unguided run.
   final ValueNotifier<int>? freeRunSignal;
@@ -58,6 +67,7 @@ class RunScreen extends StatefulWidget {
     super.key,
     this.activeCoachMessage,
     this.onWorkoutCompleted,
+    this.scheduledContext,
     this.freeRunSignal,
   });
 
@@ -177,6 +187,23 @@ class _RunScreenState extends State<RunScreen>
   List<LatLng> _capturedMainRoute = [];
 
   static const int _warmupCooldownDurationSeconds = 600; // 10 min
+
+  // ── Scheduled-workout step HUD (manual advance) ───────────────────────────
+  /// 0-based index into [ScheduledWorkoutContext.blocks]. Advanced only by the
+  /// "Next Step" button — no GPS auto-advance.
+  int _stepIndex = 0;
+
+  ScheduledWorkoutContext? get _sched => widget.scheduledContext;
+
+  bool get _hasStructuredSteps =>
+      !_isFreeRun && (_sched?.hasStructuredSteps ?? false);
+
+  void _advanceStep() {
+    final blocks = _sched?.blocks;
+    if (blocks == null || _stepIndex >= blocks.length - 1) return;
+    HapticFeedback.selectionClick();
+    setState(() => _stepIndex++);
+  }
 
   // ── Resolved workout helpers ──────────────────────────────────────────────
   ResolvedWorkout? get _workout =>
@@ -1316,11 +1343,33 @@ class _RunScreenState extends State<RunScreen>
           peakCadence: peakCadence,
           gapAveragePace: gapAveragePace,
           trackSamples: capturedTrackSamples,
+          scheduledDayId: _isFreeRun ? null : _sched?.dayId,
         );
-        await DatabaseService.instance.insertRun(newRun);
+        final insertedId = await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then(
           (r) => debugPrint('Sync: $r'),
         );
+
+        // Link the completed run straight onto the plan day — no post-hoc
+        // fuzzy distance scan. Best-effort; never blocks the summary.
+        if (!_isFreeRun && _sched != null) {
+          try {
+            final km = _capturedMainDistanceM / 1000;
+            final paceSecPerKm = km > 0
+                ? (_capturedMainSeconds / km).round()
+                : null;
+            await PlanStore.instance.markDayCompleted(
+              weekNumber: _sched!.weekNumber,
+              weekday: _sched!.weekday,
+              actualKm: km,
+              actualPaceSecPerKm: paceSecPerKm,
+              runId: insertedId > 0 ? insertedId.toString() : null,
+              completedAt: runDate,
+            );
+          } catch (e) {
+            debugPrint('[run save] plan-day link skipped: $e');
+          }
+        }
 
         // Social/offline-first side effects — best-effort, never block the
         // summary screen. Accrue mileage on the default shoe and refresh the
@@ -1380,6 +1429,8 @@ class _RunScreenState extends State<RunScreen>
             },
             activeCoachMessage: _isFreeRun ? null : _activeCoachMessage,
             isFreeRun: _isFreeRun,
+            scheduledWorkoutLinked: !_isFreeRun && _sched != null,
+            scheduledWeekNumber: _sched?.weekNumber,
           ),
         ),
       );
@@ -2130,6 +2181,17 @@ class _RunScreenState extends State<RunScreen>
               ),
             ],
           ),
+          if (_hasStructuredSteps && isActive) ...[
+            const SizedBox(height: 14),
+            Container(height: 1, color: c.divider),
+            const SizedBox(height: 14),
+            WorkoutStepHud(
+              stepIndex: _stepIndex.clamp(0, _sched!.blocks.length - 1),
+              blocks: _sched!.blocks,
+              rollingPaceSecPerKm: _paceSnapshot.smoothedPaceSecondsPerKm,
+              onNextStep: _advanceStep,
+            ),
+          ],
           if (showPaceIndicator) ...[
             const SizedBox(height: 14),
             Container(height: 1, color: c.divider),

@@ -10,6 +10,7 @@ import '../services/plan_adaptation_coordinator.dart';
 import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
 import '../widgets/plan_adaptation_card.dart';
+import '../models/scheduled_workout_context.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -612,6 +613,10 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onRunCompleted;
   final void Function(message.CoachMessage?)? onCoachMessageReady;
 
+  /// Emits the resolved plan slot for today's workout (or null on a rest / no-
+  /// plan day) so the Record tab can start a guided run already linked to it.
+  final void Function(ScheduledWorkoutContext?)? onScheduledContextReady;
+
   /// Coach tab → "Free Run": jump to the Record tab and start an unguided run.
   final VoidCallback? onQuickStartFreeRun;
 
@@ -621,6 +626,7 @@ class HomeScreen extends StatefulWidget {
     this.onNavigateToRun,
     this.onRunCompleted,
     this.onCoachMessageReady,
+    this.onScheduledContextReady,
     this.onQuickStartFreeRun,
   });
 
@@ -678,6 +684,11 @@ class _HomeScreenState extends State<HomeScreen>
   bool _adaptationBusy = false;
 
   static const _adaptationHandledKeyPref = 'plan_adaptation_handled_key';
+
+  /// Today's resolved plan slot — passed into the run tracker so a guided run
+  /// drives the step HUD and links straight onto the plan day on save. Null on
+  /// a rest / no-plan day.
+  ScheduledWorkoutContext? _scheduledContext;
 
   // ── Greeting / header state ───────────────────────────────────────────────
   String _userName = '';
@@ -908,9 +919,11 @@ class _HomeScreenState extends State<HomeScreen>
         if (dayContext == null) {
           _coachMessage = null;
           _workoutModel = _planResolvingModel;
+          _scheduledContext = null;
         } else if (dayContext.isRest) {
           _coachMessage = null;
           _workoutModel = _restDayModel;
+          _scheduledContext = null;
         } else {
           final next = _nextPlannedSession(dayContext.week, now);
           final built = _messageBuilder.buildMessage(
@@ -926,9 +939,15 @@ class _HomeScreenState extends State<HomeScreen>
             built,
             completion: dayContext.day.completion,
           );
+          // Already logged today? Then there's nothing to start — leave the
+          // link null so a bonus run stays a free run.
+          _scheduledContext = dayContext.isCompleted
+              ? null
+              : ScheduledWorkoutContext.fromDayContext(dayContext);
         }
 
         widget.onCoachMessageReady?.call(_coachMessage);
+        widget.onScheduledContextReady?.call(_scheduledContext);
 
         // Weekly planned volume comes straight off the materialised week.
         // setWeeklyPlannedKm early-returns when unchanged (~one write/week).
@@ -1904,7 +1923,6 @@ class _HomeScreenState extends State<HomeScreen>
       MaterialPageRoute(
         builder: (_) => PlanOverviewScreen(
           racePlan: racePlan,
-          activePlan: _activePlan,
           useMiles: UnitUtils.useMilesNotifier.value,
           trainingDayIndices: _trainingDayIndices,
           longRunDayIndex: _engineMemory?.longRunDayIndex,

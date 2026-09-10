@@ -208,6 +208,52 @@ class PlanStore {
     );
   }
 
+  // ── Write: mark a day completed ──────────────────────────────────────────
+
+  /// Stamp [DayCompletion] onto the plan day at [weekNumber] / [weekday]
+  /// (0 = Monday) and persist (local + Supabase via [saveAndSync]). Called the
+  /// moment a guided run is saved, so the plan reflects the completed session
+  /// immediately — no post-hoc fuzzy distance scan.
+  ///
+  /// Returns true when a matching, not-yet-completed day was updated; false
+  /// when there is no plan, the slot is missing, or it was already linked.
+  Future<bool> markDayCompleted({
+    required int weekNumber,
+    required int weekday,
+    required double actualKm,
+    int? actualPaceSecPerKm,
+    double? rpe,
+    String? runId,
+    DateTime? completedAt,
+  }) async {
+    final plan = await load();
+    if (plan == null) return false;
+
+    final wi = plan.weeks.indexWhere((w) => w.weekNumber == weekNumber);
+    if (wi < 0) return false;
+    final week = plan.weeks[wi];
+
+    final di = week.days.indexWhere((d) => d.weekday == weekday);
+    if (di < 0) return false;
+    if (week.days[di].isCompleted) return false;
+
+    final updatedDay = week.days[di].copyWith(
+      completion: DayCompletion(
+        completedAt: completedAt ?? DateTime.now(),
+        actualKm: actualKm,
+        actualPaceSecPerKm: actualPaceSecPerKm,
+        rpe: rpe,
+        runId: runId,
+      ),
+    );
+    final days = List<MaterializedDay>.of(week.days)..[di] = updatedDay;
+    final weeks = List<MaterializedWeek>.of(plan.weeks)
+      ..[wi] = week.copyWith(days: days);
+
+    await saveAndSync(plan.copyWith(weeks: weeks));
+    return true;
+  }
+
   // ── Clear ────────────────────────────────────────────────────────────────
 
   /// Drop the cached plan (e.g. plan ended, or user signed out). Remote rows

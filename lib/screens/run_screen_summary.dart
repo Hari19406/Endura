@@ -39,6 +39,13 @@ class RunSummaryScreen extends StatefulWidget {
   final message.CoachMessage? activeCoachMessage;
   final bool isFreeRun;
 
+  /// True when this run was started from a scheduled plan workout and has just
+  /// been linked onto that plan day (MaterializedDay.completion written).
+  final bool scheduledWorkoutLinked;
+
+  /// Plan week the linked workout belonged to, for the confirmation chip.
+  final int? scheduledWeekNumber;
+
   const RunSummaryScreen({
     super.key,
     required this.distanceKm,
@@ -52,6 +59,8 @@ class RunSummaryScreen extends StatefulWidget {
     required this.onDiscard,
     this.activeCoachMessage,
     this.isFreeRun = false,
+    this.scheduledWorkoutLinked = false,
+    this.scheduledWeekNumber,
   });
 
   @override
@@ -243,6 +252,38 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     };
   }
 
+  Widget _buildScheduledLinkChip(BuildContext context) {
+    final c = context.colors;
+    final wk = widget.scheduledWeekNumber;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: c.success.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.success.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_available_rounded, size: 16, color: c.success),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              wk != null
+                  ? 'Logged against your plan — Week $wk workout complete'
+                  : 'Logged against your plan — workout complete',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: c.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_SummaryData>(
@@ -320,6 +361,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                   ],
                                 ),
                               ),
+                              if (widget.scheduledWorkoutLinked) ...[
+                                _buildScheduledLinkChip(context),
+                                const SizedBox(height: 12),
+                              ],
                               _buildStatsCard(),
                               const SizedBox(height: 12),
                               _buildPaceCard(),

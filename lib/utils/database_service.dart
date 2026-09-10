@@ -47,6 +47,11 @@ class RunRecord {
   // recorded before this field existed. ───────────────────────────────────
   final List<Map<String, dynamic>> trackSamples;
 
+  // ── Link to the plan slot this run fulfilled. Format
+  // "<planId>::w<week>::d<weekday>" (see ScheduledWorkoutContext.dayId). Null
+  // for free runs and for runs recorded before this field existed. ─────────
+  final String? scheduledDayId;
+
   const RunRecord({
     this.id,
     required this.distanceKm,
@@ -67,6 +72,7 @@ class RunRecord {
     this.peakCadence,
     this.gapAveragePace,
     this.trackSamples = const [],
+    this.scheduledDayId,
   });
 
   Map<String, dynamic> toMap() => {
@@ -92,6 +98,7 @@ class RunRecord {
     if (peakCadence != null) 'peak_cadence': peakCadence,
     if (gapAveragePace != null) 'gap_average_pace': gapAveragePace,
     'track_samples_json': jsonEncode(trackSamples),
+    if (scheduledDayId != null) 'scheduled_day_id': scheduledDayId,
   };
 
   factory RunRecord.fromMap(Map<String, dynamic> map) => RunRecord(
@@ -117,6 +124,7 @@ class RunRecord {
     peakCadence: map['peak_cadence'] as int?,
     gapAveragePace: map['gap_average_pace'] as String?,
     trackSamples: _decodeTrackSamples(map['track_samples_json'] as String?),
+    scheduledDayId: map['scheduled_day_id'] as String?,
   );
 
   static List<Map<String, dynamic>> _decodeSplits(String? json) {
@@ -234,7 +242,9 @@ class DatabaseService {
       // v9 → added `shoes` table (offline-first shoe locker; mirrors the
       //      Supabase `shoes` table, syncs best-effort)
       // ────────────────────────────────────────────────────────────────────
-      version: 9,
+      // v10 → added `runs.scheduled_day_id` (direct link from a completed run
+      //       to the plan slot it fulfilled; see ScheduledWorkoutContext)
+      version: 10,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -257,7 +267,8 @@ class DatabaseService {
             avg_cadence       INTEGER,
             peak_cadence      INTEGER,
             gap_average_pace  TEXT,
-            track_samples_json TEXT  NOT NULL DEFAULT '[]'
+            track_samples_json TEXT  NOT NULL DEFAULT '[]',
+            scheduled_day_id  TEXT
           )
         ''');
         await db.execute('''
@@ -413,6 +424,17 @@ class DatabaseService {
             await db.execute(_createShoesTableSql);
           } catch (e) {
             debugPrint('[DB] shoes table already exists, skipping: $e');
+          }
+        }
+
+        if (oldVersion < 10) {
+          // v9 → v10: scheduled_day_id — direct plan-slot link for guided runs.
+          try {
+            await db.execute(
+              'ALTER TABLE runs ADD COLUMN scheduled_day_id TEXT',
+            );
+          } catch (e) {
+            debugPrint('[DB] scheduled_day_id already exists, skipping: $e');
           }
         }
       },

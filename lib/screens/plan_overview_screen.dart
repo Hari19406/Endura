@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
 import '../models/race_plan.dart';
-import '../models/weekly_plan.dart';
 import '../models/training_phase.dart';
-import '../models/workout_type.dart';
 import '../engines/plan/week_resolver.dart';
 import '../engines/plan/materialized_plan.dart';
 import '../engines/plan/plan_store.dart';
@@ -14,23 +12,25 @@ import '../engines/config/workout_template_library.dart'
 import '../engines/config/archetype_table.dart' show ExperienceLevel;
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart' show Analytics;
+import '../services/workout_compliance_coordinator.dart';
+import '../services/workout_compliance_matcher.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
+import '../widgets/workout_step_timeline.dart';
+import 'calendar_day_status.dart';
 import 'paywall_screen.dart';
 
-/// Full multi-week plan overview (Runna/Endorphins-style).
+/// Full multi-week plan overview / calendar (Runna/Endorphins-style).
 ///
-/// Shows every week the engine already generated in [RacePlan.weeks], each
-/// with its date range, total volume, and a day-by-day strip (label below
-/// each circle: REST or the workout type). The current week uses the real
-/// [activePlan] the Home screen already tracks (so completed/skipped days
-/// show correctly); every other unlocked week uses [WeekResolver] to project
-/// the same deterministic day shape the engine would assign. Weeks past the
-/// trial window are locked — phase + volume stay visible, the day strip
-/// does not, per the Runna-style "weekly shape only" pattern.
+/// Reads exclusively from the stored [MaterializedPlan] (via [PlanStore]) — no
+/// legacy `WeeklyPlan`, no `markMissedDays`. Every current-or-past week's day
+/// strip derives completion straight from [MaterializedDay.completion] (set by
+/// `WorkoutComplianceMatcher`), so the calendar and the Coach card can never
+/// drift apart. Future weeks project the same deterministic shape via
+/// [WeekResolver]. Weeks past the trial window are locked — phase + volume
+/// stay visible, the day strip does not.
 class PlanOverviewScreen extends StatefulWidget {
   final RacePlan racePlan;
-  final WeeklyPlan? activePlan;
   final bool useMiles;
   final List<int> trainingDayIndices;
   final int? longRunDayIndex;
@@ -38,7 +38,6 @@ class PlanOverviewScreen extends StatefulWidget {
   const PlanOverviewScreen({
     super.key,
     required this.racePlan,
-    required this.activePlan,
     required this.useMiles,
     required this.trainingDayIndices,
     this.longRunDayIndex,
@@ -56,7 +55,6 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
   MaterializedPlan? _materialized;
 
   RacePlan get racePlan => widget.racePlan;
-  WeeklyPlan? get activePlan => widget.activePlan;
   bool get useMiles => widget.useMiles;
   List<int> get trainingDayIndices => widget.trainingDayIndices;
   int? get longRunDayIndex => widget.longRunDayIndex;
@@ -69,6 +67,9 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
 
   Future<void> _loadMaterialized() async {
     try {
+      // Match any freshly-logged runs to their days first, so opening the
+      // calendar never shows a completed run as still pending.
+      await WorkoutComplianceCoordinator.instance.sync();
       final plan = await PlanStore.instance.load();
       if (plan == null || !mounted) return;
       // Only trust it if it was built for the same inputs we're showing.
@@ -140,12 +141,6 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     _ => ExperienceLevel.beginner,
   };
 
-  DateTime _weekStart(int weekNumber) {
-    final created = racePlan.createdAt;
-    final createdDate = DateTime(created.year, created.month, created.day);
-    return createdDate.add(Duration(days: (weekNumber - 1) * 7));
-  }
-
   WeekResolution _resolveShape(WeekTarget week) {
     final days = trainingDayIndices.isNotEmpty
         ? trainingDayIndices
@@ -164,10 +159,20 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     );
   }
 
+  /// Monday of [weekNumber], anchored on the stored plan's own build date when
+  /// we have it (so the calendar's day dates line up exactly with what
+  /// `WorkoutComplianceMatcher` matched against), else the race-plan's.
+  DateTime _mondayOf(int weekNumber) {
+    final anchor = _materialized?.builtAt ?? racePlan.createdAt;
+    final a = DateTime(anchor.year, anchor.month, anchor.day);
+    return a.add(Duration(days: (weekNumber - 1) * 7));
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final currentWeekNumber = racePlan.currentWeekNumber(DateTime.now());
+    final now = DateTime.now();
+    final currentWeekNumber = racePlan.currentWeekNumber(now);
 
     return Scaffold(
       backgroundColor: c.background,
@@ -199,20 +204,28 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
             itemBuilder: (context, index) {
               final week = racePlan.weeks[index];
               final isCurrent = week.week == currentWeekNumber;
+              final isPastOrCurrent = week.week <= currentWeekNumber;
               final isLocked = !isPro && week.week > currentWeekNumber;
-              final weekStart = _weekStart(week.week);
+              final weekMonday = _mondayOf(week.week);
               final resolution = _resolutionForWeek(week);
+              // Real day-by-day status only makes sense once a week has started.
+              final materializedWeek = isPastOrCurrent
+                  ? _materialized?.weekByNumber(week.week)
+                  : null;
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _WeekCard(
                   week: week,
-                  weekStart: weekStart,
+                  weekStart: weekMonday,
                   resolution: resolution,
                   isCurrent: isCurrent,
                   isLocked: isLocked,
                   useMiles: useMiles,
-                  activePlan: isCurrent ? activePlan : null,
+                  materializedWeek: materializedWeek,
+                  weekMonday: weekMonday,
+                  now: now,
+                  onDayTap: _showDayDetail,
                   onLockedTap: isLocked
                       ? () {
                           Analytics.capture(
@@ -234,6 +247,25 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
       ),
     );
   }
+
+  /// Tapping a day opens its resolved workout — the exact [MaterializedDay] the
+  /// engine stored — plus its completion stats if a run has been matched.
+  void _showDayDetail(MaterializedDay day, DateTime date) {
+    final now = DateTime.now();
+    final status = calendarDayStatus(day, scheduledDate: date, now: now);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => _DayDetailSheet(
+        day: day,
+        date: date,
+        status: status,
+        useMiles: useMiles,
+      ),
+    );
+  }
 }
 
 // ── Week card ────────────────────────────────────────────────────────────────
@@ -245,7 +277,13 @@ class _WeekCard extends StatelessWidget {
   final bool isCurrent;
   final bool isLocked;
   final bool useMiles;
-  final WeeklyPlan? activePlan;
+
+  /// The stored week — present for current + past weeks. Null ⇒ project the
+  /// shape from [resolution] with no completion status.
+  final MaterializedWeek? materializedWeek;
+  final DateTime weekMonday;
+  final DateTime now;
+  final void Function(MaterializedDay day, DateTime date)? onDayTap;
   final VoidCallback? onLockedTap;
 
   const _WeekCard({
@@ -255,7 +293,10 @@ class _WeekCard extends StatelessWidget {
     required this.isCurrent,
     required this.isLocked,
     required this.useMiles,
-    this.activePlan,
+    required this.weekMonday,
+    required this.now,
+    this.materializedWeek,
+    this.onDayTap,
     this.onLockedTap,
   });
 
@@ -352,8 +393,13 @@ class _WeekCard extends StatelessWidget {
             ),
             if (!isLocked) ...[
               const SizedBox(height: 16),
-              activePlan != null
-                  ? _ActiveDayStrip(plan: activePlan!)
+              materializedWeek != null
+                  ? MaterializedWeekStrip(
+                      week: materializedWeek!,
+                      weekMonday: weekMonday,
+                      now: now,
+                      onDayTap: onDayTap,
+                    )
                   : _ProjectedDayStrip(resolution: resolution),
             ],
           ],
@@ -380,44 +426,56 @@ String _intentLabel(WorkoutIntent? intent) => switch (intent) {
   null => 'REST',
 };
 
-String _workoutTypeLabel(WorkoutType type) => switch (type) {
-  WorkoutType.tempo => 'TEMPO',
-  WorkoutType.interval => 'INT',
-  WorkoutType.long => 'LONG',
-  WorkoutType.quality => 'QUALITY',
-  WorkoutType.rest => 'REST',
-  WorkoutType.easy => 'EASY',
-};
-
 class _DayCircle extends StatelessWidget {
   final int weekday; // 0=Mon..6=Sun
-  final bool isRest;
   final bool isToday;
-  final bool isCompleted;
-  final bool isSkipped;
+  final CalendarDayStatus status;
   final Color color;
   final String label;
+  final VoidCallback? onTap;
 
   const _DayCircle({
     required this.weekday,
-    required this.isRest,
+    required this.status,
     required this.label,
     required this.color,
     this.isToday = false,
-    this.isCompleted = false,
-    this.isSkipped = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final rest = status == CalendarDayStatus.restDay;
+    final missed = status == CalendarDayStatus.missed;
+    final done = status == CalendarDayStatus.completed;
 
     Widget? child;
-    if (isCompleted) {
-      child = const Icon(Icons.check, size: 14, color: Colors.black);
-    } else if (isSkipped) {
-      child = const Icon(Icons.close, size: 12, color: Colors.black45);
+    if (done) {
+      child = const Icon(Icons.check_rounded, size: 15, color: Colors.black);
+    } else if (missed) {
+      child = Icon(Icons.remove_rounded, size: 14, color: c.textTertiary);
     }
+
+    final fill = switch (status) {
+      CalendarDayStatus.completed => color,
+      CalendarDayStatus.missed => c.divider,
+      CalendarDayStatus.restDay => c.divider,
+      CalendarDayStatus.upcoming => color,
+    };
+
+    final circle = Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fill,
+        border: isToday
+            ? Border.all(color: c.accent, width: 2)
+            : (missed ? Border.all(color: c.border, width: 1) : null),
+      ),
+      child: child != null ? Center(child: child) : null,
+    );
 
     return Column(
       children: [
@@ -430,24 +488,23 @@ class _DayCircle extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-            border: isToday ? Border.all(color: c.accent, width: 2) : null,
-          ),
-          child: child != null ? Center(child: child) : null,
-        ),
+        onTap == null
+            ? circle
+            : GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: circle,
+              ),
         const SizedBox(height: 6),
         Text(
-          isRest ? 'REST' : label,
+          rest ? 'REST' : label,
           style: TextStyle(
             fontSize: 8,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
-            color: isToday ? c.textPrimary : c.textTertiary,
+            color: missed
+                ? c.textTertiary
+                : (isToday ? c.textPrimary : c.textTertiary),
           ),
         ),
       ],
@@ -455,39 +512,59 @@ class _DayCircle extends StatelessWidget {
   }
 }
 
-/// Current week — real data from Home's active [WeeklyPlan] (completed /
-/// skipped / today status included).
-class _ActiveDayStrip extends StatelessWidget {
-  final WeeklyPlan plan;
+/// A current-or-past week rendered straight from the stored [MaterializedWeek]:
+/// completion comes from [MaterializedDay.completion], "missed" is simply a
+/// past training day with no completion, and every day is tappable.
+class MaterializedWeekStrip extends StatelessWidget {
+  final MaterializedWeek week;
 
-  const _ActiveDayStrip({required this.plan});
+  /// Monday (date-only) of this week.
+  final DateTime weekMonday;
+  final DateTime now;
+  final void Function(MaterializedDay day, DateTime date)? onDayTap;
+
+  const MaterializedWeekStrip({
+    super.key,
+    required this.week,
+    required this.weekMonday,
+    required this.now,
+    this.onDayTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
+    final days = [...week.days]..sort((a, b) => a.weekday.compareTo(b.weekday));
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: plan.days.map((day) {
-        final isToday =
-            day.date.year == now.year &&
-            day.date.month == now.month &&
-            day.date.day == now.day;
-        return _DayCircle(
-          weekday: day.date.weekday - 1,
-          isRest: day.isRestDay,
-          isToday: isToday,
-          isCompleted: day.isCompleted,
-          isSkipped: day.isSkipped,
-          color: dayColorForWorkoutType(day.workoutType),
-          label: _workoutTypeLabel(day.workoutType),
-        );
-      }).toList(),
+      children: [
+        for (final d in days)
+          Builder(
+            builder: (_) {
+              final date = weekMonday.add(Duration(days: d.weekday));
+              final status =
+                  calendarDayStatus(d, scheduledDate: date, now: now);
+              final isToday = date.year == now.year &&
+                  date.month == now.month &&
+                  date.day == now.day;
+              return _DayCircle(
+                weekday: d.weekday,
+                status: status,
+                isToday: isToday,
+                color: d.isRest
+                    ? Colors.transparent
+                    : dayColorForIntent(d.intent),
+                label: d.isRest ? 'REST' : _intentLabel(d.intent),
+                onTap: onDayTap == null ? null : () => onDayTap!(d, date),
+              );
+            },
+          ),
+      ],
     );
   }
 }
 
-/// Any other unlocked week — deterministic shape from [WeekResolver], no
-/// completion status since it hasn't happened yet.
+/// A future week — deterministic shape from [WeekResolver], no completion
+/// status since it has not happened yet.
 class _ProjectedDayStrip extends StatelessWidget {
   final WeekResolution resolution;
 
@@ -502,7 +579,9 @@ class _ProjectedDayStrip extends StatelessWidget {
         final isRest = slot == null || slot.isRest;
         return _DayCircle(
           weekday: weekday,
-          isRest: isRest,
+          status: isRest
+              ? CalendarDayStatus.restDay
+              : CalendarDayStatus.upcoming,
           color: dayColorForIntent(isRest ? null : slot.intent),
           label: isRest ? 'REST' : _intentLabel(slot.intent),
         );
@@ -510,3 +589,113 @@ class _ProjectedDayStrip extends StatelessWidget {
     );
   }
 }
+
+/// Bottom sheet shown when a calendar day is tapped — the stored
+/// [MaterializedDay]'s resolved workout, plus its completion stats.
+class _DayDetailSheet extends StatelessWidget {
+  final MaterializedDay day;
+  final DateTime date;
+  final CalendarDayStatus status;
+  final bool useMiles;
+
+  const _DayDetailSheet({
+    required this.day,
+    required this.date,
+    required this.status,
+    required this.useMiles,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final (chipLabel, chipColor) = switch (status) {
+      CalendarDayStatus.completed => ('COMPLETED', c.success),
+      CalendarDayStatus.missed => ('MISSED', c.textTertiary),
+      CalendarDayStatus.restDay => ('REST DAY', c.textTertiary),
+      CalendarDayStatus.upcoming => ('SCHEDULED', c.accent),
+    };
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      DateFormat('EEEE, MMM d').format(date),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: chipColor.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      chipLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: chipColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (day.completion != null) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: c.success,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        WorkoutComplianceMatcher.completedStatsLabel(
+                          day.completion!,
+                          useMiles: useMiles,
+                        ),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (day.isRest || day.workout == null)
+                Text(
+                  'Rest day — recovery is training too.',
+                  style: TextStyle(fontSize: 14, color: c.textSecondary),
+                )
+              else
+                WorkoutStepTimeline(workout: day.workout!, useMiles: useMiles),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

@@ -3,6 +3,7 @@ import '../services/coach_message_builder.dart' as message;
 import '../engines/config/workout_template_library.dart';
 import '../theme/app_colors.dart';
 import '../widgets/workout_step_timeline.dart';
+import '../models/scheduled_workout_context.dart';
 import 'run_screen.dart';
 import '../utils/unit_utils.dart';
 
@@ -13,11 +14,17 @@ class PreRunBriefingScreen extends StatefulWidget {
   final VoidCallback onGoToRun;
   final bool returnOnStart;
 
+  /// The plan slot this briefing is for. Forwarded into [RunScreen] so the live
+  /// tracker can drive the step HUD and link the saved run to the plan day.
+  /// Null when the run is ad-hoc.
+  final ScheduledWorkoutContext? scheduledContext;
+
   const PreRunBriefingScreen({
     super.key,
     required this.coachMessage,
     required this.onGoToRun,
     this.returnOnStart = false,
+    this.scheduledContext,
   });
 
   @override
@@ -54,6 +61,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
         builder: (_) => RunScreen(
           activeCoachMessage: widget.coachMessage,
           onWorkoutCompleted: widget.onGoToRun,
+          scheduledContext: widget.scheduledContext,
         ),
       ),
     );
