@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../engines/config/workout_template_library.dart';
 import '../theme/app_colors.dart';
+import '../widgets/workout_step_timeline.dart';
 import 'run_screen.dart';
 import '../utils/unit_utils.dart';
 
@@ -57,33 +58,6 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
       ),
     );
   }
-
-  List<ResolvedBlock> get _warmupBlocks => widget
-      .coachMessage
-      .resolvedWorkout
-      .blocks
-      .where((b) => b.type == BlockType.warmup)
-      .toList();
-
-  List<ResolvedBlock> get _workBlocks => widget
-      .coachMessage
-      .resolvedWorkout
-      .blocks
-      .where((b) => b.type == BlockType.main || b.type == BlockType.recovery)
-      .toList();
-
-  List<ResolvedBlock> get _cooldownBlocks => widget
-      .coachMessage
-      .resolvedWorkout
-      .blocks
-      .where((b) => b.type == BlockType.cooldown)
-      .toList();
-
-  bool get _hasWarmup =>
-      widget.coachMessage.hasWarmupCooldown && _warmupBlocks.isNotEmpty;
-
-  bool get _hasCooldown =>
-      widget.coachMessage.hasWarmupCooldown && _cooldownBlocks.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -266,44 +240,12 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       letterSpacing: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-                  if (_hasWarmup) ...[
-                    _WorkoutSection(
-                      stepNumber: 1,
-                      label: 'WARMUP',
-                      blocks: _warmupBlocks,
-                      accentColor: const Color(0xFF388E3C),
-                      workoutIntent: widget.coachMessage.workoutIntent,
-                      useMiles: _useMiles,
-                    ),
-                    const SizedBox(height: 12),
-                    Divider(height: 1, thickness: 1, color: c.divider),
-                    const SizedBox(height: 12),
-                  ],
-
-                  _WorkoutSection(
-                    stepNumber: _hasWarmup ? 2 : 1,
-                    label: 'MAIN SET',
-                    blocks: _workBlocks,
-                    accentColor: c.textPrimary,
-                    workoutIntent: widget.coachMessage.workoutIntent,
+                  WorkoutStepTimeline(
+                    workout: widget.coachMessage.resolvedWorkout,
                     useMiles: _useMiles,
                   ),
-
-                  if (_hasCooldown) ...[
-                    const SizedBox(height: 12),
-                    Divider(height: 1, thickness: 1, color: c.divider),
-                    const SizedBox(height: 12),
-                    _WorkoutSection(
-                      stepNumber: _hasWarmup ? 3 : 2,
-                      label: 'COOLDOWN',
-                      blocks: _cooldownBlocks,
-                      accentColor: const Color(0xFF1565C0),
-                      workoutIntent: widget.coachMessage.workoutIntent,
-                      useMiles: _useMiles,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -487,193 +429,6 @@ class _Card extends StatelessWidget {
       ),
       child: child,
     );
-  }
-}
-
-// ── Workout section (within the workout card) ─────────────────────────────────
-
-class _WorkoutSection extends StatelessWidget {
-  final int stepNumber;
-  final String label;
-  final List<ResolvedBlock> blocks;
-  final Color accentColor;
-  final WorkoutIntent workoutIntent;
-  final bool useMiles;
-
-  const _WorkoutSection({
-    required this.stepNumber,
-    required this.label,
-    required this.blocks,
-    required this.accentColor,
-    required this.workoutIntent,
-    this.useMiles = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Center(
-                child: Text(
-                  '$stepNumber',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: accentColor.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: accentColor,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        for (int i = 0; i < blocks.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _buildBlockRow(blocks[i]),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildBlockRow(ResolvedBlock block) {
-    final blockLabel =
-        block.label ??
-        (block.type == BlockType.recovery
-            ? 'Recovery'
-            : block.type == BlockType.warmup
-            ? 'Warmup'
-            : block.type == BlockType.cooldown
-            ? 'Cooldown'
-            : 'Run');
-
-    final String quantity;
-    if (block.reps != null && block.reps! > 1) {
-      quantity = '${block.reps} × ${_smartDistance(block.distanceKm)}';
-    } else {
-      quantity = _smartDistance(block.distanceKm);
-    }
-
-    String? recovery;
-    if (block.reps != null && block.reps! > 1) {
-      if (block.recoverySeconds != null) {
-        final m = block.recoverySeconds! ~/ 60;
-        final s = block.recoverySeconds! % 60;
-        recovery = m > 0
-            ? '$m:${s.toString().padLeft(2, '0')} rest'
-            : '${block.recoverySeconds}s rest';
-      } else if (block.recoveryMeters != null) {
-        recovery = '${_smartDistance(block.recoveryMeters! / 1000)} jog';
-      }
-    }
-
-    final pace = _paceForIntent(block, workoutIntent);
-
-    final icon = block.type == BlockType.recovery
-        ? Icons.pause_circle_outline
-        : block.type == BlockType.warmup || block.type == BlockType.cooldown
-        ? Icons.timer_outlined
-        : block.reps != null && block.reps! > 1
-        ? Icons.repeat
-        : Icons.straighten;
-
-    final detail = StringBuffer(quantity);
-    detail.write(' · $pace');
-    if (recovery != null) detail.write(' · $recovery');
-
-    return Builder(
-      builder: (context) {
-        final c = context.colors;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Icon(icon, size: 14, color: c.textFaint),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    blockLabel,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: c.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    detail.toString(),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: c.textSecondary,
-                      height: 1.4,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  String _smartDistance(double km) {
-    final displayKm = UnitUtils.displayDistance(km, useMiles);
-    if (km < 1.0) return '${(km * 1000).round()}m';
-    return '${displayKm.toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
-  }
-
-  String _paceForIntent(ResolvedBlock block, WorkoutIntent intent) {
-    if (block.isRpeOnly) return 'RPE effort';
-    final isEasy =
-        (intent == WorkoutIntent.aerobicBase ||
-            intent == WorkoutIntent.endurance) &&
-        block.paceMaxSecondsPerKm - block.paceMinSecondsPerKm >= 30;
-    final unit = UnitUtils.perUnitLabel(useMiles);
-    if (isEasy) {
-      final ceiling = (block.paceMinSecondsPerKm / 5).round() * 5;
-      return '≤ ${_formatDisplayPace(ceiling)}$unit';
-    }
-    final lo = (block.paceMinSecondsPerKm / 5).round() * 5;
-    final hi = (block.paceMaxSecondsPerKm / 5).round() * 5;
-    return lo == hi
-        ? '${_formatDisplayPace(lo)}$unit'
-        : '${_formatDisplayPace(lo)}–${_formatDisplayPace(hi)}$unit';
-  }
-
-  String _formatDisplayPace(int secondsPerKm) {
-    final displaySeconds = UnitUtils.displayPaceSeconds(
-      secondsPerKm.toDouble(),
-      useMiles,
-    );
-    return UnitUtils.formatSeconds(displaySeconds.round());
   }
 }
 
