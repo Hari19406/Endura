@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/activity_telemetry.dart';
 import '../services/analytics_service.dart';
+import '../services/cloud_sync_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/run_comments_sheet.dart';
@@ -29,10 +30,28 @@ class ActivityDetailScreen extends StatefulWidget {
   /// (the History tab refreshes on that result).
   final Future<void> Function()? onDelete;
 
+  /// The caller's current "reacted" state for this activity (e.g. a feed
+  /// card's own local toggle) — seeds this screen's React pill so the two
+  /// stay consistent.
+  final bool initialReacted;
+
+  /// Fired the moment the React pill is toggled, so the card that opened this
+  /// screen can update its own state immediately (there is no server-side
+  /// reaction store yet — see the class doc on `_reacted`).
+  final ValueChanged<bool>? onReactedChanged;
+
+  /// Fired the moment the comment count actually changes (a comment was
+  /// posted, or the sheet reports a different count), so the caller's card can
+  /// stay in sync without waiting for a pop result.
+  final ValueChanged<int>? onCommentCountChanged;
+
   const ActivityDetailScreen({
     super.key,
     required this.activity,
     this.onDelete,
+    this.initialReacted = false,
+    this.onReactedChanged,
+    this.onCommentCountChanged,
   });
 
   @override
@@ -42,7 +61,7 @@ class ActivityDetailScreen extends StatefulWidget {
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   // The feed has no server-side reaction store yet (see RunFeedCard._kudosed),
   // so this mirrors its local-only toggle until one exists.
-  bool _reacted = false;
+  late bool _reacted = widget.initialReacted;
   late int _commentCount = widget.activity.commentCount;
 
   @override
@@ -121,9 +140,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   /// Opens the same comments bottom sheet the feed uses
   /// ([showRunCommentsSheet]) for this activity's backing run.
+  ///
+  /// [ActivityDetail.runId] is only a Supabase `runs.id` — safe to use as-is —
+  /// when [ActivityDetail.runIdIsCloud] is true (the Feed path). Runs opened
+  /// from local storage (You/History) carry a local SQLite id instead, so the
+  /// cloud id is resolved by date + distance first; there's no persisted
+  /// local↔cloud mapping to read it from directly.
   Future<void> _openComments() async {
     HapticFeedback.lightImpact();
-    final id = a.runId;
+    var id = a.runIdIsCloud ? a.runId : null;
+    if (id == null && !a.runIdIsCloud) {
+      id = await CloudSyncService.instance.resolveCloudRunId(
+        date: a.timestamp,
+        distanceKm: a.distanceKm,
+      );
+    }
     if (id == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -143,6 +174,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     if (mounted && count != _commentCount) {
       setState(() => _commentCount = count);
     }
+    widget.onCommentCountChanged?.call(count);
   }
 
   /// Same share payload the feed's [RunFeedCard._share] builds — a one-line
@@ -531,6 +563,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                     setState(() => _reacted = !_reacted);
+                    widget.onReactedChanged?.call(_reacted);
                   },
                 ),
                 _socialPill(

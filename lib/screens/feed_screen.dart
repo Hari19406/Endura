@@ -111,17 +111,6 @@ class _FeedScreenState extends State<FeedScreen>
     );
   }
 
-  void _openActivity(FeedRun run) {
-    HapticFeedback.lightImpact();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            ActivityDetailScreen(activity: ActivityDetail.fromFeedRun(run)),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -210,7 +199,6 @@ class _FeedScreenState extends State<FeedScreen>
           padding: const EdgeInsets.only(bottom: 12),
           child: RunFeedCard(
             run: _runs[i],
-            onOpen: () => _openActivity(_runs[i]),
             onTapAthlete: () {
               HapticFeedback.lightImpact();
               Navigator.push(
@@ -250,17 +238,7 @@ class RunFeedCard extends StatefulWidget {
   final FeedRun run;
   final VoidCallback onTapAthlete;
 
-  /// Opens the full activity detail view — fired for taps anywhere on the card
-  /// that a more specific handler (athlete row, overflow menu, social-bar
-  /// buttons) doesn't already claim.
-  final VoidCallback? onOpen;
-
-  const RunFeedCard({
-    super.key,
-    required this.run,
-    required this.onTapAthlete,
-    this.onOpen,
-  });
+  const RunFeedCard({super.key, required this.run, required this.onTapAthlete});
 
   @override
   State<RunFeedCard> createState() => _RunFeedCardState();
@@ -277,6 +255,29 @@ class _RunFeedCardState extends State<RunFeedCard> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Opens the full activity detail view. Reaction / comment-count changes
+  /// made in there are applied back onto this card immediately (via the
+  /// screen's `onReactedChanged` / `onCommentCountChanged`), not just on pop —
+  /// so they survive however the athlete leaves that screen.
+  Future<void> _openActivity() {
+    HapticFeedback.lightImpact();
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActivityDetailScreen(
+          activity: ActivityDetail.fromFeedRun(run, commentCountOverride: _comments),
+          initialReacted: _kudosed,
+          onReactedChanged: (v) {
+            if (mounted) setState(() => _kudosed = v);
+          },
+          onCommentCountChanged: (v) {
+            if (mounted) setState(() => _comments = v);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _openComments() async {
@@ -306,7 +307,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
   Widget build(BuildContext context) {
     final points = run.points;
     return GestureDetector(
-      onTap: widget.onOpen,
+      onTap: _openActivity,
       behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(

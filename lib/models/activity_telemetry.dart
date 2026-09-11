@@ -106,6 +106,14 @@ class ActivityDetail {
   /// actions (comments) degrade gracefully in that case.
   final int? runId;
 
+  /// True when [runId] is a **Supabase** `runs.id` — safe to use directly for
+  /// social features (comments). False when it's only a local SQLite id (the
+  /// You/History tab, before there's a known cloud row) — there is no
+  /// persisted local↔cloud id mapping, so the screen resolves the cloud id by
+  /// date + distance the moment a social action needs it. See
+  /// [CloudSyncService.resolveCloudRunId].
+  final bool runIdIsCloud;
+
   /// Owning athlete's id (`runs.user_id`). Used for share-link building.
   final String? athleteId;
 
@@ -155,6 +163,7 @@ class ActivityDetail {
 
   const ActivityDetail({
     this.runId,
+    this.runIdIsCloud = false,
     this.athleteId,
     this.commentCount = 0,
     required this.runnerName,
@@ -257,12 +266,13 @@ class ActivityDetail {
   /// summary-only (no splits, no telemetry, no calories), so the detail screen
   /// renders just the header, summary grid, GAP block (if the row has GAP),
   /// route preview and the social row — every chart section is skipped.
-  factory ActivityDetail.fromFeedRun(FeedRun run) {
+  factory ActivityDetail.fromFeedRun(FeedRun run, {int? commentCountOverride}) {
     final elapsed = run.elapsedSeconds;
     return ActivityDetail(
       runId: run.runId,
+      runIdIsCloud: true, // FeedRun.runId is the Supabase runs.id
       athleteId: run.athleteId,
-      commentCount: run.commentCount,
+      commentCount: commentCountOverride ?? run.commentCount,
       runnerName: run.displayName,
       timestamp: run.date.toLocal(),
       source: run.source,
@@ -362,6 +372,7 @@ class ActivityDetail {
 
     return ActivityDetail(
       runId: record.id,
+      runIdIsCloud: false, // local SQLite id — resolve the cloud id lazily
       commentCount: 0,
       runnerName: runnerName,
       timestamp: record.date.toLocal(),
@@ -571,6 +582,7 @@ class ActivityDetail {
 
     return ActivityDetail(
       runId: 1173,
+      runIdIsCloud: true,
       athleteId: 'mock-athlete-aditya',
       commentCount: 3,
       runnerName: 'Aditya Rao',

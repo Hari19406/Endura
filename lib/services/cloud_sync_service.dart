@@ -135,6 +135,46 @@ class CloudSyncService {
     }
   }
 
+  /// Best-effort resolve of the Supabase `runs.id` for a locally-recorded run,
+  /// matched by a ±1-minute date window + a close distance (mirrors
+  /// [updateRunRpe]'s approach) — there is no persisted local↔cloud id mapping.
+  /// Used to point comments (`activity_comments.run_id`) at the right cloud
+  /// row when an [ActivityDetail] only carries a local SQLite id. Returns null
+  /// when signed out, unsynced, or no match is found.
+  Future<int?> resolveCloudRunId({
+    required DateTime date,
+    required double distanceKm,
+  }) async {
+    try {
+      // Reads _client/_userId inside the try too: both throw if Supabase was
+      // never initialised (tests, preview harnesses), not just on a failed
+      // query.
+      final uid = _userId;
+      if (uid == null) return null;
+      final utc = date.toUtc();
+      final windowStart = utc
+          .subtract(const Duration(minutes: 1))
+          .toIso8601String();
+      final windowEnd = utc.add(const Duration(minutes: 1)).toIso8601String();
+      final rows = await _client
+          .from('runs')
+          .select('id, distance_km')
+          .eq('user_id', uid)
+          .gte('date', windowStart)
+          .lte('date', windowEnd);
+      for (final row in (rows as List)) {
+        final d = (row['distance_km'] as num?)?.toDouble();
+        if (d != null && (d - distanceKm).abs() < 0.05) {
+          return (row['id'] as num).toInt();
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[CloudSync] resolveCloudRunId error: $e');
+      return null;
+    }
+  }
+
   // ── Download runs from cloud (new device restore) ─────────────────────────
 
   Future<bool> downloadAndRestoreRuns() async {
