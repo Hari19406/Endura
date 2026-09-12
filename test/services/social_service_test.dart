@@ -66,6 +66,10 @@ class InMemoryFeedStore implements FeedStore {
   final List<Map<String, dynamic>> runs = [];
   final Map<String, Map<String, dynamic>> profiles = {};
   final Map<int, int> commentCounts = {};
+  final Map<int, int> reactionCounts = {};
+
+  /// "$userId:$runId" pairs — who has reacted to what.
+  final Set<String> reactedPairs = {};
 
   int runsForUsersCalls = 0;
 
@@ -118,6 +122,23 @@ class InMemoryFeedStore implements FeedStore {
     return {
       for (final e in commentCounts.entries)
         if (set.contains(e.key)) e.key: e.value,
+    };
+  }
+
+  @override
+  Future<Map<int, int>> reactionCountsFor(List<int> runIds) async {
+    final set = runIds.toSet();
+    return {
+      for (final e in reactionCounts.entries)
+        if (set.contains(e.key)) e.key: e.value,
+    };
+  }
+
+  @override
+  Future<Set<int>> reactedRunIdsFor(String userId, List<int> runIds) async {
+    return {
+      for (final id in runIds)
+        if (reactedPairs.contains('$userId:$id')) id,
     };
   }
 }
@@ -283,6 +304,25 @@ void main() {
       expect(result[0].runId, withComments['id']);
       expect(result[0].commentCount, 3);
       expect(result[1].commentCount, 0);
+    });
+
+    test('batch-loads reaction counts + the viewer\'s own reaction state',
+        () async {
+      feed.follows.add(const FollowEdge(me, other));
+      final base = DateTime.utc(2026, 9, 1);
+      final popular = _runRow(other, base.add(const Duration(days: 1)));
+      final unreacted = _runRow(other, base);
+      feed.runs.addAll([popular, unreacted]);
+      feed.reactionCounts[popular['id'] as int] = 5;
+      feed.reactedPairs.add('$me:${popular['id']}');
+
+      final result = await svc.fetchFriendsFeed();
+
+      expect(result[0].runId, popular['id']);
+      expect(result[0].reactionCount, 5);
+      expect(result[0].viewerReacted, isTrue);
+      expect(result[1].reactionCount, 0);
+      expect(result[1].viewerReacted, isFalse);
     });
 
     test('keyset pagination with `before` — no overlap, limit honoured',

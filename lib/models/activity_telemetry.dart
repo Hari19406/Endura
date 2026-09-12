@@ -121,6 +121,14 @@ class ActivityDetail {
   /// fetches the live list itself.
   final int commentCount;
 
+  /// Cheers/reactions already on this activity.
+  final int reactionCount;
+
+  /// Raw workout-type code ('easy', 'tempo', 'interval', 'long', 'free', …) —
+  /// kept alongside the human [title] because the share-card export needs the
+  /// code, not the label.
+  final String workoutType;
+
   // ── Header ────────────────────────────────────────────────────────────────
   final String runnerName;
   final DateTime timestamp;
@@ -166,6 +174,8 @@ class ActivityDetail {
     this.runIdIsCloud = false,
     this.athleteId,
     this.commentCount = 0,
+    this.reactionCount = 0,
+    this.workoutType = 'easy',
     required this.runnerName,
     required this.timestamp,
     required this.source,
@@ -266,13 +276,19 @@ class ActivityDetail {
   /// summary-only (no splits, no telemetry, no calories), so the detail screen
   /// renders just the header, summary grid, GAP block (if the row has GAP),
   /// route preview and the social row — every chart section is skipped.
-  factory ActivityDetail.fromFeedRun(FeedRun run, {int? commentCountOverride}) {
+  factory ActivityDetail.fromFeedRun(
+    FeedRun run, {
+    int? commentCountOverride,
+    int? reactionCountOverride,
+  }) {
     final elapsed = run.elapsedSeconds;
     return ActivityDetail(
       runId: run.runId,
       runIdIsCloud: true, // FeedRun.runId is the Supabase runs.id
       athleteId: run.athleteId,
       commentCount: commentCountOverride ?? run.commentCount,
+      reactionCount: reactionCountOverride ?? run.reactionCount,
+      workoutType: run.workoutType,
       runnerName: run.displayName,
       timestamp: run.date.toLocal(),
       source: run.source,
@@ -374,6 +390,8 @@ class ActivityDetail {
       runId: record.id,
       runIdIsCloud: false, // local SQLite id — resolve the cloud id lazily
       commentCount: 0,
+      reactionCount: 0,
+      workoutType: record.workoutType,
       runnerName: runnerName,
       timestamp: record.date.toLocal(),
       source: 'Endura Tracker',
@@ -585,6 +603,8 @@ class ActivityDetail {
       runIdIsCloud: true,
       athleteId: 'mock-athlete-aditya',
       commentCount: 3,
+      reactionCount: 12,
+      workoutType: 'long',
       runnerName: 'Aditya Rao',
       timestamp: DateTime(2026, 9, 7, 6, 42),
       source: 'Garmin',

@@ -3,14 +3,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../models/activity_telemetry.dart';
 import '../services/analytics_service.dart';
 import '../services/cloud_sync_service.dart';
+import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/run_comments_sheet.dart';
+import '../widgets/run_share_card.dart';
 
 /// Modern running-telemetry detail view: header + summary grid, route preview,
 /// kilometre splits, a grade-adjusted-pace block, and up to four scrubbable
@@ -35,10 +36,13 @@ class ActivityDetailScreen extends StatefulWidget {
   /// stay consistent.
   final bool initialReacted;
 
-  /// Fired the moment the React pill is toggled, so the card that opened this
-  /// screen can update its own state immediately (there is no server-side
-  /// reaction store yet — see the class doc on `_reacted`).
+  /// Fired the moment the React pill's toggle is confirmed (or rolled back),
+  /// so the card that opened this screen can update its own state immediately
+  /// — paired with [onReactionCountChanged], not just on pop.
   final ValueChanged<bool>? onReactedChanged;
+
+  /// Fired alongside [onReactedChanged] with the resulting reaction count.
+  final ValueChanged<int>? onReactionCountChanged;
 
   /// Fired the moment the comment count actually changes (a comment was
   /// posted, or the sheet reports a different count), so the caller's card can
@@ -51,6 +55,7 @@ class ActivityDetailScreen extends StatefulWidget {
     this.onDelete,
     this.initialReacted = false,
     this.onReactedChanged,
+    this.onReactionCountChanged,
     this.onCommentCountChanged,
   });
 
@@ -59,10 +64,15 @@ class ActivityDetailScreen extends StatefulWidget {
 }
 
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
-  // The feed has no server-side reaction store yet (see RunFeedCard._kudosed),
-  // so this mirrors its local-only toggle until one exists.
   late bool _reacted = widget.initialReacted;
+  late int _reactionCount = widget.activity.reactionCount;
   late int _commentCount = widget.activity.commentCount;
+  bool _reactionBusy = false;
+
+  /// Resolved once per screen instance — comments and reactions both need the
+  /// true Supabase `runs.id`; see [ActivityDetail.runIdIsCloud].
+  int? _resolvedCloudRunId;
+  bool _cloudRunIdResolveAttempted = false;
 
   @override
   void initState() {
@@ -138,23 +148,31 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   // ── social actions (shared with the Feed tab) ────────────────────────────
 
+  /// The true Supabase `runs.id` backing this activity, resolved once and
+  /// cached for the life of this screen.
+  ///
+  /// [ActivityDetail.runId] is only a Supabase id — safe to use as-is — when
+  /// [ActivityDetail.runIdIsCloud] is true (the Feed path). Runs opened from
+  /// local storage (You/History) carry a local SQLite id instead, so the cloud
+  /// id is resolved by date + distance first; there's no persisted
+  /// local↔cloud mapping to read it from directly. Null when it can't be
+  /// resolved (offline, unsynced, no signed-in user).
+  Future<int?> _resolveRunId() async {
+    if (a.runIdIsCloud) return a.runId;
+    if (_cloudRunIdResolveAttempted) return _resolvedCloudRunId;
+    _cloudRunIdResolveAttempted = true;
+    _resolvedCloudRunId = await CloudSyncService.instance.resolveCloudRunId(
+      date: a.timestamp,
+      distanceKm: a.distanceKm,
+    );
+    return _resolvedCloudRunId;
+  }
+
   /// Opens the same comments bottom sheet the feed uses
   /// ([showRunCommentsSheet]) for this activity's backing run.
-  ///
-  /// [ActivityDetail.runId] is only a Supabase `runs.id` — safe to use as-is —
-  /// when [ActivityDetail.runIdIsCloud] is true (the Feed path). Runs opened
-  /// from local storage (You/History) carry a local SQLite id instead, so the
-  /// cloud id is resolved by date + distance first; there's no persisted
-  /// local↔cloud mapping to read it from directly.
   Future<void> _openComments() async {
     HapticFeedback.lightImpact();
-    var id = a.runIdIsCloud ? a.runId : null;
-    if (id == null && !a.runIdIsCloud) {
-      id = await CloudSyncService.instance.resolveCloudRunId(
-        date: a.timestamp,
-        distanceKm: a.distanceKm,
-      );
-    }
+    final id = await _resolveRunId();
     if (id == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -177,25 +195,67 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     widget.onCommentCountChanged?.call(count);
   }
 
-  /// Same share payload the feed's [RunFeedCard._share] builds — a one-line
-  /// run summary via `share_plus`.
-  Future<void> _share() async {
+  /// Real, persisted cheer — optimistic UI, rolled back on failure (offline,
+  /// unresolved cloud id, RLS denial, etc).
+  Future<void> _toggleReaction() async {
+    if (_reactionBusy) return;
+    HapticFeedback.selectionClick();
+    final wasReacted = _reacted;
+    final prevCount = _reactionCount;
+    setState(() {
+      _reactionBusy = true;
+      _reacted = !wasReacted;
+      _reactionCount = prevCount + (_reacted ? 1 : -1);
+    });
+    widget.onReactedChanged?.call(_reacted);
+    widget.onReactionCountChanged?.call(_reactionCount);
+
+    final id = await _resolveRunId();
+    bool? result;
+    if (id != null) {
+      result = await SocialService.instance.toggleReaction(
+        id,
+        currentlyReacted: wasReacted,
+      );
+    }
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _reactionBusy = false;
+        _reacted = wasReacted;
+        _reactionCount = prevCount;
+      });
+      widget.onReactedChanged?.call(_reacted);
+      widget.onReactionCountChanged?.call(_reactionCount);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't update your reaction — check your connection."),
+          ),
+        );
+    } else {
+      setState(() => _reactionBusy = false);
+    }
+  }
+
+  /// Branded, shareable run card (PNG via a RepaintBoundary snapshot) — the
+  /// same export the post-run summary uses.
+  Future<void> _shareCard() async {
     HapticFeedback.lightImpact();
     final useMiles = UnitUtils.useMilesNotifier.value;
-    final dist =
-        '${UnitUtils.displayDistance(a.distanceKm, useMiles).toStringAsFixed(2)} '
-        '${UnitUtils.unitLabel(useMiles)}';
-    final text =
-        "Check out ${a.runnerName}'s $dist run on Endura! "
-        'Time: ${_fmtDuration(a.movingTime)}, '
-        'Pace: ${UnitUtils.formatPaceString(a.avgPace, useMiles)}.';
-    await SharePlus.instance.share(ShareParams(text: text));
-    Analytics.capture(
-      'activity_shared',
-      properties: {
-        if (a.runId != null) 'run_id': a.runId!,
-        'source': 'activity_detail',
-      },
+    await showRunShareSheet(
+      context,
+      ShareRunData(
+        distanceKm: a.distanceKm,
+        averagePace: a.avgPace,
+        durationSeconds: a.movingTime.inSeconds,
+        date: a.timestamp,
+        workoutType: a.workoutType,
+        gpsPoints: a.routePoints,
+        useMiles: useMiles,
+      ),
+      source: 'activity_detail',
     );
   }
 
@@ -275,7 +335,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               IconButton(
                 icon: Icon(Icons.ios_share, color: c.textPrimary, size: 20),
                 tooltip: 'Share',
-                onPressed: _share,
+                onPressed: _shareCard,
               ),
             ],
           ),
@@ -558,13 +618,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   icon: _reacted
                       ? Icons.local_fire_department
                       : Icons.local_fire_department_outlined,
-                  label: _reacted ? 'Reacted' : 'React',
+                  label: _reacted
+                      ? (_reactionCount > 1 ? 'Reacted · $_reactionCount' : 'Reacted')
+                      : (_reactionCount > 0 ? 'React · $_reactionCount' : 'React'),
                   active: _reacted,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _reacted = !_reacted);
-                    widget.onReactedChanged?.call(_reacted);
-                  },
+                  onTap: _toggleReaction,
                 ),
                 _socialPill(
                   c,
@@ -578,7 +636,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   c,
                   icon: Icons.share_outlined,
                   label: 'Share',
-                  onTap: _share,
+                  onTap: _shareCard,
                 ),
               ],
             ),

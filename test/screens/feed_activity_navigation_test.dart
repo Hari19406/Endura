@@ -59,7 +59,8 @@ void main() {
   );
 
   testWidgets(
-    'reacting inside the detail screen updates the card immediately on return',
+    'a reaction change inside the detail screen is reflected back on the '
+    'card the moment it happens — even a rollback (no backend in this test)',
     (tester) async {
       await tester.pumpWidget(_host(_run()));
 
@@ -69,16 +70,23 @@ void main() {
       await tester.tap(find.byType(RunFeedCard));
       await tester.pumpAndSettle();
 
+      // No live Supabase session in a widget test, so the persist call always
+      // fails and the optimistic reaction rolls back — settle captures both.
       await tester.tap(find.text('React'));
       await tester.pumpAndSettle();
-      expect(find.text('Reacted'), findsOneWidget);
+      expect(find.text('React'), findsOneWidget);
+      expect(
+        find.textContaining("Couldn't update your reaction"),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byIcon(Icons.arrow_back));
       await tester.pumpAndSettle();
 
-      // Back on the card — its own social bar reflects the change immediately,
-      // via onReactedChanged, without needing a pop-result round trip.
-      expect(find.text('You reacted'), findsOneWidget);
+      // Back on the card — it reflects the *final* (rolled-back) state via
+      // onReactedChanged, not a stale optimistic one, with no pop-result
+      // round trip needed.
+      expect(find.text('Be the first to react'), findsOneWidget);
     },
   );
 }

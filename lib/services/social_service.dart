@@ -95,6 +95,12 @@ abstract class FeedStore {
 
   /// Comment count per run id in [runIds] (missing key ⇒ 0).
   Future<Map<int, int>> commentCountsFor(List<int> runIds);
+
+  /// Reaction ("cheer") count per run id in [runIds] (missing key ⇒ 0).
+  Future<Map<int, int>> reactionCountsFor(List<int> runIds);
+
+  /// Which of [runIds] [userId] has already reacted to.
+  Future<Set<int>> reactedRunIdsFor(String userId, List<int> runIds);
 }
 
 class SupabaseFeedStore implements FeedStore {
@@ -157,6 +163,34 @@ class SupabaseFeedStore implements FeedStore {
     }
     return counts;
   }
+
+  @override
+  Future<Map<int, int>> reactionCountsFor(List<int> runIds) async {
+    if (runIds.isEmpty) return {};
+    final rows = await _c
+        .from('activity_reactions')
+        .select('run_id')
+        .inFilter('run_id', runIds);
+    final counts = <int, int>{};
+    for (final r in (rows as List)) {
+      final id = ((r as Map<String, dynamic>)['run_id'] as num).toInt();
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  @override
+  Future<Set<int>> reactedRunIdsFor(String userId, List<int> runIds) async {
+    if (runIds.isEmpty) return {};
+    final rows = await _c
+        .from('activity_reactions')
+        .select('run_id')
+        .eq('user_id', userId)
+        .inFilter('run_id', runIds);
+    return (rows as List)
+        .map((r) => ((r as Map<String, dynamic>)['run_id'] as num).toInt())
+        .toSet();
+  }
 }
 
 class SocialService {
@@ -184,6 +218,16 @@ class SocialService {
 
   SupabaseClient get _client => Supabase.instance.client;
   String? get _uid => _uidOverride ?? _client.auth.currentUser?.id;
+
+  /// The signed-in user's id, or null when signed out / no session. Used to
+  /// tell "my comment" from "someone else's" in the comments sheet.
+  String? get currentUserId {
+    try {
+      return _uid;
+    } catch (_) {
+      return null;
+    }
+  }
 
   // ── Discovery ─────────────────────────────────────────────────────────────
 
@@ -439,15 +483,20 @@ class SocialService {
           .toList();
       final profiles = await _feedStore.profilesByIds(authorIds);
       final commentCounts = await _feedStore.commentCountsFor(runIds);
+      final reactionCounts = await _feedStore.reactionCountsFor(runIds);
+      final reactedIds = await _feedStore.reactedRunIdsFor(me, runIds);
 
       return visibleRows
-          .map(
-            (r) => FeedRun.fromRows(
+          .map((r) {
+            final id = (r['id'] as num).toInt();
+            return FeedRun.fromRows(
               r,
               profiles[r['user_id'] as String],
-              commentCount: commentCounts[(r['id'] as num).toInt()] ?? 0,
-            ),
-          )
+              commentCount: commentCounts[id] ?? 0,
+              reactionCount: reactionCounts[id] ?? 0,
+              viewerReacted: reactedIds.contains(id),
+            );
+          })
           .toList();
     } catch (e) {
       debugPrint('[SocialService] fetchFriendsFeed error: $e');
@@ -498,6 +547,89 @@ class SocialService {
     } catch (e) {
       debugPrint('[SocialService] postComment error: $e');
       return null;
+    }
+  }
+
+  /// Deletes [commentId] — the RLS policy only allows deleting your own, so
+  /// this is a no-op (returns false) against anyone else's comment.
+  Future<bool> deleteComment(String commentId) async {
+    try {
+      final me = _uid;
+      if (me == null) return false;
+      await _client
+          .from('activity_comments')
+          .delete()
+          .eq('id', commentId)
+          .eq('user_id', me);
+      Analytics.capture('comment_deleted', properties: {'comment_id': commentId});
+      return true;
+    } catch (e) {
+      debugPrint('[SocialService] deleteComment error: $e');
+      return false;
+    }
+  }
+
+  // ── Reactions ("cheers") ─────────────────────────────────────────────────
+
+  /// Toggles the signed-in user's reaction on [runId]. Pass the UI's current
+  /// (pre-toggle) state as [currentlyReacted]. Returns the resulting state
+  /// (`true` = now reacted) on success, or `null` on failure — the caller
+  /// should roll its optimistic update back on `null`.
+  Future<bool?> toggleReaction(int runId, {required bool currentlyReacted}) async {
+    try {
+      final me = _uid;
+      if (me == null) return null;
+      if (currentlyReacted) {
+        await _client
+            .from('activity_reactions')
+            .delete()
+            .eq('run_id', runId)
+            .eq('user_id', me);
+        Analytics.capture('run_unreacted', properties: {'run_id': runId});
+        return false;
+      }
+      await _client.from('activity_reactions').upsert(
+        {'run_id': runId, 'user_id': me},
+        onConflict: 'run_id,user_id',
+        ignoreDuplicates: true,
+      );
+      Analytics.capture('run_reacted', properties: {'run_id': runId});
+      return true;
+    } catch (e) {
+      debugPrint('[SocialService] toggleReaction error: $e');
+      return null;
+    }
+  }
+
+  /// Live reaction count for one run — used when a card/screen doesn't already
+  /// carry a batch-loaded count.
+  Future<int> reactionCount(int runId) async {
+    try {
+      return await _client
+          .from('activity_reactions')
+          .count(CountOption.exact)
+          .eq('run_id', runId);
+    } catch (e) {
+      debugPrint('[SocialService] reactionCount error: $e');
+      return 0;
+    }
+  }
+
+  /// Whether the signed-in user has already reacted to [runId].
+  Future<bool> hasReacted(int runId) async {
+    try {
+      final me = _uid;
+      if (me == null) return false;
+      final row = await _client
+          .from('activity_reactions')
+          .select('id')
+          .eq('run_id', runId)
+          .eq('user_id', me)
+          .maybeSingle();
+      return row != null;
+    } catch (e) {
+      debugPrint('[SocialService] hasReacted error: $e');
+      return false;
     }
   }
 }

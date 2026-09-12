@@ -68,16 +68,24 @@ void main() {
     expect(find.text('CADENCE'), findsNothing);
   });
 
-  testWidgets('reacting fires onReactedChanged immediately', (tester) async {
-    bool? reported;
-    await tester.pumpWidget(
-      _host(_minimalCloudActivity(), onReactedChanged: (v) => reported = v),
-    );
-    await tester.tap(find.text('React'));
-    await tester.pump();
-    expect(reported, isTrue);
-    expect(find.text('Reacted'), findsOneWidget);
-  });
+  testWidgets(
+    'reacting fires onReactedChanged — optimistically true, then false when '
+    'the persist call fails (no Supabase session in this test)',
+    (tester) async {
+      final reported = <bool>[];
+      await tester.pumpWidget(
+        _host(_minimalCloudActivity(), onReactedChanged: reported.add),
+      );
+      await tester.tap(find.text('React'));
+      await tester.pumpAndSettle();
+
+      // RunFeedCard's own reaction test covers the intermediate optimistic
+      // frame deterministically (via a controllable toggler seam); here it's
+      // enough that both the optimistic call and the rollback correction fire.
+      expect(reported, [true, false]);
+      expect(find.text('React'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'a cloud-linked run opens comments with its own runId (no resolution needed)',

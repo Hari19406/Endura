@@ -128,6 +128,52 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
     });
   }
 
+  Future<void> _deleteComment(ActivityComment comment) async {
+    HapticFeedback.lightImpact();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: _P.surface,
+        title: const Text(
+          'Delete comment?',
+          style: TextStyle(color: _P.textHigh),
+        ),
+        content: const Text(
+          "This can't be undone.",
+          style: TextStyle(color: _P.textMid),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(dctx, true);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await SocialService.instance.deleteComment(comment.id);
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _comments = _comments.where((c) => c.id != comment.id).toList();
+      });
+    } else {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text("Couldn't delete that comment.")),
+        );
+    }
+  }
+
   void _jumpToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
@@ -242,11 +288,22 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
         ),
       );
     }
+    final me = SocialService.instance.currentUserId;
     return ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       itemCount: _comments.length,
-      itemBuilder: (context, i) => _CommentTile(comment: _comments[i]),
+      itemBuilder: (context, i) {
+        final comment = _comments[i];
+        // Not the still-sending optimistic row — that has no real id yet.
+        final isOwn = me != null &&
+            comment.userId == me &&
+            !comment.id.startsWith('local-');
+        return _CommentTile(
+          comment: comment,
+          onDelete: isOwn ? () => _deleteComment(comment) : null,
+        );
+      },
     );
   }
 
@@ -315,7 +372,12 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
 
 class _CommentTile extends StatelessWidget {
   final ActivityComment comment;
-  const _CommentTile({required this.comment});
+
+  /// Non-null only for the signed-in user's own comment — shows the delete
+  /// affordance.
+  final VoidCallback? onDelete;
+
+  const _CommentTile({required this.comment, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -370,6 +432,19 @@ class _CommentTile extends StatelessWidget {
               ],
             ),
           ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                size: 17,
+                color: _P.textLow,
+              ),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              tooltip: 'Delete comment',
+              onPressed: onDelete,
+            ),
         ],
       ),
     );

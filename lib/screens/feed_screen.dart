@@ -238,14 +238,28 @@ class RunFeedCard extends StatefulWidget {
   final FeedRun run;
   final VoidCallback onTapAthlete;
 
-  const RunFeedCard({super.key, required this.run, required this.onTapAthlete});
+  /// Test seam: overrides the persistence call [_toggleReaction] awaits, so a
+  /// widget test can control exactly when it resolves (and with what) to
+  /// deterministically observe the optimistic-then-settled sequence. Defaults
+  /// to the real [SocialService.toggleReaction].
+  @visibleForTesting
+  final Future<bool?> Function(int runId, {required bool currentlyReacted})?
+  reactionToggler;
+
+  const RunFeedCard({
+    super.key,
+    required this.run,
+    required this.onTapAthlete,
+    this.reactionToggler,
+  });
 
   @override
   State<RunFeedCard> createState() => _RunFeedCardState();
 }
 
 class _RunFeedCardState extends State<RunFeedCard> {
-  bool _kudosed = false;
+  late bool _kudosed = widget.run.viewerReacted;
+  late int _reactionCount = widget.run.reactionCount;
   late int _comments = widget.run.commentCount;
 
   FeedRun get run => widget.run;
@@ -267,10 +281,17 @@ class _RunFeedCardState extends State<RunFeedCard> {
       context,
       MaterialPageRoute(
         builder: (_) => ActivityDetailScreen(
-          activity: ActivityDetail.fromFeedRun(run, commentCountOverride: _comments),
+          activity: ActivityDetail.fromFeedRun(
+            run,
+            commentCountOverride: _comments,
+            reactionCountOverride: _reactionCount,
+          ),
           initialReacted: _kudosed,
           onReactedChanged: (v) {
             if (mounted) setState(() => _kudosed = v);
+          },
+          onReactionCountChanged: (v) {
+            if (mounted) setState(() => _reactionCount = v);
           },
           onCommentCountChanged: (v) {
             if (mounted) setState(() => _comments = v);
@@ -278,6 +299,28 @@ class _RunFeedCardState extends State<RunFeedCard> {
         ),
       ),
     );
+  }
+
+  /// Real, persisted cheer — optimistic UI, rolled back on failure (offline,
+  /// RLS denial, etc).
+  Future<void> _toggleReaction() async {
+    HapticFeedback.selectionClick();
+    final wasReacted = _kudosed;
+    final prevCount = _reactionCount;
+    setState(() {
+      _kudosed = !wasReacted;
+      _reactionCount = prevCount + (_kudosed ? 1 : -1);
+    });
+    final toggle = widget.reactionToggler ?? SocialService.instance.toggleReaction;
+    final result = await toggle(run.runId, currentlyReacted: wasReacted);
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _kudosed = wasReacted;
+        _reactionCount = prevCount;
+      });
+      _snack("Couldn't update your reaction — check your connection.");
+    }
   }
 
   Future<void> _openComments() async {
@@ -648,7 +691,13 @@ class _RunFeedCardState extends State<RunFeedCard> {
         ),
         const SizedBox(width: 6),
         Text(
-          _kudosed ? 'You reacted' : 'Be the first to react',
+          _kudosed
+              ? (_reactionCount > 1
+                    ? 'You + ${_reactionCount - 1} reacted'
+                    : 'You reacted')
+              : (_reactionCount > 0
+                    ? '$_reactionCount reacted'
+                    : 'Be the first to react'),
           style: const TextStyle(fontSize: 12, color: _FeedPalette.textMid),
         ),
         const Spacer(),
@@ -671,10 +720,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
             size: 19,
             color: _kudosed ? _FeedPalette.route : _FeedPalette.textMid,
           ),
-          onPressed: () {
-            HapticFeedback.selectionClick();
-            setState(() => _kudosed = !_kudosed);
-          },
+          onPressed: _toggleReaction,
         ),
       ],
     );

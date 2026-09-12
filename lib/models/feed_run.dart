@@ -36,6 +36,12 @@ class FeedRun {
   /// Number of comments on this run (batch-loaded by the feed query).
   final int commentCount;
 
+  /// Number of cheers/reactions on this run (batch-loaded by the feed query).
+  final int reactionCount;
+
+  /// Whether the signed-in viewer has already reacted to this run.
+  final bool viewerReacted;
+
   const FeedRun({
     required this.runId,
     required this.athleteId,
@@ -55,6 +61,8 @@ class FeedRun {
     this.planName,
     this.planProgress,
     this.commentCount = 0,
+    this.reactionCount = 0,
+    this.viewerReacted = false,
   });
 
   /// Decoded `{lat, lng}` points for the route thumbnail. Empty when there's no
@@ -80,6 +88,8 @@ class FeedRun {
     Map<String, dynamic> runRow,
     Map<String, dynamic>? profileRow, {
     int commentCount = 0,
+    int reactionCount = 0,
+    bool viewerReacted = false,
   }) {
     String? loc;
     if (profileRow != null) {
@@ -112,6 +122,8 @@ class FeedRun {
           ? (runRow['plan_progress'] as String).trim()
           : null,
       commentCount: commentCount,
+      reactionCount: reactionCount,
+      viewerReacted: viewerReacted,
     );
   }
 }
