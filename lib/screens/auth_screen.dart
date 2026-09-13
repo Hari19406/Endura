@@ -202,11 +202,7 @@ class _AuthScreenState extends State<AuthScreen> {
     });
 
     try {
-      const webClientId = String.fromEnvironment(
-        'GOOGLE_WEB_CLIENT_ID',
-        defaultValue:
-            '564529835415-5m1r3fknq90hkb547c1gi4an1u6gkps6.apps.googleusercontent.com',
-      );
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
       final GoogleSignIn googleSignIn = GoogleSignIn(
         serverClientId: webClientId,
