@@ -5,6 +5,8 @@ import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/pr_engine.dart';
 import '../engines/achievement_engine.dart' as achieve;
+import '../services/best_efforts_service.dart';
+import 'best_efforts_detail_screen.dart';
 import '../models/activity_telemetry.dart';
 import '../models/athlete_profile.dart';
 import '../models/shoe.dart';
@@ -19,6 +21,7 @@ import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/achievement_tile.dart';
 import '../widgets/athlete_profile_header.dart';
+import '../widgets/best_efforts_preview_card.dart';
 import '../widgets/shoe_edit_sheet.dart';
 import '../widgets/shoe_locker_view.dart';
 import 'milestones_screen.dart';
@@ -39,6 +42,7 @@ class _YouScreenState extends State<YouScreen>
     implements Refreshable {
   WeeklyStats? _stats;
   PRResults? _prResults;
+  Map<DistanceCategory, BestEffortRecord> _bestEfforts = {};
   List<achieve.Achievement> _achievements = [];
   List<String> _newAchievements = [];
   List<dynamic> _runHistory = [];
@@ -104,6 +108,7 @@ class _YouScreenState extends State<YouScreen>
       WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
+      final bestEfforts = await DatabaseService.instance.getAllCategoryPRs();
 
       // ── Athlete identity header ──────────────────────────────────────────
       // Isolated: a Supabase hiccup here must not abort the whole load and
@@ -183,6 +188,7 @@ class _YouScreenState extends State<YouScreen>
         setState(() {
           _stats = stats;
           _prResults = prResults;
+          _bestEfforts = bestEfforts;
           _achievements = achievements;
           _newAchievements = newlyUnlocked;
           _runRecords = records;
@@ -433,6 +439,12 @@ class _YouScreenState extends State<YouScreen>
           // ③ PERSONAL RECORDS
           if (_prResults != null && _runHistory.isNotEmpty) ...[
             _buildPersonalRecordsCard(),
+            const SizedBox(height: 16),
+          ],
+
+          // ③b BEST EFFORTS
+          if (_bestEfforts.isNotEmpty) ...[
+            _buildBestEffortsCard(),
             const SizedBox(height: 16),
           ],
 
@@ -839,6 +851,28 @@ class _YouScreenState extends State<YouScreen>
           }),
         ],
       ),
+    );
+  }
+
+  void _openBestEffortsDetail(DistanceCategory category) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BestEffortsDetailScreen(
+          initialCategory: category,
+          runnerName: _profile?.displayName ?? 'You',
+          avatarUrl: _profile?.avatarUrl,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBestEffortsCard() {
+    return BestEffortsPreviewCard(
+      bestEfforts: _bestEfforts,
+      onCategoryTap: _openBestEffortsDetail,
+      onSeeAll: () => _openBestEffortsDetail(DistanceCategory.k5),
+      formatDate: _formatDate,
     );
   }
 

@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'stats.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
+import '../services/best_efforts_service.dart';
 
 class RunRecord {
   final int? id;
@@ -209,6 +210,46 @@ class TrainingStateRecord {
       );
 }
 
+/// A single "top N" row in the `best_efforts` table: the fastest recorded
+/// continuous segment of [category]'s distance, extracted from one run's
+/// telemetry by [BestEffortsService]. Id is deterministic
+/// (`'<runId>_<category.name>'`) so recomputing for the same run overwrites
+/// rather than duplicates.
+class BestEffortRecord {
+  final String id;
+  final String runId;
+  final DistanceCategory category;
+  final int elapsedSeconds;
+  final DateTime recordedAt;
+
+  const BestEffortRecord({
+    required this.id,
+    required this.runId,
+    required this.category,
+    required this.elapsedSeconds,
+    required this.recordedAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'run_id': runId,
+    'distance_category': category.name,
+    'elapsed_seconds': elapsedSeconds,
+    'recorded_at': recordedAt.toIso8601String(),
+  };
+
+  factory BestEffortRecord.fromMap(Map<String, dynamic> map) =>
+      BestEffortRecord(
+        id: map['id'] as String,
+        runId: map['run_id'] as String,
+        category:
+            DistanceCategory.fromKey(map['distance_category'] as String) ??
+            DistanceCategory.k5,
+        elapsedSeconds: map['elapsed_seconds'] as int,
+        recordedAt: DateTime.parse(map['recorded_at'] as String),
+      );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DatabaseService
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,7 +285,9 @@ class DatabaseService {
       // ────────────────────────────────────────────────────────────────────
       // v10 → added `runs.scheduled_day_id` (direct link from a completed run
       //       to the plan slot it fulfilled; see ScheduledWorkoutContext)
-      version: 10,
+      // v11 → added `best_efforts` table (rolling-window PR leaderboard per
+      //       benchmark distance; see BestEffortsService)
+      version: 11,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -297,10 +340,12 @@ class DatabaseService {
           )
         ''');
         await db.execute(_createShoesTableSql);
+        await db.execute(_createBestEffortsTableSql);
         await db.execute('CREATE INDEX idx_runs_date ON runs(date DESC)');
         await db.execute(
           'CREATE INDEX idx_snap_date ON training_snapshots(date DESC)',
         );
+        await db.execute(_createBestEffortsIndexSql);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         // Each migration block is additive and guarded by the old version so
@@ -437,6 +482,21 @@ class DatabaseService {
             debugPrint('[DB] scheduled_day_id already exists, skipping: $e');
           }
         }
+
+        if (oldVersion < 11) {
+          // v10 → v11: best_efforts — top-10 rolling-window PR leaderboard
+          // per benchmark distance, computed once at run-save time.
+          try {
+            await db.execute(_createBestEffortsTableSql);
+          } catch (e) {
+            debugPrint('[DB] best_efforts table already exists, skipping: $e');
+          }
+          try {
+            await db.execute(_createBestEffortsIndexSql);
+          } catch (e) {
+            debugPrint('[DB] idx_best_efforts already exists, skipping: $e');
+          }
+        }
       },
     );
   }
@@ -456,6 +516,21 @@ class DatabaseService {
       pending_delete      INTEGER NOT NULL DEFAULT 0
     )
   ''';
+
+  static const String _createBestEffortsTableSql = '''
+    CREATE TABLE best_efforts (
+      id                TEXT    PRIMARY KEY,
+      run_id            TEXT    NOT NULL,
+      distance_category TEXT    NOT NULL,
+      elapsed_seconds   INTEGER NOT NULL,
+      recorded_at       TEXT    NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES runs (id) ON DELETE CASCADE
+    )
+  ''';
+
+  static const String _createBestEffortsIndexSql =
+      'CREATE INDEX idx_best_efforts_category_time '
+      'ON best_efforts(distance_category, elapsed_seconds ASC)';
 
   // ── CRUD: shoes (local mirror of the Supabase `shoes` table) ──────────────
 
@@ -534,6 +609,27 @@ class DatabaseService {
   Future<void> deleteRun(int id) async {
     final db = await database;
     await db.delete('runs', where: 'id = ?', whereArgs: [id]);
+    // No enforced FK cascade (foreign_keys pragma isn't enabled), so clean
+    // up this run's best-effort rows explicitly.
+    await db.delete('best_efforts', where: 'run_id = ?', whereArgs: [id.toString()]);
+  }
+
+  Future<RunRecord?> getRunById(int id) async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return RunRecord.fromMap(rows.first);
+    } catch (e, stack) {
+      debugPrint('[DB] getRunById error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return null;
+    }
   }
 
   Future<List<RunRecord>> getAllRuns() async {
@@ -619,6 +715,111 @@ class DatabaseService {
   Future<void> deleteAllRuns() async {
     final db = await database;
     await db.delete('runs');
+    await db.delete('best_efforts');
+  }
+
+  // ── CRUD: best_efforts ──────────────────────────────────────────────────────
+
+  /// Computes and stores best-effort segments for a just-completed run.
+  /// Idempotent: rows are keyed by `'<runId>_<category>'`, so recomputing for
+  /// the same run overwrites rather than duplicates. Never blocks or throws —
+  /// callers should treat this as best-effort, same as shoe/aggregate updates.
+  Future<void> insertBestEffortsForRun(
+    String runId,
+    List<BestEffortResult> results, {
+    DateTime? recordedAt,
+  }) async {
+    if (results.isEmpty) return;
+    final when = recordedAt ?? DateTime.now();
+    try {
+      final db = await database;
+      final touchedCategories = <String>{};
+      for (final r in results) {
+        final record = BestEffortRecord(
+          id: '${runId}_${r.category.name}',
+          runId: runId,
+          category: r.category,
+          elapsedSeconds: r.elapsedSeconds,
+          recordedAt: when,
+        );
+        await db.insert(
+          'best_efforts',
+          record.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+        touchedCategories.add(r.category.name);
+      }
+      for (final categoryName in touchedCategories) {
+        await _trimBestEffortsCategory(db, categoryName);
+      }
+    } catch (e, stack) {
+      debugPrint('[DB] insertBestEffortsForRun error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+    }
+  }
+
+  Future<void> insertBestEffort(BestEffortRecord record) async {
+    try {
+      final db = await database;
+      await db.insert(
+        'best_efforts',
+        record.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      await _trimBestEffortsCategory(db, record.category.name);
+    } catch (e, stack) {
+      debugPrint('[DB] insertBestEffort error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+    }
+  }
+
+  /// Keeps at most the top 10 fastest rows for [categoryName], deleting the
+  /// slowest overflow rows.
+  Future<void> _trimBestEffortsCategory(Database db, String categoryName) async {
+    final rows = await db.query(
+      'best_efforts',
+      columns: ['id'],
+      where: 'distance_category = ?',
+      whereArgs: [categoryName],
+      orderBy: 'elapsed_seconds ASC',
+    );
+    if (rows.length <= 10) return;
+    for (final row in rows.skip(10)) {
+      await db.delete('best_efforts', where: 'id = ?', whereArgs: [row['id']]);
+    }
+  }
+
+  /// Top [limit] fastest efforts for [category], fastest first.
+  Future<List<BestEffortRecord>> getBestEffortsForCategory(
+    DistanceCategory category, {
+    int limit = 10,
+  }) async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'best_efforts',
+        where: 'distance_category = ?',
+        whereArgs: [category.name],
+        orderBy: 'elapsed_seconds ASC',
+        limit: limit,
+      );
+      return rows.map(BestEffortRecord.fromMap).toList();
+    } catch (e, stack) {
+      debugPrint('[DB] getBestEffortsForCategory error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// The #1 (fastest) effort for every category that has at least one
+  /// recorded effort. Categories never reached by any run are omitted.
+  Future<Map<DistanceCategory, BestEffortRecord>> getAllCategoryPRs() async {
+    final result = <DistanceCategory, BestEffortRecord>{};
+    for (final category in DistanceCategory.values) {
+      final top = await getBestEffortsForCategory(category, limit: 1);
+      if (top.isNotEmpty) result[category] = top.first;
+    }
+    return result;
   }
 
   // ── CRUD: training_snapshots ──────────────────────────────────────────────

@@ -31,6 +31,7 @@ import '../services/ble_heart_rate_service.dart';
 import '../services/ble_cadence_service.dart';
 import '../services/health_bridge_service.dart';
 import '../utils/gap_calculator.dart';
+import '../services/best_efforts_service.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -1348,6 +1349,25 @@ class _RunScreenState extends State<RunScreen>
         CloudSyncService.instance.syncPendingRuns().then(
           (r) => debugPrint('Sync: $r'),
         );
+
+        // Best Efforts — rolling-window PR extraction. Computed once here,
+        // off the main-set track samples; best-effort and never blocks the
+        // summary screen if a run has too-sparse telemetry to compute from.
+        if (insertedId > 0) {
+          try {
+            final points = BestEffortsService.pointsFromTrackSamples(
+              capturedTrackSamples,
+            );
+            final results = BestEffortsService.extract(points);
+            await DatabaseService.instance.insertBestEffortsForRun(
+              insertedId.toString(),
+              results,
+              recordedAt: runDate,
+            );
+          } catch (e) {
+            debugPrint('[run save] best-efforts calc skipped: $e');
+          }
+        }
 
         // Link the completed run straight onto the plan day — no post-hoc
         // fuzzy distance scan. Best-effort; never blocks the summary.
