@@ -9,6 +9,7 @@ import '../engines/plan/materialized_plan.dart';
 import '../services/plan_adaptation_coordinator.dart';
 import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
+import '../widgets/build_plan_hero_card.dart';
 import '../widgets/plan_adaptation_card.dart';
 import '../models/scheduled_workout_context.dart';
 import '../engines/progression_decision.dart';
@@ -1555,9 +1556,11 @@ class _HomeScreenState extends State<HomeScreen>
                   onStartNextPlan: _onStartNextPlan,
                   onRemindLater: _onRemindLater,
                 )
-              else if (_engineMemory?.hasRacePlan != true)
-                _buildStartPlanCard()
-              else
+              else if (_engineMemory?.hasRacePlan != true) ...[
+                BuildPlanHeroCard(onStartPlan: _onStartNextPlan),
+                const SizedBox(height: 12),
+                const CoachPrinciplesCard(),
+              ] else
                 ValueListenableBuilder<bool>(
                   valueListenable: RevenueCatService.isProNotifier,
                   builder: (context, isPro, _) => WorkoutCard(
@@ -1955,100 +1958,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
     return null;
-  }
-
-  Widget _buildStartPlanCard() {
-    final c = context.colors;
-    return Semantics(
-      button: true,
-      label: 'Start a new training plan',
-      child: GestureDetector(
-        onTap: _onStartNextPlan,
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: c.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: c.border),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: c.accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'NO PLAN',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: c.accent,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Start a new\ntraining plan',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w700,
-                  color: c.textPrimary,
-                  height: 1.1,
-                  letterSpacing: -0.8,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Set your goal race and get a personalised plan built around your schedule.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: c.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: c.accent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Get started',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: c.onAccent,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 14,
-                      color: c.onAccent,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
 }
