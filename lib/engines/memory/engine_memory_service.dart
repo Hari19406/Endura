@@ -224,9 +224,17 @@ class EngineMemoryService {
   /// "Start a new training plan" card (the app's race-goal / intake re-entry
   /// point) instead of a workout card.
   Future<void> resetCurrentPlan({bool syncToCloud = true}) async {
+    final current = await load();
+    if (current.racePlan != null) {
+      final materialized = await PlanStore.instance.load();
+      await PlanHistoryRepository.instance.snapshotPlan(
+        racePlan: current.racePlan!,
+        materialized: materialized,
+      );
+    }
+
     await PlanStore.instance.resetActivePlan();
 
-    final current = await load();
     final reset = current.copyWith(
       clearRacePlan: true,
       clearActivePlan: true,

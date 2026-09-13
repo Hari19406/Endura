@@ -11,6 +11,7 @@ import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
 import '../widgets/build_plan_hero_card.dart';
 import '../widgets/plan_adaptation_card.dart';
+import '../widgets/previous_plans_section.dart';
 import '../models/scheduled_workout_context.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
@@ -1560,6 +1561,8 @@ class _HomeScreenState extends State<HomeScreen>
                 BuildPlanHeroCard(onStartPlan: _onStartNextPlan),
                 const SizedBox(height: 12),
                 const CoachPrinciplesCard(),
+                const SizedBox(height: 20),
+                PreviousPlansSection(useMiles: _distanceUnit == 'miles'),
               ] else
                 ValueListenableBuilder<bool>(
                   valueListenable: RevenueCatService.isProNotifier,

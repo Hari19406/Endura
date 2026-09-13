@@ -102,7 +102,12 @@ class PlanRestartService {
       builtAt: materialized.builtAt.add(Duration(days: offsetDays)),
     );
 
-    await EngineMemoryService().saveRacePlan(updatedRacePlan);
+    // archivePrevious: false — this reshapes the same plan's dates, it does
+    // not retire it, so it must not be snapshotted into plan_history.
+    await EngineMemoryService().saveRacePlan(
+      updatedRacePlan,
+      archivePrevious: false,
+    );
     await PlanStore.instance.saveAndSync(updatedMaterialized);
     return true;
   }
