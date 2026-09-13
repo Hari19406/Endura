@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import '../../models/weekly_plan.dart';
 import '../../models/race_plan.dart';
 import '../config/workout_template_library.dart';
 import '../../services/engine_state_sync_service.dart';
+import '../../services/plan_history_repository.dart';
 import '../plan/plan_store.dart';
 
 class EngineMemoryService {
@@ -172,8 +174,25 @@ class EngineMemoryService {
     await save(current.copyWith(clearActivePlan: true));
   }
 
-  Future<void> saveRacePlan(RacePlan plan) async {
+  /// Replaces the active race plan. When [archivePrevious] is true (the
+  /// default) and there was a different plan in place, that outgoing plan is
+  /// snapshotted into `plan_history` first — this is a real "switch plans"
+  /// call (e.g. ManagePlanScreen changing race distance/date), so the old
+  /// plan is worth keeping a record of. Pass `archivePrevious: false` when
+  /// [plan] is a reshaped copy of the *same* plan rather than a replacement —
+  /// [PlanRestartService.restartFromToday] does this, since shifting a plan's
+  /// dates isn't retiring it.
+  Future<void> saveRacePlan(RacePlan plan, {bool archivePrevious = true}) async {
     final current = await load();
+    if (archivePrevious && current.racePlan != null) {
+      final materialized = await PlanStore.instance.load();
+      unawaited(
+        PlanHistoryRepository.instance.snapshotPlan(
+          racePlan: current.racePlan!,
+          materialized: materialized,
+        ),
+      );
+    }
     // Snapshot vDOT at the moment a plan starts, so weekly nudges over the
     // life of this plan can be capped to a realistic total drift.
     await save(
