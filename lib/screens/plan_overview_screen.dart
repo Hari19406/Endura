@@ -10,12 +10,15 @@ import '../engines/plan/plan_materialization_coordinator.dart';
 import '../engines/config/workout_template_library.dart'
     show WorkoutIntent, RaceDistance;
 import '../engines/config/archetype_table.dart' show ExperienceLevel;
+import '../engines/memory/engine_memory_service.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart' show Analytics;
+import '../services/plan_restart_service.dart';
 import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
+import '../widgets/restart_plan_banner.dart';
 import '../widgets/workout_step_timeline.dart';
 import 'calendar_day_status.dart';
 import 'paywall_screen.dart';
@@ -54,7 +57,19 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
   /// strip is read from this; otherwise it falls back to a live resolve.
   MaterializedPlan? _materialized;
 
-  RacePlan get racePlan => widget.racePlan;
+  /// Mutable copy of the race plan shown — starts from [widget.racePlan] but
+  /// is replaced in place after "Restart plan from today" shifts its dates,
+  /// so the screen reflects the new schedule without needing to be re-pushed.
+  late RacePlan _racePlan = widget.racePlan;
+
+  /// Whole days behind the next uncompleted workout's original schedule.
+  /// Null hides the restart banner (no plan, or already on schedule).
+  int? _daysBehindSchedule;
+
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _currentWeekKey = GlobalKey();
+
+  RacePlan get racePlan => _racePlan;
   bool get useMiles => widget.useMiles;
   List<int> get trainingDayIndices => widget.trainingDayIndices;
   int? get longRunDayIndex => widget.longRunDayIndex;
@@ -63,6 +78,44 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
   void initState() {
     super.initState();
     _loadMaterialized();
+    _loadRestartStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrentWeek());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCurrentWeek() {
+    final ctx = _currentWeekKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 1),
+      alignment: 0.1,
+    );
+  }
+
+  Future<void> _loadRestartStatus() async {
+    final days = await PlanRestartService.daysBehindSchedule();
+    if (!mounted) return;
+    setState(() => _daysBehindSchedule = days);
+  }
+
+  /// After a successful restart: reload the race plan (its dates just
+  /// shifted) and the materialized plan off the store, then re-check whether
+  /// the banner should still show (it won't — the plan is back on schedule).
+  Future<void> _onPlanRestarted() async {
+    final memory = await EngineMemoryService().load();
+    if (!mounted) return;
+    setState(() {
+      _racePlan = memory.racePlan ?? _racePlan;
+      _materialized = null;
+    });
+    await _loadMaterialized();
+    await _loadRestartStatus();
   }
 
   Future<void> _loadMaterialized() async {
@@ -195,55 +248,78 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: ValueListenableBuilder<bool>(
-        valueListenable: RevenueCatService.isProNotifier,
-        builder: (context, isPro, _) {
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-            itemCount: racePlan.weeks.length,
-            itemBuilder: (context, index) {
-              final week = racePlan.weeks[index];
-              final isCurrent = week.week == currentWeekNumber;
-              final isPastOrCurrent = week.week <= currentWeekNumber;
-              final isLocked = !isPro && week.week > currentWeekNumber;
-              final weekMonday = _mondayOf(week.week);
-              final resolution = _resolutionForWeek(week);
-              // Real day-by-day status only makes sense once a week has started.
-              final materializedWeek = isPastOrCurrent
-                  ? _materialized?.weekByNumber(week.week)
-                  : null;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _WeekCard(
-                  week: week,
-                  weekStart: weekMonday,
-                  resolution: resolution,
-                  isCurrent: isCurrent,
-                  isLocked: isLocked,
-                  useMiles: useMiles,
-                  materializedWeek: materializedWeek,
-                  weekMonday: weekMonday,
-                  now: now,
-                  onDayTap: _showDayDetail,
-                  onLockedTap: isLocked
-                      ? () {
-                          Analytics.capture(
-                            'locked_week_tapped',
-                            properties: {'week': week.week},
-                          );
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const PaywallScreen(),
-                            ),
-                          );
-                        }
-                      : null,
+      body: Stack(
+        children: [
+          ValueListenableBuilder<bool>(
+            valueListenable: RevenueCatService.isProNotifier,
+            builder: (context, isPro, _) {
+              return ListView.builder(
+                controller: _scrollController,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  8,
+                  20,
+                  _daysBehindSchedule != null && _daysBehindSchedule! > 0
+                      ? 96
+                      : 32,
                 ),
+                itemCount: racePlan.weeks.length,
+                itemBuilder: (context, index) {
+                  final week = racePlan.weeks[index];
+                  final isCurrent = week.week == currentWeekNumber;
+                  final isPastOrCurrent = week.week <= currentWeekNumber;
+                  final isLocked = !isPro && week.week > currentWeekNumber;
+                  final weekMonday = _mondayOf(week.week);
+                  final resolution = _resolutionForWeek(week);
+                  // Real day-by-day status only makes sense once a week has started.
+                  final materializedWeek = isPastOrCurrent
+                      ? _materialized?.weekByNumber(week.week)
+                      : null;
+
+                  return Padding(
+                    key: isCurrent ? _currentWeekKey : null,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _WeekCard(
+                      week: week,
+                      weekStart: weekMonday,
+                      resolution: resolution,
+                      isCurrent: isCurrent,
+                      isLocked: isLocked,
+                      useMiles: useMiles,
+                      materializedWeek: materializedWeek,
+                      weekMonday: weekMonday,
+                      now: now,
+                      onDayTap: _showDayDetail,
+                      onLockedTap: isLocked
+                          ? () {
+                              Analytics.capture(
+                                'locked_week_tapped',
+                                properties: {'week': week.week},
+                              );
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const PaywallScreen(),
+                                ),
+                              );
+                            }
+                          : null,
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+          if (_daysBehindSchedule != null && _daysBehindSchedule! > 0)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: SafeArea(
+                top: false,
+                child: RestartPlanBanner(onRestarted: _onPlanRestarted),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -392,6 +468,12 @@ class _WeekCard extends StatelessWidget {
               ],
             ),
             if (!isLocked) ...[
+              const SizedBox(height: 14),
+              _WeekStatsRow(
+                materializedWeek: materializedWeek,
+                resolution: resolution,
+                useMiles: useMiles,
+              ),
               const SizedBox(height: 16),
               materializedWeek != null
                   ? MaterializedWeekStrip(
@@ -405,6 +487,85 @@ class _WeekCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Weekly stats row: workouts + distance completed vs. target ─────────────
+
+class _WeekStatsRow extends StatelessWidget {
+  /// Present for current + past weeks — completion counts read from here.
+  final MaterializedWeek? materializedWeek;
+
+  /// Always present — supplies the target counts/distance for both
+  /// materialized and purely-projected (future) weeks.
+  final WeekResolution resolution;
+  final bool useMiles;
+
+  const _WeekStatsRow({
+    required this.materializedWeek,
+    required this.resolution,
+    required this.useMiles,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final textTheme = Theme.of(context).textTheme;
+
+    final mw = materializedWeek;
+    final totalWorkouts = mw != null
+        ? mw.trainingDays.length
+        : resolution.days.where((d) => !d.isRest).length;
+    final completedWorkouts = mw?.trainingDays
+            .where((d) => d.isCompleted)
+            .length ??
+        0;
+
+    final targetKm = resolution.targetKm;
+    final completedKm =
+        mw?.days.fold<double>(0, (s, d) => s + (d.completion?.actualKm ?? 0)) ??
+            0;
+
+    final targetDisplay = UnitUtils.displayDistance(targetKm, useMiles);
+    final completedDisplay = UnitUtils.displayDistance(completedKm, useMiles);
+    final unit = UnitUtils.unitLabel(useMiles);
+
+    final ratio = targetKm > 0 ? (completedKm / targetKm).clamp(0.0, 1.0) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Workouts $completedWorkouts/$totalWorkouts',
+              style: textTheme.bodySmall?.copyWith(
+                color: c.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              'Distance ${completedDisplay.toStringAsFixed(1)} / ${targetDisplay.toStringAsFixed(1)} $unit',
+              style: textTheme.bodySmall?.copyWith(
+                color: c.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 4,
+            backgroundColor: c.divider,
+            valueColor: AlwaysStoppedAnimation<Color>(c.chartAccent),
+          ),
+        ),
+      ],
     );
   }
 }
