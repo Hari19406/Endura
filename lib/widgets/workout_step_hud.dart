@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../engines/config/workout_template_library.dart'
     show BlockType, ResolvedBlock;
 import '../theme/app_colors.dart';
+import '../utils/unit_utils.dart';
 
 /// Where the rolling pace sits relative to the step's target window.
 enum StepPaceVerdict {
@@ -60,10 +61,15 @@ class WorkoutStepHud extends StatelessWidget {
   final List<ResolvedBlock> blocks;
 
   /// Runner's current rolling pace, seconds per km (0 / null = no reading).
+  /// Always canonical km — this widget converts for display internally.
   final int? rollingPaceSecPerKm;
 
   /// Advance to the next block. Null / disabled on the last step.
   final VoidCallback? onNextStep;
+
+  /// Display-unit preference. The underlying block data (and the pace-verdict
+  /// comparison) always stays km-based; only rendered text converts.
+  final bool useMiles;
 
   const WorkoutStepHud({
     super.key,
@@ -71,6 +77,7 @@ class WorkoutStepHud extends StatelessWidget {
     required this.blocks,
     required this.rollingPaceSecPerKm,
     this.onNextStep,
+    this.useMiles = false,
   });
 
   ResolvedBlock get _block => blocks[stepIndex];
@@ -80,7 +87,7 @@ class WorkoutStepHud extends StatelessWidget {
     final n = stepIndex + 1;
     final total = blocks.length;
     final label = _block.label ?? _blockTypeLabel(_block.type);
-    return 'Step $n of $total · $label — ${_block.formattedDistance}';
+    return 'Step $n of $total · $label — ${_formattedDistance(_block)}';
   }
 
   static String _blockTypeLabel(BlockType t) => switch (t) {
@@ -89,6 +96,39 @@ class WorkoutStepHud extends StatelessWidget {
     BlockType.recovery => 'Recovery',
     BlockType.main => 'Interval',
   };
+
+  /// Mirrors `WorkoutStepTimeline._StepRow._distance` — sub-1 km distances
+  /// stay in metres even in miles mode (the app-wide convention for short
+  /// segments; nobody wants "437 yd" reps).
+  String _formattedDistance(ResolvedBlock b) {
+    if (b.durationSeconds != null) {
+      final s = b.durationSeconds!;
+      return s >= 60 && s % 60 == 0 ? '${s ~/ 60} min' : '${s}s';
+    }
+    if (b.distanceKm < 1.0) return '${(b.distanceKm * 1000).round()} m';
+    final d = UnitUtils.displayDistance(b.distanceKm, useMiles);
+    return '${d.toStringAsFixed(d >= 10 ? 0 : 1)} ${UnitUtils.unitLabel(useMiles)}';
+  }
+
+  /// Mirrors `StepPaceBand._window`/`_ceiling` — a unit-aware pace window for
+  /// the target badge.
+  String _targetPaceLabel(ResolvedBlock b) {
+    if (b.isRpeOnly) return 'RPE effort';
+    final unit = UnitUtils.perUnitLabel(useMiles);
+    final lo = _fmtPace(
+      UnitUtils.displayPaceSeconds(
+        b.paceMinSecondsPerKm.toDouble(),
+        useMiles,
+      ).round(),
+    );
+    final hi = _fmtPace(
+      UnitUtils.displayPaceSeconds(
+        b.paceMaxSecondsPerKm.toDouble(),
+        useMiles,
+      ).round(),
+    );
+    return lo == hi ? '$lo$unit' : '$lo–$hi$unit';
+  }
 
   ({Color fg, String text}) _paceVerdict(AppColors c) {
     switch (stepPaceVerdict(_block, rollingPaceSecPerKm)) {
@@ -110,7 +150,12 @@ class WorkoutStepHud extends StatelessWidget {
     final c = context.colors;
     final verdict = _paceVerdict(c);
     final rolling = (rollingPaceSecPerKm ?? 0) > 0
-        ? _fmtPace(rollingPaceSecPerKm!)
+        ? _fmtPace(
+            UnitUtils.displayPaceSeconds(
+              rollingPaceSecPerKm!.toDouble(),
+              useMiles,
+            ).round(),
+          )
         : '—:––';
 
     return Container(
@@ -141,7 +186,7 @@ class WorkoutStepHud extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Target ${_block.formattedPace}',
+                      'Target ${_targetPaceLabel(_block)}',
                       style: TextStyle(fontSize: 12, color: c.textSecondary),
                     ),
                     const SizedBox(height: 2),
@@ -159,7 +204,7 @@ class WorkoutStepHud extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '/km · ${verdict.text}',
+                          '${UnitUtils.perUnitLabel(useMiles)} · ${verdict.text}',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,

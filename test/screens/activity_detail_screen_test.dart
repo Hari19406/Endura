@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/models/activity_telemetry.dart';
 import 'package:run_app/screens/activity_detail_screen.dart';
 import 'package:run_app/theme/app_colors.dart';
+import 'package:run_app/utils/unit_utils.dart';
 
 ActivityDetail _minimalCloudActivity() => ActivityDetail(
   runId: 77,
@@ -43,6 +44,43 @@ ActivityDetail _localActivity() => ActivityDetail(
   hrZones: const [],
 );
 
+/// A ~2 km run with a steady 300 s/km pace, split into two km buckets, with a
+/// matching telemetry trace so `splitsForDisplay` can properly re-bucket into
+/// miles rather than falling back.
+ActivityDetail _activityWithSplits() {
+  final samples = <TelemetrySample>[
+    for (var i = 0; i <= 20; i++)
+      TelemetrySample(distanceKm: i * 0.1, paceSeconds: 300),
+  ];
+  return ActivityDetail(
+    runId: 88,
+    runIdIsCloud: true,
+    runnerName: 'Test Runner',
+    timestamp: DateTime(2026, 9, 12, 6),
+    source: 'Endura Tracker',
+    location: '',
+    title: 'Easy Run',
+    distanceKm: 2.0,
+    avgPace: '5:00',
+    movingTime: const Duration(minutes: 10),
+    avgGapPace: '5:05',
+    splits: const [
+      KmSplit(km: 1, paceSeconds: 300),
+      KmSplit(km: 2, paceSeconds: 300),
+    ],
+    telemetrySeries: samples,
+    hrZones: const [],
+  );
+}
+
+/// The summary grid / GAP block render their big value+unit pairs as a single
+/// `RichText` (value + a `TextSpan` unit suffix), not separate `Text`
+/// widgets — `find.text`/`textContaining` can't see into it, so check the
+/// flattened plain text of every mounted `RichText` instead.
+bool _anyRichTextContains(WidgetTester tester, String needle) => tester
+    .widgetList<RichText>(find.byType(RichText))
+    .any((w) => w.text.toPlainText().contains(needle));
+
 Widget _host(ActivityDetail a, {ValueChanged<bool>? onReactedChanged}) =>
     MaterialApp(
       theme: ThemeData(extensions: const [AppColors.light]),
@@ -53,6 +91,8 @@ Widget _host(ActivityDetail a, {ValueChanged<bool>? onReactedChanged}) =>
     );
 
 void main() {
+  tearDown(() => UnitUtils.useMilesNotifier.value = false);
+
   testWidgets('a run with no optional data renders without overflow', (
     tester,
   ) async {
@@ -117,4 +157,55 @@ void main() {
       );
     },
   );
+
+  group('unit-preference conversion', () {
+    testWidgets(
+      'summary grid + GAP block render in km by default',
+      (tester) async {
+        await tester.pumpWidget(_host(_activityWithSplits()));
+        await tester.pumpAndSettle();
+
+        expect(_anyRichTextContains(tester, '2.00'), isTrue); // DISTANCE
+        expect(_anyRichTextContains(tester, ' km'), isTrue);
+        expect(_anyRichTextContains(tester, '5:00'), isTrue); // PACE
+        expect(_anyRichTextContains(tester, '/km'), isTrue);
+        expect(find.text('KILOMETRE SPLITS'), findsOneWidget);
+        // Split rows still show plain km-denominated pace text.
+        expect(find.text('5:00'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'flipping to miles live converts distance, pace, GAP and re-buckets '
+      'the splits — with no manual refresh',
+      (tester) async {
+        await tester.pumpWidget(_host(_activityWithSplits()));
+        await tester.pumpAndSettle();
+
+        UnitUtils.useMilesNotifier.value = true;
+        await tester.pumpAndSettle();
+
+        // 2 km × 0.621371 ≈ 1.24 mi.
+        expect(_anyRichTextContains(tester, '1.24'), isTrue);
+        expect(_anyRichTextContains(tester, ' mi'), isTrue);
+        // 5:00/km × 1.609344 ≈ 8:03/mi.
+        expect(_anyRichTextContains(tester, '8:03'), isTrue);
+        expect(_anyRichTextContains(tester, '/mi'), isTrue);
+        expect(_anyRichTextContains(tester, '/km'), isFalse);
+
+        // Splits card re-bucketed into miles, not just relabelled km rows.
+        expect(find.text('MILE SPLITS'), findsOneWidget);
+        expect(find.text('KILOMETRE SPLITS'), findsNothing);
+        expect(find.text('MI'), findsOneWidget); // column header
+        // First full-mile bucket at a steady 300 s/km ≈ 8:03/mi.
+        expect(find.text('8:03'), findsWidgets);
+
+        // Flip back — everything reverts.
+        UnitUtils.useMilesNotifier.value = false;
+        await tester.pumpAndSettle();
+        expect(_anyRichTextContains(tester, '2.00'), isTrue);
+        expect(find.text('KILOMETRE SPLITS'), findsOneWidget);
+      },
+    );
+  });
 }

@@ -268,6 +268,85 @@ class ActivityDetail {
   int get slowestSplitSeconds =>
       splits.isEmpty ? 0 : splits.map((s) => s.paceSeconds).reduce(math.max);
 
+  /// Splits sized to the display unit — the *contract* is that
+  /// `.paceSeconds`/`.paceLabel` on the returned rows are always already
+  /// expressed in the requested unit (never needs a further [UnitUtils]
+  /// conversion), and `.km` is the 1-based index in that unit.
+  ///
+  /// [splits] itself always stays kilometre-bucketed (the stored/canonical
+  /// shape — see the class doc on [KmSplit]); this re-buckets the raw
+  /// [telemetrySeries] into 1-mile segments when [useMiles] is true, so a
+  /// "split" always means one physical distance unit, not a relabelled
+  /// kilometre. Falls back to the stored km buckets (their pace values
+  /// converted in place) when there's no trace fine-grained enough to
+  /// re-bucket from — a `FeedRun`-hydrated activity never has splits in the
+  /// first place, and a locally-recorded one carries a trace whenever it
+  /// carries splits at all, so this fallback is a rare, low-precision edge
+  /// case rather than the common path.
+  List<KmSplit> splitsForDisplay({required bool useMiles}) {
+    if (!useMiles || splits.isEmpty) return splits;
+
+    const mileKm = 1.609344;
+    if (telemetrySeries.length >= 2) {
+      final totalKm = telemetrySeries.last.distanceKm;
+      if (totalKm > 0) {
+        final unitCount = (totalKm / mileKm).ceil();
+        final rebucketed = <KmSplit>[];
+        for (var u = 1; u <= unitCount; u++) {
+          final lo = (u - 1) * mileKm;
+          final hi = math.min(u * mileKm, totalKm);
+          final inBucket = telemetrySeries
+              .where((s) => s.distanceKm >= lo && s.distanceKm <= hi)
+              .toList();
+          if (inBucket.isEmpty) continue;
+          final paces = inBucket
+              .map((s) => s.paceSeconds)
+              .whereType<int>()
+              .toList();
+          if (paces.isEmpty) continue;
+          final avgPaceSecPerKm =
+              paces.reduce((a, b) => a + b) / paces.length;
+          final alts = inBucket
+              .map((s) => s.elevationM)
+              .whereType<double>()
+              .toList();
+          final hrs = inBucket
+              .map((s) => s.hrBpm)
+              .whereType<int>()
+              .toList();
+          rebucketed.add(
+            KmSplit(
+              km: u,
+              // avg pace (sec/km) × this bucket's real km-length: for a full
+              // ~1-mile bucket that's already "seconds per mile" — the same
+              // convention the km bucketer uses (sec/km × ~1km ≈ itself).
+              paceSeconds: (avgPaceSecPerKm * (hi - lo)).round(),
+              elevationChangeM: alts.length >= 2
+                  ? alts.last - alts.first
+                  : null,
+              avgHr: hrs.isEmpty
+                  ? null
+                  : (hrs.reduce((a, b) => a + b) / hrs.length).round(),
+            ),
+          );
+        }
+        if (rebucketed.isNotEmpty) return rebucketed;
+      }
+    }
+
+    // Fallback: keep the km bucket boundaries but convert each pace value so
+    // the "always in the requested unit" contract still holds.
+    return [
+      for (final s in splits)
+        KmSplit(
+          km: s.km,
+          paceSeconds: (s.paceSeconds * mileKm).round(),
+          elevationChangeM: s.elevationChangeM,
+          avgHr: s.avgHr,
+        ),
+    ];
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   //  Hydration factories
   // ───────────────────────────────────────────────────────────────────────────

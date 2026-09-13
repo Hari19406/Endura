@@ -1949,7 +1949,7 @@ class _RunScreenState extends State<RunScreen>
               Container(height: 1, color: c.divider),
               const SizedBox(height: 16),
               _buildWelcomeTip(
-                'Today\'s target: ${PaceComparator.formatRange(_targetPaceRange!)}',
+                'Today\'s target: ${PaceComparator.formatRange(_targetPaceRange!, useMiles: _distanceUnit == 'miles')}',
               ),
             ],
           ],
@@ -2192,6 +2192,7 @@ class _RunScreenState extends State<RunScreen>
                   ? _paceSnapshot.smoothedPaceSecondsPerKm.round()
                   : null,
               onNextStep: _advanceStep,
+              useMiles: _distanceUnit == 'miles',
             ),
           ],
           if (showPaceIndicator) ...[
@@ -2201,6 +2202,7 @@ class _RunScreenState extends State<RunScreen>
             TargetPaceIndicator(
               currentPaceSecondsPerKm: _paceSnapshot.smoothedPaceSecondsPerKm,
               targetRange: _targetPaceRange,
+              useMiles: _distanceUnit == 'miles',
             ),
           ],
           if (_phaseMilestoneReached && isActive) ...[

@@ -74,6 +74,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   int? _resolvedCloudRunId;
   bool _cloudRunIdResolveAttempted = false;
 
+  /// Live unit preference — every distance/pace on this screen renders in
+  /// this unit; the underlying [ActivityDetail] data always stays km-based.
+  bool _useMiles = UnitUtils.useMilesNotifier.value;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +88,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         'source': widget.activity.source,
       },
     );
+    UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
+  }
+
+  void _onUnitPrefChanged() {
+    if (mounted) setState(() => _useMiles = UnitUtils.useMilesNotifier.value);
+  }
+
+  @override
+  void dispose() {
+    UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    super.dispose();
   }
 
   ActivityDetail get a => widget.activity;
@@ -243,7 +258,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   /// same export the post-run summary uses.
   Future<void> _shareCard() async {
     HapticFeedback.lightImpact();
-    final useMiles = UnitUtils.useMilesNotifier.value;
     await showRunShareSheet(
       context,
       ShareRunData(
@@ -253,7 +267,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         date: a.timestamp,
         workoutType: a.workoutType,
         gpsPoints: a.routePoints,
-        useMiles: useMiles,
+        useMiles: _useMiles,
       ),
       source: 'activity_detail',
     );
@@ -368,7 +382,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     const SizedBox(height: 16),
                   ],
                   if (a.hasHrData) ...[
-                    _HrZonesCard(activity: a),
+                    _HrZonesCard(activity: a, useMiles: _useMiles),
                     const SizedBox(height: 16),
                   ],
                   if (a.hasCadenceSeries) _cadenceCard(c),
@@ -537,9 +551,20 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         children: [
           Row(
             children: [
-              cell('DISTANCE', a.distanceKm.toStringAsFixed(2), 'km'),
+              cell(
+                'DISTANCE',
+                UnitUtils.displayDistance(
+                  a.distanceKm,
+                  _useMiles,
+                ).toStringAsFixed(2),
+                UnitUtils.unitLabel(_useMiles),
+              ),
               divider(),
-              cell('PACE', a.avgPace, '/km'),
+              cell(
+                'PACE',
+                UnitUtils.formatPaceString(a.avgPace, _useMiles),
+                UnitUtils.perUnitLabel(_useMiles),
+              ),
               divider(),
               cell('TIME', _fmtDuration(a.movingTime), ''),
             ],
@@ -695,10 +720,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         return _pill(c, 'matches raw pace', c.textTertiary);
       }
       final faster = delta < 0;
-      final mag = _paceFromSeconds(delta.abs());
+      final mag = _paceFromSeconds(
+        UnitUtils.displayPaceSeconds(delta.abs().toDouble(), _useMiles)
+            .round(),
+      );
       return _pill(
         c,
-        '${faster ? '−' : '+'}$mag /km than raw pace',
+        '${faster ? '−' : '+'}$mag ${UnitUtils.perUnitLabel(_useMiles)} '
+        'than raw pace',
         faster ? c.success : c.danger,
       );
     }
@@ -729,7 +758,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     const SizedBox(height: 6),
                     RichText(
                       text: TextSpan(
-                        text: a.avgGapPace,
+                        text: UnitUtils.formatPaceString(
+                          a.avgGapPace!,
+                          _useMiles,
+                        ),
                         style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
@@ -739,7 +771,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                         ),
                         children: [
                           TextSpan(
-                            text: ' /km',
+                            text: ' ${UnitUtils.perUnitLabel(_useMiles)}',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -826,19 +858,24 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   // ── 4. Kilometre splits ───────────────────────────────────────────────────
 
   Widget _splitsCard(AppColors c) {
-    final fastest = a.fastestSplitSeconds;
-    final slowest = a.slowestSplitSeconds;
+    final splits = a.splitsForDisplay(useMiles: _useMiles);
+    final fastest = splits.isEmpty
+        ? 0
+        : splits.map((s) => s.paceSeconds).reduce(math.min);
+    final slowest = splits.isEmpty
+        ? 0
+        : splits.map((s) => s.paceSeconds).reduce(math.max);
     final showElev = a.anySplitHasElevation;
     final showHr = a.anySplitHasHr;
     return _card(
       c,
-      title: 'KILOMETRE SPLITS',
+      title: _useMiles ? 'MILE SPLITS' : 'KILOMETRE SPLITS',
       child: Column(
         children: [
           const SizedBox(height: 4),
           Row(
             children: [
-              _splitHeaderCell(c, 'KM', width: 26),
+              _splitHeaderCell(c, _useMiles ? 'MI' : 'KM', width: 26),
               const SizedBox(width: 10),
               _splitHeaderCell(c, 'PACE', width: 44),
               const Expanded(child: SizedBox()),
@@ -850,7 +887,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          ...a.splits.map((s) {
+          ...splits.map((s) {
             final frac = slowest == fastest
                 ? 1.0
                 : (slowest - s.paceSeconds) / (slowest - fastest);
@@ -937,8 +974,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           }),
           const SizedBox(height: 6),
           Text(
-            'Bar length ∝ speed · fastest ${_paceFromSeconds(fastest ~/ 1)}'
-            ' relative to slowest ${_paceFromSeconds(slowest ~/ 1)}',
+            'Bar length ∝ speed · fastest ${_paceFromSeconds(fastest)}'
+            ' relative to slowest ${_paceFromSeconds(slowest)}',
             style: TextStyle(fontSize: 10.5, color: c.textFaint),
           ),
         ],
@@ -973,7 +1010,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final spots = [
       for (final s in a.telemetrySeries)
         if (s.paceSeconds != null)
-          FlSpot(s.distanceKm, -s.paceSeconds!.toDouble()),
+          FlSpot(
+            UnitUtils.displayDistance(s.distanceKm, _useMiles),
+            -UnitUtils.displayPaceSeconds(
+              s.paceSeconds!.toDouble(),
+              _useMiles,
+            ),
+          ),
     ];
     return _card(
       c,
@@ -983,9 +1026,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         child: _ScrubLineChart(
           spots: spots,
           color: c.chartAccent,
-          xUnitLabel: 'km',
+          xUnitLabel: UnitUtils.unitLabel(_useMiles),
           formatY: (y) => _paceFromSeconds((-y).round()),
-          yUnitLabel: '/km',
+          yUnitLabel: UnitUtils.perUnitLabel(_useMiles),
           fill: true,
         ),
       ),
@@ -1003,7 +1046,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final hi = elevs.reduce(math.max);
     final spots = [
       for (final s in a.telemetrySeries)
-        if (s.elevationM != null) FlSpot(s.distanceKm, s.elevationM!),
+        if (s.elevationM != null)
+          FlSpot(UnitUtils.displayDistance(s.distanceKm, _useMiles), s.elevationM!),
     ];
     return _card(
       c,
@@ -1017,7 +1061,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         child: _ScrubLineChart(
           spots: spots,
           color: c.cadenceAccent, // green
-          xUnitLabel: 'km',
+          xUnitLabel: UnitUtils.unitLabel(_useMiles),
           formatY: (y) => '${y.round()}',
           yUnitLabel: 'm',
           fill: true,
@@ -1040,7 +1084,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final spots = [
       for (final s in a.telemetrySeries)
         if (s.cadenceSpm != null)
-          FlSpot(s.distanceKm, s.cadenceSpm!.toDouble()),
+          FlSpot(
+            UnitUtils.displayDistance(s.distanceKm, _useMiles),
+            s.cadenceSpm!.toDouble(),
+          ),
     ];
     final avgCad =
         a.avgCadence ??
@@ -1065,7 +1112,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         child: _ScrubLineChart(
           spots: spots,
           color: c.elevationAccent, // orange
-          xUnitLabel: 'km',
+          xUnitLabel: UnitUtils.unitLabel(_useMiles),
           formatY: (y) => '${y.round()}',
           yUnitLabel: 'spm',
           fill: true,
@@ -1333,7 +1380,8 @@ class _ScrubLineChart extends StatelessWidget {
 
 class _HrZonesCard extends StatefulWidget {
   final ActivityDetail activity;
-  const _HrZonesCard({required this.activity});
+  final bool useMiles;
+  const _HrZonesCard({required this.activity, required this.useMiles});
 
   @override
   State<_HrZonesCard> createState() => _HrZonesCardState();
@@ -1359,7 +1407,11 @@ class _HrZonesCardState extends State<_HrZonesCard> {
     final a = widget.activity;
     final spots = [
       for (final s in a.telemetrySeries)
-        if (s.hrBpm != null) FlSpot(s.distanceKm, s.hrBpm!.toDouble()),
+        if (s.hrBpm != null)
+          FlSpot(
+            UnitUtils.displayDistance(s.distanceKm, widget.useMiles),
+            s.hrBpm!.toDouble(),
+          ),
     ];
     final hrs = a.telemetrySeries.map((s) => s.hrBpm).whereType<int>().toList();
     final minHr = hrs.isEmpty ? 100 : hrs.reduce(math.min);
@@ -1474,7 +1526,8 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                               return Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  '${value.toStringAsFixed(1)} km',
+                                  '${value.toStringAsFixed(1)} '
+                                  '${UnitUtils.unitLabel(widget.useMiles)}',
                                   style: TextStyle(
                                     fontSize: 9.5,
                                     color: c.textTertiary,
@@ -1495,7 +1548,7 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                         c,
                         pinColor: c.danger,
                         label: (spot) => '${spot.y.round()} bpm',
-                        xUnitLabel: 'km',
+                        xUnitLabel: UnitUtils.unitLabel(widget.useMiles),
                       ),
                       lineBarsData: [
                         LineChartBarData(

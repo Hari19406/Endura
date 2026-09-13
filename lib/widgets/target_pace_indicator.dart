@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../theme/app_colors.dart';
+import '../utils/unit_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PACE STATUS ENUM
@@ -59,10 +60,18 @@ class PaceComparator {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  /// Format a PaceRange as "M:SS–M:SS/km"
-  static String formatRange(message.PaceRange range) {
-    return '${formatPace(range.minSecondsPerKm)}–'
-        '${formatPace(range.maxSecondsPerKm)}/km';
+  /// Format a PaceRange as "M:SS–M:SS/km" (or "/mi" when [useMiles]).
+  /// [range] is always canonical km — only the rendered text converts.
+  static String formatRange(message.PaceRange range, {bool useMiles = false}) {
+    final lo = UnitUtils.displayPaceSeconds(
+      range.minSecondsPerKm.toDouble(),
+      useMiles,
+    ).round();
+    final hi = UnitUtils.displayPaceSeconds(
+      range.maxSecondsPerKm.toDouble(),
+      useMiles,
+    ).round();
+    return '${formatPace(lo)}–${formatPace(hi)}${UnitUtils.perUnitLabel(useMiles)}';
   }
 }
 
@@ -78,10 +87,15 @@ class TargetPaceIndicator extends StatelessWidget {
   /// Pass null for free runs — widget renders a "FREE RUN" badge.
   final message.PaceRange? targetRange;
 
+  /// Display-unit preference. [currentPaceSecondsPerKm]/[targetRange] stay
+  /// canonical km — only the rendered text converts.
+  final bool useMiles;
+
   const TargetPaceIndicator({
     super.key,
     required this.currentPaceSecondsPerKm,
     required this.targetRange,
+    this.useMiles = false,
   });
 
   // ── Visual config per status ─────────────────────────────────────────────
@@ -144,7 +158,7 @@ class TargetPaceIndicator extends StatelessWidget {
     final color = _statusColor(status);
     final label = _statusLabel(status);
     final icon = _statusIcon(status);
-    final range = PaceComparator.formatRange(targetRange!);
+    final range = PaceComparator.formatRange(targetRange!, useMiles: useMiles);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
