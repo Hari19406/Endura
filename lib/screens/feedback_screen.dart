@@ -29,7 +29,7 @@ class FeedbackScreen extends StatelessWidget {
       path: _supportEmail,
       queryParameters: {'subject': 'Support Request'},
     );
-    if (!await launchUrl(uri)) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
