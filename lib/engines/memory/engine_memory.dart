@@ -442,6 +442,7 @@ class EngineMemory {
     DateTime? lastProgressionEvaluationDate,
     int? pendingVdotNudge,
     int? longRunDayIndex,
+    bool clearLongRunDayIndex = false,
     double? baselineWeeklyKm,
     double? previousWeekTargetKm,
     // v5
@@ -503,7 +504,9 @@ class EngineMemory {
       lastProgressionEvaluationDate:
           lastProgressionEvaluationDate ?? this.lastProgressionEvaluationDate,
       pendingVdotNudge: pendingVdotNudge ?? this.pendingVdotNudge,
-      longRunDayIndex: longRunDayIndex ?? this.longRunDayIndex,
+      longRunDayIndex: clearLongRunDayIndex
+          ? null
+          : (longRunDayIndex ?? this.longRunDayIndex),
       baselineWeeklyKm: baselineWeeklyKm ?? this.baselineWeeklyKm,
       previousWeekTargetKm: previousWeekTargetKm ?? this.previousWeekTargetKm,
       // v5

@@ -118,7 +118,8 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
             style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.w700),
           ),
           content: Text(
-            'This will delete your current training plan. This cannot be undone.',
+            'Your past logged runs will stay safe, but your current '
+            'training schedule will be archived. This cannot be undone.',
             style: TextStyle(color: c.textSecondary, fontSize: 14),
           ),
           actions: [
@@ -139,8 +140,7 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
     );
 
     if (confirmed == true) {
-      await EngineMemoryService().clearRacePlan();
-      await EngineMemoryService().clearActivePlan();
+      await EngineMemoryService().resetCurrentPlan();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('goal_race');
       await prefs.remove('plan_start_date');

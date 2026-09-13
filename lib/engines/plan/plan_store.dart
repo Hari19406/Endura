@@ -279,5 +279,25 @@ class PlanStore {
     }
   }
 
+  /// Full teardown of the athlete's active plan: drops the local cache AND
+  /// every remote row for this user (the class invariant is "exactly one live
+  /// materialised plan per user", so there is never more than one to remove).
+  /// Historical `runs` rows are untouched — this table has no relationship to
+  /// them. Call this whenever the athlete changes race goal or resets
+  /// training (e.g. from ManagePlanScreen's "Remove Plan"), never partially —
+  /// clearing only the local cache (or only EngineMemory's racePlan) leaves a
+  /// stale plan that Home/PlanOverview will read straight back via [load].
+  Future<void> resetActivePlan() async {
+    await clearLocal();
+    final client = _client;
+    final user = _user;
+    if (client == null || user == null) return;
+    try {
+      await client.from(_table).delete().eq('user_id', user.id);
+    } catch (e) {
+      debugPrint('[PlanStore] resetActivePlan remote delete failed: $e');
+    }
+  }
+
   bool get isRemoteAvailable => _isSignedIn;
 }

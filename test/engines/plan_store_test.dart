@@ -135,6 +135,28 @@ void main() {
     expect(PlanStore.instance.isRemoteAvailable, isFalse);
   });
 
+  group('resetActivePlan', () {
+    test('clears the local cache — a stale plan cannot resurface via load()',
+        () async {
+      await PlanStore.instance.save(planWith(id: 'to-remove'));
+      expect(await PlanStore.instance.load(), isNotNull);
+
+      await PlanStore.instance.resetActivePlan();
+
+      expect(await PlanStore.instance.load(), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('materialized_plan_v1'), isNull);
+      expect(prefs.getString('materialized_plan_v1_updated_at'), isNull);
+    });
+
+    test('is a safe no-op on the remote side without a signed-in user',
+        () async {
+      await PlanStore.instance.save(planWith());
+      await PlanStore.instance.resetActivePlan(); // must not throw
+      expect(await PlanStore.instance.load(), isNull);
+    });
+  });
+
   group('saveAndSync', () {
     test('reports savedNoRemote when there is no signed-in user', () async {
       final outcome = await PlanStore.instance.saveAndSync(planWith(id: 'x'));

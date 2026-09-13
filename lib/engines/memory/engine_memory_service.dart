@@ -8,6 +8,7 @@ import '../../models/weekly_plan.dart';
 import '../../models/race_plan.dart';
 import '../config/workout_template_library.dart';
 import '../../services/engine_state_sync_service.dart';
+import '../plan/plan_store.dart';
 
 class EngineMemoryService {
   static const String _key = 'engine_memory_v2';
@@ -183,6 +184,47 @@ class EngineMemoryService {
   Future<void> clearRacePlan() async {
     final current = await load();
     await save(current.copyWith(clearRacePlan: true));
+  }
+
+  /// Deterministic teardown of the athlete's current plan: switching race
+  /// distance, or resetting after injury/a disrupted training block.
+  ///
+  /// Clears the [PlanStore] materialised plan (local cache + every remote
+  /// row for this user — see [PlanStore.resetActivePlan]) together with every
+  /// plan-scoped field on [EngineMemory], so nothing about the retired plan
+  /// can resurface: not the race skeleton, not the day-by-day materialised
+  /// weeks, not its ladder/session progress or weekly-completion counters.
+  ///
+  /// Deliberately leaves lifetime athlete state untouched — [vdotScore],
+  /// [EngineMemory.totalRunsCompleted], [EngineMemory.firstRunDate],
+  /// [EngineMemory.lastRunDate] and recent-run history — and never touches
+  /// the local `runs` table: past logged runs are a training record, not
+  /// part of the plan being torn down.
+  ///
+  /// [hasRacePlan] is false afterwards, which is what Home reads to show the
+  /// "Start a new training plan" card (the app's race-goal / intake re-entry
+  /// point) instead of a workout card.
+  Future<void> resetCurrentPlan({bool syncToCloud = true}) async {
+    await PlanStore.instance.resetActivePlan();
+
+    final current = await load();
+    final reset = current.copyWith(
+      clearRacePlan: true,
+      clearActivePlan: true,
+      clearMaterializedPlanId: true,
+      clearVdotAtPlanStart: true,
+      clearPlanCompletedAt: true,
+      clearLongRunDayIndex: true,
+      clearPlannedIntent: true,
+      clearPlannedIntentPreviewLabel: true,
+      isInMaintenance: false,
+      weeklyPlannedKm: 0.0,
+      weeklyCompletedKm: 0.0,
+      weeklyDowngradeCount: 0,
+      ladderPositions: const {},
+      sessionProgress: const {},
+    );
+    await save(reset, syncToCloud: syncToCloud);
   }
 
   Future<void> migrateFirstRunDateIfNeeded() async {

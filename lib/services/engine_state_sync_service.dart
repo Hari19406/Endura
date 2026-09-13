@@ -10,9 +10,15 @@ class EngineStateSyncService {
   static const String _engineMemoryKey = 'engine_memory_v3';
   static const String _trainingDaysKey = 'training_day_indices_v1';
 
-  SupabaseClient get _client => Supabase.instance.client;
+  SupabaseClient? get _client {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null; // Supabase not initialised (tests, preview harnesses)
+    }
+  }
 
-  User? get _user => _client.auth.currentUser;
+  User? get _user => _client?.auth.currentUser;
   bool get isSignedIn => _user != null;
 
   Future<void> syncEngineMemory(EngineMemory memory) async {
@@ -27,7 +33,7 @@ class EngineStateSyncService {
         'payload': memory.toJson(),
       };
 
-      await _client.auth.updateUser(UserAttributes(data: metadata));
+      await _client!.auth.updateUser(UserAttributes(data: metadata));
     } catch (e) {
       debugPrint('[EngineStateSync] syncEngineMemory error: $e');
     }
@@ -45,7 +51,7 @@ class EngineStateSyncService {
         'payload': [...indices]..sort(),
       };
 
-      await _client.auth.updateUser(UserAttributes(data: metadata));
+      await _client!.auth.updateUser(UserAttributes(data: metadata));
     } catch (e) {
       debugPrint('[EngineStateSync] syncTrainingDays error: $e');
     }
@@ -63,7 +69,7 @@ class EngineStateSyncService {
   >
   fetchCloudCoachingState() async {
     try {
-      await _client.auth.refreshSession();
+      await _client?.auth.refreshSession();
     } catch (_) {}
     final metadata = _user?.userMetadata;
     return (
