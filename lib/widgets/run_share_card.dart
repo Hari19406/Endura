@@ -55,6 +55,8 @@ enum ShareCardTemplate {
   bigDistance,
   timeOnFeet,
   statsOnly,
+  overlayDuo,
+  overlayTrio,
 }
 
 /// Grouping used by the "Pick a layout" picker sheet. [charts] has no
@@ -73,6 +75,8 @@ String _labelOf(ShareCardTemplate t) => switch (t) {
   ShareCardTemplate.bigDistance => 'Big Distance',
   ShareCardTemplate.timeOnFeet => 'Time on Feet',
   ShareCardTemplate.statsOnly => 'Stats Only',
+  ShareCardTemplate.overlayDuo => 'Overlay Duo',
+  ShareCardTemplate.overlayTrio => 'Overlay Trio',
 };
 
 String _categoryLabel(ShareCardCategory c) => switch (c) {
@@ -869,7 +873,12 @@ class RunShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wColor = WorkoutTypeStyle.color(data.workoutType);
-    final isTransparent = style == ShareCardStyle.transparent;
+    // Overlay templates are built for compositing over a photo/video, so
+    // they stay transparent regardless of the Solid/Transparent toggle.
+    final isOverlay =
+        template == ShareCardTemplate.overlayDuo ||
+        template == ShareCardTemplate.overlayTrio;
+    final isTransparent = style == ShareCardStyle.transparent || isOverlay;
     final isPoster = template == ShareCardTemplate.poster;
     final background = isTransparent ? null : (isPoster ? _posterBg : _darkBg);
 
@@ -882,6 +891,8 @@ class RunShareCard extends StatelessWidget {
       ShareCardTemplate.bigDistance => _buildBigDistanceContent(),
       ShareCardTemplate.timeOnFeet => _buildTimeOnFeetContent(),
       ShareCardTemplate.statsOnly => _buildStatsOnlyContent(),
+      ShareCardTemplate.overlayDuo => _buildOverlayDuoContent(),
+      ShareCardTemplate.overlayTrio => _buildOverlayTrioContent(),
     };
 
     return Container(
@@ -1588,6 +1599,85 @@ class RunShareCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  // ── Overlay Duo — Distance + Pace, transparent, for photo overlays ──────
+
+  String _formatDurationWords(int seconds) {
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final s = seconds % 60;
+    if (h > 0) return '${h}h ${m}m ${s}s';
+    return '${m}m ${s}s';
+  }
+
+  Widget _buildOverlayDuoContent() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildOverlayStat('Distance', '${data.distanceKm.toStringAsFixed(1)} km'),
+          const SizedBox(width: 48),
+          _buildOverlayStat('Pace', '${data.averagePace} /km'),
+        ],
+      ),
+    );
+  }
+
+  // ── Overlay Trio — Distance + Pace + Time, transparent, photo overlays ──
+
+  Widget _buildOverlayTrioContent() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildOverlayStat('Distance', '${data.distanceKm.toStringAsFixed(1)} km'),
+          const SizedBox(width: 32),
+          _buildOverlayStat('Pace', '${data.averagePace} /km'),
+          const SizedBox(width: 32),
+          _buildOverlayStat('Time', _formatDurationWords(data.durationSeconds)),
+        ],
+      ),
+    );
+  }
+
+  /// Label in a clean medium-weight sans-serif, value in an italic serif
+  /// display cut — matches the "story overlay" reference look. Both carry a
+  /// soft drop shadow so they stay legible over any photo behind them.
+  Widget _buildOverlayStat(String label, String value) {
+    const shadow = [
+      Shadow(color: Colors.black54, blurRadius: 8, offset: Offset(0, 2)),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: 0.8,
+            shadows: shadow,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontFamily: 'serif',
+            fontStyle: FontStyle.italic,
+            fontSize: 26,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            shadows: shadow,
+          ),
         ),
       ],
     );
