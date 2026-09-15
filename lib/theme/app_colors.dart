@@ -68,6 +68,12 @@ class AppColors extends ThemeExtension<AppColors> {
   /// correct semantic color for that chart.
   final Color cadenceAccent;
 
+  /// Champagne gold — a second, deliberately rare accent reserved for
+  /// "premium"/locked signifiers (paywall best-value badge, locked-workout
+  /// padlock). Does not invert between palettes; [accent] stays the action
+  /// color everywhere else so it never gets confused with this cue.
+  final Color premiumGold;
+
   const AppColors({
     required this.background,
     required this.surface,
@@ -86,6 +92,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.paceAccent,
     required this.elevationAccent,
     required this.cadenceAccent,
+    required this.premiumGold,
   });
 
   static const AppColors light = AppColors(
@@ -106,6 +113,7 @@ class AppColors extends ThemeExtension<AppColors> {
     paceAccent: Color(0xFF6A4FFF),
     elevationAccent: Color(0xFFC97B1D),
     cadenceAccent: Color(0xFF1FA97A),
+    premiumGold: Color(0xFFE3C170),
   );
 
   static const AppColors dark = AppColors(
@@ -126,6 +134,7 @@ class AppColors extends ThemeExtension<AppColors> {
     paceAccent: Color(0xFF8C6BFF),
     elevationAccent: Color(0xFFE8A33D),
     cadenceAccent: Color(0xFF3ADCA0),
+    premiumGold: Color(0xFFE3C170),
   );
 
   @override
@@ -147,6 +156,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? paceAccent,
     Color? elevationAccent,
     Color? cadenceAccent,
+    Color? premiumGold,
   }) {
     return AppColors(
       background: background ?? this.background,
@@ -166,6 +176,7 @@ class AppColors extends ThemeExtension<AppColors> {
       paceAccent: paceAccent ?? this.paceAccent,
       elevationAccent: elevationAccent ?? this.elevationAccent,
       cadenceAccent: cadenceAccent ?? this.cadenceAccent,
+      premiumGold: premiumGold ?? this.premiumGold,
     );
   }
 
@@ -190,6 +201,7 @@ class AppColors extends ThemeExtension<AppColors> {
       paceAccent: Color.lerp(paceAccent, other.paceAccent, t)!,
       elevationAccent: Color.lerp(elevationAccent, other.elevationAccent, t)!,
       cadenceAccent: Color.lerp(cadenceAccent, other.cadenceAccent, t)!,
+      premiumGold: Color.lerp(premiumGold, other.premiumGold, t)!,
     );
   }
 }

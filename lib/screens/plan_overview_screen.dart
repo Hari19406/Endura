@@ -19,6 +19,7 @@ import '../services/workout_compliance_matcher.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
 import '../widgets/restart_plan_banner.dart';
+import '../widgets/unlock_training_bottom_sheet.dart';
 import '../widgets/workout_step_timeline.dart';
 import 'calendar_day_status.dart';
 import 'paywall_screen.dart';
@@ -267,14 +268,16 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
                 itemBuilder: (context, index) {
                   final week = racePlan.weeks[index];
                   final isCurrent = week.week == currentWeekNumber;
-                  final isPastOrCurrent = week.week <= currentWeekNumber;
                   final isLocked = !isPro && week.week > currentWeekNumber;
                   final weekMonday = _mondayOf(week.week);
                   final resolution = _resolutionForWeek(week);
-                  // Real day-by-day status only makes sense once a week has started.
-                  final materializedWeek = isPastOrCurrent
-                      ? _materialized?.weekByNumber(week.week)
-                      : null;
+                  // The whole plan is materialized upfront, so real day data
+                  // exists for future weeks too — but a locked week must never
+                  // reveal it (paywall teaser stays shape-only), so gate on
+                  // lock status rather than "has this week started yet".
+                  final materializedWeek = isLocked
+                      ? null
+                      : _materialized?.weekByNumber(week.week);
 
                   return Padding(
                     key: isCurrent ? _currentWeekKey : null,
@@ -290,6 +293,9 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
                       weekMonday: weekMonday,
                       now: now,
                       onDayTap: _showDayDetail,
+                      onLockedDayTap: isLocked
+                          ? () => UnlockTrainingBottomSheet.show(context)
+                          : null,
                       onLockedTap: isLocked
                           ? () {
                               Analytics.capture(
@@ -327,21 +333,33 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
   /// Tapping a day opens its resolved workout — the exact [MaterializedDay] the
   /// engine stored — plus its completion stats if a run has been matched.
   void _showDayDetail(MaterializedDay day, DateTime date) {
-    final now = DateTime.now();
-    final status = calendarDayStatus(day, scheduledDate: date, now: now);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.colors.surface,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) => _DayDetailSheet(
-        day: day,
-        date: date,
-        status: status,
-        useMiles: useMiles,
-      ),
-    );
+    showPlanDayDetailSheet(context, day: day, date: date, useMiles: useMiles);
   }
+}
+
+/// Opens the day-detail bottom sheet for an unlocked [day]. Shared with
+/// home_screen.dart's "THIS WEEK" strip so both day-tap surfaces show the
+/// exact same workout breakdown rather than maintaining two copies of it.
+void showPlanDayDetailSheet(
+  BuildContext context, {
+  required MaterializedDay day,
+  required DateTime date,
+  required bool useMiles,
+}) {
+  final now = DateTime.now();
+  final status = calendarDayStatus(day, scheduledDate: date, now: now);
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: context.colors.surface,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (ctx) => _DayDetailSheet(
+      day: day,
+      date: date,
+      status: status,
+      useMiles: useMiles,
+    ),
+  );
 }
 
 // ── Week card ────────────────────────────────────────────────────────────────
@@ -360,6 +378,10 @@ class _WeekCard extends StatelessWidget {
   final DateTime weekMonday;
   final DateTime now;
   final void Function(MaterializedDay day, DateTime date)? onDayTap;
+
+  /// Tapping any day dot while this week is locked — opens the
+  /// [UnlockTrainingBottomSheet] teaser instead of a workout breakdown.
+  final VoidCallback? onLockedDayTap;
   final VoidCallback? onLockedTap;
 
   const _WeekCard({
@@ -373,6 +395,7 @@ class _WeekCard extends StatelessWidget {
     required this.now,
     this.materializedWeek,
     this.onDayTap,
+    this.onLockedDayTap,
     this.onLockedTap,
   });
 
@@ -474,16 +497,25 @@ class _WeekCard extends StatelessWidget {
                 resolution: resolution,
                 useMiles: useMiles,
               ),
-              const SizedBox(height: 16),
-              materializedWeek != null
-                  ? MaterializedWeekStrip(
-                      week: materializedWeek!,
-                      weekMonday: weekMonday,
-                      now: now,
-                      onDayTap: onDayTap,
-                    )
-                  : _ProjectedDayStrip(resolution: resolution),
             ],
+            const SizedBox(height: 16),
+            // Locked weeks still show the day strip — shape only, via the
+            // projected resolution rather than the real materialized data —
+            // so tapping any dot reads as a deliberate paywall teaser
+            // instead of the week simply vanishing.
+            materializedWeek != null
+                ? MaterializedWeekStrip(
+                    week: materializedWeek!,
+                    weekMonday: weekMonday,
+                    now: now,
+                    useMiles: useMiles,
+                    onDayTap: onDayTap,
+                  )
+                : _ProjectedDayStrip(
+                    resolution: resolution,
+                    useMiles: useMiles,
+                    onLockedDayTap: isLocked ? onLockedDayTap : null,
+                  ),
           ],
         ),
       ),
@@ -593,6 +625,11 @@ class _DayCircle extends StatelessWidget {
   final CalendarDayStatus status;
   final Color color;
   final String label;
+
+  /// Planned distance in km, null for a rest day. Rendered under [label] via
+  /// [UnitUtils] so it always matches the athlete's km/miles preference.
+  final double? distanceKm;
+  final bool useMiles;
   final VoidCallback? onTap;
 
   const _DayCircle({
@@ -600,6 +637,8 @@ class _DayCircle extends StatelessWidget {
     required this.status,
     required this.label,
     required this.color,
+    this.distanceKm,
+    this.useMiles = false,
     this.isToday = false,
     this.onTap,
   });
@@ -610,6 +649,9 @@ class _DayCircle extends StatelessWidget {
     final rest = status == CalendarDayStatus.restDay;
     final missed = status == CalendarDayStatus.missed;
     final done = status == CalendarDayStatus.completed;
+    final distanceLabel = rest || distanceKm == null || distanceKm == 0
+        ? null
+        : '${UnitUtils.displayDistance(distanceKm!, useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
 
     Widget? child;
     if (done) {
@@ -668,6 +710,13 @@ class _DayCircle extends StatelessWidget {
                 : (isToday ? c.textPrimary : c.textTertiary),
           ),
         ),
+        if (distanceLabel != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            distanceLabel,
+            style: TextStyle(fontSize: 8, color: c.textTertiary),
+          ),
+        ],
       ],
     );
   }
@@ -682,6 +731,7 @@ class MaterializedWeekStrip extends StatelessWidget {
   /// Monday (date-only) of this week.
   final DateTime weekMonday;
   final DateTime now;
+  final bool useMiles;
   final void Function(MaterializedDay day, DateTime date)? onDayTap;
 
   const MaterializedWeekStrip({
@@ -689,6 +739,7 @@ class MaterializedWeekStrip extends StatelessWidget {
     required this.week,
     required this.weekMonday,
     required this.now,
+    this.useMiles = false,
     this.onDayTap,
   });
 
@@ -715,6 +766,8 @@ class MaterializedWeekStrip extends StatelessWidget {
                     ? Colors.transparent
                     : dayColorForIntent(d.intent),
                 label: d.isRest ? 'REST' : _intentLabel(d.intent),
+                distanceKm: d.plannedKm,
+                useMiles: useMiles,
                 onTap: onDayTap == null ? null : () => onDayTap!(d, date),
               );
             },
@@ -728,8 +781,19 @@ class MaterializedWeekStrip extends StatelessWidget {
 /// status since it has not happened yet.
 class _ProjectedDayStrip extends StatelessWidget {
   final WeekResolution resolution;
+  final bool useMiles;
 
-  const _ProjectedDayStrip({required this.resolution});
+  /// Set (non-null) only when this strip belongs to a locked week — tapping
+  /// any day dot then opens the [UnlockTrainingBottomSheet] teaser. Null for
+  /// an unlocked week whose real data just hasn't loaded yet, so those dots
+  /// stay non-interactive rather than mis-firing the paywall.
+  final VoidCallback? onLockedDayTap;
+
+  const _ProjectedDayStrip({
+    required this.resolution,
+    this.useMiles = false,
+    this.onLockedDayTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -745,6 +809,9 @@ class _ProjectedDayStrip extends StatelessWidget {
               : CalendarDayStatus.upcoming,
           color: dayColorForIntent(isRest ? null : slot.intent),
           label: isRest ? 'REST' : _intentLabel(slot.intent),
+          distanceKm: slot?.distanceKm,
+          useMiles: useMiles,
+          onTap: onLockedDayTap,
         );
       }),
     );

@@ -12,6 +12,7 @@ import '../services/workout_compliance_matcher.dart';
 import '../widgets/build_plan_hero_card.dart';
 import '../widgets/plan_adaptation_card.dart';
 import '../widgets/previous_plans_section.dart';
+import '../widgets/unlock_training_bottom_sheet.dart';
 import '../models/scheduled_workout_context.dart';
 import '../engines/progression_decision.dart';
 import 'package:intl/intl.dart';
@@ -673,6 +674,11 @@ class _HomeScreenState extends State<HomeScreen>
   ConsistencyData? _consistencyData;
   EngineMemory? _engineMemory;
 
+  /// The current week's materialized data — reused from the same
+  /// `getTodayDayContext` call `loadData()` already makes, so the "THIS WEEK"
+  /// strip's day-tap and distance labels need no extra load of their own.
+  MaterializedWeek? _thisWeekMaterialized;
+
   // ── Plan adaptation (inline coach banner) ─────────────────────────────────
   /// A missed-block recalibration the athlete has not yet accepted or
   /// dismissed. Null when there is nothing to review.
@@ -917,6 +923,8 @@ class _HomeScreenState extends State<HomeScreen>
           weekNumber: weekNumber,
           now: now,
         );
+
+        _thisWeekMaterialized = dayContext?.week;
 
         if (dayContext == null) {
           _coachMessage = null;
@@ -1854,38 +1862,67 @@ class _HomeScreenState extends State<HomeScreen>
                     ? dayColorForWorkoutType(plannedDay.workoutType)
                     : Colors.white;
                 final showColor = hasRun || plannedDay != null;
-                return Column(
-                  children: [
-                    Text(
-                      dayLabels[i],
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                        color: isToday ? c.textPrimary : c.textTertiary,
+                final materializedDay = _materializedDayForWeekday(i);
+                final distanceKm = materializedDay?.plannedKm;
+                final useMiles = _distanceUnit == 'miles';
+                final distanceLabel =
+                    materializedDay == null ||
+                        materializedDay.isRest ||
+                        distanceKm == null ||
+                        distanceKm == 0
+                    ? null
+                    : '${UnitUtils.displayDistance(distanceKm, useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
+
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: materializedDay == null
+                      ? null
+                      : () => _onThisWeekDayTap(materializedDay, dayDate),
+                  child: Column(
+                    children: [
+                      Text(
+                        dayLabels[i],
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isToday
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isToday ? c.textPrimary : c.textTertiary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: showColor ? dayColor : Colors.transparent,
-                        border: isToday
-                            ? Border.all(color: c.accent, width: 2)
-                            : showColor
-                            ? null
-                            : Border.all(color: c.border, width: 1.5),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: showColor ? dayColor : Colors.transparent,
+                          border: isToday
+                              ? Border.all(color: c.accent, width: 2)
+                              : showColor
+                              ? null
+                              : Border.all(color: c.border, width: 1.5),
+                        ),
+                        child: hasRun
+                            ? const Icon(
+                                Icons.check,
+                                size: 15,
+                                color: Colors.black,
+                              )
+                            : null,
                       ),
-                      child: hasRun
-                          ? const Icon(
-                              Icons.check,
-                              size: 15,
-                              color: Colors.black,
-                            )
-                          : null,
-                    ),
-                  ],
+                      if (distanceLabel != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          distanceLabel,
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: c.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 );
               }),
             ),
@@ -1937,6 +1974,43 @@ class _HomeScreenState extends State<HomeScreen>
           longRunDayIndex: _engineMemory?.longRunDayIndex,
         ),
       ),
+    );
+  }
+
+  MaterializedDay? _materializedDayForWeekday(int weekday) {
+    final days = _thisWeekMaterialized?.days;
+    if (days == null) return null;
+    for (final d in days) {
+      if (d.weekday == weekday) return d;
+    }
+    return null;
+  }
+
+  /// Tapping a day dot on the "THIS WEEK" strip. This strip only ever shows
+  /// the current week, which — same rule as PlanOverviewScreen's week
+  /// lock — is never locked, so this is a defensive check rather than one
+  /// that fires in practice today.
+  void _onThisWeekDayTap(MaterializedDay day, DateTime dayDate) {
+    HapticFeedback.lightImpact();
+    final currentWeekNumber = _engineMemory?.racePlan?.currentWeekNumber(
+      DateTime.now(),
+    );
+    final weekNumber = _thisWeekMaterialized?.weekNumber;
+    final isLocked =
+        !RevenueCatService.isProNotifier.value &&
+        weekNumber != null &&
+        currentWeekNumber != null &&
+        weekNumber > currentWeekNumber;
+
+    if (isLocked) {
+      UnlockTrainingBottomSheet.show(context);
+      return;
+    }
+    showPlanDayDetailSheet(
+      context,
+      day: day,
+      date: dayDate,
+      useMiles: _distanceUnit == 'miles',
     );
   }
 
