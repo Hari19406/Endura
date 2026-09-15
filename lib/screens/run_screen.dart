@@ -193,6 +193,16 @@ class _RunScreenState extends State<RunScreen>
   /// "Next Step" button — no GPS auto-advance.
   int _stepIndex = 0;
 
+  /// Main-phase distance ([_phaseDistanceM] while in [RunMode.mainSet]) at the
+  /// moment the current step started — lets the foreground notification show
+  /// an estimated remaining distance for the active step.
+  double _stepStartDistanceM = 0.0;
+
+  /// Periodically pushes distance/pace/step state to SharedPreferences so the
+  /// foreground-service isolate ([RunTrackingTaskHandler]) can render it in
+  /// the live notification. Throttled to match the isolate's own 5s poll.
+  Timer? _notifSyncTimer;
+
   ScheduledWorkoutContext? get _sched => widget.scheduledContext;
 
   bool get _hasStructuredSteps =>
@@ -202,7 +212,97 @@ class _RunScreenState extends State<RunScreen>
     final blocks = _sched?.blocks;
     if (blocks == null || _stepIndex >= blocks.length - 1) return;
     HapticFeedback.selectionClick();
-    setState(() => _stepIndex++);
+    setState(() {
+      _stepIndex++;
+      _stepStartDistanceM = _phaseDistanceM;
+    });
+    _syncForegroundNotificationState();
+  }
+
+  static String _blockTypeLabel(BlockType t) => switch (t) {
+    BlockType.warmup => 'Warm-up',
+    BlockType.cooldown => 'Cool-down',
+    BlockType.recovery => 'Recovery',
+    BlockType.main => 'Interval',
+  };
+
+  /// Pushes the latest distance/pace/step snapshot to SharedPreferences for
+  /// the foreground-service notification to pick up on its next poll.
+  Future<void> _syncForegroundNotificationState() async {
+    if (_runState == RunState.ready) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'run_state',
+        _runState == RunState.paused ? 'paused' : 'running',
+      );
+      await prefs.setString('distance_unit', _distanceUnit);
+      final pace = _paceSnapshot.smoothedPaceSecondsPerKm > 0
+          ? _paceSnapshot.smoothedPaceSecondsPerKm.round()
+          : 0;
+      await prefs.setInt('rolling_pace_sec_per_km', pace);
+
+      if (_hasStructuredSteps) {
+        final blocks = _sched!.blocks;
+        final idx = _stepIndex.clamp(0, blocks.length - 1);
+        final block = blocks[idx];
+        await prefs.setInt('step_index', idx);
+        await prefs.setInt('step_total', blocks.length);
+        await prefs.setString(
+          'step_label',
+          block.label ?? _blockTypeLabel(block.type),
+        );
+        await prefs.setBool('step_is_rpe', block.isRpeOnly);
+        if (block.isRpeOnly) {
+          await prefs.remove('step_target_min');
+          await prefs.remove('step_target_max');
+        } else {
+          await prefs.setInt('step_target_min', block.paceMinSecondsPerKm);
+          await prefs.setInt('step_target_max', block.paceMaxSecondsPerKm);
+        }
+        final remainingM =
+            (block.totalDistanceKm * 1000) -
+            (_phaseDistanceM - _stepStartDistanceM);
+        await prefs.setDouble(
+          'step_remaining_m',
+          remainingM < 0 ? 0 : remainingM,
+        );
+      } else {
+        await prefs.remove('step_total');
+        await prefs.remove('step_label');
+        await prefs.remove('step_target_min');
+        await prefs.remove('step_target_max');
+        await prefs.remove('step_remaining_m');
+      }
+    } catch (e) {
+      debugPrint('Error syncing notification state: $e');
+    }
+  }
+
+  void _startNotifSyncTimer() {
+    _notifSyncTimer?.cancel();
+    _syncForegroundNotificationState();
+    _notifSyncTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _syncForegroundNotificationState(),
+    );
+  }
+
+  void _onForegroundTaskData(Object data) {
+    if (data is! Map) return;
+    switch (data['action']) {
+      case 'pause_resume':
+        if (_runState == RunState.running) {
+          _pauseTracking();
+        } else if (_runState == RunState.paused) {
+          _resumeTracking();
+        }
+        _syncForegroundNotificationState();
+        break;
+      case 'next_step':
+        if (_hasStructuredSteps) _advanceStep();
+        break;
+    }
   }
 
   // ── Resolved workout helpers ──────────────────────────────────────────────
@@ -348,6 +448,7 @@ class _RunScreenState extends State<RunScreen>
     _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km';
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
     widget.freeRunSignal?.addListener(_onExternalFreeRun);
+    FlutterForegroundTask.addTaskDataCallback(_onForegroundTaskData);
     _loadSettings();
     _checkPermissions();
     _startCompassTracking();
@@ -453,6 +554,7 @@ class _RunScreenState extends State<RunScreen>
         () => _distanceUnit = UnitUtils.useMilesNotifier.value ? 'miles' : 'km',
       );
     }
+    _syncForegroundNotificationState();
   }
 
   void _startCompassTracking() {}
@@ -484,13 +586,18 @@ class _RunScreenState extends State<RunScreen>
     if (await FlutterForegroundTask.isRunningService) return;
     await FlutterForegroundTask.startService(
       serviceId: 256,
-      notificationTitle: 'Run in progress',
+      notificationTitle: 'Endura · Run in progress',
       notificationText: 'tracking distance and pace',
+      notificationButtons: const [
+        NotificationButton(id: 'pause_resume', text: 'Pause'),
+      ],
       callback: startCallback,
     );
   }
 
   Future<void> _stopForegroundTask() async {
+    _notifSyncTimer?.cancel();
+    _notifSyncTimer = null;
     await FlutterForegroundTask.stopService();
   }
 
@@ -743,6 +850,8 @@ class _RunScreenState extends State<RunScreen>
         _cooldownPhaseStartSeconds = 0;
         _cooldownPhaseStartDistanceM = 0.0;
         _phaseMilestoneReached = false;
+        _stepIndex = 0;
+        _stepStartDistanceM = 0.0;
         _capturedMainDistanceM = 0.0;
         _capturedMainSeconds = 0;
         _capturedMainPace = '--:--';
@@ -763,6 +872,7 @@ class _RunScreenState extends State<RunScreen>
         _cadenceSamplesForAvg.clear();
       });
     }
+    _startNotifSyncTimer();
 
     AudioCueService.instance.announceRunStart();
     await Analytics.workoutStarted(
@@ -1065,6 +1175,7 @@ class _RunScreenState extends State<RunScreen>
         _wasRunningBeforeBackground = false;
         _backgroundTime = null;
       });
+    _syncForegroundNotificationState();
     Analytics.workoutPaused();
   }
 
@@ -1079,6 +1190,7 @@ class _RunScreenState extends State<RunScreen>
         _wasRunningBeforeBackground = false;
         _backgroundTime = null;
       });
+    _syncForegroundNotificationState();
     Analytics.workoutResumed();
     _startGPSMonitoring();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -1497,6 +1609,8 @@ class _RunScreenState extends State<RunScreen>
         _mainPhaseStartDistanceM = _distance;
         _currentPhase = RunMode.mainSet;
         _phaseMilestoneReached = false;
+        _stepIndex = 0;
+        _stepStartDistanceM = 0.0;
         _elevationGainM = 0.0;
         _lastAltitudeForGain = null;
         _splits.clear();
@@ -1576,8 +1690,10 @@ class _RunScreenState extends State<RunScreen>
     WidgetsBinding.instance.removeObserver(this);
     UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
     widget.freeRunSignal?.removeListener(_onExternalFreeRun);
+    FlutterForegroundTask.removeTaskDataCallback(_onForegroundTaskData);
     _timer?.cancel();
     _elapsedTimer?.cancel();
+    _notifSyncTimer?.cancel();
     _hrSub?.cancel();
     _cadenceSub?.cancel();
     _healthPollTimer?.cancel();
@@ -2368,6 +2484,8 @@ class _RunScreenState extends State<RunScreen>
       _cooldownPhaseStartSeconds = 0;
       _cooldownPhaseStartDistanceM = 0.0;
       _phaseMilestoneReached = false;
+      _stepIndex = 0;
+      _stepStartDistanceM = 0.0;
       _capturedMainDistanceM = 0.0;
       _capturedMainSeconds = 0;
       _capturedMainPace = '--:--';

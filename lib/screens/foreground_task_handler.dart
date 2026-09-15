@@ -1,6 +1,8 @@
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/run_notification_formatter.dart';
+
 // This callback runs in a separate isolate to track time even when app is backgrounded
 @pragma('vm:entry-point')
 void startCallback() {
@@ -33,20 +35,59 @@ class RunTrackingTaskHandler extends TaskHandler {
     final elapsed = timestamp.difference(_startTime!).inSeconds;
     final backgroundSeconds = elapsed > 0 ? elapsed : 0;
 
+    // Reload so this isolate sees writes the UI isolate made to the same
+    // on-disk SharedPreferences store since our last tick.
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     await prefs.setInt('background_elapsed_seconds', backgroundSeconds);
+
     final distanceMeters = prefs.getDouble('run_distance_meters') ?? 0.0;
     final useMiles = prefs.getString('distance_unit') == 'miles';
+    final isPaused = prefs.getString('run_state') == 'paused';
+    final paceSecPerKm = prefs.getInt('rolling_pace_sec_per_km') ?? 0;
+
+    final stepTotal = prefs.getInt('step_total') ?? 0;
+    final hasStructuredSteps = stepTotal > 1;
+    final stepIndex = (prefs.getInt('step_index') ?? 0).clamp(
+      0,
+      stepTotal > 0 ? stepTotal - 1 : 0,
+    );
+    final stepLabel = prefs.getString('step_label');
+    final stepIsRpe = prefs.getBool('step_is_rpe') ?? false;
+    final targetMin = prefs.getInt('step_target_min');
+    final targetMax = prefs.getInt('step_target_max');
+    final remainingM = prefs.getDouble('step_remaining_m');
 
     print(
       '[ForegroundTask] Elapsed: $backgroundSeconds seconds, distance: $distanceMeters m',
     );
 
-    // Update notification
     FlutterForegroundTask.updateService(
-      notificationTitle: 'Run in progress',
-      notificationText:
-          '${_formatTime(backgroundSeconds)} · ${_formatDistance(distanceMeters, useMiles)}',
+      notificationTitle: buildRunNotificationTitle(
+        hasStructuredSteps: hasStructuredSteps,
+        stepIndex: stepIndex,
+        stepTotal: stepTotal,
+        stepLabel: stepLabel,
+      ),
+      notificationText: buildRunNotificationContent(
+        distanceMeters: distanceMeters,
+        useMiles: useMiles,
+        paceSecPerKm: paceSecPerKm,
+        isPaused: isPaused,
+        hasStructuredSteps: hasStructuredSteps,
+        stepIsRpe: stepIsRpe,
+        targetMinSecPerKm: targetMin,
+        targetMaxSecPerKm: targetMax,
+        remainingStepMeters: remainingM,
+      ),
+      notificationButtons: [
+        NotificationButton(
+          id: 'pause_resume',
+          text: isPaused ? 'Resume' : 'Pause',
+        ),
+        if (hasStructuredSteps && stepIndex < stepTotal - 1)
+          const NotificationButton(id: 'next_step', text: 'Next Step'),
+      ],
     );
   }
 
@@ -59,23 +100,20 @@ class RunTrackingTaskHandler extends TaskHandler {
     await prefs.remove('run_start_time');
     await prefs.remove('background_elapsed_seconds');
     await prefs.remove('run_distance_meters');
+    await prefs.remove('run_state');
+    await prefs.remove('rolling_pace_sec_per_km');
+    await prefs.remove('step_index');
+    await prefs.remove('step_total');
+    await prefs.remove('step_label');
+    await prefs.remove('step_is_rpe');
+    await prefs.remove('step_target_min');
+    await prefs.remove('step_target_max');
+    await prefs.remove('step_remaining_m');
   }
 
-  String _formatTime(int seconds) {
-    int hours = seconds ~/ 3600;
-    int minutes = (seconds % 3600) ~/ 60;
-    int secs = seconds % 60;
-
-    if (hours > 0) {
-      return '${hours}h ${minutes}m ${secs}s';
-    } else {
-      return '${minutes}m ${secs}s';
-    }
-  }
-
-  String _formatDistance(double meters, bool useMiles) {
-    final km = meters / 1000;
-    final value = useMiles ? km * 0.621371 : km;
-    return '${value.toStringAsFixed(2)} ${useMiles ? 'mi' : 'km'}';
+  @override
+  void onNotificationButtonPressed(String id) {
+    // Relay the tap to the UI isolate, which owns the real run/GPS state.
+    FlutterForegroundTask.sendDataToMain({'action': id});
   }
 }

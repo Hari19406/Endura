@@ -15,6 +15,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
@@ -46,6 +47,7 @@ import 'widgets/target_pace_indicator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterForegroundTask.initCommunicationPort();
 
   // Best-effort: wire Supabase so live-data screens behave like the real app.
   // Missing credentials is fine here — those screens just render empty.

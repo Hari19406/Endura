@@ -19,6 +19,7 @@ import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'utils/unit_utils.dart';
 
 Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
@@ -32,6 +33,7 @@ Future<T?> safeSupabaseCall<T>(Future<T> Function() call) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterForegroundTask.initCommunicationPort();
 
   await Firebase.initializeApp();
   await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
