@@ -679,6 +679,11 @@ class _HomeScreenState extends State<HomeScreen>
   /// strip's day-tap and distance labels need no extra load of their own.
   MaterializedWeek? _thisWeekMaterialized;
 
+  /// The owning plan's id/build-anchor for [_thisWeekMaterialized] — needed to
+  /// build a [ScheduledWorkoutContext] when a day-dot tap starts a run.
+  String? _thisWeekPlanId;
+  DateTime? _thisWeekPlanBuiltAt;
+
   // ── Plan adaptation (inline coach banner) ─────────────────────────────────
   /// A missed-block recalibration the athlete has not yet accepted or
   /// dismissed. Null when there is nothing to review.
@@ -925,6 +930,8 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
         _thisWeekMaterialized = dayContext?.week;
+        _thisWeekPlanId = dayContext?.plan.planId;
+        _thisWeekPlanBuiltAt = dayContext?.plan.builtAt;
 
         if (dayContext == null) {
           _coachMessage = null;
@@ -1877,7 +1884,11 @@ class _HomeScreenState extends State<HomeScreen>
                   behavior: HitTestBehavior.opaque,
                   onTap: materializedDay == null
                       ? null
-                      : () => _onThisWeekDayTap(materializedDay, dayDate),
+                      : () => _onThisWeekDayTap(
+                          _thisWeekMaterialized!,
+                          materializedDay,
+                          dayDate,
+                        ),
                   child: Column(
                     children: [
                       Text(
@@ -1989,28 +2000,75 @@ class _HomeScreenState extends State<HomeScreen>
   /// Tapping a day dot on the "THIS WEEK" strip. This strip only ever shows
   /// the current week, which — same rule as PlanOverviewScreen's week
   /// lock — is never locked, so this is a defensive check rather than one
-  /// that fires in practice today.
-  void _onThisWeekDayTap(MaterializedDay day, DateTime dayDate) {
+  /// that fires in practice today: the paywall only shows for a *future*
+  /// week beyond the current one, never for anything in the active week or
+  /// during an active trial (RevenueCat's entitlement covers the trial too,
+  /// so `isProNotifier` is already true for it).
+  void _onThisWeekDayTap(
+    MaterializedWeek week,
+    MaterializedDay day,
+    DateTime dayDate,
+  ) {
     HapticFeedback.lightImpact();
     final currentWeekNumber = _engineMemory?.racePlan?.currentWeekNumber(
       DateTime.now(),
     );
-    final weekNumber = _thisWeekMaterialized?.weekNumber;
     final isLocked =
         !RevenueCatService.isProNotifier.value &&
-        weekNumber != null &&
         currentWeekNumber != null &&
-        weekNumber > currentWeekNumber;
+        week.weekNumber > currentWeekNumber;
 
     if (isLocked) {
       UnlockTrainingBottomSheet.show(context);
       return;
     }
-    showPlanDayDetailSheet(
+
+    if (day.isRest || day.workout == null) {
+      showPlanDayDetailSheet(
+        context,
+        day: day,
+        date: dayDate,
+        useMiles: _distanceUnit == 'miles',
+      );
+      return;
+    }
+
+    final memory = _engineMemory;
+    if (memory == null) return;
+
+    final now = DateTime.now();
+    final built = _messageBuilder.buildMessage(
+      context: _coachContextFrom(memory, _runHistory, now),
+      resolvedWorkout: day.workout!,
+      phase: week.phase,
+      weekNumber: week.weekNumber,
+    );
+
+    final isToday =
+        dayDate.year == now.year &&
+        dayDate.month == now.month &&
+        dayDate.day == now.day;
+    final planId = _thisWeekPlanId;
+    final planBuiltAt = _thisWeekPlanBuiltAt;
+    final scheduledContext = (isToday && planId != null && planBuiltAt != null)
+        ? ScheduledWorkoutContext.fromParts(
+            planId: planId,
+            planBuiltAt: planBuiltAt,
+            weekNumber: week.weekNumber,
+            weekday: day.weekday,
+            workout: day.workout!,
+          )
+        : null;
+
+    Navigator.push(
       context,
-      day: day,
-      date: dayDate,
-      useMiles: _distanceUnit == 'miles',
+      MaterialPageRoute(
+        builder: (_) => PreRunBriefingScreen(
+          coachMessage: built,
+          onGoToRun: () => widget.onNavigateToRun?.call(),
+          scheduledContext: scheduledContext,
+        ),
+      ),
     );
   }
 
