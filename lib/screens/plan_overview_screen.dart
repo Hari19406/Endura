@@ -11,6 +11,9 @@ import '../engines/config/workout_template_library.dart'
     show WorkoutIntent, RaceDistance;
 import '../engines/config/archetype_table.dart' show ExperienceLevel;
 import '../engines/memory/engine_memory_service.dart';
+import '../engines/progression_decision.dart';
+import '../models/scheduled_workout_context.dart';
+import '../services/coach_message_builder.dart' as message;
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart' show Analytics;
 import '../services/plan_restart_service.dart';
@@ -23,6 +26,7 @@ import '../widgets/unlock_training_bottom_sheet.dart';
 import '../widgets/workout_step_timeline.dart';
 import 'calendar_day_status.dart';
 import 'paywall_screen.dart';
+import 'pre_run_briefing_screen.dart';
 
 /// Full multi-week plan overview / calendar (Runna/Endorphins-style).
 ///
@@ -330,10 +334,75 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     );
   }
 
-  /// Tapping a day opens its resolved workout — the exact [MaterializedDay] the
-  /// engine stored — plus its completion stats if a run has been matched.
-  void _showDayDetail(MaterializedDay day, DateTime date) {
-    showPlanDayDetailSheet(context, day: day, date: date, useMiles: useMiles);
+  /// Tapping an unlocked day: a rest day still gets the lightweight bottom
+  /// sheet (nothing to brief), but a training day now opens the full
+  /// [PreRunBriefingScreen] — same screen Home's "today" card opens — instead
+  /// of a workout-breakdown sheet, so "Start Run" / "Skip Workout" are one tap
+  /// away from any day in the plan, not just today's.
+  Future<void> _showDayDetail(
+    MaterializedWeek week,
+    MaterializedDay day,
+    DateTime date,
+  ) async {
+    if (day.isRest || day.workout == null) {
+      showPlanDayDetailSheet(context, day: day, date: date, useMiles: useMiles);
+      return;
+    }
+
+    final coachContext = await _loadPreviewCoachContext();
+    if (!mounted) return;
+
+    final built = message.CoachMessageBuilder().buildMessage(
+      context: coachContext,
+      resolvedWorkout: day.workout!,
+      phase: week.phase,
+      weekNumber: week.weekNumber,
+    );
+
+    final now = DateTime.now();
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
+    final plan = _materialized;
+    final scheduledContext = (isToday && plan != null)
+        ? ScheduledWorkoutContext.fromParts(
+            planId: plan.planId,
+            planBuiltAt: plan.builtAt,
+            weekNumber: week.weekNumber,
+            weekday: day.weekday,
+            workout: day.workout!,
+          )
+        : null;
+
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PreRunBriefingScreen(
+          coachMessage: built,
+          onGoToRun: () {},
+          scheduledContext: scheduledContext,
+        ),
+      ),
+    );
+  }
+
+  /// A minimal [message.CoachContext] for previewing a plan day from this
+  /// screen. Only the athlete's overall training state is available here
+  /// (no run-history list is loaded on this screen) — recency/RPE-trend
+  /// signals default to neutral, which the builder already renders as
+  /// sensible fallback copy ("Max is still reading your rhythm...").
+  Future<message.CoachContext> _loadPreviewCoachContext() async {
+    final memory = await EngineMemoryService().load();
+    final now = DateTime.now();
+    final lastRun = memory.lastRunDate;
+    return message.CoachContext(
+      totalRunsCompleted: memory.totalRunsCompleted,
+      daysSinceLastRun: lastRun == null ? 999 : now.difference(lastRun).inDays,
+      progression: switch (memory.weeklyProgressionDecision) {
+        ProgressionDecision.progress => message.ProgressionSignal.progressing,
+        ProgressionDecision.regress => message.ProgressionSignal.steppingBack,
+        _ => message.ProgressionSignal.holding,
+      },
+    );
   }
 }
 
@@ -377,7 +446,8 @@ class _WeekCard extends StatelessWidget {
   final MaterializedWeek? materializedWeek;
   final DateTime weekMonday;
   final DateTime now;
-  final void Function(MaterializedDay day, DateTime date)? onDayTap;
+  final void Function(MaterializedWeek week, MaterializedDay day, DateTime date)?
+  onDayTap;
 
   /// Tapping any day dot while this week is locked — opens the
   /// [UnlockTrainingBottomSheet] teaser instead of a workout breakdown.
@@ -732,7 +802,8 @@ class MaterializedWeekStrip extends StatelessWidget {
   final DateTime weekMonday;
   final DateTime now;
   final bool useMiles;
-  final void Function(MaterializedDay day, DateTime date)? onDayTap;
+  final void Function(MaterializedWeek week, MaterializedDay day, DateTime date)?
+  onDayTap;
 
   const MaterializedWeekStrip({
     super.key,
@@ -768,7 +839,7 @@ class MaterializedWeekStrip extends StatelessWidget {
                 label: d.isRest ? 'REST' : _intentLabel(d.intent),
                 distanceKm: d.plannedKm,
                 useMiles: useMiles,
-                onTap: onDayTap == null ? null : () => onDayTap!(d, date),
+                onTap: onDayTap == null ? null : () => onDayTap!(week, d, date),
               );
             },
           ),
