@@ -174,7 +174,7 @@ void main() {
           week: week,
           weekMonday: _monday,
           now: DateTime(2026, 1, 8), // Thursday
-          onDayTap: (d, _) => tapped = d,
+          onDayTap: (week, d, date) => tapped = d,
         ),
       ),
     ));
