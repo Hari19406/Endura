@@ -666,8 +666,7 @@ class _HomeScreenState extends State<HomeScreen>
   static const _restDayModel = WorkoutDisplayModel(
     category: WorkoutCategory.rest,
     title: 'Rest Day',
-    coachingReason:
-        'Rest up today. Your next workout is already lined up.',
+    coachingReason: 'Rest up today. Your next workout is already lined up.',
     steps: [],
   );
   List<int> _trainingDayIndices = const [];
@@ -1003,10 +1002,13 @@ class _HomeScreenState extends State<HomeScreen>
           final fresh =
               prompt != null && prompt.rangeKey != _adaptationHandledKey;
           if (fresh && _adaptationPrompt?.rangeKey != prompt.rangeKey) {
-            Analytics.capture('plan_adaptation_shown', properties: {
-              'window': prompt.missedWindow.name,
-              'missed_sessions': prompt.missedSessions,
-            });
+            Analytics.capture(
+              'plan_adaptation_shown',
+              properties: {
+                'window': prompt.missedWindow.name,
+                'missed_sessions': prompt.missedSessions,
+              },
+            );
           }
           _adaptationPrompt = fresh ? prompt : null;
         } else {
@@ -1107,10 +1109,13 @@ class _HomeScreenState extends State<HomeScreen>
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_adaptationHandledKeyPref, prompt.rangeKey);
       _adaptationHandledKey = prompt.rangeKey;
-      Analytics.capture('plan_adaptation_accepted', properties: {
-        'window': prompt.missedWindow.name,
-        'missed_sessions': prompt.missedSessions,
-      });
+      Analytics.capture(
+        'plan_adaptation_accepted',
+        properties: {
+          'window': prompt.missedWindow.name,
+          'missed_sessions': prompt.missedSessions,
+        },
+      );
     } catch (e) {
       debugPrint('[HomeScreen] adaptation accept failed: $e');
     }
@@ -1131,10 +1136,13 @@ class _HomeScreenState extends State<HomeScreen>
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_adaptationHandledKeyPref, prompt.rangeKey);
     _adaptationHandledKey = prompt.rangeKey;
-    Analytics.capture('plan_adaptation_dismissed', properties: {
-      'window': prompt.missedWindow.name,
-      'missed_sessions': prompt.missedSessions,
-    });
+    Analytics.capture(
+      'plan_adaptation_dismissed',
+      properties: {
+        'window': prompt.missedWindow.name,
+        'missed_sessions': prompt.missedSessions,
+      },
+    );
     if (!mounted) return;
     setState(() => _adaptationPrompt = null);
   }
@@ -1498,9 +1506,7 @@ class _HomeScreenState extends State<HomeScreen>
               HapticFeedback.lightImpact();
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
               );
             },
           ),
@@ -1581,46 +1587,66 @@ class _HomeScreenState extends State<HomeScreen>
               ] else
                 ValueListenableBuilder<bool>(
                   valueListenable: RevenueCatService.isProNotifier,
-                  builder: (context, isPro, _) => WorkoutCard(
-                    workout:
-                        _workoutModel ??
-                        const WorkoutDisplayModel(
-                          category: WorkoutCategory.rest,
-                          title: 'Rest Day',
-                          coachingReason:
-                              'Rest up today. Your next workout is already lined up.',
-                          steps: [],
-                        ),
-                    locked: !isPro,
-                    onTap: !isPro
-                        ? () => Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PaywallScreen(),
-                            ),
-                          )
-                        : (_coachMessage != null
-                              ? () {
-                                  showPreRunCheck(
-                                    context: context,
-                                    coachMessage: _coachMessage!,
-                                    weather: _weather,
-                                    onProceed: (scaled) => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => PreRunBriefingScreen(
-                                          coachMessage: scaled,
-                                          onGoToRun: () =>
-                                              widget.onNavigateToRun?.call(),
-                                          scheduledContext: _scheduledContext,
+                  builder: (context, isPro, _) {
+                    // Same lock rule as the day-dots (_onThisWeekDayTap /
+                    // PlanOverviewScreen): only a week *beyond* the current one
+                    // is paywalled, never the current week. This card always
+                    // shows today's workout, so workoutWeekNumber is always
+                    // currentWeekNumber in practice — this stays effectively
+                    // always-unlocked-by-week, same "defensive, not exercised
+                    // today" shape as the day-dot check, kept explicit so both
+                    // gates read the same and don't drift apart again.
+                    final currentWeekNumber = _engineMemory?.racePlan
+                        ?.currentWeekNumber(DateTime.now());
+                    final workoutWeekNumber =
+                        _thisWeekMaterialized?.weekNumber ?? currentWeekNumber;
+                    final isWorkoutLocked =
+                        !isPro &&
+                        currentWeekNumber != null &&
+                        workoutWeekNumber != null &&
+                        workoutWeekNumber > currentWeekNumber;
+
+                    return WorkoutCard(
+                      workout:
+                          _workoutModel ??
+                          const WorkoutDisplayModel(
+                            category: WorkoutCategory.rest,
+                            title: 'Rest Day',
+                            coachingReason:
+                                'Rest up today. Your next workout is already lined up.',
+                            steps: [],
+                          ),
+                      locked: isWorkoutLocked,
+                      onTap: isWorkoutLocked
+                          ? () => Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PaywallScreen(),
+                              ),
+                            )
+                          : (_coachMessage != null
+                                ? () {
+                                    showPreRunCheck(
+                                      context: context,
+                                      coachMessage: _coachMessage!,
+                                      weather: _weather,
+                                      onProceed: (scaled) => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => PreRunBriefingScreen(
+                                            coachMessage: scaled,
+                                            onGoToRun: () =>
+                                                widget.onNavigateToRun?.call(),
+                                            scheduledContext: _scheduledContext,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    onSkip: _handleSkip,
-                                  );
-                                }
-                              : null),
-                  ),
+                                      onSkip: _handleSkip,
+                                    );
+                                  }
+                                : null),
+                    );
+                  },
                 ),
 
               if (_engineMemory?.hasRacePlan == true) ...[
@@ -1926,10 +1952,7 @@ class _HomeScreenState extends State<HomeScreen>
                         const SizedBox(height: 4),
                         Text(
                           distanceLabel,
-                          style: TextStyle(
-                            fontSize: 8,
-                            color: c.textTertiary,
-                          ),
+                          style: TextStyle(fontSize: 8, color: c.textTertiary),
                         ),
                       ],
                     ],
@@ -2094,5 +2117,4 @@ class _HomeScreenState extends State<HomeScreen>
     }
     return null;
   }
-
 }

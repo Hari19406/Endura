@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -17,8 +19,9 @@ const _kBrand = Color(0xFF00E5CC);
 const _kGold = Color(0xFFE3C170);
 const _kTermsUrl =
     'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
-const _kPrivacyUrl =
-    'https://sites.google.com/view/enduraprivacypolicy';
+const _kPrivacyUrl = 'https://sites.google.com/view/enduraprivacypolicy';
+const _kTimeoutMessage =
+    'This is taking longer than expected. Check your connection and try again.';
 
 /// Split-clock numerals — every price, day count and percentage on this page
 /// reads like a runner's stopwatch: tabular monospaced digits instead of the
@@ -112,6 +115,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
         await Analytics.subscriptionStarted();
         if (mounted) Navigator.pop(context, true);
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[Paywall] purchase timed out: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(_kTimeoutMessage)));
+      }
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);
       if (code == PurchasesErrorCode.purchaseCancelledError) return;
@@ -147,8 +157,20 @@ class _PaywallScreenState extends State<PaywallScreen> {
           );
         }
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[Paywall] restore timed out: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(_kTimeoutMessage)));
+      }
     } catch (e) {
       debugPrint('[Paywall] restore error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Something went wrong. Try again.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _purchasingId = null);
     }
@@ -453,12 +475,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                           .withValues(alpha: 0.5),
                                       elevation: 0,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          28,
-                                        ),
+                                        borderRadius: BorderRadius.circular(28),
                                       ),
                                     ),
-                                    child: _purchasingId == _selected!.identifier
+                                    child:
+                                        _purchasingId == _selected!.identifier
                                         ? const SizedBox(
                                             width: 22,
                                             height: 22,
@@ -904,10 +925,7 @@ class _PlanCard extends StatelessWidget {
           children: [
             if (badge != null) ...[
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_kGold, Color(0xFFC9A052)],
@@ -1234,10 +1252,7 @@ class _TrainingProofRow extends StatelessWidget {
           if (i != 0) const SizedBox(width: 10),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
               decoration: BoxDecoration(
                 color: c.surface,
                 borderRadius: BorderRadius.circular(14),
@@ -1350,11 +1365,7 @@ class _GuaranteeCard extends StatelessWidget {
           Text(
             'Manage or cancel your subscription anytime from your account settings — no calls, no fine print.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: c.textSecondary,
-              fontSize: 13,
-              height: 1.4,
-            ),
+            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.4),
           ),
         ],
       ),
