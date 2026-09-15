@@ -2067,13 +2067,15 @@ class _HomeScreenState extends State<HomeScreen>
       weekNumber: week.weekNumber,
     );
 
-    final isToday =
-        dayDate.year == now.year &&
-        dayDate.month == now.month &&
-        dayDate.day == now.day;
+    // Known plan coordinates for any not-yet-completed day (not just today) —
+    // this is what "Link Activity"/"Skip Workout" act on. A completed day
+    // gets no scheduledContext at all: nothing left to link/skip, and a run
+    // started from here is a free bonus run, not a re-completion. Whether
+    // Start Run auto-links the *new* run against this day (only if it's
+    // genuinely today) is decided inside PreRunBriefingScreen itself.
     final planId = _thisWeekPlanId;
     final planBuiltAt = _thisWeekPlanBuiltAt;
-    final scheduledContext = (isToday && planId != null && planBuiltAt != null)
+    final scheduledContext = (!day.isCompleted && planId != null && planBuiltAt != null)
         ? ScheduledWorkoutContext.fromParts(
             planId: planId,
             planBuiltAt: planBuiltAt,
@@ -2090,6 +2092,7 @@ class _HomeScreenState extends State<HomeScreen>
           coachMessage: built,
           onGoToRun: () => widget.onNavigateToRun?.call(),
           scheduledContext: scheduledContext,
+          onPlanChanged: loadData,
         ),
       ),
     );

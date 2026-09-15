@@ -359,11 +359,13 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
       weekNumber: week.weekNumber,
     );
 
-    final now = DateTime.now();
-    final isToday =
-        date.year == now.year && date.month == now.month && date.day == now.day;
+    // Known plan coordinates for any not-yet-completed day (not just today) —
+    // this is what "Link Activity"/"Skip Workout" act on; a completed day
+    // gets none (nothing left to link/skip). Whether Start Run auto-links the
+    // *new* run against this day (only if it's genuinely today) is decided
+    // inside PreRunBriefingScreen itself.
     final plan = _materialized;
-    final scheduledContext = (isToday && plan != null)
+    final scheduledContext = (!day.isCompleted && plan != null)
         ? ScheduledWorkoutContext.fromParts(
             planId: plan.planId,
             planBuiltAt: plan.builtAt,
@@ -380,6 +382,10 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
           coachMessage: built,
           onGoToRun: () {},
           scheduledContext: scheduledContext,
+          onPlanChanged: () {
+            setState(() => _materialized = null);
+            _loadMaterialized();
+          },
         ),
       ),
     );
