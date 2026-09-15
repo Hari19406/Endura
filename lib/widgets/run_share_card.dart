@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -797,11 +798,49 @@ class RunShareCard extends StatelessWidget {
   /// template, not just Poster.
   static const Color _mapBlue = Color(0xFF00E5CC);
 
-  /// Shared big/bold wordmark treatment used at the top of every template.
+  /// Strava-style route color used only by the Full (map) template's
+  /// athletic redesign — every other template keeps [_mapBlue].
+  static const Color _mapOrange = Color(0xFFFF6B35);
+
+  /// Shared big/bold wordmark treatment used at the top of every template
+  /// EXCEPT Full — Full uses [_brandMarkStyle] instead. Kept separate so the
+  /// athletic condensed identity below stays scoped to the map template and
+  /// doesn't leak into Compact/Blank/Poster/etc.
   static const TextStyle _wordmarkStyle = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w900,
     letterSpacing: 3,
+  );
+
+  // ── Athletic condensed identity — Full (map share) template only ────────
+  // Scoped deliberately: the italic serif overlay styles used by
+  // Overlay Duo/Trio are a separate, unrelated typographic system and must
+  // not be touched by any of this.
+
+  /// `ENDURA` watermark on the Full template.
+  static TextStyle get _brandMarkStyle => GoogleFonts.barlowCondensed(
+    fontWeight: FontWeight.w800,
+    letterSpacing: 2.0,
+    color: Colors.white,
+    shadows: const [
+      Shadow(offset: Offset(0, 1), blurRadius: 4.0, color: Colors.black54),
+    ],
+  );
+
+  /// Distance/Pace/Time values in the Full template's bottom telemetry bar.
+  static TextStyle get _mapMetricValueStyle => GoogleFonts.barlowCondensed(
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.5,
+    color: Colors.white,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+
+  /// DISTANCE/PACE/TIME labels in the Full template's bottom telemetry bar.
+  static TextStyle get _mapMetricLabelStyle => GoogleFonts.inter(
+    fontWeight: FontWeight.w600,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    color: Colors.white.withOpacity(0.75),
   );
 
   /// Route trace capped to a fixed box — a long thin out-and-back doesn't
@@ -815,6 +854,7 @@ class RunShareCard extends StatelessWidget {
     required double boxHeight,
     double strokeWidth = 3,
     bool showPlaceholderIcon = true,
+    Color routeColor = _mapBlue,
   }) {
     final hasRoute = data.gpsPoints.length > 1;
     Widget inner;
@@ -823,7 +863,7 @@ class RunShareCard extends StatelessWidget {
         size: Size.infinite,
         painter: RouteTracePainter(
           points: data.gpsPoints,
-          color: _mapBlue,
+          color: routeColor,
           strokeWidth: strokeWidth,
         ),
       );
@@ -851,25 +891,6 @@ class RunShareCard extends StatelessWidget {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final wColor = WorkoutTypeStyle.color(data.workoutType);
@@ -883,7 +904,7 @@ class RunShareCard extends StatelessWidget {
     final background = isTransparent ? null : (isPoster ? _posterBg : _darkBg);
 
     final content = switch (template) {
-      ShareCardTemplate.full => _buildFullContent(wColor, isTransparent),
+      ShareCardTemplate.full => _buildFullContent(isTransparent),
       ShareCardTemplate.compact => _buildCompactContent(isTransparent),
       ShareCardTemplate.blank => _buildBlankContent(isTransparent),
       ShareCardTemplate.poster => _buildPosterContent(isTransparent),
@@ -923,134 +944,49 @@ class RunShareCard extends StatelessWidget {
     );
   }
 
-  // ── Full — route trace + hero distance ──────────────────────────────────
+  // ── Full — athletic map share: watermark, route, telemetry bar ──────────
+  // Always shows Distance/Pace in km — matches [ShareCardTemplate.overlayDuo]
+  // /[overlayTrio], independent of the user's mi/km app setting.
 
-  Widget _buildFullContent(Color wColor, bool isTransparent) {
-    final distanceValue = UnitUtils.displayDistance(
-      data.distanceKm,
-      data.useMiles,
-    );
-
+  Widget _buildFullContent(bool isTransparent) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text('ENDURA', style: _wordmarkStyle.copyWith(color: Colors.white)),
-        const SizedBox(height: 8),
-        Text(
-          _formatDate(data.date),
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white54,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        Text('ENDURA', style: _brandMarkStyle),
         Expanded(
           child: Center(
             child: _buildRouteBox(
               isTransparent: isTransparent,
-              boxWidth: 220,
-              boxHeight: 220,
+              boxWidth: 240,
+              boxHeight: 240,
+              strokeWidth: 4,
+              routeColor: _mapOrange,
             ),
           ),
         ),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              distanceValue.toStringAsFixed(2),
-              style: const TextStyle(
-                fontSize: 62,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: -2,
-                height: 1.0,
-              ),
+            _buildMapMetric(
+              'DISTANCE',
+              '${data.distanceKm.toStringAsFixed(2)} km',
             ),
-            const SizedBox(width: 8),
-            Text(
-              UnitUtils.unitLabel(data.useMiles),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            _buildStat(
-              'AVG PACE',
-              UnitUtils.formatPaceString(data.averagePace, data.useMiles),
-              UnitUtils.perUnitLabel(data.useMiles),
-            ),
-            const SizedBox(width: 36),
-            if (data.durationSeconds > 0)
-              _buildStat('TIME', _formatDuration(data.durationSeconds), ''),
-          ],
-        ),
-        const SizedBox(height: 28),
-        Row(
-          children: [
-            Icon(Icons.directions_run, size: 13, color: wColor),
-            const SizedBox(width: 6),
-            const Text(
-              'COACHED BY MAX',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white38,
-                letterSpacing: 2,
-              ),
-            ),
+            _buildMapMetric('PACE', '${data.averagePace} /km'),
+            _buildMapMetric('TIME', _formatDurationWords(data.durationSeconds)),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildStat(String label, String value, String unit) {
+  Widget _buildMapMetric(String label, String value) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: -0.5,
-              ),
-            ),
-            if (unit.isNotEmpty) ...[
-              const SizedBox(width: 3),
-              Text(
-                unit,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ],
-        ),
+        Text(label, style: _mapMetricLabelStyle),
+        const SizedBox(height: 4),
+        Text(value, style: _mapMetricValueStyle.copyWith(fontSize: 20)),
       ],
     );
   }
