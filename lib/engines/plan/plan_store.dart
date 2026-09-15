@@ -254,6 +254,42 @@ class PlanStore {
     return true;
   }
 
+  // ── Write: mark a day skipped ────────────────────────────────────────────
+
+  /// Stamp a skip timestamp onto the plan day at [weekNumber] / [weekday]
+  /// (0 = Monday) — the deliberate "Skip Workout" action from the pre-run
+  /// briefing screen, distinct from a day that simply hasn't happened yet.
+  ///
+  /// Returns true when a matching day (not already completed or skipped) was
+  /// updated; false when there is no plan, the slot is missing, or the day
+  /// was already completed/skipped.
+  Future<bool> markDaySkipped({
+    required int weekNumber,
+    required int weekday,
+    DateTime? skippedAt,
+  }) async {
+    final plan = await load();
+    if (plan == null) return false;
+
+    final wi = plan.weeks.indexWhere((w) => w.weekNumber == weekNumber);
+    if (wi < 0) return false;
+    final week = plan.weeks[wi];
+
+    final di = week.days.indexWhere((d) => d.weekday == weekday);
+    if (di < 0) return false;
+    if (week.days[di].isCompleted || week.days[di].isSkipped) return false;
+
+    final updatedDay = week.days[di].copyWith(
+      skippedAt: skippedAt ?? DateTime.now(),
+    );
+    final days = List<MaterializedDay>.of(week.days)..[di] = updatedDay;
+    final weeks = List<MaterializedWeek>.of(plan.weeks)
+      ..[wi] = week.copyWith(days: days);
+
+    await saveAndSync(plan.copyWith(weeks: weeks));
+    return true;
+  }
+
   // ── Clear ────────────────────────────────────────────────────────────────
 
   /// Drop the cached plan (e.g. plan ended, or user signed out). Remote rows

@@ -677,6 +677,43 @@ class DatabaseService {
     return rows.map(RunRecord.fromMap).toList();
   }
 
+  /// Recent runs not yet linked to a plan day — what "Link Activity" on the
+  /// pre-run briefing screen offers to attach to the day being previewed.
+  Future<List<RunRecord>> getUnlinkedRuns({int limit = 20}) async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        where: 'scheduled_day_id IS NULL',
+        orderBy: 'date DESC',
+        limit: limit,
+      );
+      return rows.map(RunRecord.fromMap).toList();
+    } catch (e, stack) {
+      debugPrint('getUnlinkedRuns error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// Stamps [dayId] (`"<planId>::w<week>::d<weekday>"`) onto an already-logged
+  /// run — the retroactive counterpart to the auto-link `RunScreen` does when
+  /// saving a run against a live scheduled session.
+  Future<void> updateRunScheduledDayId(int runId, String dayId) async {
+    try {
+      final db = await database;
+      await db.update(
+        'runs',
+        {'scheduled_day_id': dayId},
+        where: 'id = ?',
+        whereArgs: [runId],
+      );
+    } catch (e, stack) {
+      debugPrint('updateRunScheduledDayId error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+    }
+  }
+
   Future<void> markRunSynced(int runId) async {
     final db = await database;
     await db.update(

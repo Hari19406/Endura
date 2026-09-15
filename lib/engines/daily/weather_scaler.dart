@@ -39,6 +39,12 @@ class WeatherScaler {
   static const int _maxDeltaSecondsPerKm = 45;
   static const int _minMeaningfulDelta = 3;
 
+  /// The pace-ceiling delta [scale] would apply for [weather], in
+  /// seconds/km — exposed so UI (the pre-run briefing's weather card) can
+  /// show the same figure ("+15s/km") without duplicating the formula.
+  int deltaSecondsPerKm(WeatherSnapshot weather) =>
+      _computeDeltaSecondsPerKm(weather);
+
   WeatherScaleResult scale(ResolvedWorkout workout, WeatherSnapshot weather) {
     final delta = _computeDeltaSecondsPerKm(weather);
     if (delta < _minMeaningfulDelta) {

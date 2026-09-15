@@ -60,6 +60,7 @@ class RevenueCatService {
     try {
       final offerings = await Purchases.getOfferings().timeout(_networkTimeout);
       final current = offerings.current;
+      if (kDebugMode) _logOfferingDiagnostics(current);
       return (annual: current?.annual, monthly: current?.monthly);
     } on TimeoutException catch (e) {
       debugPrint(
@@ -70,6 +71,38 @@ class RevenueCatService {
     } catch (e) {
       debugPrint('[RevenueCat] getOffering error: $e');
       return (annual: null, monthly: null);
+    }
+  }
+
+  /// Debug-only: makes a misconfigured dashboard (vs. a genuine network
+  /// failure) distinguishable in logcat. Both look identical to the paywall
+  /// UI — "Couldn't load pricing" either way — but a null [current] or a
+  /// present offering whose `annual`/`monthly` are still null are dashboard
+  /// problems no amount of retrying fixes, not transient ones.
+  static void _logOfferingDiagnostics(Offering? current) {
+    if (current == null) {
+      debugPrint(
+        '[RevenueCat] getOffering: no current offering returned. Check the '
+        '"default" offering is set as the CURRENT offering in the '
+        'RevenueCat dashboard.',
+      );
+      return;
+    }
+    final packages = current.availablePackages;
+    debugPrint(
+      '[RevenueCat] getOffering: offering "${current.identifier}" — '
+      '${packages.length} package(s): '
+      '${packages.map((p) => p.identifier).join(', ')}',
+    );
+    if (current.annual == null && current.monthly == null) {
+      debugPrint(
+        '[RevenueCat] getOffering: neither \$rc_annual nor \$rc_monthly '
+        'resolved on this offering. Either the package(s) above are typed '
+        'as something other than Annual/Monthly in the RC dashboard, or '
+        'they have no Play Store product attached for this app — cross-check '
+        'Offerings → "${current.identifier}" → Packages against the '
+        'Play Console subscription products.',
+      );
     }
   }
 

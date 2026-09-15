@@ -69,6 +69,12 @@ class MaterializedDay {
   /// Set when a run is logged against this day.
   final DayCompletion? completion;
 
+  /// Set when the athlete deliberately skips this day from the pre-run
+  /// briefing screen — distinct from simply not having gotten to it yet.
+  /// Mutually exclusive with [completion] in practice (`PlanStore` refuses to
+  /// skip an already-completed day and vice versa).
+  final DateTime? skippedAt;
+
   const MaterializedDay({
     required this.weekday,
     required this.slot,
@@ -77,10 +83,12 @@ class MaterializedDay {
     this.progressionStep = 0,
     this.workout,
     this.completion,
+    this.skippedAt,
   });
 
   bool get isRest => slot.isRest;
   bool get isCompleted => completion != null;
+  bool get isSkipped => skippedAt != null;
   double get plannedKm => workout?.totalDistanceKm ?? 0;
 
   MaterializedDay copyWith({
@@ -90,6 +98,7 @@ class MaterializedDay {
     int? progressionStep,
     ResolvedWorkout? workout,
     DayCompletion? completion,
+    DateTime? skippedAt,
   }) => MaterializedDay(
     weekday: weekday,
     slot: slot ?? this.slot,
@@ -98,6 +107,7 @@ class MaterializedDay {
     progressionStep: progressionStep ?? this.progressionStep,
     workout: workout ?? this.workout,
     completion: completion ?? this.completion,
+    skippedAt: skippedAt ?? this.skippedAt,
   );
 
   Map<String, dynamic> toJson() => {
@@ -108,6 +118,7 @@ class MaterializedDay {
     if (progressionStep != 0) 'progressionStep': progressionStep,
     if (workout != null) 'workout': workout!.toJson(),
     if (completion != null) 'completion': completion!.toJson(),
+    if (skippedAt != null) 'skippedAt': skippedAt!.toIso8601String(),
   };
 
   factory MaterializedDay.fromJson(Map<String, dynamic> j) => MaterializedDay(
@@ -130,6 +141,9 @@ class MaterializedDay {
     completion: j['completion'] == null
         ? null
         : DayCompletion.fromJson(j['completion'] as Map<String, dynamic>),
+    skippedAt: j['skippedAt'] == null
+        ? null
+        : DateTime.parse(j['skippedAt'] as String),
   );
 }
 
