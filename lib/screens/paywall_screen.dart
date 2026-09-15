@@ -1245,61 +1245,71 @@ class _TrainingProofRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (int i = 0; i < _kTrainingPillars.length; i++) ...[
-          if (i != 0) const SizedBox(width: 10),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
-              decoration: BoxDecoration(
-                color: c.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: c.border),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _kGold.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+    // Row sits inside the paywall's SingleChildScrollView, which hands it
+    // unbounded height — plain `CrossAxisAlignment.stretch` there tries to
+    // stretch every card to infinite height and crashes layout. IntrinsicHeight
+    // gives the Row a real (content-derived) height first, so "stretch" has
+    // something finite to stretch to — the three cards still match height.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int i = 0; i < _kTrainingPillars.length; i++) ...[
+            if (i != 0) const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: c.border),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _kGold.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        _kTrainingPillars[i].icon,
+                        color: _kGold,
+                        size: 18,
+                      ),
                     ),
-                    child: Icon(
-                      _kTrainingPillars[i].icon,
-                      color: _kGold,
-                      size: 18,
+                    const SizedBox(height: 10),
+                    Text(
+                      _kTrainingPillars[i].title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _kTrainingPillars[i].title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: c.textPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 2),
+                    Text(
+                      _kTrainingPillars[i].subtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: c.textTertiary,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _kTrainingPillars[i].subtitle,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: c.textTertiary,
-                      fontSize: 11,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

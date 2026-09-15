@@ -54,6 +54,16 @@ Widget _host(Widget child) => MaterialApp(
   home: child,
 );
 
+/// `pumpAndSettle()` never returns on this screen — the hero icon's glow runs
+/// a repeating `AnimationController` for as long as the page is mounted, so
+/// there's always a pending frame. Flush the (synchronous, since debugOffering
+/// short-circuits the real RevenueCat await) async setup with a couple of
+/// bounded pumps instead.
+Future<void> _pumpSettled(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -71,7 +81,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpSettled(tester);
 
       // Both packages resolved — never falls back to the error card.
       expect(find.text("Couldn't load pricing"), findsNothing);
@@ -98,7 +108,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpSettled(tester);
 
       final cta = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
       expect(cta.onPressed, isNotNull);
@@ -114,7 +124,7 @@ void main() {
           const PaywallScreen(debugOffering: (annual: null, monthly: null)),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpSettled(tester);
 
       expect(find.text("Couldn't load pricing"), findsOneWidget);
       // Inline card Retry + footer Retry button.
@@ -132,7 +142,7 @@ void main() {
           const PaywallScreen(debugOffering: (annual: null, monthly: null)),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpSettled(tester);
       expect(find.text('Retry'), findsWidgets);
 
       // debugOffering resolves synchronously to the same null offering, so
@@ -141,7 +151,7 @@ void main() {
       // or throws, and the error state remains a real state, not a dead end.
       await tester.tap(find.text('Retry').first);
       await tester.pump(); // spinner frame
-      await tester.pumpAndSettle();
+      await _pumpSettled(tester);
 
       expect(tester.takeException(), isNull);
       expect(find.text("Couldn't load pricing"), findsOneWidget);
