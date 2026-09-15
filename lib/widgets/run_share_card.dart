@@ -58,6 +58,7 @@ enum ShareCardTemplate {
   statsOnly,
   overlayDuo,
   overlayTrio,
+  verticalMetrics,
 }
 
 /// Grouping used by the "Pick a layout" picker sheet. [charts] has no
@@ -78,6 +79,7 @@ String _labelOf(ShareCardTemplate t) => switch (t) {
   ShareCardTemplate.statsOnly => 'Stats Only',
   ShareCardTemplate.overlayDuo => 'Overlay Duo',
   ShareCardTemplate.overlayTrio => 'Overlay Trio',
+  ShareCardTemplate.verticalMetrics => 'Vertical Stack',
 };
 
 String _categoryLabel(ShareCardCategory c) => switch (c) {
@@ -812,12 +814,12 @@ class RunShareCard extends StatelessWidget {
     letterSpacing: 3,
   );
 
-  // ── Athletic condensed identity — Full (map share) template only ────────
+  // ── Athletic condensed identity — Full (map share) & Vertical Stack ─────
   // Scoped deliberately: the italic serif overlay styles used by
   // Overlay Duo/Trio are a separate, unrelated typographic system and must
   // not be touched by any of this.
 
-  /// `ENDURA` watermark on the Full template.
+  /// `ENDURA` watermark on the Full and Vertical Stack templates.
   static TextStyle get _brandMarkStyle => GoogleFonts.barlowCondensed(
     fontWeight: FontWeight.w800,
     letterSpacing: 2.0,
@@ -827,7 +829,7 @@ class RunShareCard extends StatelessWidget {
     ],
   );
 
-  /// Distance/Pace/Time values in the Full template's bottom telemetry bar.
+  /// Distance/Pace/Time values in the Full/Vertical Stack telemetry.
   static TextStyle get _mapMetricValueStyle => GoogleFonts.barlowCondensed(
     fontWeight: FontWeight.w700,
     letterSpacing: -0.5,
@@ -835,7 +837,7 @@ class RunShareCard extends StatelessWidget {
     fontFeatures: const [FontFeature.tabularFigures()],
   );
 
-  /// DISTANCE/PACE/TIME labels in the Full template's bottom telemetry bar.
+  /// DISTANCE/PACE/TIME labels in the Full/Vertical Stack telemetry.
   static TextStyle get _mapMetricLabelStyle => GoogleFonts.inter(
     fontWeight: FontWeight.w600,
     fontSize: 11,
@@ -898,7 +900,8 @@ class RunShareCard extends StatelessWidget {
     // they stay transparent regardless of the Solid/Transparent toggle.
     final isOverlay =
         template == ShareCardTemplate.overlayDuo ||
-        template == ShareCardTemplate.overlayTrio;
+        template == ShareCardTemplate.overlayTrio ||
+        template == ShareCardTemplate.verticalMetrics;
     final isTransparent = style == ShareCardStyle.transparent || isOverlay;
     final isPoster = template == ShareCardTemplate.poster;
     final background = isTransparent ? null : (isPoster ? _posterBg : _darkBg);
@@ -914,6 +917,7 @@ class RunShareCard extends StatelessWidget {
       ShareCardTemplate.statsOnly => _buildStatsOnlyContent(),
       ShareCardTemplate.overlayDuo => _buildOverlayDuoContent(),
       ShareCardTemplate.overlayTrio => _buildOverlayTrioContent(),
+      ShareCardTemplate.verticalMetrics => _buildVerticalMetricsContent(),
     };
 
     return Container(
@@ -1323,22 +1327,6 @@ class RunShareCard extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            const Icon(Icons.directions_run, size: 13, color: _mapBlue),
-            const SizedBox(width: 6),
-            const Text(
-              'COACHED BY MAX',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white38,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -1399,25 +1387,6 @@ class RunShareCard extends StatelessWidget {
             ),
           ),
         ),
-        Row(
-          children: [
-            Icon(
-              Icons.directions_run,
-              size: 13,
-              color: WorkoutTypeStyle.color(data.workoutType),
-            ),
-            const SizedBox(width: 6),
-            const Text(
-              'COACHED BY MAX',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white38,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -1458,25 +1427,6 @@ class RunShareCard extends StatelessWidget {
             ),
           ),
         ),
-        Row(
-          children: [
-            Icon(
-              Icons.directions_run,
-              size: 13,
-              color: WorkoutTypeStyle.color(data.workoutType),
-            ),
-            const SizedBox(width: 6),
-            const Text(
-              'COACHED BY MAX',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white38,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -1516,25 +1466,6 @@ class RunShareCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
-        Row(
-          children: [
-            Icon(
-              Icons.directions_run,
-              size: 13,
-              color: WorkoutTypeStyle.color(data.workoutType),
-            ),
-            const SizedBox(width: 6),
-            const Text(
-              'COACHED BY MAX',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white38,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -1615,6 +1546,43 @@ class RunShareCard extends StatelessWidget {
             shadows: shadow,
           ),
         ),
+      ],
+    );
+  }
+
+  // ── Vertical Stack — Distance/Time/Pace stacked, transparent, ENDURA ────
+  // below the stack. Athletic condensed identity, always km/min-per-km.
+
+  Widget _buildVerticalMetricsContent() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildVerticalMetric(
+            'DISTANCE',
+            '${data.distanceKm.toStringAsFixed(2)} km',
+          ),
+          const SizedBox(height: 28),
+          _buildVerticalMetric(
+            'TIME',
+            _formatDurationWords(data.durationSeconds),
+          ),
+          const SizedBox(height: 28),
+          _buildVerticalMetric('PACE', '${data.averagePace} /km'),
+          const SizedBox(height: 36),
+          Text('ENDURA', style: _brandMarkStyle),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerticalMetric(String label, String value) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: _mapMetricLabelStyle),
+        const SizedBox(height: 6),
+        Text(value, style: _mapMetricValueStyle.copyWith(fontSize: 44)),
       ],
     );
   }
