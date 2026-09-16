@@ -78,16 +78,27 @@ Widget _host(VoidCallback? onPlanChanged) => MaterialApp(
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  /// The Danger Zone's own trigger button sits below the fold in the test
+  /// viewport (the redesigned screen is tall) — scroll it into view before
+  /// tapping. Its label is "Remove Plan", the same label the confirmation
+  /// sheet's own button uses once open, so callers disambiguate with `.last`.
+  Future<void> openConfirmSheet(WidgetTester tester) async {
+    final trigger = find.text('Remove Plan');
+    await tester.ensureVisible(trigger);
+    await tester.pumpAndSettle();
+    await tester.tap(trigger);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets(
-    'the confirm dialog tells the athlete their run history stays safe',
+    'the confirm sheet tells the athlete their run history stays safe',
     (tester) async {
       await _seedActivePlan();
       await tester.pumpWidget(_host(null));
       await tester.tap(find.text('open manage plan'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Remove Plan'));
-      await tester.pumpAndSettle();
+      await openConfirmSheet(tester);
 
       expect(
         find.textContaining('past logged runs will stay safe'),
@@ -96,7 +107,7 @@ void main() {
     },
   );
 
-  testWidgets('cancelling the confirm dialog leaves the plan untouched', (
+  testWidgets('cancelling the confirm sheet leaves the plan untouched', (
     tester,
   ) async {
     await _seedActivePlan();
@@ -104,8 +115,7 @@ void main() {
     await tester.tap(find.text('open manage plan'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Remove Plan'));
-    await tester.pumpAndSettle();
+    await openConfirmSheet(tester);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
@@ -125,9 +135,11 @@ void main() {
       await tester.tap(find.text('open manage plan'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Remove Plan'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Remove'));
+      await openConfirmSheet(tester);
+      // Two "Remove Plan" labels are now on screen — the Danger Zone's own
+      // trigger underneath, and the sheet's confirm button on top; the sheet
+      // one is the one added last.
+      await tester.tap(find.text('Remove Plan').last);
       await tester.pumpAndSettle();
 
       expect(notified, isTrue);
