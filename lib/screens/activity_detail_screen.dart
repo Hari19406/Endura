@@ -859,12 +859,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   Widget _splitsCard(AppColors c) {
     final splits = a.splitsForDisplay(useMiles: _useMiles);
-    final fastest = splits.isEmpty
-        ? 0
-        : splits.map((s) => s.paceSeconds).reduce(math.min);
-    final slowest = splits.isEmpty
-        ? 0
-        : splits.map((s) => s.paceSeconds).reduce(math.max);
+    // Bar-scaling reference points only — excludes zero/garbage paces (a
+    // sub-60s/km or /mi split is not a real running pace) so one bad split
+    // can't collapse or blow out every other bar's relative length. Ordinary
+    // splits are healed further upstream in splitsForDisplay(); this is a
+    // second, independent guard on just the min/max the bars are scaled to.
+    final validPaces = splits
+        .map((s) => s.paceSeconds)
+        .where((p) => p > 60)
+        .toList();
+    final fastest = validPaces.isEmpty ? 0 : validPaces.reduce(math.min);
+    final slowest = validPaces.isEmpty ? 0 : validPaces.reduce(math.max);
     final showElev = a.anySplitHasElevation;
     final showHr = a.anySplitHasHr;
     return _card(

@@ -73,6 +73,30 @@ ActivityDetail _activityWithSplits() {
   );
 }
 
+/// A ~3 km run whose middle split has a corrupt (zero) duration — the kind of
+/// row a duplicate GPS timestamp at a km boundary could produce before the
+/// resilience fix — with a telemetry trace too sparse to re-bucket from, so
+/// splitsForDisplay's healing (not the mile re-bucketer) is what's on test.
+ActivityDetail _activityWithInvalidSplit() => ActivityDetail(
+  runId: 99,
+  runIdIsCloud: true,
+  runnerName: 'Test Runner',
+  timestamp: DateTime(2026, 9, 16, 6),
+  source: 'Endura Tracker',
+  location: '',
+  title: 'Easy Run',
+  distanceKm: 3.0,
+  avgPace: '5:00',
+  movingTime: const Duration(seconds: 900), // 15:00 total moving time
+  splits: const [
+    KmSplit(km: 1, paceSeconds: 300),
+    KmSplit(km: 2, paceSeconds: 0), // corrupt — duplicate-timestamp artifact
+    KmSplit(km: 3, paceSeconds: 300),
+  ],
+  telemetrySeries: const [],
+  hrZones: const [],
+);
+
 /// The summary grid / GAP block render their big value+unit pairs as a single
 /// `RichText` (value + a `TextSpan` unit suffix), not separate `Text`
 /// widgets — `find.text`/`textContaining` can't see into it, so check the
@@ -205,6 +229,22 @@ void main() {
         await tester.pumpAndSettle();
         expect(_anyRichTextContains(tester, '2.00'), isTrue);
         expect(find.text('KILOMETRE SPLITS'), findsOneWidget);
+      },
+    );
+  });
+
+  group('split resilience', () {
+    testWidgets(
+      'a corrupt (zero-duration) split never renders as an impossible '
+      '0:00 pace — it is healed from the run\'s remaining moving time',
+      (tester) async {
+        await tester.pumpWidget(_host(_activityWithInvalidSplit()));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        // 15:00 total - (5:00 + 5:00) good splits = 5:00 left for the bad one.
+        expect(find.text('5:00'), findsWidgets);
+        expect(find.text('0:00'), findsNothing);
       },
     );
   });

@@ -1381,15 +1381,27 @@ class _RunScreenState extends State<RunScreen>
               .toList(),
         );
         // Convert cumulative km markers into per-split durations for storage.
+        // A duplicate GPS timestamp, a hardware clock stutter, or a corrected
+        // (out-of-order) km crossing can make two consecutive markers land on
+        // — or before — the same cumulative second, which would otherwise
+        // store a zero or negative split duration and render as an
+        // impossible "0:00" (or negative) pace downstream. Floor any such
+        // delta to the run's own overall average pace for that one split
+        // instead, and never let a single bad marker corrupt every split
+        // after it by keeping `prevSplitSeconds` monotonically increasing.
         final capturedSplits = <Map<String, dynamic>>[];
         int prevSplitSeconds = 0;
+        final fallbackSplitSeconds = _capturedMainDistanceM > 0
+            ? (_capturedMainSeconds / (_capturedMainDistanceM / 1000)).round()
+            : 0;
         for (final s in _splits) {
           final cumSeconds = s['seconds'] as int;
-          capturedSplits.add({
-            'km': s['km'],
-            'seconds': cumSeconds - prevSplitSeconds,
-          });
-          prevSplitSeconds = cumSeconds;
+          var deltaSeconds = cumSeconds - prevSplitSeconds;
+          if (deltaSeconds <= 0) {
+            deltaSeconds = fallbackSplitSeconds > 0 ? fallbackSplitSeconds : 1;
+          }
+          capturedSplits.add({'km': s['km'], 'seconds': deltaSeconds});
+          if (cumSeconds > prevSplitSeconds) prevSplitSeconds = cumSeconds;
         }
 
         final capturedTrackSamples = List<Map<String, dynamic>>.from(

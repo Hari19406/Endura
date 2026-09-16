@@ -127,20 +127,26 @@ class PaceEngine {
               .difference(_lastAcceptedPoint!.timestamp)
               .inMilliseconds /
           1000.0;
-      if (dt > 0) {
-        final dist = _haversineMeters(
-          _lastAcceptedPoint!.lat,
-          _lastAcceptedPoint!.lng,
-          point.lat,
-          point.lng,
-        );
-        if (dist / dt > _maxSpeedMs) {
-          return _buildSnapshot();
-        }
-        if (dist < _minMovementMeters) {
-          _checkStale(point.timestamp);
-          return _buildSnapshot();
-        }
+      if (dt <= 0) {
+        // Duplicate or out-of-order GPS timestamp (clock stutter, a replayed
+        // fix delivered after a pause/resume). There's no valid time delta
+        // to measure speed against — accepting it into the ring buffer would
+        // feed a zero/negative segment straight into the rolling window and
+        // surface downstream as an impossible split pace. Drop it.
+        return _buildSnapshot();
+      }
+      final dist = _haversineMeters(
+        _lastAcceptedPoint!.lat,
+        _lastAcceptedPoint!.lng,
+        point.lat,
+        point.lng,
+      );
+      if (dist / dt > _maxSpeedMs) {
+        return _buildSnapshot();
+      }
+      if (dist < _minMovementMeters) {
+        _checkStale(point.timestamp);
+        return _buildSnapshot();
       }
     }
 

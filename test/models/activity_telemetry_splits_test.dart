@@ -9,6 +9,8 @@ import 'package:run_app/models/activity_telemetry.dart';
 ActivityDetail _base({
   required List<KmSplit> splits,
   required List<TelemetrySample> telemetrySeries,
+  Duration movingTime = const Duration(minutes: 10),
+  String avgPace = '5:00',
 }) => ActivityDetail(
   runnerName: 'Runner',
   timestamp: DateTime(2026, 9, 12),
@@ -18,8 +20,8 @@ ActivityDetail _base({
   distanceKm: telemetrySeries.isEmpty
       ? splits.length.toDouble()
       : telemetrySeries.last.distanceKm,
-  avgPace: '5:00',
-  movingTime: const Duration(minutes: 10),
+  avgPace: avgPace,
+  movingTime: movingTime,
   splits: splits,
   telemetrySeries: telemetrySeries,
   hrZones: const [],
@@ -99,5 +101,118 @@ void main() {
     // totalKm == 0 → nothing to re-bucket → falls back to converted km splits.
     expect(miles, hasLength(1));
     expect(miles.first.paceSeconds, (300 * 1.609344).round());
+  });
+
+  group('healing invalid split durations', () {
+    test(
+      'a single zero-duration split (e.g. a duplicate GPS timestamp at a km '
+      'boundary) is healed from the run\'s remaining moving time, never '
+      'rendered as an impossible 0:00',
+      () {
+        // 3 splits, 10-minute (600s) total moving time. Two good splits sum
+        // to 500s, leaving 100s for the one bad split to inherit.
+        final a = _base(
+          splits: const [
+            KmSplit(km: 1, paceSeconds: 250),
+            KmSplit(km: 2, paceSeconds: 0), // duplicate-timestamp artifact
+            KmSplit(km: 3, paceSeconds: 250),
+          ],
+          telemetrySeries: const [],
+          movingTime: const Duration(seconds: 600),
+        );
+
+        final healed = a.splitsForDisplay(useMiles: false);
+
+        expect(healed, hasLength(3));
+        expect(healed[0].paceSeconds, 250); // untouched
+        expect(healed[1].paceSeconds, 100); // 600 - (250+250)
+        expect(healed[2].paceSeconds, 250); // untouched
+        expect(healed[1].paceLabel, isNot('0:00'));
+      },
+    );
+
+    test('a negative split duration is healed the same way as a zero one', () {
+      final a = _base(
+        splits: const [
+          KmSplit(km: 1, paceSeconds: 280),
+          KmSplit(km: 2, paceSeconds: -15), // out-of-order km crossing
+        ],
+        telemetrySeries: const [],
+        movingTime: const Duration(seconds: 600),
+      );
+
+      final healed = a.splitsForDisplay(useMiles: false);
+
+      expect(healed[1].paceSeconds, 320); // 600 - 280
+      expect(healed[1].paceSeconds, greaterThan(0));
+    });
+
+    test(
+      'when every split is invalid, falls back to the run\'s own average '
+      'pace rather than rendering all zeroes',
+      () {
+        final a = _base(
+          splits: const [
+            KmSplit(km: 1, paceSeconds: 0),
+            KmSplit(km: 2, paceSeconds: 0),
+          ],
+          telemetrySeries: const [],
+          movingTime: const Duration(seconds: 600),
+          avgPace: '5:00', // 300 s/km
+        );
+
+        final healed = a.splitsForDisplay(useMiles: false);
+
+        expect(healed[0].paceSeconds, 300);
+        expect(healed[1].paceSeconds, 300);
+      },
+    );
+
+    test(
+      'leaves a 0 in place only when total moving time genuinely was 0',
+      () {
+        final a = _base(
+          splits: const [KmSplit(km: 1, paceSeconds: 0)],
+          telemetrySeries: const [],
+          movingTime: Duration.zero,
+        );
+
+        final healed = a.splitsForDisplay(useMiles: false);
+
+        expect(healed[0].paceSeconds, 0);
+      },
+    );
+
+    test('healing also applies to the miles-mode fallback conversion path', () {
+      final a = _base(
+        splits: const [
+          KmSplit(km: 1, paceSeconds: 300),
+          KmSplit(km: 2, paceSeconds: 0),
+        ],
+        telemetrySeries: const [], // forces the pace-only fallback path
+        movingTime: const Duration(seconds: 600),
+      );
+
+      final miles = a.splitsForDisplay(useMiles: true);
+
+      // Healed km duration (300) is then converted to miles, same as any
+      // other stored split — never a 0:00 mile split.
+      expect(miles[1].paceSeconds, greaterThan(0));
+      expect(miles[1].paceLabel, isNot('0:00'));
+    });
+
+    test('fastestSplitSeconds/slowestSplitSeconds ignore sub-60s garbage', () {
+      final a = _base(
+        splits: const [
+          KmSplit(km: 1, paceSeconds: 5), // impossible sprint artifact
+          KmSplit(km: 2, paceSeconds: 300),
+          KmSplit(km: 3, paceSeconds: 320),
+        ],
+        telemetrySeries: const [],
+      );
+
+      expect(a.fastestSplitSeconds, 300);
+      expect(a.slowestSplitSeconds, 320);
+    });
   });
 }

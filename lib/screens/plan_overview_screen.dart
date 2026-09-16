@@ -123,13 +123,25 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     await _loadRestartStatus();
   }
 
-  Future<void> _loadMaterialized() async {
+  /// Loads the stored plan and gates it behind an inputs-fingerprint check —
+  /// only trust it if it matches what this screen is currently showing, so a
+  /// plan mid-recompute (e.g. right after ManagePlanScreen changes race
+  /// distance) never renders the wrong shape. That recompute is normally
+  /// fast, so on a mismatch (or a transient load failure) [isRetry] gives it
+  /// one short second chance before giving up — without this, a screen
+  /// opened during that narrow race window got stuck with `_materialized`
+  /// permanently null and every day dot silently non-interactive.
+  Future<void> _loadMaterialized({bool isRetry = false}) async {
     try {
       // Match any freshly-logged runs to their days first, so opening the
       // calendar never shows a completed run as still pending.
       await WorkoutComplianceCoordinator.instance.sync();
       final plan = await PlanStore.instance.load();
-      if (plan == null || !mounted) return;
+      if (!mounted) return;
+      if (plan == null) {
+        debugPrint('[PlanOverviewScreen] _loadMaterialized: PlanStore has no plan.');
+        return;
+      }
       // Only trust it if it was built for the same inputs we're showing.
       final fp = PlanMaterializationCoordinator.fingerprint(
         goalRace: racePlan.goalRace,
@@ -143,9 +155,26 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
       final head = fp.substring(0, fp.lastIndexOf('|'));
       if (plan.inputsFingerprint.startsWith(head)) {
         setState(() => _materialized = plan);
+        return;
       }
-    } catch (_) {
-      // fall back to live resolve
+
+      debugPrint(
+        '[PlanOverviewScreen] _loadMaterialized: fingerprint mismatch '
+        '(stored="${plan.inputsFingerprint}", expected~="$head") — '
+        '${isRetry ? "giving up after retry" : "retrying once"}.',
+      );
+      if (!isRetry) {
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        await _loadMaterialized(isRetry: true);
+      }
+    } catch (e, stack) {
+      debugPrint('[PlanOverviewScreen] _loadMaterialized failed: $e\n$stack');
+      if (!isRetry) {
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        await _loadMaterialized(isRetry: true);
+      }
     }
   }
 
@@ -300,6 +329,14 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
                       onLockedDayTap: isLocked
                           ? () => UnlockTrainingBottomSheet.show(context)
                           : null,
+                      // Unlocked but the real day data hasn't loaded (or
+                      // failed the fingerprint check) — same underlying bug
+                      // class as home_screen.dart's day-dot tap: give visible
+                      // feedback and retry, instead of a dot that looks
+                      // tappable but silently does nothing.
+                      onUnavailableTap: (!isLocked && materializedWeek == null)
+                          ? _onUnavailableDayTap
+                          : null,
                       onLockedTap: isLocked
                           ? () {
                               Analytics.capture(
@@ -332,6 +369,19 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
         ],
       ),
     );
+  }
+
+  void _onUnavailableDayTap() {
+    debugPrint(
+      '[PlanOverviewScreen] Day-dot tap on an unlocked week with no '
+      'materialized data yet — retrying load.',
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Your plan is still loading — try again in a moment.'),
+      ),
+    );
+    _loadMaterialized();
   }
 
   /// Tapping an unlocked day: a rest day still gets the lightweight bottom
@@ -460,6 +510,10 @@ class _WeekCard extends StatelessWidget {
   final VoidCallback? onLockedDayTap;
   final VoidCallback? onLockedTap;
 
+  /// Tapping any day dot on an *unlocked* week whose real data hasn't loaded
+  /// yet — visible "still loading" feedback instead of a dead tap.
+  final VoidCallback? onUnavailableTap;
+
   const _WeekCard({
     required this.week,
     required this.weekStart,
@@ -473,6 +527,7 @@ class _WeekCard extends StatelessWidget {
     this.onDayTap,
     this.onLockedDayTap,
     this.onLockedTap,
+    this.onUnavailableTap,
   });
 
   static String _dateRangeLabel(DateTime start) {
@@ -590,7 +645,9 @@ class _WeekCard extends StatelessWidget {
                 : _ProjectedDayStrip(
                     resolution: resolution,
                     useMiles: useMiles,
-                    onLockedDayTap: isLocked ? onLockedDayTap : null,
+                    onLockedDayTap: isLocked
+                        ? onLockedDayTap
+                        : onUnavailableTap,
                   ),
           ],
         ),

@@ -38,6 +38,13 @@ class KmSplit {
     this.avgHr,
   });
 
+  KmSplit copyWith({int? paceSeconds}) => KmSplit(
+    km: km,
+    paceSeconds: paceSeconds ?? this.paceSeconds,
+    elevationChangeM: elevationChangeM,
+    avgHr: avgHr,
+  );
+
   /// "m:ss" per-km label.
   String get paceLabel =>
       '${paceSeconds ~/ 60}:${(paceSeconds % 60).toString().padLeft(2, '0')}';
@@ -261,12 +268,18 @@ class ActivityDetail {
   bool get anySplitHasHr => splits.any((s) => s.avgHr != null);
 
   /// Fastest split's pace in seconds — the reference the splits-bar lengths are
-  /// measured against. Falls back to the slowest value when there are no splits.
-  int get fastestSplitSeconds =>
-      splits.isEmpty ? 0 : splits.map((s) => s.paceSeconds).reduce(math.min);
+  /// measured against. Excludes zero/garbage paces (<= 60s/km is not a real
+  /// running pace) so one corrupt split can't collapse the whole bar scale.
+  /// Falls back to 0 when there is no split left to measure against.
+  int get fastestSplitSeconds {
+    final valid = splits.map((s) => s.paceSeconds).where((p) => p > 60);
+    return valid.isEmpty ? 0 : valid.reduce(math.min);
+  }
 
-  int get slowestSplitSeconds =>
-      splits.isEmpty ? 0 : splits.map((s) => s.paceSeconds).reduce(math.max);
+  int get slowestSplitSeconds {
+    final valid = splits.map((s) => s.paceSeconds).where((p) => p > 60);
+    return valid.isEmpty ? 0 : valid.reduce(math.max);
+  }
 
   /// Splits sized to the display unit — the *contract* is that
   /// `.paceSeconds`/`.paceLabel` on the returned rows are always already
@@ -284,7 +297,8 @@ class ActivityDetail {
   /// carries splits at all, so this fallback is a rare, low-precision edge
   /// case rather than the common path.
   List<KmSplit> splitsForDisplay({required bool useMiles}) {
-    if (!useMiles || splits.isEmpty) return splits;
+    final healed = _healedSplits(splits);
+    if (!useMiles || healed.isEmpty) return healed;
 
     const mileKm = 1.609344;
     if (telemetrySeries.length >= 2) {
@@ -337,13 +351,53 @@ class ActivityDetail {
     // Fallback: keep the km bucket boundaries but convert each pace value so
     // the "always in the requested unit" contract still holds.
     return [
-      for (final s in splits)
+      for (final s in healed)
         KmSplit(
           km: s.km,
           paceSeconds: (s.paceSeconds * mileKm).round(),
           elevationChangeM: s.elevationChangeM,
           avgHr: s.avgHr,
         ),
+    ];
+  }
+
+  /// Heals any split whose recorded duration is invalid (`paceSeconds <= 0`
+  /// — never a real "moving time for this split") by distributing the run's
+  /// remaining moving time across just the invalid ones:
+  /// `(totalMovingTime - validSplitsTime) / invalidCount`. A duplicate GPS
+  /// timestamp or an out-of-order km crossing during live recording is
+  /// guarded against at the source now (see RunScreen's split capture), but
+  /// a run recorded before that fix can still carry one in storage — this is
+  /// the universal fallback that keeps every historical and future run safe
+  /// to render. Falls back to the run's overall average pace when every
+  /// split is invalid, and only ever leaves a 0 in place when total moving
+  /// time genuinely was 0 (nothing sane to distribute).
+  List<KmSplit> _healedSplits(List<KmSplit> raw) {
+    if (raw.isEmpty) return raw;
+    final invalidCount = raw.where((s) => s.paceSeconds <= 0).length;
+    if (invalidCount == 0) return raw;
+
+    final totalMovingSeconds = movingTime.inSeconds;
+    final fallbackPace = avgPaceSeconds;
+
+    if (invalidCount == raw.length) {
+      if (totalMovingSeconds <= 0 || fallbackPace == null || fallbackPace <= 0) {
+        return raw; // Total moving time really was 0 — 0:00 is correct here.
+      }
+      return [for (final s in raw) s.copyWith(paceSeconds: fallbackPace)];
+    }
+
+    final validSplitsTime = raw
+        .where((s) => s.paceSeconds > 0)
+        .fold<int>(0, (sum, s) => sum + s.paceSeconds);
+    final remaining = totalMovingSeconds - validSplitsTime;
+    final healedDuration = remaining > 0
+        ? (remaining / invalidCount).round()
+        : (fallbackPace ?? 1);
+
+    return [
+      for (final s in raw)
+        s.paceSeconds > 0 ? s : s.copyWith(paceSeconds: math.max(1, healedDuration)),
     ];
   }
 

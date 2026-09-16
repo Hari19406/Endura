@@ -1655,15 +1655,27 @@ class _HomeScreenState extends State<HomeScreen>
                   button: true,
                   label: 'Manage plan',
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       HapticFeedback.lightImpact();
-                      Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) =>
                               ManagePlanScreen(onPlanChanged: loadData),
                         ),
                       );
+                      // Belt-and-suspenders: ManagePlanScreen already calls
+                      // onPlanChanged (loadData) itself before popping, but
+                      // that call is fire-and-forget from a VoidCallback — if
+                      // it lands mid another in-flight loadData() and gets
+                      // silently rescheduled, the UI can be left showing a
+                      // stale plan state after returning here (e.g. "Remove
+                      // Plan" not flipping to the empty-state cards). Always
+                      // reloading again on return from this route, driven by
+                      // this screen's own awaited navigation rather than the
+                      // child's callback, guarantees the refresh actually
+                      // lands.
+                      if (mounted) await loadData();
                     },
                     child: Container(
                       width: double.infinity,
@@ -1908,13 +1920,15 @@ class _HomeScreenState extends State<HomeScreen>
 
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: materializedDay == null
-                      ? null
-                      : () => _onThisWeekDayTap(
-                          _thisWeekMaterialized!,
-                          materializedDay,
-                          dayDate,
-                        ),
+                  // Always attached — never silently inert. The color/label
+                  // above come from the legacy `_activePlan` (`_plannedDayFor`),
+                  // which can be populated even when `_thisWeekMaterialized`
+                  // hasn't loaded/matched yet, so gating the tap on
+                  // `materializedDay == null` made the dot look tappable
+                  // while doing nothing. `_onThisWeekDayTap` resolves the
+                  // real day itself, with a fresh-load fallback and visible
+                  // feedback if it genuinely isn't ready.
+                  onTap: () => _onThisWeekDayTap(i, dayDate),
                   child: Column(
                     children: [
                       Text(
@@ -2020,14 +2034,75 @@ class _HomeScreenState extends State<HomeScreen>
     return null;
   }
 
-  /// Tapping a day dot on the "THIS WEEK" strip. This strip only ever shows
-  /// the current week, which — same rule as PlanOverviewScreen's week
-  /// lock — is never locked, so this is a defensive check rather than one
-  /// that fires in practice today: the paywall only shows for a *future*
-  /// week beyond the current one, never for anything in the active week or
-  /// during an active trial (RevenueCat's entitlement covers the trial too,
-  /// so `isProNotifier` is already true for it).
-  void _onThisWeekDayTap(
+  /// Tapping a day dot on the "THIS WEEK" strip. `_thisWeekMaterialized` is
+  /// set once by `loadData()`'s call to `PlanStore.getTodayDayContext` — if
+  /// that call raced a still-materializing plan (or a plan fingerprint blip)
+  /// and came back null, the dot still renders (color/label come from the
+  /// separate legacy `_activePlan`) but had nothing to tap into. Rather than
+  /// fail silently, re-fetch the plan directly here and try once more before
+  /// giving the athlete visible feedback.
+  Future<void> _onThisWeekDayTap(int weekdayIndex, DateTime dayDate) async {
+    var week = _thisWeekMaterialized;
+    var day = _materializedDayForWeekday(weekdayIndex);
+
+    if (week == null || day == null) {
+      debugPrint(
+        '[HomeScreen] Day-dot tap: no cached MaterializedDay for weekday '
+        '$weekdayIndex (week=${week?.weekNumber}) — retrying with a fresh '
+        'PlanStore load.',
+      );
+      final now = DateTime.now();
+      final weekNumber = _engineMemory?.racePlan?.currentWeekNumber(now);
+      final plan = await PlanStore.instance.load();
+      final freshWeek = weekNumber == null
+          ? null
+          : plan?.weekByNumber(weekNumber);
+      final freshDay = freshWeek?.days
+          .where((d) => d.weekday == weekdayIndex)
+          .cast<MaterializedDay?>()
+          .firstWhere((_) => true, orElse: () => null);
+
+      if (freshWeek == null || freshDay == null) {
+        debugPrint(
+          '[HomeScreen] Day-dot tap: still no MaterializedDay after fresh '
+          'load (plan=${plan != null}, weekNumber=$weekNumber) — plan is '
+          'likely still being generated.',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your plan is still being prepared — try again in a moment.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      week = freshWeek;
+      day = freshDay;
+      if (mounted) {
+        setState(() {
+          _thisWeekMaterialized = freshWeek;
+          _thisWeekPlanId = plan!.planId;
+          _thisWeekPlanBuiltAt = plan.builtAt;
+        });
+      }
+    }
+
+    if (!mounted) return;
+    _handleThisWeekDayTap(week, day, dayDate);
+  }
+
+  /// This strip only ever shows the current week, which — same rule as
+  /// PlanOverviewScreen's week lock — is never locked, so the lock check
+  /// here is defensive rather than one that fires in practice today: the
+  /// paywall only shows for a *future* week beyond the current one, never
+  /// for anything in the active week or during an active trial (RevenueCat's
+  /// entitlement covers the trial too, so `isProNotifier` is already true
+  /// for it).
+  void _handleThisWeekDayTap(
     MaterializedWeek week,
     MaterializedDay day,
     DateTime dayDate,
