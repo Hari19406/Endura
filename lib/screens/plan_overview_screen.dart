@@ -803,7 +803,9 @@ class _DayCircle extends StatelessWidget {
       // Muted well below the normal missed fill — subtle, not alarming.
       CalendarDayStatus.skipped => c.divider.withValues(alpha: 0.5),
       CalendarDayStatus.missed => c.divider,
-      CalendarDayStatus.restDay => c.divider,
+      // Pure white by design — a clean, empty rest slot. Needs its own
+      // border (below) so it doesn't disappear against a light-theme card.
+      CalendarDayStatus.restDay => c.workoutRest,
       CalendarDayStatus.upcoming => color,
     };
 
@@ -817,6 +819,8 @@ class _DayCircle extends StatelessWidget {
             ? Border.all(color: c.accent, width: 2)
             : skipped
             ? Border.all(color: c.textTertiary, width: 1.5)
+            : rest
+            ? Border.all(color: c.border, width: 1.5)
             : (missed ? Border.all(color: c.border, width: 1) : null),
       ),
       child: child != null ? Center(child: child) : null,
@@ -909,9 +913,11 @@ class MaterializedWeekStrip extends StatelessWidget {
                 weekday: d.weekday,
                 status: status,
                 isToday: isToday,
-                color: d.isRest
-                    ? Colors.transparent
-                    : dayColorForIntent(context, d.intent),
+                // For a rest day this resolves to c.workoutRest (pure
+                // white) — unused by _DayCircle's fill switch for restDay
+                // status anyway, but keeping it accurate avoids a stale
+                // Colors.transparent value lying around.
+                color: dayColorForIntent(context, d.intent),
                 label: d.isRest ? 'REST' : _intentLabel(d.intent),
                 distanceKm: d.plannedKm,
                 useMiles: useMiles,

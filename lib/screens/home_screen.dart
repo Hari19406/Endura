@@ -22,6 +22,7 @@ import '../engines/memory/engine_memory_service.dart';
 import '../engines/memory/engine_memory.dart';
 import '../utils/database_service.dart';
 import '../models/weekly_plan.dart';
+import '../models/workout_type.dart';
 import '../screens/pre_run_briefing_screen.dart';
 import '../services/consistency_service.dart';
 import '../utils/refreshable.dart';
@@ -1897,6 +1898,7 @@ class _HomeScreenState extends State<HomeScreen>
                 final dayDate = weekMonday.add(Duration(days: i));
                 final hasRun = _dayHasRun(dayDate);
                 final plannedDay = _plannedDayFor(dayDate);
+                final isRestPlanned = plannedDay?.workoutType == WorkoutType.rest;
                 final dayColor = plannedDay != null
                     ? dayColorForWorkoutType(context, plannedDay.workoutType)
                     : c.workoutRest;
@@ -1952,9 +1954,12 @@ class _HomeScreenState extends State<HomeScreen>
                               ? Border.all(color: c.accent, width: 2)
                               : isSkipped
                               ? Border.all(color: c.textTertiary, width: 1.5)
-                              : showColor
-                              ? null
-                              : Border.all(color: c.border, width: 1.5),
+                              // Rest fills pure white — needs its own ring so
+                              // it doesn't disappear against a light-theme
+                              // card background, same as a truly empty dot.
+                              : (isRestPlanned || !showColor)
+                              ? Border.all(color: c.border, width: 1.5)
+                              : null,
                         ),
                         child: isSkipped
                             ? Icon(

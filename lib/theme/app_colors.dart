@@ -96,6 +96,11 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color workoutTempo;
   final Color workoutInterval;
   final Color workoutLong;
+
+  /// Rest-day circle fill — pure white by design (a deliberate rest reads as
+  /// a clean, empty slot, not another muted/gray status). Does not invert
+  /// between palettes; day-circle widgets pair it with a [border] ring so it
+  /// stays visible against a light-theme card background too.
   final Color workoutRest;
 
   const AppColors({
@@ -163,7 +168,7 @@ class AppColors extends ThemeExtension<AppColors> {
     workoutTempo: Color(0xFF7B2CBF),
     workoutInterval: Color(0xFFC81865),
     workoutLong: Color(0xFF0284C7),
-    workoutRest: Color(0xFF9A9A9A),
+    workoutRest: Color(0xFFFFFFFF),
   );
 
   static const AppColors dark = AppColors(
@@ -199,7 +204,7 @@ class AppColors extends ThemeExtension<AppColors> {
     workoutTempo: Color(0xFF9D4EDD),
     workoutInterval: Color(0xFFE0247C),
     workoutLong: Color(0xFF38BDF8),
-    workoutRest: Color(0xFF5A5A5F),
+    workoutRest: Color(0xFFFFFFFF),
   );
 
   @override
