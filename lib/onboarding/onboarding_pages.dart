@@ -313,7 +313,7 @@ class OPageGoal extends StatelessWidget {
         _firstTimerRow(
           distanceKey: '5k',
           icon: Icons.flag_outlined,
-          iconBg: const Color(0xFF003D35),
+          iconBg: EC.tealBg,
           iconFg: EC.teal,
           label: 'Train for your first 5K',
           sub: 'Lower-volume plan, one steady tempo a week — built to get you '
@@ -323,7 +323,7 @@ class OPageGoal extends StatelessWidget {
         _firstTimerRow(
           distanceKey: '10k',
           icon: Icons.explore_outlined,
-          iconBg: const Color(0xFF10202E),
+          iconBg: EC.blueBg,
           iconFg: EC.teal,
           label: 'Train for your first 10K',
           sub: 'Gentle mileage ramp — easy aerobic runs plus one controlled '
@@ -333,7 +333,7 @@ class OPageGoal extends StatelessWidget {
         _firstTimerRow(
           distanceKey: 'half_marathon',
           icon: Icons.workspace_premium_outlined,
-          iconBg: const Color(0xFF1E1040),
+          iconBg: EC.violetBg,
           iconFg: EC.violet,
           label: 'Train for your first half',
           sub: 'Build to 13.1 with a gradual ramp and time-on-feet long runs.',
@@ -342,7 +342,7 @@ class OPageGoal extends StatelessWidget {
         _firstTimerRow(
           distanceKey: 'marathon',
           icon: Icons.military_tech_outlined,
-          iconBg: const Color(0xFF3D0000),
+          iconBg: EC.redBg,
           iconFg: EC.red,
           label: 'Train for your first marathon',
           sub: 'A 16+ week buildup for first-time marathoners — easy pace, '
@@ -356,7 +356,7 @@ class OPageGoal extends StatelessWidget {
         const SizedBox(height: 12),
         const _ComingSoonRow(
           icon: Icons.monitor_heart_outlined,
-          iconBg: Color(0xFF0F2E1E),
+          iconBg: EC.tealBgAlt,
           iconFg: EC.teal,
           label: 'General fitness',
           sub: 'Stay consistent and improve between events. Pick your level.',
@@ -364,7 +364,7 @@ class OPageGoal extends StatelessWidget {
         const SizedBox(height: 10),
         const _ComingSoonRow(
           icon: Icons.bolt,
-          iconBg: Color(0xFF0F2E1E),
+          iconBg: EC.tealBgAlt,
           iconFg: EC.teal,
           label: 'Run faster (general fitness)',
           sub: 'No race target. Two speed workouts per week to build fitness.',
@@ -377,7 +377,7 @@ class OPageGoal extends StatelessWidget {
         const SizedBox(height: 12),
         const _ComingSoonRow(
           icon: Icons.directions_walk,
-          iconBg: Color(0xFF10202E),
+          iconBg: EC.blueBg,
           iconFg: EC.teal,
           label: 'Get back into running',
           sub:
@@ -386,7 +386,7 @@ class OPageGoal extends StatelessWidget {
         const SizedBox(height: 10),
         const _ComingSoonRow(
           icon: Icons.auto_awesome,
-          iconBg: Color(0xFF1E1040),
+          iconBg: EC.violetBg,
           iconFg: EC.violet,
           label: 'Intro to running',
           sub: 'A friendly 5-week walk/run plan to get you off the couch.',
@@ -394,7 +394,7 @@ class OPageGoal extends StatelessWidget {
         const SizedBox(height: 10),
         const _ComingSoonRow(
           icon: Icons.medical_services_outlined,
-          iconBg: Color(0xFF3D1A00),
+          iconBg: EC.orangeBg,
           iconFg: EC.orange,
           label: 'Return from injury',
           sub: 'Rebuild slowly with a guided ramp window after time off.',
@@ -423,7 +423,7 @@ class OPageGoal extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1400),
+        color: EC.amberBg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: const Center(
@@ -587,7 +587,7 @@ class OPageExperience extends StatelessWidget {
     (
       'just_starting',
       Icons.spa_outlined,
-      Color(0xFF10202E),
+      EC.blueBg,
       EC.teal,
       'Just getting started',
       'New to running — building the habit',
@@ -595,7 +595,7 @@ class OPageExperience extends StatelessWidget {
     (
       'early',
       Icons.trending_up_rounded,
-      Color(0xFF0F2E1E),
+      EC.tealBgAlt,
       EC.teal,
       'Early stages',
       'Running a few months, still finding my feet',
@@ -603,7 +603,7 @@ class OPageExperience extends StatelessWidget {
     (
       'regular',
       Icons.directions_run_rounded,
-      Color(0xFF1E1040),
+      EC.violetBg,
       EC.violet,
       'Regular runner',
       'Out 2–3× a week, comfortable with distance',
@@ -611,7 +611,7 @@ class OPageExperience extends StatelessWidget {
     (
       'seasoned',
       Icons.military_tech_outlined,
-      Color(0xFF3D1A00),
+      EC.orangeBg,
       EC.orange,
       'Seasoned runner',
       'Consistent for years, raced before',
@@ -619,7 +619,7 @@ class OPageExperience extends StatelessWidget {
     (
       'competitive',
       Icons.emoji_events_outlined,
-      Color(0xFF3D0000),
+      EC.redBg,
       EC.red,
       'Competitive athlete',
       'Structured training, chasing results',
@@ -1264,7 +1264,7 @@ class OPageIntensity extends StatelessWidget {
           const SizedBox(height: 28),
           _Row(
             leading: _iconBox(
-              const Color(0xFF003D35),
+              EC.tealBg,
               Icons.sentiment_satisfied_rounded,
               EC.teal,
             ),
@@ -1276,7 +1276,7 @@ class OPageIntensity extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: _iconBox(
-              const Color(0xFF1E1040),
+              EC.violetBg,
               Icons.trending_up_rounded,
               EC.violet,
             ),
@@ -1288,7 +1288,7 @@ class OPageIntensity extends StatelessWidget {
           const SizedBox(height: 10),
           _Row(
             leading: _iconBox(
-              const Color(0xFF3D1A00),
+              EC.orangeBg,
               Icons.bolt_rounded,
               EC.orange,
             ),
@@ -3537,7 +3537,7 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
               child: Text(
                 "Don't see your race?",
                 style: TextStyle(
-                  color: Color(0xFF3B82F6),
+                  color: EC.teal,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -4462,7 +4462,7 @@ class OPageRaceGoal extends StatelessWidget {
     (
       'pr',
       Icons.trending_up_rounded,
-      Color(0xFF3D0000),
+      EC.redBg,
       EC.red,
       'Set a PR',
       'Beat a time I\'ve already run',
@@ -4470,7 +4470,7 @@ class OPageRaceGoal extends StatelessWidget {
     (
       'target_time',
       Icons.timer_outlined,
-      Color(0xFF3D1A00),
+      EC.orangeBg,
       EC.orange,
       'Run a specific time',
       'I have a finish time in mind',
@@ -4478,7 +4478,7 @@ class OPageRaceGoal extends StatelessWidget {
     (
       'finish',
       Icons.flag_outlined,
-      Color(0xFF003D35),
+      EC.tealBg,
       EC.teal,
       'Just complete it',
       'Cross the line feeling strong',
@@ -4486,7 +4486,7 @@ class OPageRaceGoal extends StatelessWidget {
     (
       'enjoy',
       Icons.celebration_outlined,
-      Color(0xFF1E1040),
+      EC.violetBg,
       EC.violet,
       'Enjoy the experience',
       'Have fun, no pressure on the clock',
@@ -4494,7 +4494,7 @@ class OPageRaceGoal extends StatelessWidget {
     (
       'undecided',
       Icons.help_outline_rounded,
-      Color(0xFF10202E),
+      EC.blueBg,
       EC.teal,
       'Not sure yet',
       'Decide as training goes on',

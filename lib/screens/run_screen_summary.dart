@@ -24,6 +24,7 @@ import '../models/training_phase.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import '../utils/unit_utils.dart';
+import '../utils/workout_type_style.dart';
 import '../widgets/run_share_card.dart';
 
 class RunSummaryScreen extends StatefulWidget {
@@ -146,10 +147,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
               HapticFeedback.heavyImpact();
               Navigator.pop(ctx, true);
             },
-            child: const Text(
+            child: Text(
               'Discard',
               style: TextStyle(
-                color: Color(0xFFD32F2F),
+                color: context.colors.danger,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -430,11 +431,11 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     width: double.infinity,
                     child: TextButton(
                       onPressed: _discardRun,
-                      child: const Text(
+                      child: Text(
                         'Discard activity',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFFD32F2F),
+                          color: context.colors.danger,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -804,9 +805,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   width: dotR * 2,
                   height: dotR * 2,
                   decoration: BoxDecoration(
-                    color: Colors.black,
+                    color: context.colors.accent,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(
+                      color: context.colors.onAccent,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
@@ -910,15 +914,15 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1C1C1E),
+                    color: context.colors.accent,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'REQUIRED',
                     style: TextStyle(
                       fontSize: 8,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: context.colors.onAccent,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -1503,8 +1507,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                 width: 14,
                 height: 14,
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF388E3C),
+                  decoration: BoxDecoration(
+                    color: context.colors.success,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1514,8 +1518,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                 width: 14,
                 height: 14,
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFD32F2F),
+                  decoration: BoxDecoration(
+                    color: context.colors.danger,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1589,14 +1593,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       'Race pace work — confidence and rhythm at goal pace.',
   };
 
-  Color _intentAccentColor(WorkoutIntent? intent) => switch (intent) {
-    WorkoutIntent.threshold => const Color(0xFFBF360C),
-    WorkoutIntent.vo2max => const Color(0xFF0D47A1),
-    WorkoutIntent.speed => const Color(0xFF0D47A1),
-    WorkoutIntent.endurance => const Color(0xFF1B5E20),
-    WorkoutIntent.raceSpecific => const Color(0xFFBF360C),
-    _ => Colors.black,
-  };
+  Color _intentAccentColor(WorkoutIntent? intent) =>
+      dayColorForIntent(context, intent);
 
   IconData _intentIcon(WorkoutIntent? intent) => switch (intent) {
     WorkoutIntent.threshold => Icons.bolt,

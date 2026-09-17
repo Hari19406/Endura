@@ -17,6 +17,7 @@ import '../engines/config/workout_template_library.dart' show WorkoutIntent;
 import '../engines/plan/week_resolver.dart' show DaySlot;
 import '../models/plan_config_state.dart';
 import '../services/analytics_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
 import 'onboarding_screen.dart' show EC, ET;
@@ -520,6 +521,8 @@ class _VolumeCurveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final heroStart = context.colors.heroGradientStart;
+    final heroGradient = context.colors.heroGradient;
     final points = projection.weeks;
     final unit = UnitUtils.unitLabel(useMiles);
     final spots = <FlSpot>[
@@ -557,7 +560,7 @@ class _VolumeCurveCard extends StatelessWidget {
               caption,
               style: TextStyle(
                 fontSize: 12,
-                color: scrubbed == null ? EC.textSecondary : EC.teal,
+                color: scrubbed == null ? EC.textSecondary : heroStart,
                 fontWeight: scrubbed == null
                     ? FontWeight.w400
                     : FontWeight.w700,
@@ -616,7 +619,7 @@ class _VolumeCurveCard extends StatelessWidget {
                     isCurved: true,
                     curveSmoothness: 0.2,
                     preventCurveOverShooting: true,
-                    color: EC.teal,
+                    color: heroStart,
                     barWidth: 2.5,
                     dotData: const FlDotData(show: false),
                     showingIndicators: scrubIndex == null
@@ -628,8 +631,8 @@ class _VolumeCurveCard extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          EC.teal.withOpacity(0.26),
-                          EC.teal.withOpacity(0.0),
+                          heroGradient.colors.first.withOpacity(0.26),
+                          heroGradient.colors.last.withOpacity(0.0),
                         ],
                       ),
                     ),
@@ -640,16 +643,13 @@ class _VolumeCurveCard extends StatelessWidget {
                   getTouchedSpotIndicator: (bar, indexes) => indexes
                       .map(
                         (_) => TouchedSpotIndicatorData(
-                          FlLine(
-                            color: EC.teal.withOpacity(0.45),
-                            strokeWidth: 1.5,
-                          ),
+                          FlLine(color: heroStart.withOpacity(0.45), strokeWidth: 1.5),
                           FlDotData(
                             getDotPainter: (s, pct, b, i) => FlDotCirclePainter(
                               radius: 4,
                               color: EC.surface,
                               strokeWidth: 2.5,
-                              strokeColor: EC.teal,
+                              strokeColor: heroStart,
                             ),
                           ),
                         ),

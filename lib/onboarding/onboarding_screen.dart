@@ -37,6 +37,17 @@ class EC {
   static const orange = Color(0xFFFF7A3D);
   static const white = Color(0xFFFFFFFF);
   static const black = Color(0xFF000000);
+
+  /// Dimmed icon-background swatches paired with the accent foregrounds
+  /// above (e.g. [tealBg] behind a [teal] icon). Named here instead of
+  /// repeating the same literals across onboarding_pages.dart.
+  static const tealBg = Color(0xFF003D35);
+  static const tealBgAlt = Color(0xFF0F2E1E);
+  static const blueBg = Color(0xFF10202E);
+  static const violetBg = Color(0xFF1E1040);
+  static const redBg = Color(0xFF3D0000);
+  static const orangeBg = Color(0xFF3D1A00);
+  static const amberBg = Color(0xFF1A1400);
 }
 
 class ET {
