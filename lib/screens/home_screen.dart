@@ -788,10 +788,15 @@ class _HomeScreenState extends State<HomeScreen>
     if (_cloudRestoreAttempted && !force) return;
     _cloudRestoreAttempted = true;
     try {
-      await CloudSyncService.instance.downloadAndRestoreRuns();
+      await CloudSyncService.instance.downloadAndRestoreRuns().timeout(
+        const Duration(seconds: 8),
+      );
       debugPrint('[HomeScreen] Cloud restore complete');
     } catch (e) {
-      debugPrint('[HomeScreen] Cloud restore failed: $e');
+      // Network unreachable (or slow enough to time out) — the dashboard
+      // falls back to whatever is already cached locally rather than
+      // stalling loadData() forever waiting on a hung request.
+      debugPrint('[HomeScreen] Cloud restore failed/timed out: $e');
     }
   }
 
@@ -817,8 +822,25 @@ class _HomeScreenState extends State<HomeScreen>
         _restoreFromCloudIfNeeded(force: forceCloudRestore),
         _loadSettings(),
       ]);
-      await _restoreCloudCoachingState();
-      await _hydrateLocalProfileFromCloud();
+      // Each cloud step below is independently guarded — a Supabase
+      // outage or a hung DNS lookup on this one step must not prevent the
+      // purely-local logic further down (today's materialised workout,
+      // the active plan, consistency stats) from still running and
+      // rendering the dashboard from cache.
+      try {
+        await _restoreCloudCoachingState().timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint(
+          '[HomeScreen] Cloud coaching state restore failed/timed out: $e',
+        );
+      }
+      try {
+        await _hydrateLocalProfileFromCloud().timeout(
+          const Duration(seconds: 8),
+        );
+      } catch (e) {
+        debugPrint('[HomeScreen] Profile hydration failed/timed out: $e');
+      }
       CloudSyncService.instance.syncPendingRuns();
       _syncLocalProfileToCloud();
       _trainingDayIndices = await TrainingDaysService.loadOrDefault(4);
@@ -1551,22 +1573,30 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(-0.8, -0.9),
-            radius: 1.4,
-            colors: [
-              c.heroGradientEnd.withOpacity(0.24),
-              c.heroGradientStart.withOpacity(0.08),
-              c.background,
-            ],
-            stops: const [0.0, 0.45, 1.0],
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.9, -0.9),
+                  radius: 1.4,
+                  colors: [
+                    c.heroGradientEnd.withValues(alpha: 0.16),
+                    c.heroGradientStart.withValues(alpha: 0.05),
+                    c.background,
+                  ],
+                  stops: const [0.0, 0.45, 1.0],
+                ),
+              ),
+            ),
           ),
-        ),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildDashboardContent(),
+          Positioned.fill(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildDashboardContent(),
+          ),
+        ],
       ),
     );
   }
