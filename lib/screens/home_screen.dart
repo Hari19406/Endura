@@ -1969,19 +1969,9 @@ class _HomeScreenState extends State<HomeScreen>
                 final plannedDay = _plannedDayFor(dayDate);
                 final isRestPlanned =
                     plannedDay?.workoutType == WorkoutType.rest;
-                // Rest reads as a muted dark slot, never a bright white
-                // circle — a rest day is a deliberate non-event, not
-                // something that should visually compete with a completed
-                // or upcoming workout dot.
-                const restFill = Color(0xFF22242F);
                 final dayColor = plannedDay != null
-                    ? (isRestPlanned
-                          ? restFill
-                          : dayColorForWorkoutType(
-                              context,
-                              plannedDay.workoutType,
-                            ))
-                    : restFill;
+                    ? dayColorForWorkoutType(context, plannedDay.workoutType)
+                    : c.workoutRest;
                 final showColor = hasRun || plannedDay != null;
                 final materializedDay = _materializedDayForWeekday(i);
                 final isSkipped = materializedDay?.isSkipped ?? false;
@@ -2034,15 +2024,12 @@ class _HomeScreenState extends State<HomeScreen>
                               ? Border.all(color: c.accent, width: 2)
                               : isSkipped
                               ? Border.all(color: c.textTertiary, width: 1.5)
-                              // A faint ring on the muted rest fill (and on a
-                              // truly empty/unplanned dot) keeps it visible
-                              // against the card surface without reading as
-                              // an active or completed day.
+                              // Rest fills solid white — needs its own ring
+                              // so it doesn't disappear against a
+                              // light-theme card background, same as a
+                              // truly empty dot.
                               : (isRestPlanned || !showColor)
-                              ? Border.all(
-                                  color: c.border.withValues(alpha: 0.6),
-                                  width: 1,
-                                )
+                              ? Border.all(color: c.border, width: 1.5)
                               : null,
                         ),
                         child: isSkipped

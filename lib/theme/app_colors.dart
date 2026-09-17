@@ -164,11 +164,11 @@ class AppColors extends ThemeExtension<AppColors> {
     chartGrid: Color(0x0F000000),
     hrAccent: Color(0xFFD6255F),
     scrim: Color(0x99000000),
-    workoutEasy: Color(0xFF00B89A),
-    workoutTempo: Color(0xFF7B2CBF),
-    workoutInterval: Color(0xFFC81865),
-    workoutLong: Color(0xFF0284C7),
-    workoutRest: Color(0xFFFFFFFF),
+    workoutEasy: Color(0xFF00E676),
+    workoutTempo: Color(0xFFFFB300),
+    workoutInterval: Color(0xFFFF2A55),
+    workoutLong: Color(0xFF00B0FF),
+    workoutRest: Color(0xFFF4F4F6),
   );
 
   static const AppColors dark = AppColors(
@@ -200,11 +200,11 @@ class AppColors extends ThemeExtension<AppColors> {
     chartGrid: Color(0x0FFFFFFF),
     hrAccent: Color(0xFFFF3366),
     scrim: Color(0x99000000),
-    workoutEasy: Color(0xFF00E5CC),
-    workoutTempo: Color(0xFF9D4EDD),
-    workoutInterval: Color(0xFFE0247C),
-    workoutLong: Color(0xFF38BDF8),
-    workoutRest: Color(0xFFFFFFFF),
+    workoutEasy: Color(0xFF00E676),
+    workoutTempo: Color(0xFFFFB300),
+    workoutInterval: Color(0xFFFF2A55),
+    workoutLong: Color(0xFF00B0FF),
+    workoutRest: Color(0xFFF4F4F6),
   );
 
   @override
