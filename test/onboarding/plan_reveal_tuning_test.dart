@@ -6,6 +6,7 @@ import 'package:run_app/engines/plan/week_resolver.dart' show DaySlot, SlotType;
 import 'package:run_app/models/plan_config_state.dart';
 import 'package:run_app/onboarding/plan_reveal_data.dart';
 import 'package:run_app/onboarding/plan_reveal_page.dart';
+import 'package:run_app/theme/app_theme.dart';
 import 'package:run_app/utils/unit_utils.dart';
 import 'package:run_app/utils/workout_type_style.dart';
 
@@ -141,12 +142,27 @@ void main() {
     DaySlot slot(SlotType t, WorkoutIntent i) =>
         DaySlot(weekday: 0, slotType: t, intent: i);
 
-    test('a medium-long is NOT the endurance-blue long-run colour', () {
+    testWidgets('a medium-long is NOT the endurance-blue long-run colour', (
+      tester,
+    ) async {
+      late BuildContext ctx;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
       final ml = slot(SlotType.mediumLong, WorkoutIntent.endurance);
       final lr = slot(SlotType.longRun, WorkoutIntent.endurance);
-      expect(slotFill(ml), isNot(slotFill(lr)));
-      expect(slotFill(ml), dayColorForIntent(WorkoutIntent.aerobicBase));
-      expect(slotFill(lr), dayColorForIntent(WorkoutIntent.endurance));
+      expect(slotFill(ctx, ml), isNot(slotFill(ctx, lr)));
+      expect(slotFill(ctx, ml), dayColorForIntent(ctx, WorkoutIntent.aerobicBase));
+      expect(slotFill(ctx, lr), dayColorForIntent(ctx, WorkoutIntent.endurance));
     });
 
     test('short label distinguishes a medium-long from the long run', () {
