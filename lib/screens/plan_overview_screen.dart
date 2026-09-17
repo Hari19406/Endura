@@ -436,6 +436,8 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
             setState(() => _materialized = null);
             _loadMaterialized();
           },
+          dayStatus: calendarDayStatus(day, scheduledDate: date, now: DateTime.now()),
+          completion: day.completion,
         ),
       ),
     );

@@ -24,6 +24,7 @@ import '../engines/memory/engine_memory.dart';
 import '../utils/database_service.dart';
 import '../models/weekly_plan.dart';
 import '../screens/pre_run_briefing_screen.dart';
+import 'calendar_day_status.dart';
 import '../services/consistency_service.dart';
 import '../utils/refreshable.dart';
 import '../services/coach_message_builder.dart' as message;
@@ -2039,6 +2040,8 @@ class _HomeScreenState extends State<HomeScreen>
           onGoToRun: () => widget.onNavigateToRun?.call(),
           scheduledContext: scheduledContext,
           onPlanChanged: loadData,
+          dayStatus: calendarDayStatus(day, scheduledDate: dayDate, now: now),
+          completion: day.completion,
         ),
       ),
     );

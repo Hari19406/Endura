@@ -3,7 +3,9 @@ import 'package:intl/intl.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../engines/config/workout_template_library.dart';
 import '../engines/daily/weather_scaler.dart';
+import '../engines/plan/materialized_plan.dart' show DayCompletion;
 import '../engines/plan/plan_store.dart';
+import '../models/activity_telemetry.dart' show ActivityDetail;
 import '../services/analytics_service.dart' show Analytics;
 import '../services/location_service.dart';
 import '../services/weather_service.dart';
@@ -13,6 +15,8 @@ import '../utils/workout_type_style.dart' show dayColorForIntent;
 import '../widgets/ambient_scaffold.dart';
 import '../widgets/workout_step_timeline.dart' show StepPaceBand;
 import '../models/scheduled_workout_context.dart';
+import 'activity_detail_screen.dart';
+import 'calendar_day_status.dart';
 import 'run_screen.dart';
 import '../utils/unit_utils.dart';
 
@@ -159,6 +163,19 @@ class PreRunBriefingScreen extends StatefulWidget {
   /// stored plan, so the screen that pushed this one can reload its state.
   final VoidCallback? onPlanChanged;
 
+  /// How this plan day currently reads on the calendar — completed, skipped,
+  /// missed, or upcoming (see [calendarDayStatus]). Null means "not a plan
+  /// day at all" (an ad-hoc/free-run briefing), which renders identically to
+  /// [CalendarDayStatus.upcoming]. Drives which action buttons and header
+  /// badge this screen shows; callers already compute this for their day
+  /// strips, so it's threaded straight through rather than re-derived here.
+  final CalendarDayStatus? dayStatus;
+
+  /// The logged-run stats for this day, present only when [dayStatus] is
+  /// [CalendarDayStatus.completed] — backs the "✓ Completed · X km logged"
+  /// header chip and the "View Activity" action.
+  final DayCompletion? completion;
+
   const PreRunBriefingScreen({
     super.key,
     required this.coachMessage,
@@ -166,6 +183,8 @@ class PreRunBriefingScreen extends StatefulWidget {
     this.returnOnStart = false,
     this.scheduledContext,
     this.onPlanChanged,
+    this.dayStatus,
+    this.completion,
   });
 
   @override
@@ -199,6 +218,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
   bool _busy = false;
 
   bool get _canLinkOrSkip => widget.scheduledContext != null;
+
+  bool get _isCompleted => widget.dayStatus == CalendarDayStatus.completed;
+  bool get _isSkipped => widget.dayStatus == CalendarDayStatus.skipped;
 
   /// The workout actually shown below — weather-eased when the toggle is on
   /// and a snapshot is available, otherwise the plan's own resolved workout.
@@ -301,6 +323,14 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     );
   }
 
+  /// The primary button's label — only reached for the non-completed
+  /// (upcoming/skipped/missed) branch of [_buildFloatingActions], since a
+  /// completed day swaps the whole button for an outlined "Run Again".
+  String get _primaryLabel {
+    if (_isSkipped) return 'Run Anyway';
+    return widget.coachMessage.hasWarmupCooldown ? 'Start Workout' : 'Start Run';
+  }
+
   // ── Link Activity ─────────────────────────────────────────────────────
 
   int? _parsePaceSeconds(String pace) {
@@ -361,6 +391,25 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
         ),
       );
     }
+  }
+
+  // ── View Activity (completed + linked to a run) ───────────────────────
+
+  Future<void> _openLinkedActivity() async {
+    final runId = int.tryParse(widget.completion?.runId ?? '');
+    if (runId == null || _busy) return;
+
+    final record = await DatabaseService.instance.getRunById(runId);
+    if (!mounted || record == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActivityDetailScreen(
+          activity: ActivityDetail.fromRunRecord(record, runnerName: 'You'),
+        ),
+      ),
+    );
   }
 
   // ── Skip Workout ─────────────────────────────────────────────────────
@@ -657,6 +706,27 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     return '$dateStr · ${dist.toStringAsFixed(1)} $unit total';
   }
 
+  /// The green "✓ Completed" / muted "Skipped" pill shown under the subtitle.
+  /// Only called when [_isCompleted] or [_isSkipped] is true.
+  Widget _buildStatusChip(AppColors c) {
+    if (_isCompleted) {
+      final km = widget.completion?.actualKm;
+      final loggedText = (km != null && km > 0)
+          ? ' · ${UnitUtils.displayDistance(km, _useMiles).toStringAsFixed(2)} ${UnitUtils.unitLabel(_useMiles)} logged'
+          : '';
+      return _StatusChip(
+        icon: Icons.check_circle_rounded,
+        label: 'Completed$loggedText',
+        color: c.success,
+      );
+    }
+    return _StatusChip(
+      icon: Icons.skip_next_rounded,
+      label: 'Skipped',
+      color: c.textTertiary,
+    );
+  }
+
   /// A soft top-of-screen wash tinted by the workout's training intent,
   /// layered above [AmbientScaffold]'s own shared background nodes — resolves
   /// through [dayColorForIntent] so it tracks the same tokens as every other
@@ -705,7 +775,34 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_canLinkOrSkip) ...[
+              // ── Secondary slot: Link Activity (upcoming/skipped) or View
+              // Activity (completed + actually linked to a run) ────────────
+              if (_isCompleted) ...[
+                if (widget.completion?.runId != null) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: OutlinedButton(
+                      onPressed: _busy ? null : _openLinkedActivity,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: c.textPrimary,
+                        side: BorderSide(color: c.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'View Activity',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ] else if (_canLinkOrSkip) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 46,
@@ -729,39 +826,67 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
                 ),
                 const SizedBox(height: 10),
               ],
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
-                opacity: _busy ? 0.5 : 1,
-                child: Container(
+
+              // ── Primary slot: outlined "Run Again" once completed,
+              // otherwise the gradient Start/Run Anyway pill ────────────────
+              if (_isCompleted)
+                SizedBox(
                   width: double.infinity,
                   height: 52,
-                  decoration: BoxDecoration(
-                    gradient: c.heroGradient,
-                    borderRadius: BorderRadius.circular(30),
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : _startWorkout,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: c.textPrimary,
+                      side: BorderSide(color: c.accent, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: const Text(
+                      'Run Again',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
                   ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
+                )
+              else
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: _busy ? 0.5 : 1,
+                  child: Container(
+                    width: double.infinity,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: c.heroGradient,
                       borderRadius: BorderRadius.circular(30),
-                      onTap: _busy ? null : _startWorkout,
-                      child: Center(
-                        child: Text(
-                          widget.coachMessage.hasWarmupCooldown
-                              ? 'Start Workout'
-                              : 'Start Run',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.1,
-                            color: Colors.white,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(30),
+                        onTap: _busy ? null : _startWorkout,
+                        child: Center(
+                          child: Text(
+                            _primaryLabel,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.1,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (_canLinkOrSkip) ...[
+
+              // Skip Workout only makes sense for a day that hasn't already
+              // been resolved one way or the other.
+              if (_canLinkOrSkip && !_isSkipped && !_isCompleted) ...[
                 const SizedBox(height: 4),
                 TextButton(
                   onPressed: _busy ? null : _confirmSkip,
@@ -838,13 +963,19 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
                           color: c.textSecondary,
                         ),
                       ),
+                      if (_isCompleted || _isSkipped) ...[
+                        const SizedBox(height: 10),
+                        _buildStatusChip(c),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
                 // ── Weather-adjusted pacing card ─────────────────────────
-                _buildWeatherCard(),
+                // Hidden once the run is done — the pacing toggle has
+                // nothing left to adjust after the fact.
+                if (!_isCompleted) _buildWeatherCard(),
 
                 // ── Step breakdown cards ──────────────────────────────────
                 _buildStepCards(workout),
@@ -874,6 +1005,47 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
             useMiles: _useMiles,
           ),
       ],
+    );
+  }
+}
+
+// ── Status chip ──────────────────────────────────────────────────────────────
+
+/// The small pill under the header subtitle for a completed or skipped day.
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatusChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
