@@ -1585,6 +1585,40 @@ class _HomeScreenState extends State<HomeScreen>
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     center: const Alignment(-1.1, -0.9),
+                    radius: 1.3,
+                    colors: [
+                      c.heroGradientEnd.withValues(alpha: 0.28),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(1.2, -0.25),
+                    radius: 1.2,
+                    colors: [
+                      c.heroGradientStart.withValues(alpha: 0.22),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(-1.2, 0.4),
                     radius: 1.2,
                     colors: [
                       c.heroGradientEnd.withValues(alpha: 0.20),
@@ -1601,44 +1635,10 @@ class _HomeScreenState extends State<HomeScreen>
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
-                    center: const Alignment(1.2, -0.25),
-                    radius: 1.1,
-                    colors: [
-                      c.heroGradientStart.withValues(alpha: 0.15),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.7],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(-1.2, 0.4),
-                    radius: 1.1,
-                    colors: [
-                      c.heroGradientEnd.withValues(alpha: 0.14),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.7],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
                     center: const Alignment(1.1, 0.95),
-                    radius: 1.2,
+                    radius: 1.3,
                     colors: [
-                      c.heroGradientStart.withValues(alpha: 0.16),
+                      c.heroGradientStart.withValues(alpha: 0.24),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.7],
