@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../utils/stats.dart';
 import '../engines/coach_engine_v2.dart';
 import '../engines/plan/plan_store.dart';
+import '../engines/plan/plan_materialization_coordinator.dart';
 import '../engines/plan/materialized_plan.dart';
 import '../services/plan_adaptation_coordinator.dart';
 import '../services/workout_compliance_coordinator.dart';
@@ -52,53 +53,58 @@ enum WorkoutCategory { easy, tempo, interval, long, rest }
 
 class WorkoutDisplayStyle {
   final WorkoutCategory category;
-  final Color accentColor;
   final String badgeLabel;
   final IconData icon;
 
   const WorkoutDisplayStyle({
     required this.category,
-    required this.accentColor,
     required this.badgeLabel,
     required this.icon,
   });
+}
+
+/// Badge/icon accent for a workout category — resolves through the shared
+/// [AppColors] workout-type tokens instead of a locally hardcoded palette.
+Color workoutCategoryColor(BuildContext context, WorkoutCategory category) {
+  final c = context.colors;
+  return switch (category) {
+    WorkoutCategory.easy => c.workoutEasy,
+    WorkoutCategory.tempo => c.workoutTempo,
+    WorkoutCategory.interval => c.workoutInterval,
+    WorkoutCategory.long => c.workoutLong,
+    WorkoutCategory.rest => c.workoutRest,
+  };
 }
 
 WorkoutDisplayStyle _workoutDisplayStyle(WorkoutIntent intent) {
   return switch (intent) {
     WorkoutIntent.aerobicBase => const WorkoutDisplayStyle(
       category: WorkoutCategory.easy,
-      accentColor: Color(0xFF004D40),
       badgeLabel: 'EASY',
       icon: Icons.directions_run,
     ),
     WorkoutIntent.endurance => const WorkoutDisplayStyle(
       category: WorkoutCategory.long,
-      accentColor: Color(0xFF1B5E20),
       badgeLabel: 'ENDURANCE',
       icon: Icons.landscape_outlined,
     ),
     WorkoutIntent.threshold => const WorkoutDisplayStyle(
       category: WorkoutCategory.tempo,
-      accentColor: Color(0xFFBF360C),
       badgeLabel: 'QUALITY',
       icon: Icons.bolt,
     ),
     WorkoutIntent.vo2max => const WorkoutDisplayStyle(
       category: WorkoutCategory.interval,
-      accentColor: Color(0xFF0D47A1),
       badgeLabel: 'QUALITY',
       icon: Icons.repeat_rounded,
     ),
     WorkoutIntent.speed => const WorkoutDisplayStyle(
       category: WorkoutCategory.interval,
-      accentColor: Color(0xFF0D47A1),
       badgeLabel: 'SPEED',
       icon: Icons.flash_on,
     ),
     WorkoutIntent.raceSpecific => const WorkoutDisplayStyle(
       category: WorkoutCategory.tempo,
-      accentColor: Color(0xFFBF360C),
       badgeLabel: 'RACE PACE',
       icon: Icons.flag_outlined,
     ),
@@ -261,42 +267,38 @@ class WorkoutCard extends StatelessWidget {
       case WorkoutCategory.tempo:
         return const WorkoutDisplayStyle(
           category: WorkoutCategory.tempo,
-          accentColor: Color(0xFFBF360C),
           badgeLabel: 'QUALITY',
           icon: Icons.bolt,
         );
       case WorkoutCategory.interval:
         return const WorkoutDisplayStyle(
           category: WorkoutCategory.interval,
-          accentColor: Color(0xFF0D47A1),
           badgeLabel: 'QUALITY',
           icon: Icons.repeat_rounded,
         );
       case WorkoutCategory.long:
         return const WorkoutDisplayStyle(
           category: WorkoutCategory.long,
-          accentColor: Color(0xFF1B5E20),
           badgeLabel: 'ENDURANCE',
           icon: Icons.landscape_outlined,
         );
       case WorkoutCategory.rest:
         return const WorkoutDisplayStyle(
           category: WorkoutCategory.rest,
-          accentColor: Color(0xFF37474F),
           badgeLabel: 'REST',
           icon: Icons.bedtime_outlined,
         );
       case WorkoutCategory.easy:
         return const WorkoutDisplayStyle(
           category: WorkoutCategory.easy,
-          accentColor: Color(0xFF004D40),
           badgeLabel: 'EASY',
           icon: Icons.directions_run,
         );
     }
   }
 
-  Color get _accent => _style.accentColor;
+  Color _accent(BuildContext context) =>
+      workoutCategoryColor(context, _style.category);
   String get _badge => _style.badgeLabel;
   IconData get _icon => _style.icon;
   bool get _isEmpty =>
@@ -326,20 +328,20 @@ class WorkoutCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: _accent.withOpacity(0.2),
+                      color: _accent(context).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(_icon, size: 13, color: _accent),
+                        Icon(_icon, size: 13, color: _accent(context)),
                         const SizedBox(width: 6),
                         Text(
                           _badge,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: _accent,
+                            color: _accent(context),
                             letterSpacing: 1.0,
                           ),
                         ),
@@ -923,10 +925,46 @@ class _HomeScreenState extends State<HomeScreen>
       try {
         final now = DateTime.now();
         final weekNumber = memory.racePlan?.currentWeekNumber(now) ?? 1;
-        final dayContext = await PlanStore.instance.getTodayDayContext(
+        var dayContext = await PlanStore.instance.getTodayDayContext(
           weekNumber: weekNumber,
           now: now,
         );
+
+        // Self-heal: a real racePlan skeleton exists but PlanStore has no
+        // matching MaterializedPlan for it (the persist write raced
+        // onboarding finishing, a reinstall's local cache cleared before
+        // cloud sync landed, or any other drift). Nothing was ever rebuilding
+        // this — the Coach card was showing "Preparing your plan" forever
+        // with no path out. Rebuild once, right here, so today's workout can
+        // still render on this same pass instead of leaving the athlete
+        // stuck until they happen to hit a screen that does trigger a
+        // recompute (ManagePlanScreen).
+        if (dayContext == null && memory.racePlan != null) {
+          debugPrint(
+            '[HomeScreen] No MaterializedPlan for week $weekNumber — '
+            'rebuilding from the stored racePlan skeleton.',
+          );
+          try {
+            final rebuilt = await PlanMaterializationCoordinator.instance
+                .recompute(
+                  skeleton: memory.racePlan,
+                  trainingDayIndices: _trainingDayIndices,
+                  longRunDayIndex: memory.longRunDayIndex,
+                  goalRace: memory.racePlan!.goalRace,
+                  experienceLevel: memory.racePlan!.experienceLevel,
+                  vdot: memory.vdotScore,
+                  now: now,
+                );
+            if (rebuilt != null) {
+              dayContext = rebuilt.contextForWeekday(
+                weekNumber: weekNumber,
+                weekdayIndex: now.weekday - 1,
+              );
+            }
+          } catch (e, stack) {
+            debugPrint('[HomeScreen] Plan rebuild failed: $e\n$stack');
+          }
+        }
 
         _thisWeekMaterialized = dayContext?.week;
         _thisWeekPlanId = dayContext?.plan.planId;
@@ -1860,8 +1898,8 @@ class _HomeScreenState extends State<HomeScreen>
                 final hasRun = _dayHasRun(dayDate);
                 final plannedDay = _plannedDayFor(dayDate);
                 final dayColor = plannedDay != null
-                    ? dayColorForWorkoutType(plannedDay.workoutType)
-                    : Colors.white;
+                    ? dayColorForWorkoutType(context, plannedDay.workoutType)
+                    : c.workoutRest;
                 final showColor = hasRun || plannedDay != null;
                 final materializedDay = _materializedDayForWeekday(i);
                 final isSkipped = materializedDay?.isSkipped ?? false;

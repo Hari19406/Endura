@@ -82,14 +82,18 @@ class RacePlan {
 
   int get totalWeeks => weeks.length;
 
+  /// Date-only (year/month/day) — a plan created at 23:50 must not read as a
+  /// week later the moment the clock ticks past midnight ten minutes on.
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
   WeekTarget? currentWeek(DateTime now) {
-    final weekIndex = now.difference(createdAt).inDays ~/ 7;
+    final weekIndex = _dateOnly(now).difference(_dateOnly(createdAt)).inDays ~/ 7;
     if (weekIndex < 0 || weekIndex >= weeks.length) return null;
     return weeks[weekIndex];
   }
 
   int currentWeekNumber(DateTime now) {
-    final idx = now.difference(createdAt).inDays ~/ 7;
+    final idx = _dateOnly(now).difference(_dateOnly(createdAt)).inDays ~/ 7;
     return (idx + 1).clamp(1, weeks.length);
   }
 

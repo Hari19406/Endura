@@ -384,10 +384,12 @@ String intentLabel(WorkoutIntent? intent) => switch (intent) {
 /// Fill colour for a day pill. A microcycle has exactly one endurance-blue
 /// pill — the long run. A mid-week medium-long is aerobic volume, so it reads
 /// with the base/recovery colour, never a second blue next to the long run.
-Color slotFill(DaySlot? slot) {
+Color slotFill(BuildContext context, DaySlot? slot) {
   if (slot == null || slot.isRest) return Colors.transparent;
-  if (slot.isMediumLong) return dayColorForIntent(WorkoutIntent.aerobicBase);
-  return dayColorForIntent(slot.intent);
+  if (slot.isMediumLong) {
+    return dayColorForIntent(context, WorkoutIntent.aerobicBase);
+  }
+  return dayColorForIntent(context, slot.intent);
 }
 
 String slotShortLabel(DaySlot? slot) {
