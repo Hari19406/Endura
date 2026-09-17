@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
-import '../utils/stats.dart';
 import '../engines/pr_engine.dart';
 import '../engines/achievement_engine.dart' as achieve;
 import '../services/best_efforts_service.dart';
@@ -40,7 +39,6 @@ class YouScreen extends StatefulWidget {
 class _YouScreenState extends State<YouScreen>
     with SingleTickerProviderStateMixin
     implements Refreshable {
-  WeeklyStats? _stats;
   PRResults? _prResults;
   Map<DistanceCategory, BestEffortRecord> _bestEfforts = {};
   List<achieve.Achievement> _achievements = [];
@@ -105,7 +103,6 @@ class _YouScreenState extends State<YouScreen>
     });
 
     try {
-      WeeklyStats stats = await getWeeklyStats();
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
       final bestEfforts = await DatabaseService.instance.getAllCategoryPRs();
@@ -186,7 +183,6 @@ class _YouScreenState extends State<YouScreen>
 
       if (mounted) {
         setState(() {
-          _stats = stats;
           _prResults = prResults;
           _bestEfforts = bestEfforts;
           _achievements = achievements;
@@ -454,13 +450,7 @@ class _YouScreenState extends State<YouScreen>
             const SizedBox(height: 16),
           ],
 
-          // ⑤ TRAINING STATUS
-          if (_stats != null && _stats!.totalRuns > 0) ...[
-            _buildTrainingStatusCard(),
-            const SizedBox(height: 16),
-          ],
-
-          // ⑥ FEEDBACK
+          // ⑤ FEEDBACK
           _buildFeedbackRow(),
           const SizedBox(height: 8),
         ],
@@ -941,123 +931,6 @@ class _YouScreenState extends State<YouScreen>
               ),
             );
           }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrainingStatusCard() {
-    final recentRuns = _runHistory.take(3).toList();
-    final rpeValues = recentRuns
-        .where((r) => r.rpe != null)
-        .map<double>((r) => (r.rpe as num).toDouble())
-        .toList();
-    final avgRpe = rpeValues.isEmpty
-        ? null
-        : rpeValues.reduce((a, b) => a + b) / rpeValues.length;
-
-    final c = context.colors;
-    final Color statusColor;
-    final String statusLabel;
-    final String statusMessage;
-
-    if (avgRpe == null) {
-      statusColor = c.textTertiary;
-      statusLabel = 'No data';
-      statusMessage =
-          'Complete a few runs with RPE feedback to see your training status.';
-    } else if (avgRpe >= 7.0) {
-      statusColor = const Color(0xFFD32F2F);
-      statusLabel = 'High effort';
-      statusMessage =
-          'Recent runs have felt hard. Consider an easy day or rest.';
-    } else if (avgRpe >= 5.5) {
-      statusColor = const Color(0xFFF57C00);
-      statusLabel = 'Moderate';
-      statusMessage =
-          'Effort is building. Monitor how you feel before pushing harder.';
-    } else {
-      statusColor = const Color(0xFF388E3C);
-      statusLabel = 'On track';
-      statusMessage = 'Effort levels look good. You\'re managing load well.';
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'TRAINING STATUS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: c.textTertiary,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: c.surface,
-              border: Border(
-                left: BorderSide(color: statusColor, width: 3),
-                top: BorderSide(color: c.border),
-                right: BorderSide(color: c.border),
-                bottom: BorderSide(color: c.border),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'READINESS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: c.textTertiary,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    Text(
-                      statusLabel.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  statusMessage,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: c.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                if (avgRpe != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Avg RPE (last ${rpeValues.length} runs): ${avgRpe.toStringAsFixed(1)}',
-                    style: TextStyle(fontSize: 12, color: c.textTertiary),
-                  ),
-                ],
-              ],
-            ),
-          ),
         ],
       ),
     );
