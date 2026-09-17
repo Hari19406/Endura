@@ -23,7 +23,6 @@ import '../engines/memory/engine_memory_service.dart';
 import '../engines/memory/engine_memory.dart';
 import '../utils/database_service.dart';
 import '../models/weekly_plan.dart';
-import '../models/workout_type.dart';
 import '../screens/pre_run_briefing_screen.dart';
 import '../services/consistency_service.dart';
 import '../utils/refreshable.dart';
@@ -42,7 +41,6 @@ import '../screens/manage_plan_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../screens/plan_overview_screen.dart';
-import '../utils/workout_type_style.dart';
 import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/weather_service.dart';
@@ -1847,8 +1845,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildWeeklyCarouselCard(double width) {
     final now = DateTime.now();
-    final todayIndex = now.weekday - 1;
-    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     final weekMonday = DateTime(
       now.year,
       now.month,
@@ -1875,115 +1871,19 @@ class _HomeScreenState extends State<HomeScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(7, (i) {
-                final isToday = i == todayIndex;
-                final dayDate = weekMonday.add(Duration(days: i));
-                final hasRun = _dayHasRun(dayDate);
-                final plannedDay = _plannedDayFor(dayDate);
-                final isRestPlanned =
-                    plannedDay?.workoutType == WorkoutType.rest;
-                final dayColor = plannedDay != null
-                    ? dayColorForWorkoutType(context, plannedDay.workoutType)
-                    : c.workoutRest;
-                final showColor = hasRun || plannedDay != null;
-                final materializedDay = _materializedDayForWeekday(i);
-                final isSkipped = materializedDay?.isSkipped ?? false;
-                final distanceKm = materializedDay?.plannedKm;
-                final useMiles = _distanceUnit == 'miles';
-                final distanceLabel =
-                    materializedDay == null ||
-                        materializedDay.isRest ||
-                        distanceKm == null ||
-                        distanceKm == 0
-                    ? null
-                    : '${UnitUtils.displayDistance(distanceKm, useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
-
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  // Always attached — never silently inert. The color/label
-                  // above come from the legacy `_activePlan` (`_plannedDayFor`),
-                  // which can be populated even when `_thisWeekMaterialized`
-                  // hasn't loaded/matched yet, so gating the tap on
-                  // `materializedDay == null` made the dot look tappable
-                  // while doing nothing. `_onThisWeekDayTap` resolves the
-                  // real day itself, with a fresh-load fallback and visible
-                  // feedback if it genuinely isn't ready.
-                  onTap: () => _onThisWeekDayTap(i, dayDate),
-                  child: Column(
-                    children: [
-                      Text(
-                        dayLabels[i],
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isToday
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isToday ? c.textPrimary : c.textTertiary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isSkipped
-                              // Muted well below the normal fill — a
-                              // deliberate skip should never read as an
-                              // overdue/forgotten session.
-                              ? c.divider.withValues(alpha: 0.5)
-                              : (showColor ? dayColor : Colors.transparent),
-                          border: isToday
-                              ? Border.all(color: c.accent, width: 2)
-                              : isSkipped
-                              ? Border.all(color: c.textTertiary, width: 1.5)
-                              // Rest fills solid white — needs its own ring
-                              // so it doesn't disappear against a
-                              // light-theme card background, same as a
-                              // truly empty dot.
-                              : (isRestPlanned || !showColor)
-                              ? Border.all(color: c.border, width: 1.5)
-                              : null,
-                        ),
-                        child: isSkipped
-                            ? Icon(
-                                Icons.skip_next_rounded,
-                                size: 16,
-                                color: c.textTertiary,
-                              )
-                            : hasRun
-                            ? const Icon(
-                                Icons.check,
-                                size: 15,
-                                color: Colors.black,
-                              )
-                            : null,
-                      ),
-                      if (isSkipped) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'SKIPPED',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
-                            color: c.textTertiary,
-                          ),
-                        ),
-                      ] else if (distanceLabel != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          distanceLabel,
-                          style: TextStyle(fontSize: 8, color: c.textTertiary),
-                        ),
-                      ],
-                    ],
+            // Same MaterializedWeekStrip widget PlanOverviewScreen renders
+            // its current week with — guarantees identical workout types,
+            // colors, and statuses between Home and the full plan view
+            // instead of drifting from a second, legacy data source.
+            _thisWeekMaterialized == null
+                ? const SizedBox(height: 32 + 8 + 11 + 6 + 12)
+                : MaterializedWeekStrip(
+                    week: _thisWeekMaterialized!,
+                    weekMonday: weekMonday,
+                    now: now,
+                    useMiles: _distanceUnit == 'miles',
+                    onDayTap: _handleThisWeekDayTap,
                   ),
-                );
-              }),
-            ),
             const Spacer(),
             RichText(
               text: TextSpan(
@@ -2052,76 +1952,6 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
-  }
-
-  MaterializedDay? _materializedDayForWeekday(int weekday) {
-    final days = _thisWeekMaterialized?.days;
-    if (days == null) return null;
-    for (final d in days) {
-      if (d.weekday == weekday) return d;
-    }
-    return null;
-  }
-
-  /// Tapping a day dot on the "THIS WEEK" strip. `_thisWeekMaterialized` is
-  /// set once by `loadData()`'s call to `PlanStore.getTodayDayContext` — if
-  /// that call raced a still-materializing plan (or a plan fingerprint blip)
-  /// and came back null, the dot still renders (color/label come from the
-  /// separate legacy `_activePlan`) but had nothing to tap into. Rather than
-  /// fail silently, re-fetch the plan directly here and try once more before
-  /// giving the athlete visible feedback.
-  Future<void> _onThisWeekDayTap(int weekdayIndex, DateTime dayDate) async {
-    var week = _thisWeekMaterialized;
-    var day = _materializedDayForWeekday(weekdayIndex);
-
-    if (week == null || day == null) {
-      debugPrint(
-        '[HomeScreen] Day-dot tap: no cached MaterializedDay for weekday '
-        '$weekdayIndex (week=${week?.weekNumber}) — retrying with a fresh '
-        'PlanStore load.',
-      );
-      final now = DateTime.now();
-      final weekNumber = _engineMemory?.racePlan?.currentWeekNumber(now);
-      final plan = await PlanStore.instance.load();
-      final freshWeek = weekNumber == null
-          ? null
-          : plan?.weekByNumber(weekNumber);
-      final freshDay = freshWeek?.days
-          .where((d) => d.weekday == weekdayIndex)
-          .cast<MaterializedDay?>()
-          .firstWhere((_) => true, orElse: () => null);
-
-      if (freshWeek == null || freshDay == null) {
-        debugPrint(
-          '[HomeScreen] Day-dot tap: still no MaterializedDay after fresh '
-          'load (plan=${plan != null}, weekNumber=$weekNumber) — plan is '
-          'likely still being generated.',
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Your plan is still being prepared — try again in a moment.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      week = freshWeek;
-      day = freshDay;
-      if (mounted) {
-        setState(() {
-          _thisWeekMaterialized = freshWeek;
-          _thisWeekPlanId = plan!.planId;
-          _thisWeekPlanBuiltAt = plan.builtAt;
-        });
-      }
-    }
-
-    if (!mounted) return;
-    _handleThisWeekDayTap(week, day, dayDate);
   }
 
   /// This strip only ever shows the current week, which — same rule as
@@ -2203,26 +2033,4 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  bool _dayHasRun(DateTime day) {
-    for (final RunHistory r in _runHistory) {
-      if (r.date.year == day.year &&
-          r.date.month == day.month &&
-          r.date.day == day.day)
-        return true;
-    }
-    return false;
-  }
-
-  PlannedDay? _plannedDayFor(DateTime day) {
-    final days = _activePlan?.days;
-    if (days == null) return null;
-    for (final d in days) {
-      if (d.date.year == day.year &&
-          d.date.month == day.month &&
-          d.date.day == day.day) {
-        return d;
-      }
-    }
-    return null;
-  }
 }

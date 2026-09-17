@@ -80,8 +80,15 @@ class PreRunBriefingScreen extends StatefulWidget {
   State<PreRunBriefingScreen> createState() => _PreRunBriefingScreenState();
 }
 
-class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
+class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
+    with SingleTickerProviderStateMixin {
   bool _useMiles = UnitUtils.useMilesNotifier.value;
+
+  /// Drives the rotating cloud icon shown while the weather card is loading.
+  late final AnimationController _cloudSpinController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  )..repeat();
 
   // ── Weather-adjusted pacing ────────────────────────────────────────────
   WeatherSnapshot? _weather;
@@ -142,6 +149,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   @override
   void dispose() {
     UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    _cloudSpinController.dispose();
     super.dispose();
   }
 
@@ -336,11 +344,61 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   Widget _buildWeatherCard() {
     final c = context.colors;
     final textTheme = Theme.of(context).textTheme;
-    if (_weatherLoading) return const SizedBox.shrink();
 
-    final weather = _weather;
-    if (weather == null) return const SizedBox.shrink();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: _weatherLoading
+          ? _buildWeatherLoadingCard(c)
+          : (_weather == null
+                ? const SizedBox.shrink(key: ValueKey('weather-hidden'))
+                : _buildWeatherContentCard(c, textTheme, _weather!)),
+    );
+  }
 
+  /// Shown the instant the screen mounts, before GPS/network resolve — a
+  /// spinning cloud so the card never appears to "pop in" late.
+  Widget _buildWeatherLoadingCard(AppColors c) {
+    return Padding(
+      key: const ValueKey('weather-loading'),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kCardBorder, width: 1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            RotationTransition(
+              turns: _cloudSpinController,
+              child: Icon(
+                Icons.cloud_queue_rounded,
+                size: 28,
+                color: c.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Checking conditions…',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: c.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherContentCard(
+    AppColors c,
+    TextTheme textTheme,
+    WeatherSnapshot weather,
+  ) {
     final delta = _weatherScaler.deltaSecondsPerKm(weather);
     final (tier, tierLabel, tierColor) = _impactTier(delta, c);
     final markerFraction = (delta.clamp(0, 40) / 40).toDouble();
@@ -360,6 +418,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     };
 
     return Padding(
+      key: const ValueKey('weather-content'),
       padding: const EdgeInsets.only(bottom: 10),
       child: Container(
         width: double.infinity,
@@ -552,24 +611,34 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header: title + subtitle ──────────────────────────────
-                Text(
-                  widget.coachMessage.workoutTitle.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: c.textPrimary,
-                    letterSpacing: -0.5,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _subtitle(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: c.textSecondary,
+                // ── Header: title + subtitle (centered) ───────────────────
+                SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        widget.coachMessage.workoutTitle.toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          color: c.textPrimary,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _subtitle(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: c.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 20),

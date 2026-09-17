@@ -21,6 +21,7 @@ import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
+import '../widgets/ambient_scaffold.dart';
 import '../widgets/restart_plan_banner.dart';
 import '../widgets/unlock_training_bottom_sheet.dart';
 import '../widgets/workout_step_timeline.dart';
@@ -261,8 +262,7 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     final now = DateTime.now();
     final currentWeekNumber = racePlan.currentWeekNumber(now);
 
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
       appBar: AppBar(
         title: Text(
           'Your Plan',

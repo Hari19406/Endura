@@ -208,101 +208,173 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
       valueListenable: UnitUtils.useMilesNotifier,
       builder: (context, useMiles, _) {
         final p = _effectiveProjection;
-        return Container(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(-0.8, -0.9),
-              radius: 1.4,
-              colors: [
-                context.colors.heroGradientEnd.withOpacity(0.24),
-                context.colors.heroGradientStart.withOpacity(0.08),
-                context.colors.background,
-              ],
-              stops: const [0.0, 0.45, 1.0],
-            ),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: ET.pagePad,
-                  children: [
-                    const SizedBox(height: 24),
-                    _RevealHeader(
-                      answers: widget.answers,
-                      projection: p,
-                      useMiles: useMiles,
+        final c = context.colors;
+        // Mirrors AmbientScaffold's 4-node zig-zag glow (this page has no
+        // Scaffold of its own — it's a page inside onboarding_screen.dart's
+        // PageView — so the layers are inlined here instead of using the
+        // widget directly).
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final glowNode1Alpha = isDark ? 0.28 : 0.42;
+        final glowNode2Alpha = isDark ? 0.22 : 0.35;
+        final glowNode3Alpha = isDark ? 0.20 : 0.32;
+        final glowNode4Alpha = isDark ? 0.24 : 0.38;
+        final glowStop = isDark ? 0.7 : 0.75;
+        return Stack(
+          children: [
+            Positioned.fill(child: ColoredBox(color: c.background)),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(-1.1, -0.9),
+                      radius: 1.3,
+                      colors: [
+                        c.heroGradientEnd.withValues(alpha: glowNode1Alpha),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, glowStop],
                     ),
-                    const SizedBox(height: 22),
-                    if (p == null)
-                      const _RevealSkeleton()
-                    else ...[
-                      _TypicalWeekStrip(
-                        days: p.typicalWeek,
-                        weekNumber: p.typicalWeekNumber,
-                        useMiles: useMiles,
-                      ),
-                      const SizedBox(height: 14),
-                      _VolumeCurveCard(
-                        projection: p,
-                        useMiles: useMiles,
-                        scrubIndex: _scrub,
-                        onScrub: _onScrub,
-                      ),
-                    ],
-                    // The fine-tune controls stand on their own — they only need
-                    // the config + VolumeModel bounds — so they render even when
-                    // the projection failed to build.
-                    const SizedBox(height: 14),
-                    _TuneControlsCard(
-                      config: _config,
-                      weeklyBounds: _clampRange(
-                        _config.weeklyVolumeRange,
-                        _weeklyBounds.min,
-                        _weeklyBounds.max,
-                      ),
-                      weeklyMin: _weeklyBounds.min,
-                      weeklyMax: _weeklyBounds.max,
-                      longRunBounds: _clampRange(
-                        _config.longRunRange,
-                        _longRunBounds.min,
-                        _longRunBounds.max,
-                      ),
-                      longRunMin: _longRunBounds.min,
-                      longRunMax: _longRunBounds.max,
-                      useMiles: useMiles,
-                      onDraft: _onConfigDraft,
-                      onCommitted: _onConfigCommitted,
-                    ),
-                    if (p != null) ...[
-                      const SizedBox(height: 14),
-                      // Rebuilds in place when the projection changes (edit
-                      // return / slider release). Kept as a plain rebuild — an
-                      // AnimatedSwitcher here was reverted: a fixed-shape strip
-                      // swapping instantly is not jarring, and the curve above
-                      // already carries the visible "it updated" motion.
-                      _NextWeekPreviewCard(
-                        days: p.previewWeek,
-                        weekNumber: p.previewWeekNumber,
-                        useMiles: useMiles,
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    _ReceiptCard(
-                      rows: buildReceiptRows(
-                        widget.answers,
-                        p,
-                        useMiles: useMiles,
-                      ),
-                      onEdit: _onEditTapped,
-                    ),
-                    const SizedBox(height: 28),
-                  ],
+                  ),
                 ),
               ),
-              _CtaBar(onGenerate: widget.onGenerate),
-            ],
-          ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(1.2, -0.25),
+                      radius: 1.2,
+                      colors: [
+                        c.heroGradientStart.withValues(alpha: glowNode2Alpha),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, glowStop],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(-1.2, 0.4),
+                      radius: 1.2,
+                      colors: [
+                        c.heroGradientEnd.withValues(alpha: glowNode3Alpha),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, glowStop],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(1.1, 0.95),
+                      radius: 1.3,
+                      colors: [
+                        c.heroGradientStart.withValues(alpha: glowNode4Alpha),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, glowStop],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: ET.pagePad,
+                      children: [
+                        const SizedBox(height: 24),
+                        _RevealHeader(
+                          answers: widget.answers,
+                          projection: p,
+                          useMiles: useMiles,
+                        ),
+                        const SizedBox(height: 22),
+                        if (p == null)
+                          const _RevealSkeleton()
+                        else ...[
+                          _TypicalWeekStrip(
+                            days: p.typicalWeek,
+                            weekNumber: p.typicalWeekNumber,
+                            useMiles: useMiles,
+                          ),
+                          const SizedBox(height: 14),
+                          _VolumeCurveCard(
+                            projection: p,
+                            useMiles: useMiles,
+                            scrubIndex: _scrub,
+                            onScrub: _onScrub,
+                          ),
+                        ],
+                        // The fine-tune controls stand on their own — they only need
+                        // the config + VolumeModel bounds — so they render even when
+                        // the projection failed to build.
+                        const SizedBox(height: 14),
+                        _TuneControlsCard(
+                          config: _config,
+                          weeklyBounds: _clampRange(
+                            _config.weeklyVolumeRange,
+                            _weeklyBounds.min,
+                            _weeklyBounds.max,
+                          ),
+                          weeklyMin: _weeklyBounds.min,
+                          weeklyMax: _weeklyBounds.max,
+                          longRunBounds: _clampRange(
+                            _config.longRunRange,
+                            _longRunBounds.min,
+                            _longRunBounds.max,
+                          ),
+                          longRunMin: _longRunBounds.min,
+                          longRunMax: _longRunBounds.max,
+                          useMiles: useMiles,
+                          onDraft: _onConfigDraft,
+                          onCommitted: _onConfigCommitted,
+                        ),
+                        if (p != null) ...[
+                          const SizedBox(height: 14),
+                          // Rebuilds in place when the projection changes (edit
+                          // return / slider release). Kept as a plain rebuild — an
+                          // AnimatedSwitcher here was reverted: a fixed-shape strip
+                          // swapping instantly is not jarring, and the curve above
+                          // already carries the visible "it updated" motion.
+                          _NextWeekPreviewCard(
+                            days: p.previewWeek,
+                            weekNumber: p.previewWeekNumber,
+                            useMiles: useMiles,
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        _ReceiptCard(
+                          rows: buildReceiptRows(
+                            widget.answers,
+                            p,
+                            useMiles: useMiles,
+                          ),
+                          onEdit: _onEditTapped,
+                        ),
+                        const SizedBox(height: 28),
+                      ],
+                    ),
+                  ),
+                  _CtaBar(onGenerate: widget.onGenerate),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
