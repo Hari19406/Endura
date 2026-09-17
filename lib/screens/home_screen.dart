@@ -1247,9 +1247,20 @@ class _HomeScreenState extends State<HomeScreen>
         (localMemoryUpdatedAt == null ||
             (cloudState.memoryUpdatedAt?.isAfter(localMemoryUpdatedAt) ??
                 false));
+    // The "local looks empty, trust the cloud" fallback must only fire for a
+    // device that has *never* saved engine memory locally (no updatedAt at
+    // all) — never for a device whose local state is merely sparse right
+    // now, e.g. right after an intentional Remove Plan reset (no race plan,
+    // no runs yet). Otherwise a stale/failed cloud sync from that same reset
+    // can silently resurrect the just-removed plan on the very next reload,
+    // since this restore runs before Home even reads the freshly-reset
+    // EngineMemory. Mirrors the tighter `localDays == null` check already
+    // used for trainingDays above.
     final shouldRestoreCloudMemory =
         cloudMemory != null &&
-        (cloudMemoryNewer || _shouldRestoreCloudMemory(localMemory));
+        (cloudMemoryNewer ||
+            (localMemoryUpdatedAt == null &&
+                _shouldRestoreCloudMemory(localMemory)));
 
     if (shouldRestoreCloudMemory) {
       await EngineMemoryService().save(cloudMemory, syncToCloud: false);
