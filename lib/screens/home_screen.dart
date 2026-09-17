@@ -517,7 +517,7 @@ class WorkoutCard extends StatelessWidget {
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: c.accent,
+                            gradient: c.heroGradient,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -528,14 +528,15 @@ class WorkoutCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: c.onAccent,
+                                  color: Colors.white,
+                                  letterSpacing: 0.4,
                                 ),
                               ),
                               const SizedBox(width: 5),
-                              Icon(
+                              const Icon(
                                 Icons.arrow_forward_rounded,
                                 size: 13,
-                                color: c.onAccent,
+                                color: Colors.white,
                               ),
                             ],
                           ),
@@ -1579,14 +1580,13 @@ class _HomeScreenState extends State<HomeScreen>
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: const Alignment(-0.9, -0.9),
-                  radius: 1.4,
+                  center: const Alignment(-1.0, -1.0),
+                  radius: 1.2,
                   colors: [
-                    c.heroGradientEnd.withValues(alpha: 0.16),
-                    c.heroGradientStart.withValues(alpha: 0.05),
-                    c.background,
+                    c.heroGradientEnd.withValues(alpha: 0.14),
+                    Colors.transparent,
                   ],
-                  stops: const [0.0, 0.45, 1.0],
+                  stops: const [0.0, 0.7],
                 ),
               ),
             ),
@@ -1723,72 +1723,46 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                 ),
 
-              if (_engineMemory?.hasRacePlan == true) ...[
-                const SizedBox(height: 10),
-                Semantics(
-                  button: true,
-                  label: 'Manage plan',
-                  child: GestureDetector(
-                    onTap: () async {
-                      HapticFeedback.lightImpact();
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ManagePlanScreen(onPlanChanged: loadData),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSectionLabel('THIS WEEK'),
+                  if (_engineMemory?.hasRacePlan == true)
+                    Semantics(
+                      button: true,
+                      label: 'Manage plan',
+                      child: TextButton(
+                        onPressed: _openManagePlan,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: context.colors.textSecondary,
                         ),
-                      );
-                      // Belt-and-suspenders: ManagePlanScreen already calls
-                      // onPlanChanged (loadData) itself before popping, but
-                      // that call is fire-and-forget from a VoidCallback — if
-                      // it lands mid another in-flight loadData() and gets
-                      // silently rescheduled, the UI can be left showing a
-                      // stale plan state after returning here (e.g. "Remove
-                      // Plan" not flipping to the empty-state cards). Always
-                      // reloading again on return from this route, driven by
-                      // this screen's own awaited navigation rather than the
-                      // child's callback, guarantees the refresh actually
-                      // lands.
-                      if (mounted) await loadData();
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.colors.surface,
-                        border: Border.all(
-                          color: context.colors.border,
-                          width: 1.0,
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Manage Plan',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: context.colors.textPrimary,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Manage Plan',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: context.colors.textSecondary,
+                              ),
                             ),
-                          ),
-                          Icon(
-                            Icons.chevron_right,
-                            color: context.colors.textTertiary,
-                            size: 20,
-                          ),
-                        ],
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 14,
+                              color: context.colors.textTertiary,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              _buildSectionLabel('INSIGHTS'),
+                ],
+              ),
               const SizedBox(height: 10),
               _buildBottomCarousel(),
             ],
@@ -1923,23 +1897,6 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'THIS WEEK',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: c.textTertiary,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                if (_engineMemory?.racePlan != null)
-                  Icon(Icons.chevron_right, size: 16, color: c.textTertiary),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(7, (i) {
                 final isToday = i == todayIndex;
                 final dayDate = weekMonday.add(Duration(days: i));
@@ -1947,9 +1904,19 @@ class _HomeScreenState extends State<HomeScreen>
                 final plannedDay = _plannedDayFor(dayDate);
                 final isRestPlanned =
                     plannedDay?.workoutType == WorkoutType.rest;
+                // Rest reads as a muted dark slot, never a bright white
+                // circle — a rest day is a deliberate non-event, not
+                // something that should visually compete with a completed
+                // or upcoming workout dot.
+                const restFill = Color(0xFF22242F);
                 final dayColor = plannedDay != null
-                    ? dayColorForWorkoutType(context, plannedDay.workoutType)
-                    : c.workoutRest;
+                    ? (isRestPlanned
+                          ? restFill
+                          : dayColorForWorkoutType(
+                              context,
+                              plannedDay.workoutType,
+                            ))
+                    : restFill;
                 final showColor = hasRun || plannedDay != null;
                 final materializedDay = _materializedDayForWeekday(i);
                 final isSkipped = materializedDay?.isSkipped ?? false;
@@ -2002,11 +1969,15 @@ class _HomeScreenState extends State<HomeScreen>
                               ? Border.all(color: c.accent, width: 2)
                               : isSkipped
                               ? Border.all(color: c.textTertiary, width: 1.5)
-                              // Rest fills pure white — needs its own ring so
-                              // it doesn't disappear against a light-theme
-                              // card background, same as a truly empty dot.
+                              // A faint ring on the muted rest fill (and on a
+                              // truly empty/unplanned dot) keeps it visible
+                              // against the card surface without reading as
+                              // an active or completed day.
                               : (isRestPlanned || !showColor)
-                              ? Border.all(color: c.border, width: 1.5)
+                              ? Border.all(
+                                  color: c.border.withValues(alpha: 0.6),
+                                  width: 1,
+                                )
                               : null,
                         ),
                         child: isSkipped
@@ -2079,6 +2050,25 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _openManagePlan() async {
+    HapticFeedback.lightImpact();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ManagePlanScreen(onPlanChanged: loadData),
+      ),
+    );
+    // Belt-and-suspenders: ManagePlanScreen already calls onPlanChanged
+    // (loadData) itself before popping, but that call is fire-and-forget
+    // from a VoidCallback — if it lands mid another in-flight loadData()
+    // and gets silently rescheduled, the UI can be left showing a stale
+    // plan state after returning here (e.g. "Remove Plan" not flipping to
+    // the empty-state cards). Always reloading again on return from this
+    // route, driven by this screen's own awaited navigation rather than
+    // the child's callback, guarantees the refresh actually lands.
+    if (mounted) await loadData();
   }
 
   void _openPlanOverview() {
