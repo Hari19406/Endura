@@ -11,6 +11,10 @@ enum CalendarDayStatus {
   /// A logged run has been matched to this day.
   completed,
 
+  /// The athlete deliberately skipped this day from the pre-run briefing
+  /// screen — distinct from [missed], which is an overdue/never-touched day.
+  skipped,
+
   /// A training day whose scheduled date is in the past and was never done.
   missed,
 
@@ -27,6 +31,7 @@ CalendarDayStatus calendarDayStatus(
   required DateTime now,
 }) {
   if (day.completion != null) return CalendarDayStatus.completed;
+  if (day.isSkipped) return CalendarDayStatus.skipped;
   if (day.isRest) return CalendarDayStatus.restDay;
 
   final sched =

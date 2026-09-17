@@ -782,6 +782,7 @@ class _DayCircle extends StatelessWidget {
     final rest = status == CalendarDayStatus.restDay;
     final missed = status == CalendarDayStatus.missed;
     final done = status == CalendarDayStatus.completed;
+    final skipped = status == CalendarDayStatus.skipped;
     final distanceLabel = rest || distanceKm == null || distanceKm == 0
         ? null
         : '${UnitUtils.displayDistance(distanceKm!, useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
@@ -789,12 +790,18 @@ class _DayCircle extends StatelessWidget {
     Widget? child;
     if (done) {
       child = const Icon(Icons.check_rounded, size: 15, color: Colors.black);
+    } else if (skipped) {
+      // A forward-skip glyph (not the "−" used for missed) so an intentional
+      // skip never reads as an overdue/forgotten session.
+      child = Icon(Icons.skip_next_rounded, size: 15, color: c.textTertiary);
     } else if (missed) {
       child = Icon(Icons.remove_rounded, size: 14, color: c.textTertiary);
     }
 
     final fill = switch (status) {
       CalendarDayStatus.completed => color,
+      // Muted well below the normal missed fill — subtle, not alarming.
+      CalendarDayStatus.skipped => c.divider.withValues(alpha: 0.5),
       CalendarDayStatus.missed => c.divider,
       CalendarDayStatus.restDay => c.divider,
       CalendarDayStatus.upcoming => color,
@@ -808,6 +815,8 @@ class _DayCircle extends StatelessWidget {
         color: fill,
         border: isToday
             ? Border.all(color: c.accent, width: 2)
+            : skipped
+            ? Border.all(color: c.textTertiary, width: 1.5)
             : (missed ? Border.all(color: c.border, width: 1) : null),
       ),
       child: child != null ? Center(child: child) : null,
@@ -833,12 +842,16 @@ class _DayCircle extends StatelessWidget {
               ),
         const SizedBox(height: 6),
         Text(
-          rest ? 'REST' : label,
+          rest
+              ? 'REST'
+              : skipped
+              ? 'SKIPPED'
+              : label,
           style: TextStyle(
             fontSize: 8,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
-            color: missed
+            color: (missed || skipped)
                 ? c.textTertiary
                 : (isToday ? c.textPrimary : c.textTertiary),
           ),
@@ -972,6 +985,7 @@ class _DayDetailSheet extends StatelessWidget {
     final c = context.colors;
     final (chipLabel, chipColor) = switch (status) {
       CalendarDayStatus.completed => ('COMPLETED', c.success),
+      CalendarDayStatus.skipped => ('SKIPPED', c.textTertiary),
       CalendarDayStatus.missed => ('MISSED', c.textTertiary),
       CalendarDayStatus.restDay => ('REST DAY', c.textTertiary),
       CalendarDayStatus.upcoming => ('SCHEDULED', c.accent),
