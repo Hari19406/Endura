@@ -119,8 +119,7 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
     super.didUpdateWidget(old);
     // The athlete edited an answer from the receipt and came back. Re-seed the
     // sliders from the new answers unless they've already hand-tuned.
-    if (!_userTuned &&
-        old.answers.fingerprint != widget.answers.fingerprint) {
+    if (!_userTuned && old.answers.fingerprint != widget.answers.fingerprint) {
       setState(() {
         _config = widget.initialConfig ?? _synthConfig();
         _tunedProjection = null; // fall back to the fresh onboarding projection
@@ -209,87 +208,101 @@ class _OPagePlanRevealState extends State<OPagePlanReveal> {
       valueListenable: UnitUtils.useMilesNotifier,
       builder: (context, useMiles, _) {
         final p = _effectiveProjection;
-        return Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: ET.pagePad,
-                children: [
-                  const SizedBox(height: 24),
-                  _RevealHeader(
-                    answers: widget.answers,
-                    projection: p,
-                    useMiles: useMiles,
-                  ),
-                  const SizedBox(height: 22),
-                  if (p == null)
-                    const _RevealSkeleton()
-                  else ...[
-                    _TypicalWeekStrip(
-                      days: p.typicalWeek,
-                      weekNumber: p.typicalWeekNumber,
-                      useMiles: useMiles,
-                    ),
-                    const SizedBox(height: 14),
-                    _VolumeCurveCard(
+        return Container(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(-0.8, -0.9),
+              radius: 1.4,
+              colors: [
+                context.colors.heroGradientEnd.withOpacity(0.24),
+                context.colors.heroGradientStart.withOpacity(0.08),
+                context.colors.background,
+              ],
+              stops: const [0.0, 0.45, 1.0],
+            ),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: ET.pagePad,
+                  children: [
+                    const SizedBox(height: 24),
+                    _RevealHeader(
+                      answers: widget.answers,
                       projection: p,
                       useMiles: useMiles,
-                      scrubIndex: _scrub,
-                      onScrub: _onScrub,
                     ),
-                  ],
-                  // The fine-tune controls stand on their own — they only need
-                  // the config + VolumeModel bounds — so they render even when
-                  // the projection failed to build.
-                  const SizedBox(height: 14),
-                  _TuneControlsCard(
-                    config: _config,
-                    weeklyBounds: _clampRange(
-                      _config.weeklyVolumeRange,
-                      _weeklyBounds.min,
-                      _weeklyBounds.max,
-                    ),
-                    weeklyMin: _weeklyBounds.min,
-                    weeklyMax: _weeklyBounds.max,
-                    longRunBounds: _clampRange(
-                      _config.longRunRange,
-                      _longRunBounds.min,
-                      _longRunBounds.max,
-                    ),
-                    longRunMin: _longRunBounds.min,
-                    longRunMax: _longRunBounds.max,
-                    useMiles: useMiles,
-                    onDraft: _onConfigDraft,
-                    onCommitted: _onConfigCommitted,
-                  ),
-                  if (p != null) ...[
+                    const SizedBox(height: 22),
+                    if (p == null)
+                      const _RevealSkeleton()
+                    else ...[
+                      _TypicalWeekStrip(
+                        days: p.typicalWeek,
+                        weekNumber: p.typicalWeekNumber,
+                        useMiles: useMiles,
+                      ),
+                      const SizedBox(height: 14),
+                      _VolumeCurveCard(
+                        projection: p,
+                        useMiles: useMiles,
+                        scrubIndex: _scrub,
+                        onScrub: _onScrub,
+                      ),
+                    ],
+                    // The fine-tune controls stand on their own — they only need
+                    // the config + VolumeModel bounds — so they render even when
+                    // the projection failed to build.
                     const SizedBox(height: 14),
-                    // Rebuilds in place when the projection changes (edit
-                    // return / slider release). Kept as a plain rebuild — an
-                    // AnimatedSwitcher here was reverted: a fixed-shape strip
-                    // swapping instantly is not jarring, and the curve above
-                    // already carries the visible "it updated" motion.
-                    _NextWeekPreviewCard(
-                      days: p.previewWeek,
-                      weekNumber: p.previewWeekNumber,
+                    _TuneControlsCard(
+                      config: _config,
+                      weeklyBounds: _clampRange(
+                        _config.weeklyVolumeRange,
+                        _weeklyBounds.min,
+                        _weeklyBounds.max,
+                      ),
+                      weeklyMin: _weeklyBounds.min,
+                      weeklyMax: _weeklyBounds.max,
+                      longRunBounds: _clampRange(
+                        _config.longRunRange,
+                        _longRunBounds.min,
+                        _longRunBounds.max,
+                      ),
+                      longRunMin: _longRunBounds.min,
+                      longRunMax: _longRunBounds.max,
                       useMiles: useMiles,
+                      onDraft: _onConfigDraft,
+                      onCommitted: _onConfigCommitted,
                     ),
+                    if (p != null) ...[
+                      const SizedBox(height: 14),
+                      // Rebuilds in place when the projection changes (edit
+                      // return / slider release). Kept as a plain rebuild — an
+                      // AnimatedSwitcher here was reverted: a fixed-shape strip
+                      // swapping instantly is not jarring, and the curve above
+                      // already carries the visible "it updated" motion.
+                      _NextWeekPreviewCard(
+                        days: p.previewWeek,
+                        weekNumber: p.previewWeekNumber,
+                        useMiles: useMiles,
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    _ReceiptCard(
+                      rows: buildReceiptRows(
+                        widget.answers,
+                        p,
+                        useMiles: useMiles,
+                      ),
+                      onEdit: _onEditTapped,
+                    ),
+                    const SizedBox(height: 28),
                   ],
-                  const SizedBox(height: 14),
-                  _ReceiptCard(
-                    rows: buildReceiptRows(
-                      widget.answers,
-                      p,
-                      useMiles: useMiles,
-                    ),
-                    onEdit: _onEditTapped,
-                  ),
-                  const SizedBox(height: 28),
-                ],
+                ),
               ),
-            ),
-            _CtaBar(onGenerate: widget.onGenerate),
-          ],
+              _CtaBar(onGenerate: widget.onGenerate),
+            ],
+          ),
         );
       },
     );
@@ -643,7 +656,10 @@ class _VolumeCurveCard extends StatelessWidget {
                   getTouchedSpotIndicator: (bar, indexes) => indexes
                       .map(
                         (_) => TouchedSpotIndicatorData(
-                          FlLine(color: heroStart.withOpacity(0.45), strokeWidth: 1.5),
+                          FlLine(
+                            color: heroStart.withOpacity(0.45),
+                            strokeWidth: 1.5,
+                          ),
                           FlDotData(
                             getDotPainter: (s, pct, b, i) => FlDotCirclePainter(
                               radius: 4,
@@ -758,13 +774,8 @@ class _TuneControlsCard extends StatelessWidget {
             divisions: (weeklyMax - weeklyMin).round().clamp(1, 200),
             activeColor: EC.teal,
             inactiveColor: EC.surface2,
-            labels: RangeLabels(
-              _km(w.start, useMiles),
-              _km(w.end, useMiles),
-            ),
-            onChanged: (v) => onDraft(
-              config.copyWith(weeklyVolumeRange: v),
-            ),
+            labels: RangeLabels(_km(w.start, useMiles), _km(w.end, useMiles)),
+            onChanged: (v) => onDraft(config.copyWith(weeklyVolumeRange: v)),
             onChangeEnd: (_) => onCommitted(),
           ),
           const SizedBox(height: 6),
@@ -777,9 +788,7 @@ class _TuneControlsCard extends StatelessWidget {
             activeColor: EC.teal,
             inactiveColor: EC.surface2,
             label: '${config.runsPerWeek}',
-            onChanged: (v) => onDraft(
-              config.copyWith(runsPerWeek: v.round()),
-            ),
+            onChanged: (v) => onDraft(config.copyWith(runsPerWeek: v.round())),
             onChangeEnd: (_) => onCommitted(),
           ),
           const SizedBox(height: 6),
@@ -794,13 +803,8 @@ class _TuneControlsCard extends StatelessWidget {
             divisions: (longRunMax - longRunMin).round().clamp(1, 200),
             activeColor: EC.teal,
             inactiveColor: EC.surface2,
-            labels: RangeLabels(
-              _km(lr.start, useMiles),
-              _km(lr.end, useMiles),
-            ),
-            onChanged: (v) => onDraft(
-              config.copyWith(longRunRange: v),
-            ),
+            labels: RangeLabels(_km(lr.start, useMiles), _km(lr.end, useMiles)),
+            onChanged: (v) => onDraft(config.copyWith(longRunRange: v)),
             onChangeEnd: (_) => onCommitted(),
           ),
           const SizedBox(height: 4),
@@ -884,7 +888,13 @@ class _NextWeekPreviewCard extends StatelessWidget {
           Row(
             children: List.generate(7, (i) {
               final slot = i < days.length ? days[i] : null;
-              return Expanded(child: _PreviewPill(slot: slot, letter: _dayLetters[i], useMiles: useMiles));
+              return Expanded(
+                child: _PreviewPill(
+                  slot: slot,
+                  letter: _dayLetters[i],
+                  useMiles: useMiles,
+                ),
+              );
             }),
           ),
           const SizedBox(height: 12),
@@ -1200,22 +1210,29 @@ class _CtaBar extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         height: 56,
-        child: ElevatedButton(
-          onPressed: () {
-            HapticFeedback.mediumImpact();
-            onGenerate();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: EC.teal,
-            foregroundColor: EC.black,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ET.radius),
-            ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: context.colors.heroGradient,
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: const Text(
-            'Start training',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          child: ElevatedButton(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onGenerate();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Start training',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
           ),
         ),
       ),

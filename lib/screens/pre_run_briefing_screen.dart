@@ -9,12 +9,45 @@ import '../services/location_service.dart';
 import '../services/weather_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/database_service.dart';
-import '../widgets/workout_step_timeline.dart';
+import '../widgets/workout_step_timeline.dart' show StepPaceBand;
 import '../models/scheduled_workout_context.dart';
 import 'run_screen.dart';
 import '../utils/unit_utils.dart';
 
 enum BlockState { pending, done }
+
+// ── Dynamic ambient palette ─────────────────────────────────────────────────
+
+/// The two-stop wash used for a workout's ambient header glow and its step
+/// card accents — chosen by training intent, not by phase/week (those were
+/// stripped from this screen).
+@immutable
+class _WorkoutGlow {
+  final Color primary;
+  final Color dark;
+  const _WorkoutGlow(this.primary, this.dark);
+}
+
+_WorkoutGlow _glowForIntent(WorkoutIntent intent) {
+  switch (intent) {
+    case WorkoutIntent.aerobicBase:
+    case WorkoutIntent.endurance:
+      return const _WorkoutGlow(Color(0xFF1E50FF), Color(0xFF0D2040));
+    case WorkoutIntent.vo2max:
+    case WorkoutIntent.speed:
+      return const _WorkoutGlow(Color(0xFFFF5500), Color(0xFF4A1500));
+    case WorkoutIntent.threshold:
+    case WorkoutIntent.raceSpecific:
+      return const _WorkoutGlow(Color(0xFFFFC107), Color(0xFF4A3500));
+  }
+}
+
+const _kCardBg = Color(0xFF12161F);
+const _kCardBorder = Color(0xFF1E2535);
+const _kStepBodyBg = Color(0xFF141923);
+const _kPrimaryBlue = Color(0xFF007AFF);
+const _kDangerRed = Color(0xFFFF3B30);
+const _kWarmupBlue = Color(0xFF1E50FF);
 
 class PreRunBriefingScreen extends StatefulWidget {
   final message.CoachMessage coachMessage;
@@ -293,11 +326,11 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
 
   // ── Weather card ─────────────────────────────────────────────────────
 
-  (String, Color) _impactTier(int delta, AppColors c) {
-    if (delta <= 0) return ('No Impact', c.success);
-    if (delta < 15) return ('Low Impact', c.success);
-    if (delta < 30) return ('Moderate Impact', c.premiumGold);
-    return ('Significant Impact', c.danger);
+  (int, String, Color) _impactTier(int delta, AppColors c) {
+    if (delta <= 0) return (1, 'No Impact', c.success);
+    if (delta < 15) return (2, 'Low Impact', c.success);
+    if (delta < 30) return (3, 'Moderate Impact', c.premiumGold);
+    return (4, 'Significant Impact', c.danger);
   }
 
   Widget _buildWeatherCard() {
@@ -309,7 +342,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     if (weather == null) return const SizedBox.shrink();
 
     final delta = _weatherScaler.deltaSecondsPerKm(weather);
-    final (tierLabel, tierColor) = _impactTier(delta, c);
+    final (tier, tierLabel, tierColor) = _impactTier(delta, c);
+    final markerFraction = (delta.clamp(0, 40) / 40).toDouble();
     final icon = switch (weather.condition) {
       WeatherCondition.clear => Icons.wb_sunny_outlined,
       WeatherCondition.cloudy => Icons.cloud_outlined,
@@ -326,8 +360,15 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     };
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: _Card(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kCardBorder, width: 1),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -377,18 +418,38 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                     ],
                   ),
                 ),
+                Icon(Icons.chevron_right_rounded, color: c.textTertiary),
               ],
             ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: Container(
-                height: 5,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [c.success, c.premiumGold, c.danger],
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 14,
+              child: Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Container(
+                      height: 5,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [c.success, c.premiumGold, c.danger],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Align(
+                    alignment: Alignment(-1 + 2 * markerFraction, 0),
+                    child: Container(
+                      width: 2,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 14),
@@ -408,8 +469,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       const SizedBox(height: 2),
                       Text(
                         delta > 0
-                            ? '+${delta}s/km · $tierLabel'
-                            : 'No adjustment needed · $tierLabel',
+                            ? '+${delta}s/km · Tier $tier: $tierLabel'
+                            : 'No adjustment needed · Tier $tier: $tierLabel',
                         style: textTheme.bodySmall?.copyWith(
                           color: tierColor,
                           fontWeight: FontWeight.w600,
@@ -433,492 +494,386 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     );
   }
 
+  // ── Header ────────────────────────────────────────────────────────────
+
+  String _subtitle() {
+    final date = widget.scheduledContext?.scheduledDate ?? DateTime.now();
+    final dateStr = DateFormat('MMMM d, yyyy').format(date);
+    final dist = UnitUtils.displayDistance(_displayedWorkout.totalDistanceKm, _useMiles);
+    final unit = _useMiles ? 'miles' : 'kilometers';
+    return '$dateStr · ${dist.toStringAsFixed(1)} $unit total';
+  }
+
+  Widget _buildAmbientGlow(_WorkoutGlow glow) {
+    return IgnorePointer(
+      child: Container(
+        height: 300,
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment.topCenter,
+            radius: 1.1,
+            colors: [
+              glow.primary.withValues(alpha: 0.32),
+              glow.dark.withValues(alpha: 0.18),
+              Colors.transparent,
+            ],
+            stops: const [0, 0.5, 1],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final workout = _displayedWorkout;
-    final hasCoachContent =
-        widget.coachMessage.reflectionText.isNotEmpty ||
-        widget.coachMessage.goalText.isNotEmpty ||
-        widget.coachMessage.feelText.isNotEmpty;
-
     final c = context.colors;
+    final glow = _glowForIntent(widget.coachMessage.workoutIntent);
+
     return Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(
-        title: Text(
-          'Today\'s Workout',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: c.textPrimary,
-            fontSize: 16,
-            letterSpacing: -0.3,
-          ),
-        ),
-        centerTitle: false,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: c.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header card ──────────────────────────────────────────────────
-            _Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.coachMessage.phaseWeekLabel.isNotEmpty) ...[
-                    _PhaseWeekBanner(label: widget.coachMessage.phaseWeekLabel),
-                    const SizedBox(height: 8),
-                  ],
-                  Text(
-                    widget.coachMessage.workoutTitle,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: c.textPrimary,
-                      letterSpacing: -0.5,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    widget.coachMessage.hasWarmupCooldown
-                        ? 'Warmup & cooldown included'
-                        : 'Easy effort — no warmup needed',
-                    style: TextStyle(fontSize: 12, color: c.textTertiary),
-                  ),
-                  const SizedBox(height: 14),
-                  _buildHeroStats(workout),
-                ],
-              ),
+      body: Stack(
+        children: [
+          Positioned(top: 0, left: 0, right: 0, child: _buildAmbientGlow(glow)),
+          SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20).copyWith(
+              top: 4,
+              bottom: 24,
             ),
-
-            const SizedBox(height: 8),
-
-            // ── Coach card ───────────────────────────────────────────────────
-            if (hasCoachContent)
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: c.accent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              'M',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: c.onAccent,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Max',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: c.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (widget.coachMessage.reflectionText.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        widget.coachMessage.reflectionText,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: c.textPrimary,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                    if (widget.coachMessage.acknowledgementText.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.coachMessage.acknowledgementText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: c.textTertiary,
-                          fontStyle: FontStyle.italic,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                    if (widget.coachMessage.goalText.isNotEmpty ||
-                        widget.coachMessage.feelText.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Divider(height: 1, thickness: 1, color: c.divider),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (widget.coachMessage.goalText.isNotEmpty)
-                            Expanded(
-                              child: _InsightItem(
-                                icon: Icons.flag_outlined,
-                                label: 'GOAL',
-                                text: widget.coachMessage.goalText,
-                                iconColor: const Color(0xFF1565C0),
-                              ),
-                            ),
-                          if (widget.coachMessage.goalText.isNotEmpty &&
-                              widget.coachMessage.feelText.isNotEmpty)
-                            const SizedBox(width: 16),
-                          if (widget.coachMessage.feelText.isNotEmpty)
-                            Expanded(
-                              child: _InsightItem(
-                                icon: Icons.favorite_border,
-                                label: 'FEEL',
-                                text: widget.coachMessage.feelText,
-                                iconColor: const Color(0xFFE53935),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-            if (hasCoachContent) const SizedBox(height: 8),
-
-            // ── Weather-adjusted pacing card ─────────────────────────────────
-            _buildWeatherCard(),
-
-            // ── Workout card ─────────────────────────────────────────────────
-            _Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'WORKOUT',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: c.textTertiary,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  WorkoutStepTimeline(workout: workout, useMiles: _useMiles),
-                ],
-              ),
-            ),
-
-            if (widget.coachMessage.movedFromDay != null) ...[
-              const SizedBox(height: 8),
-              _Card(
-                child: Row(
-                  children: [
-                    Icon(Icons.swap_horiz, size: 14, color: c.textTertiary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${widget.coachMessage.workoutTitle} moved from '
-                        '${widget.coachMessage.movedFromDay}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: c.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-        child: Container(
-          padding: const EdgeInsets.only(top: 10),
-          decoration: BoxDecoration(
-            color: c.background,
-            border: Border(top: BorderSide(color: c.divider, width: 1)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_canLinkOrSkip) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _openLinkActivitySheet,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: c.textPrimary,
-                      side: BorderSide(color: c.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Link Activity',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _busy ? null : _startWorkout,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: c.accent,
-                    foregroundColor: c.onAccent,
-                    disabledBackgroundColor: c.accent.withValues(alpha: 0.5),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    widget.coachMessage.hasWarmupCooldown
-                        ? 'Start Workout'
-                        : 'Start Run',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                ),
-              ),
-              if (_canLinkOrSkip) ...[
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: _busy ? null : _confirmSkip,
-                  style: TextButton.styleFrom(foregroundColor: c.danger),
-                  child: const Text(
-                    'Skip Workout',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroStats(ResolvedWorkout workout) {
-    final c = context.colors;
-    final labels = <String>[];
-    final values = <String>[];
-
-    final totalDist = workout.totalDistanceKm;
-    if (totalDist > 0) {
-      values.add(
-        '${UnitUtils.displayDistance(totalDist, _useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(_useMiles)}',
-      );
-      labels.add('DISTANCE');
-    }
-
-    final dur = workout.estimatedDuration;
-    if (dur.inMinutes > 0) {
-      values.add('~${dur.inMinutes} min');
-      labels.add('DURATION');
-    }
-
-    final workBlocks = workout.blocks.where((b) => b.type == BlockType.main);
-    if (workBlocks.isNotEmpty) {
-      final nonRpe = workBlocks.where((b) => !b.isRpeOnly);
-      if (nonRpe.isNotEmpty) {
-        final fastest = nonRpe
-            .map((b) => b.paceMinSecondsPerKm)
-            .reduce((a, b) => a < b ? a : b);
-        final slowest = nonRpe
-            .map((b) => b.paceMaxSecondsPerKm)
-            .reduce((a, b) => a > b ? a : b);
-        final intent = widget.coachMessage.workoutIntent;
-        if ((intent == WorkoutIntent.aerobicBase ||
-                intent == WorkoutIntent.endurance) &&
-            (slowest - fastest) >= 30) {
-          final ceiling = (fastest / 5).round() * 5;
-          values.add('≤ ${_fmt(ceiling)} ${UnitUtils.perUnitLabel(_useMiles)}');
-        } else {
-          final lo = (fastest / 5).round() * 5;
-          final hi = (slowest / 5).round() * 5;
-          values.add(
-            lo == hi
-                ? '${_fmt(lo)} ${UnitUtils.perUnitLabel(_useMiles)}'
-                : '${_fmt(lo)}–${_fmt(hi)} ${UnitUtils.perUnitLabel(_useMiles)}',
-          );
-        }
-        labels.add('PACE');
-      }
-    }
-
-    if (labels.isEmpty) return const SizedBox.shrink();
-
-    return Row(
-      children: [
-        for (int i = 0; i < labels.length; i++) ...[
-          if (i > 0) ...[
-            const SizedBox(width: 12),
-            Container(width: 1, height: 32, color: c.divider),
-            const SizedBox(width: 12),
-          ],
-          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Header: title + subtitle ──────────────────────────────
                 Text(
-                  values[i],
+                  widget.coachMessage.workoutTitle.toUpperCase(),
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
                     color: c.textPrimary,
-                    letterSpacing: -0.3,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                    letterSpacing: -0.5,
+                    height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
                 Text(
-                  labels[i],
+                  _subtitle(),
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: c.textTertiary,
-                    letterSpacing: 0.5,
+                    color: c.textSecondary,
                   ),
                 ),
+                const SizedBox(height: 20),
+
+                // ── Weather-adjusted pacing card ─────────────────────────
+                _buildWeatherCard(),
+
+                // ── Step breakdown cards ──────────────────────────────────
+                _buildStepCards(workout),
+
+                const SizedBox(height: 24),
+
+                // ── Actions ────────────────────────────────────────────────
+                if (_canLinkOrSkip) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: OutlinedButton(
+                      onPressed: _busy ? null : _openLinkActivitySheet,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: c.textPrimary,
+                        side: BorderSide(color: c.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'Link Activity',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _busy ? null : _startWorkout,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kPrimaryBlue,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: _kPrimaryBlue.withValues(alpha: 0.5),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: Text(
+                      widget.coachMessage.hasWarmupCooldown
+                          ? 'Start Workout'
+                          : 'Start Run',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_canLinkOrSkip) ...[
+                  const SizedBox(height: 4),
+                  Center(
+                    child: TextButton(
+                      onPressed: _busy ? null : _confirmSkip,
+                      style: TextButton.styleFrom(foregroundColor: _kDangerRed),
+                      child: const Text(
+                        'Skip Workout',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStepCards(ResolvedWorkout workout) {
+    final blocks = workout.blocks;
+    if (blocks.isEmpty) {
+      return Text(
+        'Full rest day — nothing scheduled.',
+        style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
+      );
+    }
+    return Column(
+      children: [
+        for (final block in blocks)
+          _StepCard(
+            block: block,
+            intent: workout.intent,
+            useMiles: _useMiles,
+          ),
       ],
     );
   }
-
-  String _fmt(int secondsPerKm) {
-    final displaySeconds = UnitUtils.displayPaceSeconds(
-      secondsPerKm.toDouble(),
-      _useMiles,
-    );
-    return UnitUtils.formatSeconds(displaySeconds.round());
-  }
 }
 
-// ── Shared card wrapper ───────────────────────────────────────────────────────
+// ── Step breakdown card ──────────────────────────────────────────────────────
 
-class _Card extends StatelessWidget {
-  final Widget child;
-  const _Card({required this.child});
+/// A single workout step rendered as a two-part card: a solid accent header
+/// band (step name + total distance/duration) over a dark body with the
+/// per-rep pace/effort prescription and any between-rep recovery cue.
+class _StepCard extends StatelessWidget {
+  final ResolvedBlock block;
+  final WorkoutIntent intent;
+  final bool useMiles;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: child,
-    );
-  }
-}
-
-// ── Coaching insight item ─────────────────────────────────────────────────────
-
-class _InsightItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String text;
-  final Color iconColor;
-
-  const _InsightItem({
-    required this.icon,
-    required this.label,
-    required this.text,
-    required this.iconColor,
+  const _StepCard({
+    required this.block,
+    required this.intent,
+    required this.useMiles,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 12, color: iconColor),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: iconColor,
-                letterSpacing: 1.1,
-              ),
+    final band = StepPaceBand.forBlock(block, intent, useMiles: useMiles);
+    final headerColor = _headerColor();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: headerColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 13,
-            color: context.colors.textSecondary,
-            height: 1.5,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _title(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                Text(
+                  _headerQuantity(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: _kStepBodyBg,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: headerColor.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.directions_run_rounded,
+                        size: 14,
+                        color: headerColor,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _primaryLine(band),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFF4F4F5),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_recoveryLine() != null) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 36),
+                    child: Text(
+                      _recoveryLine()!,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF8A8A8F),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
-}
 
-// ── Phase + week banner ───────────────────────────────────────────────────────
+  // ── Derived text ──────────────────────────────────────────────────────────
 
-class _PhaseWeekBanner extends StatelessWidget {
-  final String label;
-  const _PhaseWeekBanner({required this.label});
+  Color _headerColor() {
+    if (block.type != BlockType.main) return _kWarmupBlue;
+    return _glowForIntent(intent).primary;
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F0FE),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF1565C0),
-        ),
-      ),
-    );
+  String _title() {
+    switch (block.type) {
+      case BlockType.warmup:
+        return 'Warmup';
+      case BlockType.cooldown:
+        return 'Cooldown';
+      case BlockType.recovery:
+        return 'Recovery';
+      case BlockType.main:
+        if (block.isRpeOnly && intent == WorkoutIntent.speed) return 'Strides';
+        if ((block.reps ?? 1) > 1) {
+          return intent == WorkoutIntent.threshold
+              ? 'Cruise Interval'
+              : 'Interval';
+        }
+        return switch (intent) {
+          WorkoutIntent.threshold => 'Tempo',
+          WorkoutIntent.vo2max => 'Interval',
+          WorkoutIntent.speed => 'Reps',
+          WorkoutIntent.raceSpecific => 'Race Pace',
+          WorkoutIntent.endurance => 'Long Run',
+          WorkoutIntent.aerobicBase => 'Easy Run',
+        };
+    }
+  }
+
+  String _headerQuantity() {
+    if (block.durationSeconds != null) {
+      final total = block.durationSeconds! * (block.reps ?? 1);
+      return total >= 60 && total % 60 == 0
+          ? '${total ~/ 60} min'
+          : '${total}s';
+    }
+    return _fmtDistance(block.totalDistanceKm);
+  }
+
+  String _eachQuantity() {
+    if (block.durationSeconds != null) {
+      final s = block.durationSeconds!;
+      return s >= 60 && s % 60 == 0 ? '${s ~/ 60} min' : '${s}s';
+    }
+    return _fmtDistance(block.distanceKm);
+  }
+
+  String _fmtDistance(double km) {
+    if (km < 1.0) return '${(km * 1000).round()} m';
+    final d = UnitUtils.displayDistance(km, useMiles);
+    return '${d.toStringAsFixed(d >= 10 ? 0 : 1)} ${UnitUtils.unitLabel(useMiles)}';
+  }
+
+  String _primaryLine(StepPaceBand band) {
+    final reps = block.reps ?? 1;
+    final each = _eachQuantity();
+    final qty = reps > 1 ? '$reps × $each' : each;
+    return band.effortOnly ? '$qty — ${band.value}' : '$qty at ${band.value}';
+  }
+
+  String? _recoveryLine() {
+    if ((block.reps ?? 1) <= 1) return null;
+    if (block.recoverySeconds != null) {
+      final s = block.recoverySeconds!;
+      final txt = s >= 60
+          ? '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')} min'
+          : '${s}s';
+      return '$txt jog between reps';
+    }
+    if (block.recoveryMeters != null) {
+      return '${_fmtDistance(block.recoveryMeters! / 1000)} jog between reps';
+    }
+    return null;
   }
 }
 

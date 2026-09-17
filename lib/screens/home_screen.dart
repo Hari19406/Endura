@@ -311,8 +311,8 @@ class WorkoutCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.border, width: 1.0),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -1551,9 +1551,23 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildDashboardContent(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(-0.8, -0.9),
+            radius: 1.4,
+            colors: [
+              c.heroGradientEnd.withOpacity(0.24),
+              c.heroGradientStart.withOpacity(0.08),
+              c.background,
+            ],
+            stops: const [0.0, 0.45, 1.0],
+          ),
+        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _buildDashboardContent(),
+      ),
     );
   }
 
@@ -1715,8 +1729,11 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       decoration: BoxDecoration(
                         color: context.colors.surface,
-                        border: Border.all(color: context.colors.border),
-                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: context.colors.border,
+                          width: 1.0,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1836,8 +1853,8 @@ class _HomeScreenState extends State<HomeScreen>
       height: 190,
       decoration: BoxDecoration(
         color: context.colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.colors.border),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.colors.border, width: 1.0),
       ),
       padding: const EdgeInsets.all(18),
       child: child,
@@ -1898,7 +1915,8 @@ class _HomeScreenState extends State<HomeScreen>
                 final dayDate = weekMonday.add(Duration(days: i));
                 final hasRun = _dayHasRun(dayDate);
                 final plannedDay = _plannedDayFor(dayDate);
-                final isRestPlanned = plannedDay?.workoutType == WorkoutType.rest;
+                final isRestPlanned =
+                    plannedDay?.workoutType == WorkoutType.rest;
                 final dayColor = plannedDay != null
                     ? dayColorForWorkoutType(context, plannedDay.workoutType)
                     : c.workoutRest;
@@ -2174,7 +2192,8 @@ class _HomeScreenState extends State<HomeScreen>
     // genuinely today) is decided inside PreRunBriefingScreen itself.
     final planId = _thisWeekPlanId;
     final planBuiltAt = _thisWeekPlanBuiltAt;
-    final scheduledContext = (!day.isCompleted && planId != null && planBuiltAt != null)
+    final scheduledContext =
+        (!day.isCompleted && planId != null && planBuiltAt != null)
         ? ScheduledWorkoutContext.fromParts(
             planId: planId,
             planBuiltAt: planBuiltAt,
