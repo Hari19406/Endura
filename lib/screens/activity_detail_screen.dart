@@ -10,6 +10,7 @@ import '../services/cloud_sync_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/unit_utils.dart';
+import '../widgets/ambient_scaffold.dart';
 import '../widgets/run_comments_sheet.dart';
 import '../widgets/run_share_card.dart';
 
@@ -246,7 +247,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text("Couldn't update your reaction — check your connection."),
+            content: Text(
+              "Couldn't update your reaction — check your connection.",
+            ),
           ),
         );
     } else {
@@ -311,8 +314,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
+      safeArea: false,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -644,8 +647,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       ? Icons.local_fire_department
                       : Icons.local_fire_department_outlined,
                   label: _reacted
-                      ? (_reactionCount > 1 ? 'Reacted · $_reactionCount' : 'Reacted')
-                      : (_reactionCount > 0 ? 'React · $_reactionCount' : 'React'),
+                      ? (_reactionCount > 1
+                            ? 'Reacted · $_reactionCount'
+                            : 'Reacted')
+                      : (_reactionCount > 0
+                            ? 'React · $_reactionCount'
+                            : 'React'),
                   active: _reacted,
                   onTap: _toggleReaction,
                 ),
@@ -721,8 +728,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       }
       final faster = delta < 0;
       final mag = _paceFromSeconds(
-        UnitUtils.displayPaceSeconds(delta.abs().toDouble(), _useMiles)
-            .round(),
+        UnitUtils.displayPaceSeconds(delta.abs().toDouble(), _useMiles).round(),
       );
       return _pill(
         c,
@@ -1017,10 +1023,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         if (s.paceSeconds != null)
           FlSpot(
             UnitUtils.displayDistance(s.distanceKm, _useMiles),
-            -UnitUtils.displayPaceSeconds(
-              s.paceSeconds!.toDouble(),
-              _useMiles,
-            ),
+            -UnitUtils.displayPaceSeconds(s.paceSeconds!.toDouble(), _useMiles),
           ),
     ];
     return _card(
@@ -1052,7 +1055,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final spots = [
       for (final s in a.telemetrySeries)
         if (s.elevationM != null)
-          FlSpot(UnitUtils.displayDistance(s.distanceKm, _useMiles), s.elevationM!),
+          FlSpot(
+            UnitUtils.displayDistance(s.distanceKm, _useMiles),
+            s.elevationM!,
+          ),
     ];
     return _card(
       c,

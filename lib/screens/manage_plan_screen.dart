@@ -8,6 +8,7 @@ import '../engines/plan/plan_materialization_coordinator.dart';
 import '../models/race_plan.dart';
 import '../models/training_phase.dart';
 import '../services/training_days_service.dart';
+import '../widgets/ambient_scaffold.dart';
 
 class ManagePlanScreen extends StatefulWidget {
   final VoidCallback? onPlanChanged;
@@ -49,12 +50,13 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
         _goalRace = memory.racePlan!.goalRace;
         _raceDate = memory.racePlan!.raceDate;
       }
-      _longRunDayIndex = (memory.longRunDayIndex != null &&
+      _longRunDayIndex =
+          (memory.longRunDayIndex != null &&
               trainingDays.contains(memory.longRunDayIndex))
           ? memory.longRunDayIndex
           : (trainingDays.isEmpty
-              ? null
-              : trainingDays.reduce((a, b) => a > b ? a : b));
+                ? null
+                : trainingDays.reduce((a, b) => a > b ? a : b));
       _isLoading = false;
     });
   }
@@ -68,15 +70,16 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
       lastDate: DateTime.now().add(const Duration(days: 730)),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: c.accent,
-            brightness: Theme.of(ctx).brightness,
-          ).copyWith(
-            primary: c.accent,
-            onPrimary: c.onAccent,
-            surface: c.surface,
-            onSurface: c.textPrimary,
-          ),
+          colorScheme:
+              ColorScheme.fromSeed(
+                seedColor: c.accent,
+                brightness: Theme.of(ctx).brightness,
+              ).copyWith(
+                primary: c.accent,
+                onPrimary: c.onAccent,
+                surface: c.surface,
+                onSurface: c.textPrimary,
+              ),
         ),
         child: child!,
       ),
@@ -286,7 +289,9 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
     final now = DateTime.now();
     final currentWeek = plan?.currentWeek(now);
     final phase =
-        currentWeek?.phase ?? plan?.weeks.firstOrNull?.phase ?? TrainingPhase.base;
+        currentWeek?.phase ??
+        plan?.weeks.firstOrNull?.phase ??
+        TrainingPhase.base;
     final weeklyKm = currentWeek?.targetKm ?? plan?.startingWeeklyKm;
     final weeksLeft = _weeksRemaining();
 
@@ -479,10 +484,7 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
             ),
             const SizedBox(width: 10),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 5,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 color: c.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
@@ -512,7 +514,9 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
           child: Padding(
             padding: EdgeInsets.only(right: i == 6 ? 0 : 6),
             child: GestureDetector(
-              onTap: enabled ? () => setState(() => _longRunDayIndex = i) : null,
+              onTap: enabled
+                  ? () => setState(() => _longRunDayIndex = i)
+                  : null,
               child: Container(
                 height: 46,
                 alignment: Alignment.center,
@@ -636,8 +640,7 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
       appBar: AppBar(
         title: Text(
           'Manage Plan',

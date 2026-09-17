@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
+import '../widgets/ambient_scaffold.dart';
 
 const _bugReportUrl = 'https://form.typeform.com/to/E0c0vC59';
 const _featureRequestUrl = 'https://form.typeform.com/to/a2Icpu0I';
@@ -44,8 +45,7 @@ class FeedbackScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
       appBar: AppBar(
         title: Text(
           'Feedback & Support',

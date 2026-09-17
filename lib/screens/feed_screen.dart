@@ -14,6 +14,7 @@ import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/date_format_utils.dart';
 import '../utils/unit_utils.dart';
+import '../widgets/ambient_scaffold.dart';
 import '../widgets/route_trace_painter.dart';
 import '../widgets/run_comments_sheet.dart';
 import 'activity_detail_screen.dart';
@@ -115,8 +116,8 @@ class _FeedScreenState extends State<FeedScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
+      safeArea: false,
       appBar: AppBar(
         title: Text(
           'Activity Feed',
@@ -311,7 +312,8 @@ class _RunFeedCardState extends State<RunFeedCard> {
       _kudosed = !wasReacted;
       _reactionCount = prevCount + (_kudosed ? 1 : -1);
     });
-    final toggle = widget.reactionToggler ?? SocialService.instance.toggleReaction;
+    final toggle =
+        widget.reactionToggler ?? SocialService.instance.toggleReaction;
     final result = await toggle(run.runId, currentlyReacted: wasReacted);
     if (!mounted) return;
     if (result == null) {

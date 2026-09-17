@@ -19,6 +19,7 @@ import 'feedback_screen.dart';
 import '../utils/refreshable.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/achievement_tile.dart';
+import '../widgets/ambient_scaffold.dart';
 import '../widgets/athlete_profile_header.dart';
 import '../widgets/best_efforts_preview_card.dart';
 import '../widgets/shoe_edit_sheet.dart';
@@ -295,8 +296,8 @@ class _YouScreenState extends State<YouScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
+      safeArea: false,
       appBar: AppBar(
         title: Text(
           'You',
