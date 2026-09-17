@@ -1537,16 +1537,7 @@ class _HomeScreenState extends State<HomeScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildSectionLabel("TODAY'S WORKOUT"),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_weather != null) ...[
-                        _buildWeatherChip(),
-                        const SizedBox(width: 10),
-                      ],
-                      _buildFreeRunButton(),
-                    ],
-                  ),
+                  if (_weather != null) _buildWeatherChip(),
                 ],
               ),
               const SizedBox(height: 10),
@@ -1793,41 +1784,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// Quick Start — jump to the Record tab and begin an unguided Free Run.
-  Widget _buildFreeRunButton() {
-    final c = context.colors;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        widget.onQuickStartFreeRun?.call();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: c.accent.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: c.accent.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.bolt, size: 14, color: c.accent),
-            const SizedBox(width: 4),
-            Text(
-              'Free Run',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: c.accent,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomCarousel() {
     // Coach tab is execution-only: just this week's adherence circles. Raw
     // mileage totals and the last-run recap live on the You tab now.
@@ -1908,6 +1864,7 @@ class _HomeScreenState extends State<HomeScreen>
                     : Colors.white;
                 final showColor = hasRun || plannedDay != null;
                 final materializedDay = _materializedDayForWeekday(i);
+                final isSkipped = materializedDay?.isSkipped ?? false;
                 final distanceKm = materializedDay?.plannedKm;
                 final useMiles = _distanceUnit == 'miles';
                 final distanceLabel =
@@ -1947,14 +1904,27 @@ class _HomeScreenState extends State<HomeScreen>
                         height: 32,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: showColor ? dayColor : Colors.transparent,
+                          color: isSkipped
+                              // Muted well below the normal fill — a
+                              // deliberate skip should never read as an
+                              // overdue/forgotten session.
+                              ? c.divider.withValues(alpha: 0.5)
+                              : (showColor ? dayColor : Colors.transparent),
                           border: isToday
                               ? Border.all(color: c.accent, width: 2)
+                              : isSkipped
+                              ? Border.all(color: c.textTertiary, width: 1.5)
                               : showColor
                               ? null
                               : Border.all(color: c.border, width: 1.5),
                         ),
-                        child: hasRun
+                        child: isSkipped
+                            ? Icon(
+                                Icons.skip_next_rounded,
+                                size: 16,
+                                color: c.textTertiary,
+                              )
+                            : hasRun
                             ? const Icon(
                                 Icons.check,
                                 size: 15,
@@ -1962,7 +1932,18 @@ class _HomeScreenState extends State<HomeScreen>
                               )
                             : null,
                       ),
-                      if (distanceLabel != null) ...[
+                      if (isSkipped) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'SKIPPED',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                            color: c.textTertiary,
+                          ),
+                        ),
+                      ] else if (distanceLabel != null) ...[
                         const SizedBox(height: 4),
                         Text(
                           distanceLabel,

@@ -83,7 +83,7 @@ class WeatherService {
     final cached = await _readCache();
     if (!forceRefresh && cached != null && !cached.isStale) return cached;
 
-    final position = await _getLocation();
+    final position = await getLocation();
     if (position == null) return cached; // stale cache is better than nothing
 
     final snapshot = await _fetchFromOpenMeteo(
@@ -98,7 +98,10 @@ class WeatherService {
 
   // ── Location ──────────────────────────────────────────────────────────
 
-  static Future<Position?> _getLocation() async {
+  /// Public so [LocationService] can reuse the same permission/timeout
+  /// handling to reverse-geocode a human-readable place name, without
+  /// duplicating this logic.
+  static Future<Position?> getLocation() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) return null;
 

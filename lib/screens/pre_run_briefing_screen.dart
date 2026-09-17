@@ -5,6 +5,7 @@ import '../engines/config/workout_template_library.dart';
 import '../engines/daily/weather_scaler.dart';
 import '../engines/plan/plan_store.dart';
 import '../services/analytics_service.dart' show Analytics;
+import '../services/location_service.dart';
 import '../services/weather_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/database_service.dart';
@@ -55,6 +56,11 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
   bool _weatherPacingEnabled = false;
   static const _weatherScaler = WeatherScaler();
 
+  /// Reverse-geocoded "City, Region" — null (never blocks the weather card
+  /// itself) while resolving or on any failure, in which case the card shows
+  /// a generic "Current Location" label instead.
+  String? _locationLabel;
+
   // ── Link / Skip busy state ───────────────────────────────────────────────
   bool _busy = false;
 
@@ -75,6 +81,10 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
     super.initState();
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
     _loadWeather();
+    // Fire-and-forget, independent of the weather fetch — geocoding is
+    // purely decorative and must never hold up the weather card (or the
+    // first frame) while it resolves.
+    _loadLocationLabel();
   }
 
   Future<void> _loadWeather() async {
@@ -84,6 +94,12 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
       _weather = weather;
       _weatherLoading = false;
     });
+  }
+
+  Future<void> _loadLocationLabel() async {
+    final label = await LocationService.getCurrentLocationLabel();
+    if (!mounted || label == null) return;
+    setState(() => _locationLabel = label);
   }
 
   void _onUnitPrefChanged() {
@@ -353,7 +369,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Feels like ${weather.apparentTempC.round()}° · Current location',
+                        'Feels like ${weather.apparentTempC.round()}° · ${_locationLabel ?? 'Current Location'}',
                         style: textTheme.bodySmall?.copyWith(
                           color: c.textTertiary,
                         ),
