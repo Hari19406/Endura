@@ -1576,17 +1576,73 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       body: Stack(
         children: [
+          // Base fill — the solid color every glow node fades out to.
+          Positioned.fill(child: ColoredBox(color: c.background)),
+          // Ambient lighting nodes, staggered zig-zag around the edges.
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(-1.0, -1.0),
-                  radius: 1.2,
-                  colors: [
-                    c.heroGradientEnd.withValues(alpha: 0.14),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.7],
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(-1.1, -0.9),
+                    radius: 1.2,
+                    colors: [
+                      c.heroGradientEnd.withValues(alpha: 0.20),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(1.2, -0.25),
+                    radius: 1.1,
+                    colors: [
+                      c.heroGradientStart.withValues(alpha: 0.15),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(-1.2, 0.4),
+                    radius: 1.1,
+                    colors: [
+                      c.heroGradientEnd.withValues(alpha: 0.14),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(1.1, 0.95),
+                    radius: 1.2,
+                    colors: [
+                      c.heroGradientStart.withValues(alpha: 0.16),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7],
+                  ),
                 ),
               ),
             ),
