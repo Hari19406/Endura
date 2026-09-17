@@ -1525,6 +1525,15 @@ class _HomeScreenState extends State<HomeScreen>
     final greetingText = _userName.isNotEmpty
         ? '$_greeting, $_userName'
         : _greeting;
+    // Light-theme surfaces are near-white, so the same low alphas that read
+    // as a punchy glow on a near-black dark background wash out to nothing.
+    // Boost intensity substantially in light mode to compensate.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final glowNode1Alpha = isDark ? 0.28 : 0.42;
+    final glowNode2Alpha = isDark ? 0.22 : 0.35;
+    final glowNode3Alpha = isDark ? 0.20 : 0.32;
+    final glowNode4Alpha = isDark ? 0.24 : 0.38;
+    final glowStop = isDark ? 0.7 : 0.75;
     return Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(
@@ -1587,10 +1596,10 @@ class _HomeScreenState extends State<HomeScreen>
                     center: const Alignment(-1.1, -0.9),
                     radius: 1.3,
                     colors: [
-                      c.heroGradientEnd.withValues(alpha: 0.28),
+                      c.heroGradientEnd.withValues(alpha: glowNode1Alpha),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.7],
+                    stops: [0.0, glowStop],
                   ),
                 ),
               ),
@@ -1604,10 +1613,10 @@ class _HomeScreenState extends State<HomeScreen>
                     center: const Alignment(1.2, -0.25),
                     radius: 1.2,
                     colors: [
-                      c.heroGradientStart.withValues(alpha: 0.22),
+                      c.heroGradientStart.withValues(alpha: glowNode2Alpha),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.7],
+                    stops: [0.0, glowStop],
                   ),
                 ),
               ),
@@ -1621,10 +1630,10 @@ class _HomeScreenState extends State<HomeScreen>
                     center: const Alignment(-1.2, 0.4),
                     radius: 1.2,
                     colors: [
-                      c.heroGradientEnd.withValues(alpha: 0.20),
+                      c.heroGradientEnd.withValues(alpha: glowNode3Alpha),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.7],
+                    stops: [0.0, glowStop],
                   ),
                 ),
               ),
@@ -1638,10 +1647,10 @@ class _HomeScreenState extends State<HomeScreen>
                     center: const Alignment(1.1, 0.95),
                     radius: 1.3,
                     colors: [
-                      c.heroGradientStart.withValues(alpha: 0.24),
+                      c.heroGradientStart.withValues(alpha: glowNode4Alpha),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.7],
+                    stops: [0.0, glowStop],
                   ),
                 ),
               ),

@@ -154,10 +154,10 @@ class AppColors extends ThemeExtension<AppColors> {
     elevationAccent: Color(0xFFC97B1D),
     cadenceAccent: Color(0xFF1FA97A),
     premiumGold: Color(0xFFE3C170),
-    heroGradientStart: Color(0xFFC81865),
-    heroGradientEnd: Color(0xFF6A1B9A),
+    heroGradientStart: Color(0xFF8B1E9F),
+    heroGradientEnd: Color(0xFF591A9C),
     heroGradient: LinearGradient(
-      colors: [Color(0xFFC81865), Color(0xFF6A1B9A)],
+      colors: [Color(0xFF8B1E9F), Color(0xFF591A9C)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
