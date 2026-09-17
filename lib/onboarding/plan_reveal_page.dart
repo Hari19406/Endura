@@ -456,7 +456,7 @@ class _DayCell extends StatelessWidget {
     final isRest = slot == null || slot!.isRest;
     // dayColorForIntent maps rest to white, which was designed for a light
     // surface and reads as a bright blob on EC.bg. Ring it instead.
-    final fill = slotFill(slot);
+    final fill = slotFill(context, slot);
     final km = slot?.distanceKm;
 
     return Column(
@@ -914,7 +914,7 @@ class _PreviewPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRest = slot == null || slot!.isRest;
-    final fill = slotFill(slot);
+    final fill = slotFill(context, slot);
     final km = slot?.distanceKm;
 
     return Column(

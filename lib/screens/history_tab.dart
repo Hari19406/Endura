@@ -405,7 +405,7 @@ class _HistoryTabState extends State<HistoryTab> {
     final selected = _activeType == filter.type;
     final tint = filter.type == null
         ? c.chartAccent
-        : WorkoutTypeStyle.color(filter.type!);
+        : WorkoutTypeStyle.color(context, filter.type!);
 
     return Semantics(
       button: true,
@@ -500,7 +500,7 @@ class _HistoryTabState extends State<HistoryTab> {
   Widget _buildRunCard(RunRecord record) {
     final c = context.colors;
     final typeLabel = WorkoutTypeStyle.label(record.workoutType);
-    final typeColor = WorkoutTypeStyle.color(record.workoutType);
+    final typeColor = WorkoutTypeStyle.color(context, record.workoutType);
 
     return Semantics(
       button: true,

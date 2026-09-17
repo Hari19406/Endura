@@ -911,7 +911,7 @@ class MaterializedWeekStrip extends StatelessWidget {
                 isToday: isToday,
                 color: d.isRest
                     ? Colors.transparent
-                    : dayColorForIntent(d.intent),
+                    : dayColorForIntent(context, d.intent),
                 label: d.isRest ? 'REST' : _intentLabel(d.intent),
                 distanceKm: d.plannedKm,
                 useMiles: useMiles,
@@ -954,7 +954,7 @@ class _ProjectedDayStrip extends StatelessWidget {
           status: isRest
               ? CalendarDayStatus.restDay
               : CalendarDayStatus.upcoming,
-          color: dayColorForIntent(isRest ? null : slot.intent),
+          color: dayColorForIntent(context, isRest ? null : slot.intent),
           label: isRest ? 'REST' : _intentLabel(slot.intent),
           distanceKm: slot?.distanceKm,
           useMiles: useMiles,

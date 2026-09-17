@@ -895,7 +895,9 @@ class RunShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wColor = WorkoutTypeStyle.color(data.workoutType);
+    // Fixed export color — share cards render the same regardless of the
+    // viewer's theme, so this intentionally does not resolve via context.
+    final wColor = WorkoutTypeStyle.exportColor(data.workoutType);
     // Overlay templates are built for compositing over a photo/video, so
     // they stay transparent regardless of the Solid/Transparent toggle.
     final isOverlay =

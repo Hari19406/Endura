@@ -91,8 +91,7 @@ class AppColors extends ThemeExtension<AppColors> {
 
   /// Workout-type/day-circle colors. Single source of truth — replaces the
   /// duplicated hardcoded copies previously scattered across
-  /// workout_type_style.dart, home_screen.dart, weekly_plan_strip.dart,
-  /// weekly_plan_card.dart, and run_screen_summary.dart.
+  /// workout_type_style.dart, home_screen.dart, and run_screen_summary.dart.
   final Color workoutEasy;
   final Color workoutTempo;
   final Color workoutInterval;

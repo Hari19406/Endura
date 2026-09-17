@@ -120,7 +120,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 
   String _workoutLabel(String type) => WorkoutTypeStyle.label(type);
 
-  Color _workoutColor(String type) => WorkoutTypeStyle.color(type);
+  Color _workoutColor(BuildContext context, String type) =>
+      WorkoutTypeStyle.color(context, type);
 
   Future<void> _confirmDeleteWorkout() async {
     HapticFeedback.lightImpact();
@@ -185,7 +186,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final splits =
         (widget.record?.splits as List?)?.cast<Map<String, dynamic>>() ??
         const [];
-    final wColor = _workoutColor(workoutType);
+    final wColor = _workoutColor(context, workoutType);
     final gpsPoints = _getGpsPoints();
 
     final elapsedSeconds = widget.record?.elapsedSeconds as int?;
