@@ -3,8 +3,11 @@
 // Form for the public social identity fields on `profiles`. Coaching config
 // (vDOT, plan, training days) is edited elsewhere and untouched here.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/athlete_profile.dart';
@@ -57,8 +60,35 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
         imageQuality: 90,
       );
       if (picked == null) return;
+
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Profile Photo',
+            toolbarColor: const Color(0xFF00E5CC), // Endura blue
+            toolbarWidgetColor: Colors.white,
+            cropFrameColor: const Color(0xFF00E5CC),
+            cropGridColor: Colors.white24,
+            activeControlsWidgetColor: const Color(0xFF00E5CC),
+            backgroundColor: Colors.black,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            cropStyle: CropStyle.circle,
+          ),
+          IOSUiSettings(
+            title: 'Crop Profile Photo',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            cropStyle: CropStyle.circle,
+          ),
+        ],
+      );
+      if (cropped == null) return;
+
       setState(() => _avatarBusy = true);
-      final raw = await picked.readAsBytes();
+      final raw = await File(cropped.path).readAsBytes();
       final jpeg = AvatarCompressor.toAvatarJpeg(raw);
       if (jpeg == null) {
         setState(() {
