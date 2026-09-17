@@ -9,6 +9,8 @@ import '../services/location_service.dart';
 import '../services/weather_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/database_service.dart';
+import '../utils/workout_type_style.dart' show dayColorForIntent;
+import '../widgets/ambient_scaffold.dart';
 import '../widgets/workout_step_timeline.dart' show StepPaceBand;
 import '../models/scheduled_workout_context.dart';
 import 'run_screen.dart';
@@ -16,38 +18,128 @@ import '../utils/unit_utils.dart';
 
 enum BlockState { pending, done }
 
-// ── Dynamic ambient palette ─────────────────────────────────────────────────
+// ── Chasing-dash cloud loader ────────────────────────────────────────────────
 
-/// The two-stop wash used for a workout's ambient header glow and its step
-/// card accents — chosen by training intent, not by phase/week (those were
-/// stripped from this screen).
-@immutable
-class _WorkoutGlow {
-  final Color primary;
-  final Color dark;
-  const _WorkoutGlow(this.primary, this.dark);
-}
+/// An upright cloud outline whose contour is drawn as a dashed stroke that
+/// continuously marches around the perimeter ("chasing dash" / marching
+/// ants) — the cloud silhouette itself never moves or rotates.
+class _ChasingDashCloud extends StatelessWidget {
+  final Animation<double> animation;
+  final Color color;
 
-_WorkoutGlow _glowForIntent(WorkoutIntent intent) {
-  switch (intent) {
-    case WorkoutIntent.aerobicBase:
-    case WorkoutIntent.endurance:
-      return const _WorkoutGlow(Color(0xFF1E50FF), Color(0xFF0D2040));
-    case WorkoutIntent.vo2max:
-    case WorkoutIntent.speed:
-      return const _WorkoutGlow(Color(0xFFFF5500), Color(0xFF4A1500));
-    case WorkoutIntent.threshold:
-    case WorkoutIntent.raceSpecific:
-      return const _WorkoutGlow(Color(0xFFFFC107), Color(0xFF4A3500));
+  const _ChasingDashCloud({required this.animation, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) => CustomPaint(
+        painter: _ChasingDashCloudPainter(
+          progress: animation.value,
+          color: color,
+        ),
+      ),
+    );
   }
 }
 
-const _kCardBg = Color(0xFF12161F);
-const _kCardBorder = Color(0xFF1E2535);
-const _kStepBodyBg = Color(0xFF141923);
-const _kPrimaryBlue = Color(0xFF007AFF);
-const _kDangerRed = Color(0xFFFF3B30);
-const _kWarmupBlue = Color(0xFF1E50FF);
+class _ChasingDashCloudPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  const _ChasingDashCloudPainter({required this.progress, required this.color});
+
+  static const _dashLength = 5.0;
+  static const _gapLength = 4.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cloudPath = _buildCloudPath(size);
+    // One full dash+gap pattern length of travel per animation loop —
+    // `progress` runs 0→1 on repeat, so the phase at 1.0 lands exactly back
+    // on the phase at 0.0 (mod pattern length), giving a seamless loop with
+    // no visible jump/reset.
+    final patternLength = _dashLength + _gapLength;
+    final phase = progress * patternLength * 2;
+    final dashed = _dashedPath(cloudPath, _dashLength, _gapLength, phase);
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(dashed, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChasingDashCloudPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.color != color;
+}
+
+/// A simple rounded cloud silhouette: a pill-shaped base with three
+/// overlapping circular bumps unioned on top, built with `Path.combine` so
+/// the result is a single clean outline rather than overlapping strokes.
+Path _buildCloudPath(Size size) {
+  final w = size.width;
+  final h = size.height;
+
+  final base = Path()
+    ..addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.06, h * 0.46, w * 0.88, h * 0.46),
+        Radius.circular(h * 0.23),
+      ),
+    );
+
+  final bumps = <Offset, double>{
+    Offset(w * 0.27, h * 0.46): h * 0.30,
+    Offset(w * 0.50, h * 0.34): h * 0.36,
+    Offset(w * 0.72, h * 0.46): h * 0.30,
+  };
+
+  var path = base;
+  for (final entry in bumps.entries) {
+    final bump = Path()
+      ..addOval(Rect.fromCircle(center: entry.key, radius: entry.value));
+    path = Path.combine(PathOperation.union, path, bump);
+  }
+  return path;
+}
+
+/// Walks every contour of [source] and rebuilds it as alternating dash/gap
+/// segments offset by [phase], so animating [phase] over time produces a
+/// continuous "marching ants" effect along the outline.
+Path _dashedPath(
+  Path source,
+  double dashLength,
+  double gapLength,
+  double phase,
+) {
+  final dashPath = Path();
+  final patternLength = dashLength + gapLength;
+
+  for (final metric in source.computeMetrics()) {
+    final total = metric.length;
+    var distance = phase % patternLength;
+    if (distance < 0) distance += patternLength;
+
+    var start = -distance;
+    while (start < total) {
+      final end = start + dashLength;
+      final clampedStart = start.clamp(0.0, total);
+      final clampedEnd = end.clamp(0.0, total);
+      if (clampedEnd > clampedStart) {
+        dashPath.addPath(
+          metric.extractPath(clampedStart, clampedEnd),
+          Offset.zero,
+        );
+      }
+      start += patternLength;
+    }
+  }
+  return dashPath;
+}
 
 class PreRunBriefingScreen extends StatefulWidget {
   final message.CoachMessage coachMessage;
@@ -84,10 +176,12 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     with SingleTickerProviderStateMixin {
   bool _useMiles = UnitUtils.useMilesNotifier.value;
 
-  /// Drives the rotating cloud icon shown while the weather card is loading.
-  late final AnimationController _cloudSpinController = AnimationController(
+  /// Drives the chasing-dash outline animation on the cloud icon shown while
+  /// the weather card is loading — the cloud body stays upright; only the
+  /// dashes marching around its contour move.
+  late final AnimationController _cloudDashController = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 2),
+    duration: const Duration(milliseconds: 1400),
   )..repeat();
 
   // ── Weather-adjusted pacing ────────────────────────────────────────────
@@ -149,7 +243,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
   @override
   void dispose() {
     UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
-    _cloudSpinController.dispose();
+    _cloudDashController.dispose();
     super.dispose();
   }
 
@@ -365,17 +459,17 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _kCardBg,
-          border: Border.all(color: _kCardBorder, width: 1),
+          color: c.surface,
+          border: Border.all(color: c.border, width: 1),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            RotationTransition(
-              turns: _cloudSpinController,
-              child: Icon(
-                Icons.cloud_queue_rounded,
-                size: 28,
+            SizedBox(
+              width: 34,
+              height: 26,
+              child: _ChasingDashCloud(
+                animation: _cloudDashController,
                 color: c.textSecondary,
               ),
             ),
@@ -424,8 +518,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _kCardBg,
-          border: Border.all(color: _kCardBorder, width: 1),
+          color: c.surface,
+          border: Border.all(color: c.border, width: 1),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -563,20 +657,122 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     return '$dateStr · ${dist.toStringAsFixed(1)} $unit total';
   }
 
-  Widget _buildAmbientGlow(_WorkoutGlow glow) {
+  /// A soft top-of-screen wash tinted by the workout's training intent,
+  /// layered above [AmbientScaffold]'s own shared background nodes — resolves
+  /// through [dayColorForIntent] so it tracks the same tokens as every other
+  /// intent/interval accent on this screen instead of a one-off hex value.
+  Widget _buildAmbientGlow(Color intentColor) {
     return IgnorePointer(
       child: Container(
-        height: 300,
+        height: 260,
         decoration: BoxDecoration(
           gradient: RadialGradient(
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              glow.primary.withValues(alpha: 0.32),
-              glow.dark.withValues(alpha: 0.18),
+              intentColor.withValues(alpha: 0.30),
               Colors.transparent,
             ],
-            stops: const [0, 0.5, 1],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Sticky Start/Link/Skip stack that floats over the ambient background —
+  /// a bottom-fade scrim keeps the buttons legible over whatever card or glow
+  /// scrolls beneath them.
+  Widget _buildFloatingActions(AppColors c) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              c.background.withValues(alpha: 0),
+              c.background.withValues(alpha: 0.92),
+              c.background,
+            ],
+            stops: const [0, 0.35, 1],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_canLinkOrSkip) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : _openLinkActivitySheet,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: c.textPrimary,
+                      side: BorderSide(color: c.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: const Text(
+                      'Link Activity',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: _busy ? 0.5 : 1,
+                child: Container(
+                  width: double.infinity,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: c.heroGradient,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: _busy ? null : _startWorkout,
+                      child: Center(
+                        child: Text(
+                          widget.coachMessage.hasWarmupCooldown
+                              ? 'Start Workout'
+                              : 'Start Run',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (_canLinkOrSkip) ...[
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: _busy ? null : _confirmSkip,
+                  style: TextButton.styleFrom(foregroundColor: c.danger),
+                  child: const Text(
+                    'Skip Workout',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -587,10 +783,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
   Widget build(BuildContext context) {
     final workout = _displayedWorkout;
     final c = context.colors;
-    final glow = _glowForIntent(widget.coachMessage.workoutIntent);
+    final intentColor = dayColorForIntent(context, widget.coachMessage.workoutIntent);
 
-    return Scaffold(
-      backgroundColor: c.background,
+    return AmbientScaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -602,11 +797,16 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
       ),
       body: Stack(
         children: [
-          Positioned(top: 0, left: 0, right: 0, child: _buildAmbientGlow(glow)),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _buildAmbientGlow(intentColor),
+          ),
           SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20).copyWith(
               top: 4,
-              bottom: 24,
+              bottom: 150,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -648,76 +848,10 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
 
                 // ── Step breakdown cards ──────────────────────────────────
                 _buildStepCards(workout),
-
-                const SizedBox(height: 24),
-
-                // ── Actions ────────────────────────────────────────────────
-                if (_canLinkOrSkip) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: OutlinedButton(
-                      onPressed: _busy ? null : _openLinkActivitySheet,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: c.textPrimary,
-                        side: BorderSide(color: c.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        'Link Activity',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _busy ? null : _startWorkout,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kPrimaryBlue,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: _kPrimaryBlue.withValues(alpha: 0.5),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: Text(
-                      widget.coachMessage.hasWarmupCooldown
-                          ? 'Start Workout'
-                          : 'Start Run',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
-                  ),
-                ),
-                if (_canLinkOrSkip) ...[
-                  const SizedBox(height: 4),
-                  Center(
-                    child: TextButton(
-                      onPressed: _busy ? null : _confirmSkip,
-                      style: TextButton.styleFrom(foregroundColor: _kDangerRed),
-                      child: const Text(
-                        'Skip Workout',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
+          _buildFloatingActions(c),
         ],
       ),
     );
@@ -762,8 +896,9 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final band = StepPaceBand.forBlock(block, intent, useMiles: useMiles);
-    final headerColor = _headerColor();
+    final headerColor = _headerColor(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -804,9 +939,14 @@ class _StepCard extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: _kStepBodyBg,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+            decoration: BoxDecoration(
+              color: c.surface,
+              border: Border(
+                left: BorderSide(color: c.border, width: 1),
+                right: BorderSide(color: c.border, width: 1),
+                bottom: BorderSide(color: c.border, width: 1),
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -833,10 +973,10 @@ class _StepCard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           _primaryLine(band),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFF4F4F5),
+                            color: c.textPrimary,
                             height: 1.4,
                           ),
                         ),
@@ -850,9 +990,9 @@ class _StepCard extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 36),
                     child: Text(
                       _recoveryLine()!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
-                        color: Color(0xFF8A8A8F),
+                        color: c.textTertiary,
                         height: 1.4,
                       ),
                     ),
@@ -868,9 +1008,13 @@ class _StepCard extends StatelessWidget {
 
   // ── Derived text ──────────────────────────────────────────────────────────
 
-  Color _headerColor() {
-    if (block.type != BlockType.main) return _kWarmupBlue;
-    return _glowForIntent(intent).primary;
+  /// Warmup/cooldown/recovery always read as the low-intensity "easy" token;
+  /// main-set blocks resolve dynamically through [dayColorForIntent] so this
+  /// stays in lockstep with every other intent/interval accent in the app.
+  Color _headerColor(BuildContext context) {
+    final c = context.colors;
+    if (block.type != BlockType.main) return c.workoutEasy;
+    return dayColorForIntent(context, intent);
   }
 
   String _title() {
