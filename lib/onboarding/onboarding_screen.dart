@@ -529,6 +529,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _animateTo(next);
   }
 
+  /// The race picker's ✕. In the full flow it steps back to the goal screen;
+  /// in the shortened (re-plan) flow the picker is the first page, so there is
+  /// nothing to step back to and it leaves the wizard entirely.
+  void _closeRacePicker() {
+    if (!_editReturn && _current == 0) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    _prev();
+  }
+
   void _prev() {
     // Backing out of an edit abandons it and returns to the reveal rather than
     // walking backwards through the questionnaire.
@@ -1108,7 +1119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _paceDistance = _paceDistFor(_goal);
           });
         },
-        onClose: _prev,
+        onClose: _closeRacePicker,
         onAdvance: _advanceFromRacePicker,
       ),
 
