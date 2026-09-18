@@ -1562,11 +1562,13 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(height: 2),
             Text(
-              DateFormat('EEEE, MMM d').format(DateTime.now()),
+              _headerSubtitle(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: c.textTertiary,
+                color: c.textSecondary,
               ),
             ),
           ],
@@ -1615,10 +1617,6 @@ class _HomeScreenState extends State<HomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_raceDate != null && _raceDate!.isAfter(DateTime.now())) ...[
-                _buildRaceCountdownChip(),
-                const SizedBox(height: 14),
-              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1775,36 +1773,20 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildRaceCountdownChip() {
-    final days = _raceDate!.difference(DateTime.now()).inDays;
-    final label = days == 0
+  /// "Saturday, Sep 19 • 56 days to 10K" — falls back to just the date when
+  /// there's no upcoming race date.
+  String _headerSubtitle() {
+    final now = DateTime.now();
+    final date = DateFormat('EEEE, MMM d').format(now);
+    final race = _raceDate;
+    if (race == null || !race.isAfter(now)) return date;
+    final days = race.difference(now).inDays;
+    final countdown = days == 0
         ? 'Race day — $_goalRaceName!'
         : days == 1
         ? '1 day to $_goalRaceName'
         : '$days days to $_goalRaceName';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFFFECB3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.flag_outlined, size: 13, color: Color(0xFF856404)),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF856404),
-            ),
-          ),
-        ],
-      ),
-    );
+    return '$date • $countdown';
   }
 
   Widget _buildWeatherChip() {
