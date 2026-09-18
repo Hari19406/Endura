@@ -554,6 +554,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     while (prev >= 0 && _isSkipped(_sequence[prev])) {
       prev--;
     }
+    if (prev < 0) {
+      // First page: leave the flow if it was pushed as a route (e.g. from
+      // Home). During first-run onboarding it is the root, so there's nowhere
+      // to go back to.
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      return;
+    }
     _animateTo(prev);
   }
 

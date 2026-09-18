@@ -1129,6 +1129,22 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  /// Empty-state "Start my new plan" — launches the full intake flow from the
+  /// goal screen ("What are you training for?"), not the shortened race-first one.
+  Future<void> _onStartNewPlan() async {
+    HapticFeedback.mediumImpact();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (routeContext) => OnboardingScreen(
+          onComplete: () {
+            Navigator.of(routeContext).pop();
+            loadData();
+          },
+        ),
+      ),
+    );
+  }
+
   /// User tapped "I need a break — remind me in 2 weeks".
   Future<void> _onRemindLater() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1654,7 +1670,7 @@ class _HomeScreenState extends State<HomeScreen>
                   onRemindLater: _onRemindLater,
                 )
               else if (_engineMemory?.hasRacePlan != true) ...[
-                BuildPlanHeroCard(onStartPlan: _onStartNextPlan),
+                BuildPlanHeroCard(onStartPlan: _onStartNewPlan),
                 const SizedBox(height: 12),
                 const CoachPrinciplesCard(),
                 const SizedBox(height: 20),
