@@ -1941,12 +1941,37 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _openManagePlan() async {
     HapticFeedback.lightImpact();
-    await Navigator.push(
+    final planRemoved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ManagePlanScreen(onPlanChanged: loadData),
       ),
     );
+    if (planRemoved == true && mounted) {
+      // Drop every plan-derived field right now so nothing stale can keep the
+      // active-plan branch alive while the reload below runs.
+      setState(() {
+        _engineMemory = _engineMemory?.copyWith(
+          clearRacePlan: true,
+          clearActivePlan: true,
+        );
+        _activePlan = null;
+        _workoutModel = null;
+        _coachMessage = null;
+        _scheduledContext = null;
+        _thisWeekMaterialized = null;
+        _thisWeekPlanId = null;
+        _thisWeekPlanBuiltAt = null;
+        _adaptationPrompt = null;
+        _raceDate = null;
+        _showPlanComplete = false;
+      });
+      // loadData() silently no-ops while another load is in flight (e.g. the
+      // one ManagePlanScreen fired), so wait it out rather than losing ours.
+      for (var i = 0; i < 300 && _isFetching && mounted; i++) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+    }
     // Belt-and-suspenders: ManagePlanScreen already calls onPlanChanged
     // (loadData) itself before popping, but that call is fire-and-forget
     // from a VoidCallback — if it lands mid another in-flight loadData()

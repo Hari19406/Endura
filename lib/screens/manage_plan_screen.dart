@@ -251,7 +251,7 @@ class _ManagePlanScreenState extends State<ManagePlanScreen> {
 
       if (mounted) {
         widget.onPlanChanged?.call();
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       }
     }
   }
