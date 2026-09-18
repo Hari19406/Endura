@@ -31,8 +31,10 @@ class EC {
   static const textPrimary = Color(0xFFFFFFFF);
   static const textSecondary = Color(0xFF9A9A9A);
   static const muted = Color(0xFF555555);
-  static const teal = Color(0xFF00C2A8);
-  static const tealDim = Color(0xFF00856F);
+  // Primary accent — named "teal" historically; now Night Ultra Hyper Violet
+  // (matches AppColors.workoutTempo / dark heroGradientEnd family).
+  static const teal = Color(0xFF8C52FF);
+  static const tealDim = Color(0xFF5A34A6);
   static const red = Color(0xFFE84040);
   static const amber = Color(0xFFF0A800);
   static const violet = Color(0xFF7C6EF0);
@@ -43,8 +45,8 @@ class EC {
   /// Dimmed icon-background swatches paired with the accent foregrounds
   /// above (e.g. [tealBg] behind a [teal] icon). Named here instead of
   /// repeating the same literals across onboarding_pages.dart.
-  static const tealBg = Color(0xFF003D35);
-  static const tealBgAlt = Color(0xFF0F2E1E);
+  static const tealBg = Color(0x268C52FF); // ~15% violet wash
+  static const tealBgAlt = Color(0x408C52FF); // ~25% violet wash
   static const blueBg = Color(0xFF10202E);
   static const violetBg = Color(0xFF1E1040);
   static const redBg = Color(0xFF3D0000);
