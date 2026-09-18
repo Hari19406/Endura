@@ -50,7 +50,7 @@ class BuildPlanHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Build your first plan',
+            'Build your plan',
             style: textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: c.textPrimary,
@@ -58,7 +58,7 @@ class BuildPlanHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Professional training, personalized to you—built to make you more consistent, fitter, and faster.',
+            'Tailored workouts designed around your targets to get you race-ready with confidence.',
             style: textTheme.bodyMedium?.copyWith(
               color: c.textSecondary,
               height: 1.4,

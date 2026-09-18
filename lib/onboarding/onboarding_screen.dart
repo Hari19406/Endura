@@ -14,6 +14,8 @@ import '../../models/plan_config_state.dart';
 import '../../engines/core/vdot_calculator.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/ambient_scaffold.dart';
 import 'onboarding_pages.dart';
 import 'plan_reveal_data.dart';
 import 'plan_reveal_page.dart';
@@ -1036,12 +1038,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── Build ────────────────────────────────────────────────────────────────
 
+  // Onboarding is a deliberately fixed-dark surface (EC.* tokens, white text),
+  // so its subtree is pinned to the dark theme — otherwise AmbientScaffold
+  // would paint a light base under white text when the app is in light mode.
+  static final ThemeData _darkTheme = AppTheme.dark;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: EC.bg,
-      body: SafeArea(
-        child: Column(
+    return Theme(
+      data: _darkTheme,
+      child: AmbientScaffold(
+        body: Column(
           // IMPORTANT: the top-bar and bottom-bar slots below are ALWAYS
           // present as Column children — never `if (...) Widget(...)` in this
           // list. Column/Flex reconciles children positionally: when an item
