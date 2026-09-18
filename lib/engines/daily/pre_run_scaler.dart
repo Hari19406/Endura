@@ -14,6 +14,7 @@
 ///   Need rest                 → handled at UI layer (shakeout or rest)
 library;
 
+import '../../config/feature_flags.dart';
 import '../config/workout_template_library.dart';
 
 // ============================================================================
@@ -77,8 +78,9 @@ class PreRunScaler {
   const PreRunScaler();
 
   PreRunScaleResult scale(ResolvedWorkout workout, PreRunInputs inputs) {
-    // Upper body pain or fully green → no change.
-    if (inputs.isFullGo || inputs.hasUpperBodyPain) {
+    // Feature disabled, upper body pain, or fully green → no change.
+    if (!enableReadinessPaceAdjustment ||
+        inputs.isFullGo || inputs.hasUpperBodyPain) {
       return PreRunScaleResult(workout: workout);
     }
 

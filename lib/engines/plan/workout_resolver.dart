@@ -17,6 +17,7 @@
 library;
 
 import '../config/workout_template_library.dart';
+import '../../config/feature_flags.dart';
 import 'session_selector.dart';
 import 'volume_calculator.dart';
 import '../core/pace_table.dart';
@@ -450,7 +451,9 @@ class WorkoutResolver {
   // ============================================================================
 
   ScalingTier _tierFromReadiness(SelectorReadiness readiness) =>
-      switch (readiness) {
+      !enableReadinessPaceAdjustment
+      ? ScalingTier.full
+      : switch (readiness) {
         SelectorReadiness.green => ScalingTier.full,
         SelectorReadiness.yellow => ScalingTier.reduced,
         SelectorReadiness.red => ScalingTier.minimum,

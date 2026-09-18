@@ -11,6 +11,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../config/feature_flags.dart';
 import '../theme/app_colors.dart';
 import '../engines/daily/pre_run_scaler.dart';
 import '../engines/daily/weather_scaler.dart';
@@ -30,6 +31,10 @@ Future<void> showPreRunCheck({
   required VoidCallback onSkip,
   WeatherSnapshot? weather,
 }) {
+  if (!enableReadinessPaceAdjustment) {
+    onProceed(coachMessage);
+    return Future<void>.value();
+  }
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
