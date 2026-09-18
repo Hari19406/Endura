@@ -23,19 +23,35 @@ enum CalendarDayStatus {
 
   /// A training day that is today or still ahead.
   upcoming,
+
+  /// A week-1 slot that falls before the plan's start date — the plan is
+  /// Monday-aligned, so a plan created on a Friday still owns Mon–Thu of week
+  /// 1 as slots, but they were never the athlete's to do. Not [missed], and
+  /// not tappable.
+  prePlan,
 }
 
+/// [planStart], when given, is the plan's first day (date-only): any slot
+/// dated before it is [CalendarDayStatus.prePlan]. Omit it for a plan with no
+/// partial first week.
 CalendarDayStatus calendarDayStatus(
   MaterializedDay day, {
   required DateTime scheduledDate,
   required DateTime now,
+  DateTime? planStart,
 }) {
   if (day.completion != null) return CalendarDayStatus.completed;
-  if (day.isSkipped) return CalendarDayStatus.skipped;
-  if (day.isRest) return CalendarDayStatus.restDay;
 
   final sched =
       DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day);
+  if (planStart != null &&
+      sched.isBefore(DateTime(planStart.year, planStart.month, planStart.day))) {
+    return CalendarDayStatus.prePlan;
+  }
+
+  if (day.isSkipped) return CalendarDayStatus.skipped;
+  if (day.isRest) return CalendarDayStatus.restDay;
+
   final today = DateTime(now.year, now.month, now.day);
   if (sched.isBefore(today)) return CalendarDayStatus.missed;
   return CalendarDayStatus.upcoming;

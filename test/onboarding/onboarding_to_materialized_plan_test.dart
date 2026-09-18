@@ -72,7 +72,6 @@ void main() {
       experienceLevel: ExperienceLevel.intermediate,
       vdot: cfg.vDOT.round(),
       inputsFingerprint: 'e2e',
-      now: start,
     );
 
     test('the config carries every screen value unchanged', () {

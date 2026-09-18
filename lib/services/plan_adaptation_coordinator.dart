@@ -72,14 +72,15 @@ class PlanAdaptationCoordinator {
     final done = completedRunDates.map(_dateOnly).toSet();
 
     // Every scheduled (non-rest, has-workout) session strictly before today.
-    final week1Start = _dateOnly(plan.builtAt);
+    // Pre-plan slots (week-1 days before the athlete's start date) were never
+    // theirs to do — counting them would flag a brand-new plan as "missed
+    // three sessions" on day one.
     final scheduled = <DateTime>[];
     for (final w in plan.weeks) {
       for (final day in w.days) {
         if (day.isRest || day.workout == null) continue;
-        final date = week1Start.add(
-          Duration(days: (w.weekNumber - 1) * 7 + day.weekday),
-        );
+        if (plan.isPrePlanDay(w.weekNumber, day.weekday)) continue;
+        final date = plan.dateFor(w.weekNumber, day.weekday);
         if (date.isBefore(today)) scheduled.add(date);
       }
     }

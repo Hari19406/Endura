@@ -9,6 +9,7 @@ library;
 import '../engines/config/workout_template_library.dart'
     show BlockType, ResolvedBlock, ResolvedWorkout;
 import '../engines/plan/materialized_plan.dart';
+import '../utils/plan_calendar.dart';
 
 class ScheduledWorkoutContext {
   /// Stable id for this plan slot: `"<planId>::w<week>::d<weekday>"`.
@@ -86,11 +87,9 @@ class ScheduledWorkoutContext {
               .map((b) => b.paceMaxSecondsPerKm)
               .reduce((a, b) => a > b ? a : b);
 
-    final date = DateTime(
-      planBuiltAt.year,
-      planBuiltAt.month,
-      planBuiltAt.day,
-    ).add(Duration(days: (weekNumber - 1) * 7 + weekday));
+    // [planBuiltAt] is snapped to its week's Monday, so a legacy plan whose
+    // anchor is a raw (non-Monday) timestamp still maps weekday 0 to Monday.
+    final date = PlanCalendar.dateFor(planBuiltAt, weekNumber, weekday);
 
     return ScheduledWorkoutContext(
       dayId: '$planId::w$weekNumber::d$weekday',

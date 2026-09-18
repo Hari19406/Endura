@@ -7,6 +7,7 @@
 library;
 
 import '../../models/training_phase.dart';
+import '../../utils/plan_calendar.dart';
 import '../config/workout_template_library.dart' show ResolvedWorkout, WorkoutIntent;
 
 /// Structural role of a training day. Superset of WeekResolver.SlotType — adds
@@ -223,7 +224,18 @@ class MaterializedPlan {
   static const int schemaVersion = 1;
 
   final String planId;
+
+  /// The plan's date anchor: the Monday of week 1. Every calendar date in the
+  /// plan is `builtAt + (weekNumber-1)*7 + weekday`. Set once from the
+  /// skeleton's creation date (never re-stamped on rebuild), so week 1 can't
+  /// drift. Plans persisted before Monday-alignment hold a raw build timestamp
+  /// here instead — always go through [week1Monday] / [dateFor], which snap it.
   final DateTime builtAt;
+
+  /// The athlete's actual first day on the plan. Null on plans persisted before
+  /// Monday-alignment, where [builtAt] itself was the start — see
+  /// [planStartDate].
+  final DateTime? startDate;
 
   /// vDOT the paces were baked from.
   final int builtFromVdot;
@@ -249,6 +261,7 @@ class MaterializedPlan {
   const MaterializedPlan({
     required this.planId,
     required this.builtAt,
+    this.startDate,
     required this.builtFromVdot,
     required this.inputsFingerprint,
     required this.weeks,
@@ -256,6 +269,28 @@ class MaterializedPlan {
     this.sessionProgress = const {},
     this.adaptationLog = const [],
   });
+
+  /// Monday (date-only) of week 1 — the true anchor for every plan date.
+  DateTime get week1Monday => PlanCalendar.mondayOf(builtAt);
+
+  /// The athlete's first day on the plan (date-only).
+  DateTime get planStartDate => PlanCalendar.dateOnly(startDate ?? builtAt);
+
+  /// The calendar date of [weekNumber] (1-based) / [weekday] (0 = Monday).
+  DateTime dateFor(int weekNumber, int weekday) =>
+      PlanCalendar.dateFor(builtAt, weekNumber, weekday);
+
+  /// The first weekday index (0 = Monday) of [weekNumber] that belongs to the
+  /// athlete. Only week 1 can start mid-week; slots before this index are
+  /// pre-plan.
+  int firstActiveWeekday(int weekNumber) {
+    if (weekNumber != 1) return 0;
+    return PlanCalendar.daysBetween(week1Monday, planStartDate).clamp(0, 6);
+  }
+
+  /// True for a week-1 slot that falls before the plan's start date.
+  bool isPrePlanDay(int weekNumber, int weekday) =>
+      weekNumber == 1 && weekday < firstActiveWeekday(1);
 
   MaterializedWeek? weekByNumber(int n) {
     for (final w in weeks) {
@@ -286,6 +321,7 @@ class MaterializedPlan {
   MaterializedPlan copyWith({
     List<MaterializedWeek>? weeks,
     DateTime? builtAt,
+    DateTime? startDate,
     int? builtFromVdot,
     String? inputsFingerprint,
     Map<String, int>? ladderState,
@@ -294,6 +330,7 @@ class MaterializedPlan {
   }) => MaterializedPlan(
     planId: planId,
     builtAt: builtAt ?? this.builtAt,
+    startDate: startDate ?? this.startDate,
     builtFromVdot: builtFromVdot ?? this.builtFromVdot,
     inputsFingerprint: inputsFingerprint ?? this.inputsFingerprint,
     weeks: weeks ?? this.weeks,
@@ -306,6 +343,7 @@ class MaterializedPlan {
     'schemaVersion': schemaVersion,
     'planId': planId,
     'builtAt': builtAt.toIso8601String(),
+    if (startDate != null) 'startDate': startDate!.toIso8601String(),
     'builtFromVdot': builtFromVdot,
     'inputsFingerprint': inputsFingerprint,
     'ladderState': ladderState,
@@ -318,6 +356,9 @@ class MaterializedPlan {
   factory MaterializedPlan.fromJson(Map<String, dynamic> j) => MaterializedPlan(
     planId: j['planId'] as String,
     builtAt: DateTime.parse(j['builtAt'] as String),
+    startDate: j['startDate'] == null
+        ? null
+        : DateTime.parse(j['startDate'] as String),
     builtFromVdot: (j['builtFromVdot'] as num).toInt(),
     inputsFingerprint: j['inputsFingerprint'] as String,
     ladderState: _intMap(j['ladderState']),

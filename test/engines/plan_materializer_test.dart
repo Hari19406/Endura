@@ -40,7 +40,6 @@ void main() {
     vdot: vdot,
     inputsFingerprint: 'fp-1',
     previous: previous,
-    now: now,
   );
 
   test('every skeleton week is materialised with resolved workouts', () {
@@ -153,7 +152,6 @@ void main() {
       experienceLevel: ExperienceLevel.intermediate,
       vdot: 46,
       inputsFingerprint: 'fp',
-      now: now,
     );
 
     // Walk the non-cutback quality days in order; group consecutive runs on the
@@ -198,7 +196,6 @@ void main() {
       experienceLevel: ExperienceLevel.advanced,
       vdot: 50,
       inputsFingerprint: 'fp',
-      now: now,
     );
     // Non-taper cutbacks only — taper weeks never carry a medium-long.
     final cutbacks = plan.weeks.where(

@@ -19,6 +19,7 @@ import '../services/analytics_service.dart' show Analytics;
 import '../services/plan_restart_service.dart';
 import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
+import '../utils/plan_calendar.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
 import '../widgets/ambient_scaffold.dart';
@@ -247,13 +248,14 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     );
   }
 
-  /// Monday of [weekNumber], anchored on the stored plan's own build date when
-  /// we have it (so the calendar's day dates line up exactly with what
-  /// `WorkoutComplianceMatcher` matched against), else the race-plan's.
+  /// Monday of [weekNumber]. Both anchors are snapped to their week's Monday
+  /// by [PlanCalendar.dateFor], so this is a real Monday even for plans stored
+  /// before Monday-alignment (whose anchor was the raw creation timestamp).
+  /// Prefers the stored plan's own anchor so the calendar's day dates line up
+  /// exactly with what `WorkoutComplianceMatcher` matched against.
   DateTime _mondayOf(int weekNumber) {
     final anchor = _materialized?.builtAt ?? racePlan.createdAt;
-    final a = DateTime(anchor.year, anchor.month, anchor.day);
-    return a.add(Duration(days: (weekNumber - 1) * 7));
+    return PlanCalendar.dateFor(anchor, weekNumber, 0);
   }
 
   @override
@@ -324,6 +326,7 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
                       useMiles: useMiles,
                       materializedWeek: materializedWeek,
                       weekMonday: weekMonday,
+                      planStart: _materialized?.planStartDate,
                       now: now,
                       onDayTap: _showDayDetail,
                       onLockedDayTap: isLocked
@@ -436,7 +439,12 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
             setState(() => _materialized = null);
             _loadMaterialized();
           },
-          dayStatus: calendarDayStatus(day, scheduledDate: date, now: DateTime.now()),
+          dayStatus: calendarDayStatus(
+            day,
+            scheduledDate: date,
+            now: DateTime.now(),
+            planStart: plan?.planStartDate,
+          ),
           completion: day.completion,
         ),
       ),
@@ -503,6 +511,10 @@ class _WeekCard extends StatelessWidget {
   /// shape from [resolution] with no completion status.
   final MaterializedWeek? materializedWeek;
   final DateTime weekMonday;
+
+  /// The plan's first day — week-1 days before it are pre-plan (muted,
+  /// untappable, excluded from the week's workout/distance targets).
+  final DateTime? planStart;
   final DateTime now;
   final void Function(MaterializedWeek week, MaterializedDay day, DateTime date)?
   onDayTap;
@@ -525,6 +537,7 @@ class _WeekCard extends StatelessWidget {
     required this.useMiles,
     required this.weekMonday,
     required this.now,
+    this.planStart,
     this.materializedWeek,
     this.onDayTap,
     this.onLockedDayTap,
@@ -533,7 +546,7 @@ class _WeekCard extends StatelessWidget {
   });
 
   static String _dateRangeLabel(DateTime start) {
-    final end = start.add(const Duration(days: 6));
+    final end = PlanCalendar.shiftDays(start, 6);
     final startFmt = DateFormat('MMM d').format(start);
     final endFmt = DateFormat('MMM d').format(end);
     return '$startFmt – $endFmt';
@@ -629,6 +642,12 @@ class _WeekCard extends StatelessWidget {
                 materializedWeek: materializedWeek,
                 resolution: resolution,
                 useMiles: useMiles,
+                // Only week 1 can start mid-week; every other week's Monday
+                // is after the plan start, which clamps this to 0.
+                firstActiveWeekday: planStart == null
+                    ? 0
+                    : PlanCalendar.daysBetween(weekMonday, planStart!)
+                          .clamp(0, 6),
               ),
             ],
             const SizedBox(height: 16),
@@ -640,6 +659,7 @@ class _WeekCard extends StatelessWidget {
                 ? MaterializedWeekStrip(
                     week: materializedWeek!,
                     weekMonday: weekMonday,
+                    planStart: planStart,
                     now: now,
                     useMiles: useMiles,
                     onDayTap: onDayTap,
@@ -669,10 +689,16 @@ class _WeekStatsRow extends StatelessWidget {
   final WeekResolution resolution;
   final bool useMiles;
 
+  /// First weekday index (0 = Monday) that belongs to the athlete this week —
+  /// non-zero only for a partial first week. Earlier slots are pre-plan and
+  /// don't count toward the workout/distance targets.
+  final int firstActiveWeekday;
+
   const _WeekStatsRow({
     required this.materializedWeek,
     required this.resolution,
     required this.useMiles,
+    this.firstActiveWeekday = 0,
   });
 
   @override
@@ -681,15 +707,21 @@ class _WeekStatsRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final mw = materializedWeek;
-    final totalWorkouts = mw != null
-        ? mw.trainingDays.length
+    final activeTrainingDays = mw?.trainingDays
+        .where((d) => d.weekday >= firstActiveWeekday)
+        .toList();
+    final totalWorkouts = activeTrainingDays != null
+        ? activeTrainingDays.length
         : resolution.days.where((d) => !d.isRest).length;
-    final completedWorkouts = mw?.trainingDays
-            .where((d) => d.isCompleted)
-            .length ??
-        0;
+    final completedWorkouts =
+        activeTrainingDays?.where((d) => d.isCompleted).length ?? 0;
 
-    final targetKm = resolution.targetKm;
+    // A partial first week's distance target is only what's left to run.
+    final targetKm = (mw != null && firstActiveWeekday > 0)
+        ? mw.days
+              .where((d) => d.weekday >= firstActiveWeekday)
+              .fold<double>(0, (s, d) => s + d.plannedKm)
+        : resolution.targetKm;
     final completedKm =
         mw?.days.fold<double>(0, (s, d) => s + (d.completion?.actualKm ?? 0)) ??
             0;
@@ -785,7 +817,9 @@ class _DayCircle extends StatelessWidget {
     final missed = status == CalendarDayStatus.missed;
     final done = status == CalendarDayStatus.completed;
     final skipped = status == CalendarDayStatus.skipped;
-    final distanceLabel = rest || distanceKm == null || distanceKm == 0
+    final prePlan = status == CalendarDayStatus.prePlan;
+    final distanceLabel =
+        rest || prePlan || distanceKm == null || distanceKm == 0
         ? null
         : '${UnitUtils.displayDistance(distanceKm!, useMiles).toStringAsFixed(1)} ${UnitUtils.unitLabel(useMiles)}';
 
@@ -809,6 +843,9 @@ class _DayCircle extends StatelessWidget {
       // border (below) so it doesn't disappear against a light-theme card.
       CalendarDayStatus.restDay => c.workoutRest,
       CalendarDayStatus.upcoming => color,
+      // Empty — the slot exists in the plan's shape but was never the
+      // athlete's; no fill, no glyph.
+      CalendarDayStatus.prePlan => Colors.transparent,
     };
 
     final circle = Container(
@@ -819,6 +856,8 @@ class _DayCircle extends StatelessWidget {
         color: fill,
         border: isToday
             ? Border.all(color: c.accent, width: 2)
+            : prePlan
+            ? Border.all(color: c.divider, width: 1)
             : skipped
             ? Border.all(color: c.textTertiary, width: 1.5)
             : rest
@@ -850,6 +889,8 @@ class _DayCircle extends StatelessWidget {
         Text(
           rest
               ? 'REST'
+              : prePlan
+              ? '—'
               : skipped
               ? 'SKIPPED'
               : label,
@@ -857,7 +898,9 @@ class _DayCircle extends StatelessWidget {
             fontSize: 8,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.3,
-            color: (missed || skipped)
+            color: prePlan
+                ? c.textFaint
+                : (missed || skipped)
                 ? c.textTertiary
                 : (isToday ? c.textPrimary : c.textTertiary),
           ),
@@ -876,12 +919,17 @@ class _DayCircle extends StatelessWidget {
 
 /// A current-or-past week rendered straight from the stored [MaterializedWeek]:
 /// completion comes from [MaterializedDay.completion], "missed" is simply a
-/// past training day with no completion, and every day is tappable.
+/// past training day with no completion, and every day is tappable — except
+/// pre-plan slots (before [planStart]), which are muted and inert.
 class MaterializedWeekStrip extends StatelessWidget {
   final MaterializedWeek week;
 
   /// Monday (date-only) of this week.
   final DateTime weekMonday;
+
+  /// The plan's first day (date-only). Slots dated before it render as
+  /// pre-plan. Null for a plan with no partial first week.
+  final DateTime? planStart;
   final DateTime now;
   final bool useMiles;
   final void Function(MaterializedWeek week, MaterializedDay day, DateTime date)?
@@ -892,6 +940,7 @@ class MaterializedWeekStrip extends StatelessWidget {
     required this.week,
     required this.weekMonday,
     required this.now,
+    this.planStart,
     this.useMiles = false,
     this.onDayTap,
   });
@@ -905,9 +954,13 @@ class MaterializedWeekStrip extends StatelessWidget {
         for (final d in days)
           Builder(
             builder: (_) {
-              final date = weekMonday.add(Duration(days: d.weekday));
-              final status =
-                  calendarDayStatus(d, scheduledDate: date, now: now);
+              final date = PlanCalendar.shiftDays(weekMonday, d.weekday);
+              final status = calendarDayStatus(
+                d,
+                scheduledDate: date,
+                now: now,
+                planStart: planStart,
+              );
               final isToday = date.year == now.year &&
                   date.month == now.month &&
                   date.day == now.day;
@@ -923,7 +976,9 @@ class MaterializedWeekStrip extends StatelessWidget {
                 label: d.isRest ? 'REST' : _intentLabel(d.intent),
                 distanceKm: d.plannedKm,
                 useMiles: useMiles,
-                onTap: onDayTap == null ? null : () => onDayTap!(week, d, date),
+                onTap: (onDayTap == null || status == CalendarDayStatus.prePlan)
+                    ? null
+                    : () => onDayTap!(week, d, date),
               );
             },
           ),
@@ -997,6 +1052,7 @@ class _DayDetailSheet extends StatelessWidget {
       CalendarDayStatus.missed => ('MISSED', c.textTertiary),
       CalendarDayStatus.restDay => ('REST DAY', c.textTertiary),
       CalendarDayStatus.upcoming => ('SCHEDULED', c.accent),
+      CalendarDayStatus.prePlan => ('BEFORE YOUR PLAN', c.textTertiary),
     };
 
     return SafeArea(

@@ -79,7 +79,6 @@ void main() {
       experienceLevel: 'intermediate',
       vdot: 47,
       goalTimeSeconds: 2700,
-      now: now,
     );
 
     final loaded = await PlanStore.instance.load();

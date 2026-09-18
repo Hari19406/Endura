@@ -45,6 +45,7 @@ import '../screens/plan_overview_screen.dart';
 import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/weather_service.dart';
+import '../utils/plan_calendar.dart';
 import '../utils/unit_utils.dart';
 
 // Import the shortened onboarding for post-plan re-onboarding.
@@ -687,6 +688,10 @@ class _HomeScreenState extends State<HomeScreen>
   String? _thisWeekPlanId;
   DateTime? _thisWeekPlanBuiltAt;
 
+  /// The plan's first day — week-1 days before it are pre-plan and render
+  /// muted/disabled in the strip instead of reading as "missed".
+  DateTime? _thisWeekPlanStartDate;
+
   // ── Plan adaptation (inline coach banner) ─────────────────────────────────
   /// A missed-block recalibration the athlete has not yet accepted or
   /// dismissed. Null when there is nothing to review.
@@ -977,7 +982,6 @@ class _HomeScreenState extends State<HomeScreen>
                   goalRace: memory.racePlan!.goalRace,
                   experienceLevel: memory.racePlan!.experienceLevel,
                   vdot: memory.vdotScore,
-                  now: now,
                 );
             if (rebuilt != null) {
               dayContext = rebuilt.contextForWeekday(
@@ -993,6 +997,7 @@ class _HomeScreenState extends State<HomeScreen>
         _thisWeekMaterialized = dayContext?.week;
         _thisWeekPlanId = dayContext?.plan.planId;
         _thisWeekPlanBuiltAt = dayContext?.plan.builtAt;
+        _thisWeekPlanStartDate = dayContext?.plan.planStartDate;
 
         if (dayContext == null) {
           _coachMessage = null;
@@ -1865,11 +1870,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildWeeklyCarouselCard(double width) {
     final now = DateTime.now();
-    final weekMonday = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: now.weekday - 1));
+    // Monday of the *plan* week being shown, from the plan's own Monday
+    // anchor — the same source PlanOverviewScreen uses — so the two strips
+    // can never disagree about which date a slot falls on. Falls back to the
+    // calendar Monday only while no plan has loaded (the strip isn't drawn
+    // then anyway).
+    final shownWeek = _thisWeekMaterialized;
+    final planAnchor = _thisWeekPlanBuiltAt;
+    final weekMonday = (shownWeek != null && planAnchor != null)
+        ? PlanCalendar.dateFor(planAnchor, shownWeek.weekNumber, 0)
+        : PlanCalendar.mondayOf(now);
 
     final runsThisWeek =
         _consistencyData?.runsThisWeek ??
@@ -1900,6 +1910,7 @@ class _HomeScreenState extends State<HomeScreen>
                 : MaterializedWeekStrip(
                     week: _thisWeekMaterialized!,
                     weekMonday: weekMonday,
+                    planStart: _thisWeekPlanStartDate,
                     now: now,
                     useMiles: _distanceUnit == 'miles',
                     onDayTap: _handleThisWeekDayTap,
@@ -1962,6 +1973,7 @@ class _HomeScreenState extends State<HomeScreen>
         _thisWeekMaterialized = null;
         _thisWeekPlanId = null;
         _thisWeekPlanBuiltAt = null;
+        _thisWeekPlanStartDate = null;
         _adaptationPrompt = null;
         _raceDate = null;
         _showPlanComplete = false;
@@ -2073,7 +2085,12 @@ class _HomeScreenState extends State<HomeScreen>
           onGoToRun: () => widget.onNavigateToRun?.call(),
           scheduledContext: scheduledContext,
           onPlanChanged: loadData,
-          dayStatus: calendarDayStatus(day, scheduledDate: dayDate, now: now),
+          dayStatus: calendarDayStatus(
+            day,
+            scheduledDate: dayDate,
+            now: now,
+            planStart: _thisWeekPlanStartDate,
+          ),
           completion: day.completion,
         ),
       ),

@@ -25,6 +25,7 @@ import '../engines/config/workout_template_library.dart'
     show BlockType, ResolvedBlock, ResolvedWorkout, WorkoutIntent;
 import '../engines/plan/materialized_plan.dart';
 import '../models/training_phase.dart';
+import '../utils/plan_calendar.dart';
 
 /// How long the athlete was away, in consecutive missed calendar days.
 enum MissedWindow {
@@ -133,11 +134,11 @@ class PlanAdaptationService {
       );
     }
 
-    final week1Start = _dateOnly(activePlan.builtAt);
+    final week1Start = activePlan.week1Monday;
     final today = _dateOnly(currentDate);
     final total = activePlan.totalWeeks;
     final currentWeekNo =
-        ((today.difference(week1Start).inDays) ~/ 7 + 1).clamp(1, total);
+        (PlanCalendar.daysBetween(week1Start, today) ~/ 7 + 1).clamp(1, total);
     final todayIdx = currentDate.weekday - 1; // 0 = Monday
 
     // The last two week numbers are the race taper and are never volume-scaled
@@ -424,8 +425,7 @@ class PlanAdaptationService {
     required (int, int) ePace,
   }) {
     if (d.weekday < fromIdx || d.completion != null || d.isRest) return d;
-    final dayDate = week1Start
-        .add(Duration(days: (weekNumber - 1) * 7 + d.weekday));
+    final dayDate = PlanCalendar.dateFor(week1Start, weekNumber, d.weekday);
     if (dayDate.isBefore(windowStart) || dayDate.isAfter(windowEnd)) return d;
 
     final isHard = d.slot.isQuality ||

@@ -22,6 +22,7 @@ import '../config/workout_template_library.dart'
 import '../core/vdot_calculator.dart' show pacesFor;
 import '../../models/plan_config_state.dart';
 import '../../models/training_phase.dart';
+import '../../utils/plan_calendar.dart';
 import 'materialized_plan.dart';
 
 /// A logged run, reduced to what adaptation needs. The caller builds these from
@@ -73,9 +74,14 @@ class PlanAdaptation {
       return AdaptationResult(plan: plan, applied: const []);
     }
 
-    final week1Start = _dateOnly(plan.builtAt);
+    final week1Start = plan.week1Monday;
     final currentWeekNo = _weekNumberFor(asOfDate, week1Start, plan.totalWeeks);
     final todayIdx = asOfDate.weekday - 1; // 0 = Monday
+
+    // Week 1 can be a partial week (the plan starts mid-week). Slots before
+    // the start date are pre-plan: never the athlete's, so never "missed",
+    // never counted toward "all done", never part of the planned volume.
+    int firstActive(MaterializedWeek w) => plan.firstActiveWeekday(w.weekNumber);
 
     // ── Partition ──────────────────────────────────────────────────────────
     final frozen = <MaterializedWeek>[];
@@ -83,10 +89,10 @@ class PlanAdaptation {
     final future = <MaterializedWeek>[];
 
     for (final w in plan.weeks) {
-      final wEnd = week1Start.add(Duration(days: w.weekNumber * 7));
+      final wEnd = PlanCalendar.dateFor(week1Start, w.weekNumber + 1, 0);
       final isPast = w.isFrozen ||
           !wEnd.isAfter(asOfDate) ||
-          _allTrainingDaysDone(w);
+          _allTrainingDaysDone(w, fromIdx: firstActive(w));
       if (isPast) {
         frozen.add(w); // by reference — untouched
       } else if (w.weekNumber == currentWeekNo) {
@@ -110,6 +116,7 @@ class PlanAdaptation {
       future: mutatedFuture,
       previousWeek: _weekByNumber(plan, currentWeekNo - 1),
       week1Start: week1Start,
+      firstActive: firstActive,
       asOfDate: asOfDate,
       todayIdx: todayIdx,
       currentWeekNo: currentWeekNo,
@@ -123,6 +130,7 @@ class PlanAdaptation {
       plan: plan,
       history: history,
       week1Start: week1Start,
+      firstActive: firstActive,
       currentWeekNo: currentWeekNo,
       current: mutatedCurrent,
       future: mutatedFuture,
@@ -183,6 +191,7 @@ class PlanAdaptation {
     required List<MaterializedWeek> future,
     required MaterializedWeek? previousWeek,
     required DateTime week1Start,
+    required int Function(MaterializedWeek) firstActive,
     required DateTime asOfDate,
     required int todayIdx,
     required int currentWeekNo,
@@ -190,7 +199,11 @@ class PlanAdaptation {
   }) {
     // 1a — a key day earlier THIS week was missed and days remain: shift it.
     if (current != null) {
-      final missed = _firstMissedKeyDayIndex(current, todayIdx);
+      final missed = _firstMissedKeyDayIndex(
+        current,
+        todayIdx,
+        fromIdx: firstActive(current),
+      );
       if (missed != null) {
         final candidate = _shiftTargetIndex(current, missed, todayIdx);
         if (candidate != null) {
@@ -215,7 +228,11 @@ class PlanAdaptation {
     // 1b — last week ended with a missed key session: carry ONE forward,
     //      or drop it if we're tapering.
     if (previousWeek != null && current != null) {
-      final missedIdx = _firstMissedKeyDayIndex(previousWeek, 7);
+      final missedIdx = _firstMissedKeyDayIndex(
+        previousWeek,
+        7,
+        fromIdx: firstActive(previousWeek),
+      );
       if (missedIdx != null) {
         final missedDay = previousWeek.days[missedIdx];
         final isLong = missedDay.slot == MaterializedSlot.longRun;
@@ -233,7 +250,11 @@ class PlanAdaptation {
           return (current, future);
         }
 
-        final carried = _carryInto(current, missedDay);
+        final carried = _carryInto(
+          current,
+          missedDay,
+          fromIdx: firstActive(current),
+        );
         if (carried != null) {
           log.add(AdaptationLogEntry(
             at: asOfDate,
@@ -259,10 +280,15 @@ class PlanAdaptation {
     return (current, future);
   }
 
-  /// Index of the earliest quality/long day before [beforeIdx] that has no
-  /// completion, or null.
-  static int? _firstMissedKeyDayIndex(MaterializedWeek w, int beforeIdx) {
-    for (var i = 0; i < w.days.length && i < beforeIdx; i++) {
+  /// Index of the earliest quality/long day in `[fromIdx, beforeIdx)` that has
+  /// no completion, or null. [fromIdx] skips a partial first week's pre-plan
+  /// slots.
+  static int? _firstMissedKeyDayIndex(
+    MaterializedWeek w,
+    int beforeIdx, {
+    int fromIdx = 0,
+  }) {
+    for (var i = fromIdx; i < w.days.length && i < beforeIdx; i++) {
       final d = w.days[i];
       if (d.completion == null && _isKey(d.slot) && d.workout != null) return i;
     }
@@ -292,21 +318,23 @@ class PlanAdaptation {
   /// separation and never creating a second long run or a third quality.
   static (MaterializedWeek, int)? _carryInto(
     MaterializedWeek week,
-    MaterializedDay missedDay,
-  ) {
+    MaterializedDay missedDay, {
+    int fromIdx = 0,
+  }) {
     final isLong = missedDay.slot == MaterializedSlot.longRun;
     if (isLong && week.hasLongRun) return null;
     if (!isLong && week.qualityCount >= 2) {
       // replace the lowest-priority quality (quality2) rather than add a third
       final q2 = week.days.indexWhere((d) => d.slot == MaterializedSlot.quality2);
-      if (q2 < 0) return null;
+      // A pre-plan slot can't host a session — it isn't the athlete's day.
+      if (q2 < fromIdx) return null;
       final days = List<MaterializedDay>.of(week.days);
       days[q2] = _withContent(days[q2], from: missedDay);
       if (_hasBackToBackHard(days)) return null;
       return (week.copyWith(days: days), q2);
     }
 
-    for (var j = 0; j < week.days.length; j++) {
+    for (var j = fromIdx; j < week.days.length; j++) {
       final d = week.days[j];
       if (d.completion != null || d.slot != MaterializedSlot.easy) continue;
       final days = List<MaterializedDay>.of(week.days);
@@ -324,6 +352,7 @@ class PlanAdaptation {
     required MaterializedPlan plan,
     required List<RunSession> history,
     required DateTime week1Start,
+    required int Function(MaterializedWeek) firstActive,
     required int currentWeekNo,
     required MaterializedWeek? current,
     required List<MaterializedWeek> future,
@@ -338,10 +367,19 @@ class PlanAdaptation {
     if (wA == null || wB == null) return;
 
     double ratio(MaterializedWeek w) {
-      final planned = w.plannedKm > 0 ? w.plannedKm : w.targetKm;
+      // A partial first week is judged only on the days the athlete actually
+      // had: planned km and the run window both start at the plan's first
+      // active day, not Monday.
+      final fromIdx = firstActive(w);
+      final activePlanned = w.days
+          .where((d) => d.weekday >= fromIdx)
+          .fold<double>(0, (s, d) => s + d.plannedKm);
+      final planned = activePlanned > 0
+          ? activePlanned
+          : (w.plannedKm > 0 ? w.plannedKm : w.targetKm);
       if (planned <= 0) return 1.0;
-      final start = week1Start.add(Duration(days: (w.weekNumber - 1) * 7));
-      final end = start.add(const Duration(days: 7));
+      final start = PlanCalendar.dateFor(week1Start, w.weekNumber, fromIdx);
+      final end = PlanCalendar.dateFor(week1Start, w.weekNumber + 1, 0);
       final done = history
           .where((r) => !r.date.isBefore(start) && r.date.isBefore(end))
           .fold<double>(0, (s, r) => s + r.distanceKm);
@@ -414,8 +452,8 @@ class PlanAdaptation {
     return false;
   }
 
-  static bool _allTrainingDaysDone(MaterializedWeek w) {
-    final training = w.days.where((d) => !d.isRest);
+  static bool _allTrainingDaysDone(MaterializedWeek w, {int fromIdx = 0}) {
+    final training = w.days.where((d) => !d.isRest && d.weekday >= fromIdx);
     return training.isNotEmpty && training.every((d) => d.completion != null);
   }
 
@@ -523,10 +561,8 @@ class PlanAdaptation {
 
   // ── Date / lookup helpers ───────────────────────────────────────────────
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
   static int _weekNumberFor(DateTime asOf, DateTime week1Start, int total) {
-    final elapsed = _dateOnly(asOf).difference(week1Start).inDays;
+    final elapsed = PlanCalendar.daysBetween(week1Start, asOf);
     return (elapsed ~/ 7 + 1).clamp(1, total);
   }
 

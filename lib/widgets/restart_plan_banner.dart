@@ -240,7 +240,7 @@ class _RestartPlanBottomSheetState extends State<RestartPlanBottomSheet> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Update your plan start date to today. This will shift all your workouts forward.',
+                  'Move your plan forward so you pick it up from here. Every workout shifts by whole weeks, so your weeks still run Monday to Sunday.',
                   textAlign: TextAlign.center,
                   style: textTheme.bodyMedium?.copyWith(
                     color: c.textSecondary,
@@ -279,7 +279,7 @@ class _RestartPlanBottomSheetState extends State<RestartPlanBottomSheet> {
                       const SizedBox(height: 12),
                       _bullet(
                         context,
-                        'Your plan start date will update to today',
+                        'Your plan moves forward to the current week',
                       ),
                       const SizedBox(height: 8),
                       _bullet(
@@ -289,7 +289,7 @@ class _RestartPlanBottomSheetState extends State<RestartPlanBottomSheet> {
                       const SizedBox(height: 8),
                       _bullet(
                         context,
-                        'Begin your new training plan from today',
+                        'Pick your training back up from your next workout',
                       ),
                     ],
                   ),

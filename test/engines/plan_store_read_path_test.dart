@@ -33,7 +33,6 @@ void main() {
       experienceLevel: ExperienceLevel.intermediate,
       vdot: 46,
       inputsFingerprint: 'fp-read-path',
-      now: now,
     );
   }
 

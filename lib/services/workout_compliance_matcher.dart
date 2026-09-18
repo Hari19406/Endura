@@ -22,6 +22,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../engines/plan/materialized_plan.dart';
+import '../utils/plan_calendar.dart';
 import '../utils/unit_utils.dart';
 
 /// A logged run reduced to what completion-matching needs. The caller builds
@@ -123,17 +124,22 @@ class WorkoutComplianceMatcher {
       return WorkoutComplianceResult(plan: plan, matches: const []);
     }
 
-    final week1Start = _dateOnly(plan.builtAt);
     final win = windowDays.abs();
 
     // ── Candidate scheduled days ─────────────────────────────────────────────
+    // Dates come from the plan's Monday anchor (`plan.dateFor`) — the same
+    // source the calendar and Home strips use, so a slot's date can never
+    // differ between what's drawn and what's matched. Pre-plan slots (week-1
+    // days before the athlete's start date) were never scheduled for them, so
+    // they can't claim a run.
     final candidates = <_Candidate>[];
     for (final w in plan.weeks) {
       for (final d in w.days) {
         if (d.isRest || d.workout == null || d.completion != null) continue;
-        final sched = week1Start
-            .add(Duration(days: (w.weekNumber - 1) * 7 + d.weekday));
-        candidates.add(_Candidate(w.weekNumber, d, sched));
+        if (plan.isPrePlanDay(w.weekNumber, d.weekday)) continue;
+        candidates.add(
+          _Candidate(w.weekNumber, d, plan.dateFor(w.weekNumber, d.weekday)),
+        );
       }
     }
     if (candidates.isEmpty) {
@@ -158,7 +164,7 @@ class WorkoutComplianceMatcher {
       _Scored? best;
       for (final (aDate, a) in acts) {
         if (claimed.contains(a.id)) continue;
-        final offset = aDate.difference(c.scheduledDate).inDays;
+        final offset = PlanCalendar.daysBetween(c.scheduledDate, aDate);
         if (offset.abs() > win) continue;
 
         final distRatio = target > 0 ? a.distanceKm / target : 1.0;

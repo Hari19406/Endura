@@ -16,11 +16,15 @@ class RouteTracePainter extends CustomPainter {
   /// original spacing so poster output is unchanged.
   final double padding;
 
+  /// Soft black shadow under the line so it stays readable on bright photos.
+  final bool dropShadow;
+
   const RouteTracePainter({
     required this.points,
     this.color = Colors.white,
     this.strokeWidth = 3,
     this.padding = 24,
+    this.dropShadow = false,
   });
 
   @override
@@ -67,6 +71,17 @@ class RouteTracePainter extends CustomPainter {
       path.lineTo(o.dx, o.dy);
     }
 
+    if (dropShadow) {
+      final shadowPaint = Paint()
+        ..color = Colors.black54
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawPath(path.shift(const Offset(0, 1)), shadowPaint);
+    }
+
     final linePaint = Paint()
       ..color = color.withOpacity(0.95)
       ..strokeWidth = strokeWidth
@@ -81,5 +96,6 @@ class RouteTracePainter extends CustomPainter {
       oldDelegate.points != points ||
       oldDelegate.color != color ||
       oldDelegate.strokeWidth != strokeWidth ||
-      oldDelegate.padding != padding;
+      oldDelegate.padding != padding ||
+      oldDelegate.dropShadow != dropShadow;
 }

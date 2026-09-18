@@ -10,6 +10,7 @@ import '../core/pace_table.dart';
 import '../core/vdot_calculator.dart' show PRDistance;
 import '../../models/race_plan.dart';
 import '../../models/training_phase.dart';
+import '../../utils/plan_calendar.dart';
 import 'materialized_plan.dart';
 import 'week_resolver.dart';
 import 'workout_resolver.dart';
@@ -43,9 +44,14 @@ class PlanMaterializer {
     required int vdot,
     required String inputsFingerprint,
     MaterializedPlan? previous,
-    DateTime? now,
   }) {
-    final builtAt = (now ?? DateTime.now()).toUtc();
+    // Date anchor: the Monday of the week the plan was created in, taken from
+    // the skeleton — not from "now" — so a rebuild on any later day (a settings
+    // edit, Home's self-heal) can't slide week 1. Slot weekdays are real
+    // calendar weekdays (0 = Monday), so the anchor MUST be a Monday. Stored as
+    // local-midnight (no `Z`) so no timezone can shift the calendar date.
+    final builtAt = PlanCalendar.mondayOf(skeleton.createdAt);
+    final startDate = PlanCalendar.dateOnly(skeleton.createdAt);
     final planId =
         previous?.planId ??
         'plan_${skeleton.createdAt.millisecondsSinceEpoch}';
@@ -189,6 +195,7 @@ class PlanMaterializer {
     return MaterializedPlan(
       planId: planId,
       builtAt: builtAt,
+      startDate: startDate,
       builtFromVdot: vdot.clamp(30, 85),
       inputsFingerprint: inputsFingerprint,
       weeks: weeks,

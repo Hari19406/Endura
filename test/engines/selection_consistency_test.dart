@@ -96,7 +96,6 @@ void main() {
         experienceLevel: ExperienceLevel.intermediate,
         vdot: 48,
         inputsFingerprint: 'fp',
-        now: now,
       );
 
       final resolver = const WorkoutResolver();

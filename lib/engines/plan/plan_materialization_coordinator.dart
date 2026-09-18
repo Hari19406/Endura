@@ -29,7 +29,6 @@ class PlanMaterializationCoordinator {
     required int vdot,
     int? goalTimeSeconds,
     MaterializedPlan? previous,
-    DateTime? now,
   }) async {
     final plan = _build(
       skeleton: skeleton,
@@ -40,7 +39,6 @@ class PlanMaterializationCoordinator {
       vdot: vdot,
       goalTimeSeconds: goalTimeSeconds,
       previous: previous,
-      now: now,
     );
     await PlanStore.instance.save(plan);
     return plan;
@@ -58,7 +56,6 @@ class PlanMaterializationCoordinator {
     required int vdot,
     int? goalTimeSeconds,
     MaterializedPlan? previous,
-    DateTime? now,
   }) async {
     final plan = _build(
       skeleton: skeleton,
@@ -69,7 +66,6 @@ class PlanMaterializationCoordinator {
       vdot: vdot,
       goalTimeSeconds: goalTimeSeconds,
       previous: previous,
-      now: now,
     );
     final sync = await PlanStore.instance.saveAndSync(plan);
     return (plan: plan, sync: sync);
@@ -84,7 +80,6 @@ class PlanMaterializationCoordinator {
     required int vdot,
     int? goalTimeSeconds,
     MaterializedPlan? previous,
-    DateTime? now,
   }) {
     return _materializer.materialize(
       skeleton: skeleton,
@@ -102,7 +97,6 @@ class PlanMaterializationCoordinator {
         goalTimeSeconds: goalTimeSeconds,
       ),
       previous: previous,
-      now: now,
     );
   }
 
@@ -116,7 +110,6 @@ class PlanMaterializationCoordinator {
     required String experienceLevel,
     required int vdot,
     int? goalTimeSeconds,
-    DateTime? now,
   }) async {
     if (skeleton == null) return null;
     final previous = await PlanStore.instance.load();
@@ -129,7 +122,6 @@ class PlanMaterializationCoordinator {
       vdot: vdot,
       goalTimeSeconds: goalTimeSeconds,
       previous: previous,
-      now: now,
     );
   }
 

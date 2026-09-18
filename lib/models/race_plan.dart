@@ -1,3 +1,4 @@
+import '../utils/plan_calendar.dart';
 import 'training_phase.dart';
 
 class WeekTarget {
@@ -66,6 +67,10 @@ class WeekTarget {
 class RacePlan {
   final String goalRace;
   final DateTime raceDate;
+
+  /// The instant the athlete actually created the plan — deliberately NOT
+  /// snapped to a Monday: plan-id uniqueness and the plan-history "started"
+  /// stamp depend on it being real. Weeks count from [weekAnchor] instead.
   final DateTime createdAt;
   final double startingWeeklyKm;
   final String experienceLevel;
@@ -82,19 +87,29 @@ class RacePlan {
 
   int get totalWeeks => weeks.length;
 
-  /// Date-only (year/month/day) — a plan created at 23:50 must not read as a
-  /// week later the moment the clock ticks past midnight ten minutes on.
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  /// Monday (date-only) of the week the plan was created in — the anchor every
+  /// plan week and calendar date derives from. Week N is the seven days from
+  /// `weekAnchor + (N-1)*7`, so weeks always run Monday–Sunday and a day slot's
+  /// weekday index is its real calendar weekday.
+  DateTime get weekAnchor => PlanCalendar.mondayOf(createdAt);
+
+  /// The athlete's actual first day on the plan (date-only). Week-1 days before
+  /// this are pre-plan: they belong to the week but were never the athlete's.
+  DateTime get startDate => PlanCalendar.dateOnly(createdAt);
+
+  int _weekIndexOf(DateTime now) =>
+      PlanCalendar.daysBetween(weekAnchor, now) ~/ 7;
 
   WeekTarget? currentWeek(DateTime now) {
-    final weekIndex = _dateOnly(now).difference(_dateOnly(createdAt)).inDays ~/ 7;
+    // Floor-divide: a date before the anchor is week index -1, not 0.
+    final days = PlanCalendar.daysBetween(weekAnchor, now);
+    final weekIndex = days < 0 ? -1 : days ~/ 7;
     if (weekIndex < 0 || weekIndex >= weeks.length) return null;
     return weeks[weekIndex];
   }
 
   int currentWeekNumber(DateTime now) {
-    final idx = _dateOnly(now).difference(_dateOnly(createdAt)).inDays ~/ 7;
-    return (idx + 1).clamp(1, weeks.length);
+    return (_weekIndexOf(now) + 1).clamp(1, weeks.length);
   }
 
   bool isComplete(DateTime now) => now.isAfter(raceDate);

@@ -1,18 +1,23 @@
 /// PlanRestartService — "Restart plan from today": shifts the active plan's
-/// whole timeline so the next uncompleted workout lands on today.
+/// whole timeline forward so the next uncompleted workout is no longer in the
+/// past.
 ///
-/// Every calendar date on the plan is derived from a single anchor
-/// (`RacePlan.createdAt` for week/weekday math, `MaterializedPlan.builtAt`
-/// for the stored plan's own day strip) plus a day's fixed (weekNumber,
-/// weekday). Shifting both anchors by the same day offset therefore moves
-/// every day uniformly — preserving weekly cadence and recovery spacing
-/// exactly as designed — without touching any already-logged completion.
+/// Every calendar date on the plan is derived from a single Monday anchor
+/// (`RacePlan.createdAt` snapped via `weekAnchor` for week/weekday math,
+/// `MaterializedPlan.builtAt` for the stored plan's own day strip) plus a
+/// day's fixed (weekNumber, weekday). A slot's weekday is its real calendar
+/// weekday, so the shift is always a whole number of WEEKS: the plan stays
+/// Monday-aligned, weekly cadence and recovery spacing are preserved exactly
+/// as designed, and no already-logged completion is touched. The next
+/// uncompleted workout therefore lands on the next occurrence of its own
+/// weekday on or after today.
 library;
 
 import '../engines/memory/engine_memory_service.dart';
 import '../engines/plan/materialized_plan.dart';
 import '../engines/plan/plan_store.dart';
 import '../models/race_plan.dart';
+import '../utils/plan_calendar.dart';
 
 class NextWorkoutInfo {
   final int weekNumber;
@@ -29,27 +34,21 @@ class NextWorkoutInfo {
 class PlanRestartService {
   const PlanRestartService._();
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  /// The first training day (not rest, not already completed) in week/weekday
-  /// order, anchored on [anchor] — null when every training day is done.
-  static NextWorkoutInfo? findNextUncompleted(
-    MaterializedPlan plan,
-    DateTime anchor,
-  ) {
+  /// The first training day (not rest, not already completed, not pre-plan) in
+  /// week/weekday order — null when every training day is done.
+  static NextWorkoutInfo? findNextUncompleted(MaterializedPlan plan) {
     final weeks = [...plan.weeks]
       ..sort((a, b) => a.weekNumber.compareTo(b.weekNumber));
     for (final week in weeks) {
       final days = [...week.days]..sort((a, b) => a.weekday.compareTo(b.weekday));
       for (final day in days) {
         if (day.isRest || day.isCompleted) continue;
-        final date = anchor.add(
-          Duration(days: (week.weekNumber - 1) * 7 + day.weekday),
-        );
+        // Pre-plan slots were never the athlete's to do.
+        if (plan.isPrePlanDay(week.weekNumber, day.weekday)) continue;
         return NextWorkoutInfo(
           weekNumber: week.weekNumber,
           weekday: day.weekday,
-          scheduledDate: date,
+          scheduledDate: plan.dateFor(week.weekNumber, day.weekday),
         );
       }
     }
@@ -65,41 +64,51 @@ class PlanRestartService {
     final materialized = await PlanStore.instance.load();
     if (racePlan == null || materialized == null) return null;
 
-    final anchor = _dateOnly(materialized.builtAt);
-    final next = findNextUncompleted(materialized, anchor);
+    final next = findNextUncompleted(materialized);
     if (next == null) return null;
 
-    return _dateOnly(DateTime.now()).difference(next.scheduledDate).inDays;
+    return PlanCalendar.daysBetween(next.scheduledDate, DateTime.now());
   }
 
-  /// Shifts the plan so the next uncompleted workout lands on today. Returns
-  /// false when there is no active plan or every training day is already
-  /// completed (nothing to restart); true otherwise (including the no-op case
-  /// where the plan is already on schedule).
+  /// Whole weeks to shift so a workout [behindDays] behind schedule lands on or
+  /// after today: the smallest multiple of 7 days that clears the gap. 0 when
+  /// on schedule or less than a week ahead.
+  static int weeksToShift(int behindDays) => (behindDays / 7).ceil();
+
+  /// Shifts the plan forward by whole weeks so the next uncompleted workout
+  /// lands on or after today. Returns false when there is no active plan or
+  /// every training day is already completed (nothing to restart); true
+  /// otherwise (including the no-op case where the plan is already on
+  /// schedule).
   static Future<bool> restartFromToday() async {
     final memory = await EngineMemoryService().load();
     final racePlan = memory.racePlan;
     final materialized = await PlanStore.instance.load();
     if (racePlan == null || materialized == null) return false;
 
-    final anchor = _dateOnly(materialized.builtAt);
-    final next = findNextUncompleted(materialized, anchor);
+    final next = findNextUncompleted(materialized);
     if (next == null) return false;
 
-    final offsetDays =
-        _dateOnly(DateTime.now()).difference(next.scheduledDate).inDays;
+    final behindDays = PlanCalendar.daysBetween(
+      next.scheduledDate,
+      DateTime.now(),
+    );
+    final offsetDays = weeksToShift(behindDays) * 7;
     if (offsetDays == 0) return true;
 
     final updatedRacePlan = RacePlan(
       goalRace: racePlan.goalRace,
-      raceDate: racePlan.raceDate.add(Duration(days: offsetDays)),
-      createdAt: racePlan.createdAt.add(Duration(days: offsetDays)),
+      raceDate: PlanCalendar.shiftDays(racePlan.raceDate, offsetDays),
+      createdAt: PlanCalendar.shiftDays(racePlan.createdAt, offsetDays),
       startingWeeklyKm: racePlan.startingWeeklyKm,
       experienceLevel: racePlan.experienceLevel,
       weeks: racePlan.weeks,
     );
     final updatedMaterialized = materialized.copyWith(
-      builtAt: materialized.builtAt.add(Duration(days: offsetDays)),
+      builtAt: PlanCalendar.shiftDays(materialized.builtAt, offsetDays),
+      startDate: materialized.startDate == null
+          ? null
+          : PlanCalendar.shiftDays(materialized.startDate!, offsetDays),
     );
 
     // archivePrevious: false — this reshapes the same plan's dates, it does
