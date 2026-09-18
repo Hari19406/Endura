@@ -56,7 +56,7 @@ void main() {
   });
 
   testWidgets('OnboardingScreen: picking "first 5K" skips the race picker, '
-      'experience, weekly-volume and race-goal questions', (tester) async {
+      'experience and race-goal questions (weekly volume is still asked)', (tester) async {
     await tester.pumpWidget(
       MaterialApp(home: OnboardingScreen(onComplete: () {})),
     );
@@ -73,13 +73,15 @@ void main() {
 
     // Skipped questions are not on screen …
     expect(find.textContaining('experience?'), findsNothing);
-    expect(find.text('How much do you run\nin a typical week?'), findsNothing);
     expect(find.text('What do you want\nfrom race day?'), findsNothing);
     expect(find.text('What race are\nyou running?'), findsNothing);
     expect(find.textContaining('coming soon'), findsNothing);
 
     // … and the wizard has landed on the first question it still asks.
-    expect(find.text('How many days a\nweek can you run?'), findsOneWidget);
+    expect(
+      find.text('How much do you run\nin a typical week?'),
+      findsOneWidget,
+    );
 
     // No exception was thrown reaching here.
     expect(tester.takeException(), isNull);

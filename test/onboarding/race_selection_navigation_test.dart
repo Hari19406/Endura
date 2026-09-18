@@ -103,16 +103,16 @@ void main() {
     await tester.tap(find.text('Continue'));
     await _settle(tester);
 
-    expect(find.text(_weeklyVolumeTitle), findsOneWidget);
-    await tester.tap(find.text('20–35 km/week'));
+    expect(find.text(_raceGoalTitle), findsOneWidget);
+    // 'finish' keeps _needsTargetTime false, so _next() skips OPage.targetTime
+    // and lands on weekly volume, which now follows the goal/target steps.
+    await tester.tap(find.text('Just complete it'));
     await tester.pump();
     await tester.tap(find.text('Continue'));
     await _settle(tester);
 
-    expect(find.text(_raceGoalTitle), findsOneWidget);
-    // 'finish' keeps _needsTargetTime false, so _next() skips OPage.targetTime
-    // entirely and lands directly on runsPerWeek — the exact requested slice.
-    await tester.tap(find.text('Just complete it'));
+    expect(find.text(_weeklyVolumeTitle), findsOneWidget);
+    await tester.tap(find.text('20–35 km/week'));
     await tester.pump();
     await tester.tap(find.text('Continue'));
     await _settle(tester);

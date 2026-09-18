@@ -67,9 +67,9 @@ enum OPage {
   goal, // "What are you training for?" — only Upcoming race is live
   racePicker, // pick a real race (or add one manually)
   experience, // race-type experience (this flow's own 5-level vocab)
-  weeklyVolume, // typical km/week → baseline weekly volume
   raceGoal, // what's the goal for this race (this flow's own vocab)
   targetTime, // shown only for pr / target_time goals
+  weeklyVolume, // typical km/week → baseline weekly volume (every funnel)
   runsPerWeek, // slider + live plan preview
   dayPicker, // which days are free
   longRunDay, // long run day
@@ -298,9 +298,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   static const _shortSequence = [
     OPage.racePicker,
     OPage.experience,
-    OPage.weeklyVolume,
     OPage.raceGoal,
     OPage.targetTime,
+    OPage.weeklyVolume,
     OPage.runsPerWeek,
     OPage.dayPicker,
     OPage.longRunDay,
@@ -328,7 +328,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (_isFirstTimeRunner &&
         (p == OPage.racePicker ||
             p == OPage.experience ||
-            p == OPage.weeklyVolume ||
             p == OPage.raceGoal)) {
       return true;
     }
@@ -363,13 +362,34 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // _showTopBar/_showBottom while animateToPage's scroll activity is still
   // active, in case that timing ever matters on some future layout.
   Future<void> _animateTo(int index) async {
-    if (index < 0 || index >= _total) return;
+    if (index < 0 || index >= _total || _navigating) return;
+    _navigating = true;
+    try {
+      await _slideTo(index);
+    } finally {
+      _navigating = false;
+    }
+    if (!mounted) return;
+    _finishNavigation(index);
+  }
+
+  bool _navigating = false;
+
+  /// Always a single-page slide in the direction of travel. Skipped pages are
+  /// jumped over first (invisibly), so a multi-page hop never sweeps through
+  /// the pages in between.
+  Future<void> _slideTo(int index) async {
+    if (_ctrl.hasClients && (index - _current).abs() > 1) {
+      _ctrl.jumpToPage(index > _current ? index - 1 : index + 1);
+    }
     await _ctrl.animateToPage(
       index,
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeInOut,
     );
-    if (!mounted) return;
+  }
+
+  void _finishNavigation(int index) {
     setState(() => _current = index);
     HapticFeedback.selectionClick();
     Analytics.onboardingStepViewed(_sequence[index].name, index);
@@ -575,7 +595,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// anchored to the safe minimum of the distance's [RaceArchetypeEnvelope] —
   /// the gentlest honest starting point for the ramp.
   double get _baselineWeeklyKm {
-    if (_isFirstTimeRunner) {
+    if (_isFirstTimeRunner && _weeklyVolumeTier == null) {
       final dist = PlanMaterializationCoordinator.raceDistanceFrom(
         _goal ?? '5k',
       );
