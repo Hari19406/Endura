@@ -1941,9 +1941,12 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
     if (planRemoved == true && mounted) {
-      // Drop every plan-derived field right now so nothing stale can keep the
-      // active-plan branch alive while the reload below runs.
+      // Drop every plan-derived field right now and render the empty state
+      // immediately. Deliberately no waiting on, or re-triggering of,
+      // loadData(): a load already in flight (fired by ManagePlanScreen) reads
+      // the freshly-reset memory itself and its `finally` clears the spinner.
       setState(() {
+        _isLoading = false;
         _engineMemory = _engineMemory?.copyWith(
           clearRacePlan: true,
           clearActivePlan: true,
@@ -1960,20 +1963,10 @@ class _HomeScreenState extends State<HomeScreen>
         _raceDate = null;
         _showPlanComplete = false;
       });
-      // loadData() silently no-ops while another load is in flight (e.g. the
-      // one ManagePlanScreen fired), so wait it out rather than losing ours.
-      for (var i = 0; i < 300 && _isFetching && mounted; i++) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
+      return;
     }
-    // Belt-and-suspenders: ManagePlanScreen already calls onPlanChanged
-    // (loadData) itself before popping, but that call is fire-and-forget
-    // from a VoidCallback — if it lands mid another in-flight loadData()
-    // and gets silently rescheduled, the UI can be left showing a stale
-    // plan state after returning here (e.g. "Remove Plan" not flipping to
-    // the empty-state cards). Always reloading again on return from this
-    // route, driven by this screen's own awaited navigation rather than
-    // the child's callback, guarantees the refresh actually lands.
+    // Plan edited but not removed: reload from this screen's own awaited
+    // navigation rather than relying on the child's fire-and-forget callback.
     if (mounted) await loadData();
   }
 
