@@ -377,7 +377,6 @@ class _YouScreenState extends State<YouScreen>
                   pinned: true,
                   delegate: _SliverTabBarDelegate(
                     _SegmentedTabBar(controller: _tabController),
-                    c.background,
                   ),
                 ),
               ],
@@ -1083,8 +1082,7 @@ class _YouScreenState extends State<YouScreen>
 /// inside the [NestedScrollView].
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   final PreferredSizeWidget tabBar;
-  final Color background;
-  _SliverTabBarDelegate(this.tabBar, this.background);
+  _SliverTabBarDelegate(this.tabBar);
 
   @override
   double get minExtent => tabBar.preferredSize.height;
@@ -1097,12 +1095,12 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(color: background, child: tabBar);
+    return Container(color: Colors.transparent, child: tabBar);
   }
 
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) =>
-      oldDelegate.tabBar != tabBar || oldDelegate.background != background;
+      oldDelegate.tabBar != tabBar;
 }
 
 /// Stats / History / Gear as an elevated segmented pill instead of a flat
