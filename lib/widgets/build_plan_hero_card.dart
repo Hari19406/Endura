@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
 class BuildPlanHeroCard extends StatelessWidget {
-  /// "Start my first plan" — launches the plan-creation wizard.
+  /// "Start my new plan" — launches the plan-creation wizard.
   final VoidCallback onStartPlan;
 
   const BuildPlanHeroCard({super.key, required this.onStartPlan});
@@ -31,42 +31,22 @@ class BuildPlanHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: c.chartAccent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '✨ 2 min setup',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: c.chartAccent,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: c.heroGradientEnd.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: c.heroGradientEnd.withValues(alpha: 0.45),
               ),
-              // Decorative — coach/pulse motif, not an interactive control.
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: c.surfaceAlt,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.border),
-                ),
-                child: Icon(
-                  Icons.favorite_border_rounded,
-                  size: 16,
-                  color: c.textSecondary,
-                ),
+            ),
+            child: Text(
+              '✨ 2 min setup',
+              style: textTheme.labelSmall?.copyWith(
+                color: c.textPrimary,
+                fontWeight: FontWeight.w700,
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 18),
           Text(
@@ -101,24 +81,27 @@ class BuildPlanHeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 22),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: onStartPlan,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: c.onAccent,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          // Same heroGradient treatment as the "View Workout" button.
+          Material(
+            color: Colors.transparent,
+            child: Ink(
+              width: double.infinity,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: c.heroGradient,
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                'Start my first plan',
-                style: textTheme.titleMedium?.copyWith(
-                  color: c.onAccent,
-                  fontWeight: FontWeight.w700,
+              child: InkWell(
+                onTap: onStartPlan,
+                borderRadius: BorderRadius.circular(12),
+                child: Center(
+                  child: Text(
+                    'Start my new plan',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -252,13 +235,16 @@ class _AvatarCluster extends StatelessWidget {
                 height: _size,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color.surfaceAlt,
+                  color: Color.alphaBlend(
+                    color.heroGradientEnd.withValues(alpha: 0.28),
+                    color.surface,
+                  ),
                   border: Border.all(color: color.surface, width: 2),
                 ),
                 child: Icon(
                   Icons.person_rounded,
                   size: 16,
-                  color: color.textSecondary,
+                  color: color.textPrimary,
                 ),
               ),
             ),

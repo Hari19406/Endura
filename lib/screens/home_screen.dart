@@ -1724,12 +1724,12 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                 ),
 
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSectionLabel('THIS WEEK'),
-                  if (_engineMemory?.hasRacePlan == true)
+              if (_engineMemory?.hasRacePlan == true) ...[
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSectionLabel('THIS WEEK'),
                     Semantics(
                       button: true,
                       label: 'Manage plan',
@@ -1762,10 +1762,11 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _buildBottomCarousel(),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _buildBottomCarousel(),
+              ],
             ],
           ),
         ),
@@ -2071,5 +2072,4 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
-
 }
