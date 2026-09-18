@@ -22,6 +22,19 @@ import '../utils/unit_utils.dart';
 
 enum BlockState { pending, done }
 
+/// Muted emerald used for the "Completed" status chip — deliberately not
+/// [AppColors.success] (too bright/neon against the dark card) and not a
+/// theme token, since this is a one-off refinement of a single badge rather
+/// than a new semantic color the rest of the app should pick up.
+const _kCompletedChipBg = Color(0xFF1B4D3E);
+const _kCompletedChipBorder = Color(0xFF2E7D32);
+const _kCompletedChipText = Color(0xFFA5D6A7);
+
+/// Exact blue of the primary Start Workout/Start Run CTA — Warmup and
+/// Cooldown step cards match it precisely so those two "bookend" steps read
+/// as one visual family with the action that starts the whole session.
+const _kStartBlue = Color(0xFF007AFF);
+
 // ── Chasing-dash cloud loader ────────────────────────────────────────────────
 
 /// An upright cloud outline whose contour is drawn as a dashed stroke that
@@ -717,7 +730,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
       return _StatusChip(
         icon: Icons.check_circle_rounded,
         label: 'Completed$loggedText',
-        color: c.success,
+        color: _kCompletedChipText,
+        background: _kCompletedChipBg,
+        border: _kCompletedChipBorder,
       );
     }
     return _StatusChip(
@@ -749,158 +764,129 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     );
   }
 
-  /// Sticky Start/Link/Skip stack that floats over the ambient background —
-  /// a bottom-fade scrim keeps the buttons legible over whatever card or glow
-  /// scrolls beneath them.
-  Widget _buildFloatingActions(AppColors c) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              c.background.withValues(alpha: 0),
-              c.background.withValues(alpha: 0.92),
-              c.background,
-            ],
-            stops: const [0, 0.35, 1],
+  /// The Link/View → Start/Run Again → Skip action stack — deliberately laid
+  /// out as the last thing in the scrollable content (not a floating/sticky
+  /// bar) so reaching a CTA means having scrolled past the full workout
+  /// prescription first.
+  Widget _buildActionButtons(AppColors c) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── Secondary slot: Link Activity (upcoming/skipped) or View
+        // Activity (completed + actually linked to a run) ──────────────────
+        if (_isCompleted) ...[
+          if (widget.completion?.runId != null) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: OutlinedButton(
+                onPressed: _busy ? null : _openLinkedActivity,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: c.textPrimary,
+                  side: BorderSide(color: c.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text(
+                  'View Activity',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ] else if (_canLinkOrSkip) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: OutlinedButton(
+              onPressed: _busy ? null : _openLinkActivitySheet,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: c.textPrimary,
+                side: BorderSide(color: c.border),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text(
+                'Link Activity',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Secondary slot: Link Activity (upcoming/skipped) or View
-              // Activity (completed + actually linked to a run) ────────────
-              if (_isCompleted) ...[
-                if (widget.completion?.runId != null) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: OutlinedButton(
-                      onPressed: _busy ? null : _openLinkedActivity,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: c.textPrimary,
-                        side: BorderSide(color: c.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        'View Activity',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-              ] else if (_canLinkOrSkip) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _openLinkActivitySheet,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: c.textPrimary,
-                      side: BorderSide(color: c.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Text(
-                      'Link Activity',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
+          const SizedBox(height: 10),
+        ],
 
-              // ── Primary slot: outlined "Run Again" once completed,
-              // otherwise the gradient Start/Run Anyway pill ────────────────
-              if (_isCompleted)
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _startWorkout,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: c.textPrimary,
-                      side: BorderSide(color: c.accent, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Text(
-                      'Run Again',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
-                  opacity: _busy ? 0.5 : 1,
-                  child: Container(
-                    width: double.infinity,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: c.heroGradient,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(30),
-                        onTap: _busy ? null : _startWorkout,
-                        child: Center(
-                          child: Text(
-                            _primaryLabel,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.1,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+        // ── Primary slot: outlined "Run Again" once completed, otherwise
+        // the solid Start/Run Anyway pill ───────────────────────────────────
+        if (_isCompleted)
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: _busy ? null : _startWorkout,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: c.textPrimary,
+                side: BorderSide(color: c.accent, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text(
+                'Run Again',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ),
+          )
+        else
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: _busy ? 0.5 : 1,
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _busy ? null : _startWorkout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kStartBlue,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: _kStartBlue.withValues(alpha: 0.5),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
                   ),
                 ),
-
-              // Skip Workout only makes sense for a day that hasn't already
-              // been resolved one way or the other.
-              if (_canLinkOrSkip && !_isSkipped && !_isCompleted) ...[
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: _busy ? null : _confirmSkip,
-                  style: TextButton.styleFrom(foregroundColor: c.danger),
-                  child: const Text(
-                    'Skip Workout',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                child: Text(
+                  _primaryLabel,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
                   ),
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
-        ),
-      ),
+
+        // Skip Workout only makes sense for a day that hasn't already been
+        // resolved one way or the other.
+        if (_canLinkOrSkip && !_isSkipped && !_isCompleted) ...[
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: _busy ? null : _confirmSkip,
+            style: TextButton.styleFrom(foregroundColor: c.danger),
+            child: const Text(
+              'Skip Workout',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -931,7 +917,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
           SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20).copyWith(
               top: 4,
-              bottom: 150,
+              bottom: 32,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -979,10 +965,15 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
 
                 // ── Step breakdown cards ──────────────────────────────────
                 _buildStepCards(workout),
+
+                // Deliberate scroll-to-reach gap — the CTAs sit at the very
+                // end of the content stream, not pinned/floating, so getting
+                // to "Start" means scrolling past the whole prescription.
+                const SizedBox(height: 48),
+                _buildActionButtons(c),
               ],
             ),
           ),
-          _buildFloatingActions(c),
         ],
       ),
     );
@@ -1012,15 +1003,22 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
 // ── Status chip ──────────────────────────────────────────────────────────────
 
 /// The small pill under the header subtitle for a completed or skipped day.
+/// [background]/[border] default to a soft tint of [color] (the skipped
+/// chip's plain style); pass them explicitly for a chip that needs its own
+/// fixed palette regardless of [color] (the completed chip's muted emerald).
 class _StatusChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final Color? background;
+  final Color? border;
 
   const _StatusChip({
     required this.icon,
     required this.label,
     required this.color,
+    this.background,
+    this.border,
   });
 
   @override
@@ -1028,7 +1026,8 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
+        color: background ?? color.withValues(alpha: 0.14),
+        border: border != null ? Border.all(color: border!, width: 1) : null,
         borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
@@ -1180,13 +1179,23 @@ class _StepCard extends StatelessWidget {
 
   // ── Derived text ──────────────────────────────────────────────────────────
 
-  /// Warmup/cooldown/recovery always read as the low-intensity "easy" token;
-  /// main-set blocks resolve dynamically through [dayColorForIntent] so this
-  /// stays in lockstep with every other intent/interval accent in the app.
+  /// Warmup and Cooldown always read as [_kStartBlue] — the same exact blue
+  /// as the primary Start button, so those two bookend steps visually pair
+  /// with the action that kicks the session off. Recovery keeps the muted
+  /// "easy" token; main-set blocks resolve dynamically through
+  /// [dayColorForIntent] so they stay in lockstep with every other
+  /// intent/interval accent in the app.
   Color _headerColor(BuildContext context) {
     final c = context.colors;
-    if (block.type != BlockType.main) return c.workoutEasy;
-    return dayColorForIntent(context, intent);
+    switch (block.type) {
+      case BlockType.warmup:
+      case BlockType.cooldown:
+        return _kStartBlue;
+      case BlockType.recovery:
+        return c.workoutEasy;
+      case BlockType.main:
+        return dayColorForIntent(context, intent);
+    }
   }
 
   String _title() {
