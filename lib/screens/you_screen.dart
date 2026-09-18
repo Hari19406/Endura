@@ -38,8 +38,11 @@ class YouScreen extends StatefulWidget {
 }
 
 class _YouScreenState extends State<YouScreen>
-    with SingleTickerProviderStateMixin
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin
     implements Refreshable {
+  @override
+  bool get wantKeepAlive => true;
+
   PRResults? _prResults;
   Map<DistanceCategory, BestEffortRecord> _bestEfforts = {};
   List<achieve.Achievement> _achievements = [];
@@ -295,6 +298,7 @@ class _YouScreenState extends State<YouScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final c = context.colors;
     return AmbientScaffold(
       safeArea: false,
@@ -372,32 +376,19 @@ class _YouScreenState extends State<YouScreen>
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _SliverTabBarDelegate(
-                    TabBar(
-                      controller: _tabController,
-                      indicatorColor: c.accent,
-                      indicatorWeight: 2,
-                      labelColor: c.textPrimary,
-                      unselectedLabelColor: c.textTertiary,
-                      labelStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      tabs: const [
-                        Tab(text: 'Stats'),
-                        Tab(text: 'History'),
-                        Tab(text: 'Gear'),
-                      ],
-                    ),
+                    _SegmentedTabBar(controller: _tabController),
                     c.background,
                   ),
                 ),
               ],
+              // Tap-only: this TabBarView sits inside the root shell's own
+              // horizontal PageView (Feed/Coach/Run/You), so letting it also
+              // respond to horizontal drags would fight that outer swipe
+              // gesture. The segmented pill above is how these sub-tabs are
+              // meant to be switched.
               body: TabBarView(
                 controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildSummaryTab(),
                   HistoryTab(
@@ -1091,7 +1082,7 @@ class _YouScreenState extends State<YouScreen>
 /// Pins the You-tab sub-tab bar below the (scroll-away) athlete profile header
 /// inside the [NestedScrollView].
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
+  final PreferredSizeWidget tabBar;
   final Color background;
   _SliverTabBarDelegate(this.tabBar, this.background);
 
@@ -1112,6 +1103,67 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) =>
       oldDelegate.tabBar != tabBar || oldDelegate.background != background;
+}
+
+/// Stats / History / Gear as an elevated segmented pill instead of a flat
+/// full-width bar with a Material underline indicator.
+class _SegmentedTabBar extends StatelessWidget implements PreferredSizeWidget {
+  final TabController controller;
+
+  const _SegmentedTabBar({required this.controller});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(52);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: c.surface.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: c.border, width: 1),
+        ),
+        child: TabBar(
+          controller: controller,
+          // A Material 3 TabBar draws its own full-width bottom divider and
+          // underline indicator by default — both are exactly the "flat
+          // black bar" look being replaced, so both are switched off here.
+          dividerColor: Colors.transparent,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicatorPadding: const EdgeInsets.all(2),
+          indicator: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: c.accent.withValues(alpha: 0.28),
+                blurRadius: 10,
+                spreadRadius: -1,
+              ),
+            ],
+          ),
+          splashBorderRadius: BorderRadius.circular(8),
+          labelColor: c.textPrimary,
+          unselectedLabelColor: c.textTertiary,
+          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: const [
+            Tab(text: 'Stats'),
+            Tab(text: 'History'),
+            Tab(text: 'Gear'),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Shown in the header slot for the brief window before the profile resolves

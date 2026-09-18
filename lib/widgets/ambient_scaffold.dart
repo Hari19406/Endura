@@ -21,12 +21,20 @@ class AmbientScaffold extends StatelessWidget {
   /// safe-area handling).
   final bool safeArea;
 
+  /// Lets the ambient glow/background reach behind a transparent [appBar]
+  /// instead of stopping at its bottom edge, for screens whose header sits
+  /// directly on the shared background rather than an opaque bar. The caller
+  /// is responsible for giving its own content enough top padding to clear
+  /// the header (the Scaffold no longer reserves that space automatically).
+  final bool extendBodyBehindAppBar;
+
   const AmbientScaffold({
     super.key,
     required this.body,
     this.appBar,
     this.bottomNavigationBar,
     this.safeArea = true,
+    this.extendBodyBehindAppBar = false,
   });
 
   @override
@@ -47,6 +55,7 @@ class AmbientScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: c.background,
       appBar: appBar,
+      extendBodyBehindAppBar: extendBodyBehindAppBar,
       bottomNavigationBar: bottomNavigationBar,
       body: Stack(
         children: [

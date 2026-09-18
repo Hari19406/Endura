@@ -118,6 +118,7 @@ class _FeedScreenState extends State<FeedScreen>
     final c = context.colors;
     return AmbientScaffold(
       safeArea: false,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
           'Activity Feed',
@@ -130,7 +131,7 @@ class _FeedScreenState extends State<FeedScreen>
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: c.background,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
@@ -155,10 +156,18 @@ class _FeedScreenState extends State<FeedScreen>
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: c.accent,
-        onRefresh: () => _load(refresh: true),
-        child: _buildBody(),
+      // extendBodyBehindAppBar (above) lets the ambient glow run behind the
+      // now-transparent header, so the Scaffold no longer reserves that
+      // space for us — push content below the status bar + app bar manually.
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + kToolbarHeight,
+        ),
+        child: RefreshIndicator(
+          color: c.accent,
+          onRefresh: () => _load(refresh: true),
+          child: _buildBody(),
+        ),
       ),
     );
   }

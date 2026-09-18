@@ -1538,6 +1538,7 @@ class _HomeScreenState extends State<HomeScreen>
         : _greeting;
     return AmbientScaffold(
       safeArea: false,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         toolbarHeight: 76,
         title: Column(
@@ -1567,7 +1568,8 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: c.surface,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
             icon: Icon(
@@ -1585,9 +1587,15 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildDashboardContent(),
+      // extendBodyBehindAppBar (above) lets the ambient glow run behind the
+      // now-transparent header, so the Scaffold no longer reserves that
+      // space for us — push content below the status bar + app bar manually.
+      body: Padding(
+        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 76),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _buildDashboardContent(),
+      ),
     );
   }
 

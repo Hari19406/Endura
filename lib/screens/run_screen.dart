@@ -63,12 +63,19 @@ class RunScreen extends StatefulWidget {
   /// While this screen is in the ready state, a bump starts an unguided run.
   final ValueNotifier<int>? freeRunSignal;
 
+  /// Fired whenever tracking starts/stops (i.e. [RunState] crosses in or out
+  /// of [RunState.ready]), so the root shell can disable swipe-to-switch-tabs
+  /// while a run is actually in progress — a horizontal swipe over the live
+  /// map must pan the map, not flip to another tab.
+  final ValueChanged<bool>? onTrackingActiveChanged;
+
   const RunScreen({
     super.key,
     this.activeCoachMessage,
     this.onWorkoutCompleted,
     this.scheduledContext,
     this.freeRunSignal,
+    this.onTrackingActiveChanged,
   });
 
   @override
@@ -76,8 +83,18 @@ class RunScreen extends StatefulWidget {
 }
 
 class _RunScreenState extends State<RunScreen>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
+    with
+        WidgetsBindingObserver,
+        TickerProviderStateMixin,
+        AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   RunState _runState = RunState.ready;
+
+  void _notifyTrackingActive() {
+    widget.onTrackingActiveChanged?.call(_runState != RunState.ready);
+  }
   PermissionStatus _permissionStatus = PermissionStatus.checking;
 
   int _seconds = 0;
@@ -871,6 +888,7 @@ class _RunScreenState extends State<RunScreen>
         _peakCadenceSeen = null;
         _cadenceSamplesForAvg.clear();
       });
+      _notifyTrackingActive();
     }
     _startNotifSyncTimer();
 
@@ -1778,6 +1796,7 @@ class _RunScreenState extends State<RunScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_permissionStatus != PermissionStatus.granted &&
         _runState == RunState.ready) {
       return Scaffold(body: _buildPermissionError());
@@ -2523,6 +2542,7 @@ class _RunScreenState extends State<RunScreen>
       _isGPSSignalLost = false;
       _activeCoachMessage = widget.activeCoachMessage;
     });
+    _notifyTrackingActive();
 
     _startGpsWarmup();
   }
