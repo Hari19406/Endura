@@ -302,19 +302,21 @@ class _YouScreenState extends State<YouScreen>
     final c = context.colors;
     return AmbientScaffold(
       safeArea: false,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
           'You',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             color: c.textPrimary,
-            fontSize: 18,
+            fontSize: 22,
             letterSpacing: -0.5,
           ),
         ),
         centerTitle: false,
         elevation: 0,
-        backgroundColor: c.background,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
@@ -336,74 +338,81 @@ class _YouScreenState extends State<YouScreen>
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 48, color: c.textTertiary),
-                  const SizedBox(height: 16),
-                  Text(
-                    _errorMessage,
-                    style: TextStyle(color: c.textSecondary, fontSize: 14),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(onPressed: loadData, child: const Text('Retry')),
-                ],
-              ),
-            )
-          : NestedScrollView(
-              headerSliverBuilder: (context, _) => [
-                // Always present — the header must never collapse to 0 height.
-                SliverToBoxAdapter(
-                  child: _profile != null
-                      ? AthleteProfileHeader(
-                          profile: _profile!,
-                          counts: _counts,
-                          isSelf: true,
-                          activityCount: _activityCount,
-                          onEditProfile: _editProfile,
-                          onTapFollowers: () =>
-                              _openAthleteList(AthleteListMode.followers),
-                          onTapFollowing: () =>
-                              _openAthleteList(AthleteListMode.following),
-                        )
-                      : const _ProfileHeaderSkeleton(),
+      // extendBodyBehindAppBar lets the ambient glow run behind the
+      // transparent header, so clear the status bar + toolbar manually.
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + kToolbarHeight,
+        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage.isNotEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 48, color: c.textTertiary),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage,
+                      style: TextStyle(color: c.textSecondary, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(onPressed: loadData, child: const Text('Retry')),
+                  ],
                 ),
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _SliverTabBarDelegate(
-                    _SegmentedTabBar(controller: _tabController),
+              )
+            : NestedScrollView(
+                headerSliverBuilder: (context, _) => [
+                  // Always present — the header must never collapse to 0 height.
+                  SliverToBoxAdapter(
+                    child: _profile != null
+                        ? AthleteProfileHeader(
+                            profile: _profile!,
+                            counts: _counts,
+                            isSelf: true,
+                            activityCount: _activityCount,
+                            onEditProfile: _editProfile,
+                            onTapFollowers: () =>
+                                _openAthleteList(AthleteListMode.followers),
+                            onTapFollowing: () =>
+                                _openAthleteList(AthleteListMode.following),
+                          )
+                        : const _ProfileHeaderSkeleton(),
                   ),
-                ),
-              ],
-              // Tap-only: this TabBarView sits inside the root shell's own
-              // horizontal PageView (Feed/Coach/Run/You), so letting it also
-              // respond to horizontal drags would fight that outer swipe
-              // gesture. The segmented pill above is how these sub-tabs are
-              // meant to be switched.
-              body: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildSummaryTab(),
-                  HistoryTab(
-                    records: _runRecords.cast<RunRecord>(),
-                    onRefresh: loadData,
-                    onOpenRun: _openRunDetail,
-                  ),
-                  ShoeLockerView(
-                    shoes: _shoes,
-                    editable: true,
-                    onAdd: () => _addOrEditShoe(),
-                    onEdit: (s) => _addOrEditShoe(s),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _SliverTabBarDelegate(
+                      _SegmentedTabBar(controller: _tabController),
+                    ),
                   ),
                 ],
+                // Tap-only: this TabBarView sits inside the root shell's own
+                // horizontal PageView (Feed/Coach/Run/You), so letting it also
+                // respond to horizontal drags would fight that outer swipe
+                // gesture. The segmented pill above is how these sub-tabs are
+                // meant to be switched.
+                body: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _buildSummaryTab(),
+                    HistoryTab(
+                      records: _runRecords.cast<RunRecord>(),
+                      onRefresh: loadData,
+                      onOpenRun: _openRunDetail,
+                    ),
+                    ShoeLockerView(
+                      shoes: _shoes,
+                      editable: true,
+                      onAdd: () => _addOrEditShoe(),
+                      onEdit: (s) => _addOrEditShoe(s),
+                    ),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
@@ -1148,7 +1157,10 @@ class _SegmentedTabBar extends StatelessWidget implements PreferredSizeWidget {
           splashBorderRadius: BorderRadius.circular(8),
           labelColor: c.textPrimary,
           unselectedLabelColor: c.textTertiary,
-          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          labelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
           unselectedLabelStyle: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
