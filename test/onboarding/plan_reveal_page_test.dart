@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/onboarding/plan_reveal_data.dart';
 import 'package:run_app/onboarding/plan_reveal_page.dart';
+import 'package:run_app/theme/app_theme.dart';
 import 'package:run_app/utils/unit_utils.dart';
 
 final _now = DateTime(2026, 1, 5); // a Monday
@@ -40,6 +41,7 @@ Widget _host({
   VoidCallback? onGenerate,
 }) {
   return MaterialApp(
+    theme: AppTheme.dark,
     home: Scaffold(
       body: OPagePlanReveal(
         answers: answers,
@@ -68,10 +70,7 @@ void main() {
       final answers = _answers();
       final projection = PlanProjection.build(answers, now: _now);
 
-      await _pumpTall(
-        tester,
-        _host(answers: answers, projection: projection),
-      );
+      await _pumpTall(tester, _host(answers: answers, projection: projection));
 
       for (final label in const [
         'Goal',
@@ -154,10 +153,7 @@ void main() {
     testWidgets('renders a skeleton, not a crash, without a projection', (
       tester,
     ) async {
-      await _pumpTall(
-        tester,
-        _host(answers: _answers(), projection: null),
-      );
+      await _pumpTall(tester, _host(answers: _answers(), projection: null));
 
       expect(tester.takeException(), isNull);
       expect(find.text('Shaping your weeks…'), findsOneWidget);

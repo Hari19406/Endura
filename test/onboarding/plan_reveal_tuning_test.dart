@@ -36,6 +36,7 @@ Widget _host({
   required OnboardingAnswers answers,
   ValueChanged<PlanConfigState>? onConfigChanged,
 }) => MaterialApp(
+  theme: AppTheme.dark,
   home: Scaffold(
     body: OPagePlanReveal(
       answers: answers,
@@ -69,10 +70,7 @@ void main() {
       expect(find.byType(Slider), findsOneWidget); // runs per week
       expect(find.text('Gradual start'), findsOneWidget);
       expect(find.text('PREVIEW YOUR NEXT WEEK'), findsOneWidget);
-      expect(
-        find.textContaining('updates as you tune above'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('updates as you tune above'), findsOneWidget);
     });
 
     testWidgets('toggling Gradual start reports the tuned config', (
@@ -161,8 +159,14 @@ void main() {
       final ml = slot(SlotType.mediumLong, WorkoutIntent.endurance);
       final lr = slot(SlotType.longRun, WorkoutIntent.endurance);
       expect(slotFill(ctx, ml), isNot(slotFill(ctx, lr)));
-      expect(slotFill(ctx, ml), dayColorForIntent(ctx, WorkoutIntent.aerobicBase));
-      expect(slotFill(ctx, lr), dayColorForIntent(ctx, WorkoutIntent.endurance));
+      expect(
+        slotFill(ctx, ml),
+        dayColorForIntent(ctx, WorkoutIntent.aerobicBase),
+      );
+      expect(
+        slotFill(ctx, lr),
+        dayColorForIntent(ctx, WorkoutIntent.endurance),
+      );
     });
 
     test('short label distinguishes a medium-long from the long run', () {
