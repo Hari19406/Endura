@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../engines/memory/engine_memory_service.dart';
+import '../models/activity_telemetry.dart' show ActivityDetail;
 import '../utils/database_service.dart';
 
 class CloudSyncService {
@@ -24,6 +25,7 @@ class CloudSyncService {
 
     try {
       final plan = await _planTagFor(run);
+      final splits = _uploadSplitsFor(run);
       await _client.from('runs').upsert({
         'user_id': _userId,
         'distance_km': run.distanceKm,
@@ -40,6 +42,7 @@ class CloudSyncService {
         if (run.elapsedSeconds != null) 'elapsed_seconds': run.elapsedSeconds,
         if (plan.$1 != null) 'plan_name': plan.$1,
         if (plan.$2 != null) 'plan_progress': plan.$2,
+        if (splits.isNotEmpty) 'splits': splits,
       });
 
       await DatabaseService.instance.markRunSynced(run.id!);
@@ -173,6 +176,30 @@ class CloudSyncService {
       debugPrint('[CloudSync] resolveCloudRunId error: $e');
       return null;
     }
+  }
+
+  /// Compact per-km splits to upload alongside the summary fields — enough
+  /// for a friend's Feed card to render the KILOMETRE SPLITS card and a
+  /// coarse elevation/pace chart (see [ActivityDetail.fromFeedRun]), without
+  /// uploading the full GPS/telemetry trace. Reuses
+  /// [ActivityDetail.fromRunRecord]'s own km-bucketing (elevation delta + avg
+  /// HR per split) rather than re-deriving it here, so there is exactly one
+  /// place that turns a track into km splits. `[]` for a run with no splits
+  /// (e.g. a manual/GPS-only entry) — the caller omits the column entirely.
+  List<Map<String, dynamic>> _uploadSplitsFor(RunRecord run) {
+    final splits = ActivityDetail.fromRunRecord(
+      run,
+      runnerName: '',
+    ).splits;
+    return [
+      for (final s in splits)
+        {
+          'km': s.km,
+          'seconds': s.paceSeconds,
+          if (s.elevationChangeM != null) 'elev': s.elevationChangeM,
+          if (s.avgHr != null) 'hr': s.avgHr,
+        },
+    ];
   }
 
   // ── Download runs from cloud (new device restore) ─────────────────────────

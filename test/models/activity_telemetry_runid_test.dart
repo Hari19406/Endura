@@ -42,6 +42,153 @@ void main() {
     expect(a.commentCount, 7);
   });
 
+  group('fromFeedRun splits + synthetic elevation/pace trace', () {
+    test('builds KmSplits from the raw uploaded splits', () {
+      final run = FeedRun(
+        runId: 901,
+        athleteId: 'a1',
+        displayName: 'Runner',
+        date: DateTime.utc(2026, 9, 1),
+        distanceKm: 2,
+        averagePace: '5:00',
+        durationSeconds: 600,
+        elevationGain: 12,
+        splits: const [
+          {'km': 1, 'seconds': 300, 'elev': -3.0, 'hr': 148},
+          {'km': 2, 'seconds': 300, 'elev': 5.0, 'hr': 152},
+        ],
+      );
+      final a = ActivityDetail.fromFeedRun(run);
+
+      expect(a.splits, hasLength(2));
+      expect(a.splits[0].paceSeconds, 300);
+      expect(a.splits[0].elevationChangeM, -3.0);
+      expect(a.splits[0].avgHr, 148);
+      expect(a.anySplitHasElevation, isTrue);
+      expect(a.anySplitHasHr, isTrue);
+    });
+
+    test(
+      'synthesises a coarse elevation trace (cumulative per-split delta) so '
+      'hasElevationData is true and the chart can render',
+      () {
+        final run = FeedRun(
+          runId: 902,
+          athleteId: 'a1',
+          displayName: 'Runner',
+          date: DateTime.utc(2026, 9, 1),
+          distanceKm: 3,
+          averagePace: '5:00',
+          durationSeconds: 900,
+          elevationGain: 20,
+          splits: const [
+            {'km': 1, 'seconds': 300, 'elev': 10.0},
+            {'km': 2, 'seconds': 300, 'elev': -4.0},
+            {'km': 3, 'seconds': 300, 'elev': 8.0},
+          ],
+        );
+        final a = ActivityDetail.fromFeedRun(run);
+
+        expect(a.hasElevationData, isTrue);
+        // Baseline sample + one per split.
+        expect(a.telemetrySeries, hasLength(4));
+        expect(a.telemetrySeries[0].elevationM, 0);
+        expect(a.telemetrySeries[1].elevationM, 10.0);
+        expect(a.telemetrySeries[2].elevationM, 6.0); // 10 - 4
+        expect(a.telemetrySeries[3].elevationM, 14.0); // 6 + 8
+      },
+    );
+
+    test(
+      'synthesises a pace trace from each split\'s own pace, so '
+      'hasPaceSeries is true',
+      () {
+        final run = FeedRun(
+          runId: 903,
+          athleteId: 'a1',
+          displayName: 'Runner',
+          date: DateTime.utc(2026, 9, 1),
+          distanceKm: 2,
+          averagePace: '5:00',
+          durationSeconds: 600,
+          splits: const [
+            {'km': 1, 'seconds': 295},
+            {'km': 2, 'seconds': 305},
+          ],
+        );
+        final a = ActivityDetail.fromFeedRun(run);
+
+        expect(a.hasPaceSeries, isTrue);
+        final paces = a.telemetrySeries
+            .map((s) => s.paceSeconds)
+            .whereType<int>()
+            .toList();
+        expect(paces, [295, 305]);
+      },
+    );
+
+    test('no splits at all → empty splits and telemetry, as before', () {
+      final run = FeedRun(
+        runId: 904,
+        athleteId: 'a1',
+        displayName: 'Runner',
+        date: DateTime.utc(2026, 9, 1),
+        distanceKm: 5,
+        averagePace: '5:00',
+        durationSeconds: 1500,
+      );
+      final a = ActivityDetail.fromFeedRun(run);
+
+      expect(a.splits, isEmpty);
+      expect(a.telemetrySeries, isEmpty);
+      expect(a.hasElevationData, isFalse);
+      expect(a.hasPaceSeries, isFalse);
+    });
+
+    test(
+      'splits with no elevation data at all leave elevationM null '
+      'throughout (nothing to accumulate) rather than a flat-0 fake profile',
+      () {
+        final run = FeedRun(
+          runId: 905,
+          athleteId: 'a1',
+          displayName: 'Runner',
+          date: DateTime.utc(2026, 9, 1),
+          distanceKm: 2,
+          averagePace: '5:00',
+          durationSeconds: 600,
+          splits: const [
+            {'km': 1, 'seconds': 300},
+            {'km': 2, 'seconds': 300},
+          ],
+        );
+        final a = ActivityDetail.fromFeedRun(run);
+
+        expect(a.telemetrySeries.every((s) => s.elevationM == null), isTrue);
+        expect(a.hasElevationData, isFalse);
+      },
+    );
+
+    test('a malformed split entry (missing km/seconds) is skipped', () {
+      final run = FeedRun(
+        runId: 906,
+        athleteId: 'a1',
+        displayName: 'Runner',
+        date: DateTime.utc(2026, 9, 1),
+        distanceKm: 2,
+        averagePace: '5:00',
+        durationSeconds: 600,
+        splits: const [
+          {'km': 1, 'seconds': 300},
+          {'seconds': 300}, // missing km
+          {'km': 3}, // missing seconds
+        ],
+      );
+      final a = ActivityDetail.fromFeedRun(run);
+      expect(a.splits, hasLength(1));
+    });
+  });
+
   test('fromRunRecord marks the id as local, not cloud', () {
     final record = RunRecord(
       id: 12,

@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/models/activity_telemetry.dart';
+import 'package:run_app/models/feed_run.dart';
 import 'package:run_app/screens/activity_detail_screen.dart';
 import 'package:run_app/theme/app_colors.dart';
 import 'package:run_app/utils/unit_utils.dart';
@@ -229,6 +230,44 @@ void main() {
         await tester.pumpAndSettle();
         expect(_anyRichTextContains(tester, '2.00'), isTrue);
         expect(find.text('KILOMETRE SPLITS'), findsOneWidget);
+      },
+    );
+  });
+
+  group('feed-hydrated activity (a friend\'s run)', () {
+    testWidgets(
+      'renders the KILOMETRE SPLITS card and an elevation chart from the '
+      'uploaded per-split data — not just a summary-only card',
+      (tester) async {
+        final activity = ActivityDetail.fromFeedRun(
+          FeedRun(
+            runId: 501,
+            athleteId: 'friend-1',
+            displayName: 'Friend Runner',
+            date: DateTime.utc(2026, 9, 18, 6),
+            distanceKm: 3.0,
+            averagePace: '5:00',
+            durationSeconds: 900,
+            elevationGain: 18,
+            splits: const [
+              {'km': 1, 'seconds': 295, 'elev': 10.0, 'hr': 150},
+              {'km': 2, 'seconds': 300, 'elev': -6.0, 'hr': 154},
+              {'km': 3, 'seconds': 305, 'elev': 4.0, 'hr': 158},
+            ],
+          ),
+        );
+
+        await tester.pumpWidget(_host(activity));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('KILOMETRE SPLITS'), findsOneWidget);
+        expect(find.text('ELEVATION PROFILE'), findsOneWidget);
+        expect(find.text('PACE'), findsWidgets); // chart card + summary cell
+        // No uploaded HR/cadence trace exists for a friend's run yet — those
+        // cards stay hidden rather than showing an empty/broken chart.
+        expect(find.text('HEART RATE & ZONES'), findsNothing);
+        expect(find.text('CADENCE'), findsNothing);
       },
     );
   });

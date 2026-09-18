@@ -33,6 +33,15 @@ class FeedRun {
   final String? planName;
   final String? planProgress; // e.g. "Week 3 / 8"
 
+  /// Per-km splits as `[{'km': 1, 'seconds': 320, 'elev': -4.0, 'hr': 152}, ...]`
+  /// — `elev`/`hr` are omitted per-entry when the recording had no altitude/HR
+  /// source. Empty for a run recorded before splits were uploaded, or a
+  /// manual/GPS-only entry with none to begin with. See
+  /// [CloudSyncService.uploadRun] (the writer) and
+  /// [ActivityDetail.fromFeedRun] (the reader — builds [KmSplit]s from this
+  /// and a coarse synthetic elevation/pace trace from the per-split deltas).
+  final List<Map<String, dynamic>> splits;
+
   /// Number of comments on this run (batch-loaded by the feed query).
   final int commentCount;
 
@@ -60,6 +69,7 @@ class FeedRun {
     this.source = 'Endura Tracker',
     this.planName,
     this.planProgress,
+    this.splits = const [],
     this.commentCount = 0,
     this.reactionCount = 0,
     this.viewerReacted = false,
@@ -121,9 +131,18 @@ class FeedRun {
               true
           ? (runRow['plan_progress'] as String).trim()
           : null,
+      splits: _decodeSplits(runRow['splits']),
       commentCount: commentCount,
       reactionCount: reactionCount,
       viewerReacted: viewerReacted,
     );
+  }
+
+  /// Parses the `runs.splits` jsonb column (a `List` of small maps) into
+  /// `List<Map<String, dynamic>>`. Tolerant of `null` (older rows / runs
+  /// with none) and any unexpected shape — never throws.
+  static List<Map<String, dynamic>> _decodeSplits(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
   }
 }

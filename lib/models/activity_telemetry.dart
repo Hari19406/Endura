@@ -405,16 +405,21 @@ class ActivityDetail {
   //  Hydration factories
   // ───────────────────────────────────────────────────────────────────────────
 
-  /// Builds a view-model from an activity-feed row. Feed payloads are
-  /// summary-only (no splits, no telemetry, no calories), so the detail screen
-  /// renders just the header, summary grid, GAP block (if the row has GAP),
-  /// route preview and the social row — every chart section is skipped.
+  /// Builds a view-model from an activity-feed row. Feed payloads never carry
+  /// the full GPS/HR/cadence trace (that never leaves the recording device —
+  /// see [CloudSyncService.uploadRun]), so the HR & Zones and Cadence cards
+  /// are always skipped here. [FeedRun.splits] — a compact per-km breakdown
+  /// that *is* uploaded — drives the KILOMETRE SPLITS card directly, and also
+  /// seeds a coarse, km-resolution synthetic trace (see
+  /// [_telemetryFromSplits]) so the Pace and Elevation scrub charts render
+  /// too, just at lower resolution than a locally-recorded run's.
   factory ActivityDetail.fromFeedRun(
     FeedRun run, {
     int? commentCountOverride,
     int? reactionCountOverride,
   }) {
     final elapsed = run.elapsedSeconds;
+    final splits = _splitsFromRaw(run.splits);
     return ActivityDetail(
       runId: run.runId,
       runIdIsCloud: true, // FeedRun.runId is the Supabase runs.id
@@ -436,11 +441,58 @@ class ActivityDetail {
           : null,
       elevationGainM: run.elevationGain > 0 ? run.elevationGain : null,
       calories: null,
-      splits: const [],
-      telemetrySeries: const [],
+      splits: splits,
+      telemetrySeries: _telemetryFromSplits(splits),
       hrZones: const [],
       routePoints: run.points,
     );
+  }
+
+  /// Parses [FeedRun.splits]' raw `{'km', 'seconds', 'elev'?, 'hr'?}` maps
+  /// into [KmSplit]s. Tolerant of a missing/malformed entry — skips it rather
+  /// than throwing, so one bad row doesn't blank the whole splits card.
+  static List<KmSplit> _splitsFromRaw(List<Map<String, dynamic>> raw) {
+    final splits = <KmSplit>[];
+    for (final m in raw) {
+      final km = (m['km'] as num?)?.toInt();
+      final seconds = (m['seconds'] as num?)?.toInt();
+      if (km == null || seconds == null) continue;
+      splits.add(
+        KmSplit(
+          km: km,
+          paceSeconds: seconds,
+          elevationChangeM: (m['elev'] as num?)?.toDouble(),
+          avgHr: (m['hr'] as num?)?.toInt(),
+        ),
+      );
+    }
+    return splits;
+  }
+
+  /// Synthesises one [TelemetrySample] per km boundary from [splits] — a
+  /// cumulative elevation profile (running sum of each split's elevation
+  /// delta) and each split's own pace, so [hasElevationData]/[hasPaceSeries]
+  /// (and the scrub charts that gate on them) work from data no finer than
+  /// what a Feed row actually carries. Leaves `elevationM` null throughout
+  /// when not a single split has an elevation delta (nothing to accumulate).
+  static List<TelemetrySample> _telemetryFromSplits(List<KmSplit> splits) {
+    if (splits.isEmpty) return const [];
+    final hasElevation = splits.any((s) => s.elevationChangeM != null);
+    var cumulativeElevation = 0.0;
+    final samples = [
+      TelemetrySample(distanceKm: 0, elevationM: hasElevation ? 0 : null),
+    ];
+    for (final s in splits) {
+      if (hasElevation) cumulativeElevation += s.elevationChangeM ?? 0;
+      samples.add(
+        TelemetrySample(
+          distanceKm: s.km.toDouble(),
+          paceSeconds: s.paceSeconds,
+          elevationM: hasElevation ? cumulativeElevation : null,
+        ),
+      );
+    }
+    return samples;
   }
 
   /// Builds a view-model from a locally-recorded [RunRecord] (You / History
