@@ -650,7 +650,6 @@ class RunShareCard extends StatelessWidget {
           ),
         ),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildMapMetric('DISTANCE', _distanceText),
@@ -662,14 +661,21 @@ class RunShareCard extends StatelessWidget {
     );
   }
 
+  /// One of three equal-width telemetry columns; scales down instead of
+  /// overflowing on long values (e.g. "3h 42m 10s").
   Widget _buildMapMetric(String label, String value) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: _mapMetricLabelStyle),
-        const SizedBox(height: 4),
-        Text(value, style: _mapMetricValueStyle.copyWith(fontSize: 20)),
-      ],
+    return Expanded(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: _mapMetricLabelStyle),
+            const SizedBox(height: 4),
+            Text(value, style: _mapMetricValueStyle.copyWith(fontSize: 20)),
+          ],
+        ),
+      ),
     );
   }
 
