@@ -924,7 +924,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   SizedBox(
                     width: 26,
                     child: Text(
-                      '${s.km}',
+                      s.isPartial
+                          ? UnitUtils.displayDistance(
+                              s.distanceKm,
+                              _useMiles,
+                            ).toStringAsFixed(1)
+                          : '${s.km}',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -1079,7 +1084,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       c,
       title: 'ELEVATION PROFILE',
       trailing: Text(
-        '▲ ${(hi - lo).round()} m range · ${a.elevationGainM!.round()} m gain',
+        '▲ ${(hi - lo).round()} m range · ${(a.elevationGainM ?? 0).round()} m gain',
         style: TextStyle(fontSize: 10.5, color: c.textTertiary),
       ),
       child: SizedBox(

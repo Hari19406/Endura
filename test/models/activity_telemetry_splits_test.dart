@@ -60,10 +60,12 @@ void main() {
     // A full mile at a steady 300 s/km ≈ 483 s/mi (8:03).
     expect(miles[0].paceSeconds, closeTo(483, 1));
     expect(miles[0].paceLabel, '8:03');
-    // The trailing partial bucket is shorter, so its "time" is
-    // proportionally smaller — same convention the km bucketer uses for a
-    // partial final km.
-    expect(miles[1].paceSeconds, lessThan(miles[0].paceSeconds));
+    // The trailing partial bucket is flagged as partial, carries its real
+    // length, and its pace is normalised per mile so it stays comparable.
+    expect(miles[0].isPartial, isFalse);
+    expect(miles[1].isPartial, isTrue);
+    expect(miles[1].distanceKm, closeTo(3.2 - 1.609344, 0.001));
+    expect(miles[1].paceSeconds, closeTo(483, 1));
   });
 
   test(

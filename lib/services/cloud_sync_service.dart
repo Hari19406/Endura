@@ -187,12 +187,11 @@ class CloudSyncService {
   /// place that turns a track into km splits. `[]` for a run with no splits
   /// (e.g. a manual/GPS-only entry) — the caller omits the column entirely.
   List<Map<String, dynamic>> _uploadSplitsFor(RunRecord run) {
-    final splits = ActivityDetail.fromRunRecord(
-      run,
-      runnerName: '',
-    ).splits;
+    final splits = ActivityDetail.fromRunRecord(run, runnerName: '').splits;
     return [
-      for (final s in splits)
+      // Partial trailing splits are display-only: the feed payload has no
+      // distance field, so a partial would read as a full km there.
+      for (final s in splits.where((s) => !s.isPartial))
         {
           'km': s.km,
           'seconds': s.paceSeconds,

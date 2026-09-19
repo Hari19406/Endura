@@ -31,18 +31,31 @@ class KmSplit {
   /// no HR source.
   final int? avgHr;
 
+  /// Physical length this split covers, in km. 1.0 for every full kilometre;
+  /// less for a trailing partial (e.g. 0.7 for a 0.7 km run). For a partial
+  /// split [paceSeconds] is already normalised to a per-km pace, so its bar
+  /// and label stay comparable with the full splits.
+  final double distanceKm;
+
   const KmSplit({
     required this.km,
     required this.paceSeconds,
     this.elevationChangeM,
     this.avgHr,
-  });
+    this.distanceKm = 1.0,
+    bool? partial,
+  }) : isPartial = partial ?? distanceKm < 0.995;
+
+  /// True for a trailing split shorter than one display unit (km or mile).
+  final bool isPartial;
 
   KmSplit copyWith({int? paceSeconds}) => KmSplit(
     km: km,
     paceSeconds: paceSeconds ?? this.paceSeconds,
     elevationChangeM: elevationChangeM,
     avgHr: avgHr,
+    distanceKm: distanceKm,
+    partial: isPartial,
   );
 
   /// "m:ss" per-km label.
@@ -241,9 +254,10 @@ class ActivityDetail {
   bool get hasHrData =>
       hrZones.isNotEmpty && _channelCount((s) => s.hrBpm != null) >= 2;
 
-  /// A gain figure plus ≥ 2 altitude samples → the Elevation Profile can render.
-  bool get hasElevationData =>
-      elevationGainM != null && _channelCount((s) => s.elevationM != null) >= 2;
+  /// ≥ 2 altitude samples → the Elevation Profile can render, even when the
+  /// net gain is 0 m (a flat baseline). Hidden only when no altitude was
+  /// recorded at all (indoor / no GPS altitude).
+  bool get hasElevationData => _channelCount((s) => s.elevationM != null) >= 2;
 
   /// Mean HR over the trace — display fallback when [avgHr] wasn't supplied.
   int? get seriesAvgHr {
@@ -318,23 +332,22 @@ class ActivityDetail {
               .whereType<int>()
               .toList();
           if (paces.isEmpty) continue;
-          final avgPaceSecPerKm =
-              paces.reduce((a, b) => a + b) / paces.length;
+          final avgPaceSecPerKm = paces.reduce((a, b) => a + b) / paces.length;
           final alts = inBucket
               .map((s) => s.elevationM)
               .whereType<double>()
               .toList();
-          final hrs = inBucket
-              .map((s) => s.hrBpm)
-              .whereType<int>()
-              .toList();
+          final hrs = inBucket.map((s) => s.hrBpm).whereType<int>().toList();
           rebucketed.add(
             KmSplit(
               km: u,
-              // avg pace (sec/km) × this bucket's real km-length: for a full
-              // ~1-mile bucket that's already "seconds per mile" — the same
-              // convention the km bucketer uses (sec/km × ~1km ≈ itself).
-              paceSeconds: (avgPaceSecPerKm * (hi - lo)).round(),
+              // avg pace (sec/km) × one mile = seconds per mile. Always the
+              // per-unit pace — a trailing partial bucket is normalised too
+              // (its real length is carried in distanceKm) so its bar/label
+              // stay comparable with the full miles.
+              paceSeconds: (avgPaceSecPerKm * mileKm).round(),
+              distanceKm: hi - lo,
+              partial: (hi - lo) < mileKm - 0.005,
               elevationChangeM: alts.length >= 2
                   ? alts.last - alts.first
                   : null,
@@ -357,6 +370,8 @@ class ActivityDetail {
           paceSeconds: (s.paceSeconds * mileKm).round(),
           elevationChangeM: s.elevationChangeM,
           avgHr: s.avgHr,
+          distanceKm: s.distanceKm,
+          partial: s.isPartial,
         ),
     ];
   }
@@ -381,7 +396,9 @@ class ActivityDetail {
     final fallbackPace = avgPaceSeconds;
 
     if (invalidCount == raw.length) {
-      if (totalMovingSeconds <= 0 || fallbackPace == null || fallbackPace <= 0) {
+      if (totalMovingSeconds <= 0 ||
+          fallbackPace == null ||
+          fallbackPace <= 0) {
         return raw; // Total moving time really was 0 — 0:00 is correct here.
       }
       return [for (final s in raw) s.copyWith(paceSeconds: fallbackPace)];
@@ -397,7 +414,9 @@ class ActivityDetail {
 
     return [
       for (final s in raw)
-        s.paceSeconds > 0 ? s : s.copyWith(paceSeconds: math.max(1, healedDuration)),
+        s.paceSeconds > 0
+            ? s
+            : s.copyWith(paceSeconds: math.max(1, healedDuration)),
     ];
   }
 
@@ -554,6 +573,44 @@ class ActivityDetail {
               : (hrs.reduce((a, b) => a + b) / hrs.length).round(),
         ),
       );
+    }
+
+    // Trailing partial kilometre (or the whole of a run shorter than 1 km):
+    // stored splits only exist for completed km, so without this a short run
+    // has no splits card at all. Stored `seconds` are per-km durations (the
+    // run screen converts its cumulative markers to deltas on save), so the
+    // partial's time is whatever moving time the full splits don't account for.
+    final coveredKm = splits.isEmpty ? 0 : splits.last.km;
+    final remainingKm = record.distanceKm - coveredKm;
+    if (remainingKm >= 0.1 && remainingKm < 1.0) {
+      final usedSec = splits.fold<int>(0, (sum, s) => sum + s.paceSeconds);
+      final remainingSec = record.durationSeconds - usedSec;
+      if (remainingSec > 0) {
+        final lo = coveredKm * 1000.0;
+        final seg = ts.where((s) {
+          final d = (s['d'] as num?)?.toDouble();
+          return d != null && d >= lo;
+        });
+        final alts = seg
+            .map((s) => (s['alt'] as num?)?.toDouble())
+            .whereType<double>()
+            .toList(growable: false);
+        final hrs = seg
+            .map((s) => (s['hr'] as num?)?.toDouble())
+            .whereType<double>()
+            .toList(growable: false);
+        splits.add(
+          KmSplit(
+            km: coveredKm + 1,
+            paceSeconds: (remainingSec / remainingKm).round(),
+            elevationChangeM: alts.length >= 2 ? alts.last - alts.first : null,
+            avgHr: hrs.isEmpty
+                ? null
+                : (hrs.reduce((a, b) => a + b) / hrs.length).round(),
+            distanceKm: remainingKm,
+          ),
+        );
+      }
     }
 
     final hrSamples = samples
