@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,14 +10,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/analytics_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/ambient_scaffold.dart';
 
-// Endura teal — brand color, intentionally not a theme token (fixed across light/dark)
-const _kBrand = Color(0xFF00E5CC);
-// Champagne gold — a second, deliberately rare accent used only to mark
-// "premium" signifiers (best-value badge, guarantee seal, pro checkmarks).
-// Teal stays the action color everywhere else so buttons/selection state
-// don't get confused with this purely decorative premium cue.
-const _kGold = Color(0xFFE3C170);
+// Cards on this page: 10px radius, 1px border (Night Ultra). The primary CTA
+// is the one deliberate exception — a 28px pill.
+const double _kCardRadius = 10;
+const double _kCtaRadius = 28;
 const _kTermsUrl =
     'https://laced-drill-6ab.notion.site/Terms-of-Service-for-Endura-3862582d8c2d80358fcfcc0442194dc7';
 const _kPrivacyUrl = 'https://sites.google.com/view/enduraprivacypolicy';
@@ -239,23 +238,29 @@ class _PaywallScreenState extends State<PaywallScreen> {
   /// `pricePerMonthString` (already localized and rounded by the store);
   /// falls back to price / 12 rounded to a whole unit.
   String _monthlyEquivalent(Package pkg) {
-    final provided = pkg.storeProduct.pricePerMonthString;
-    if (provided != null && provided.trim().isNotEmpty) return provided.trim();
-    final symbol = pkg.storeProduct.priceString
-        .replaceAll(RegExp(r'[\d.,\s]'), '')
-        .trim();
-    final monthly = pkg.storeProduct.price / 12;
-    return '$symbol${monthly.round()}';
+    final product = pkg.storeProduct;
+    final monthly = product.price / 12;
+    try {
+      return NumberFormat.simpleCurrency(
+        name: product.currencyCode,
+      ).format(monthly);
+    } catch (_) {
+      // Unknown/empty currency code — fall back to the store's own string.
+      final provided = product.pricePerMonthString;
+      return (provided != null && provided.trim().isNotEmpty)
+          ? provided.trim()
+          : product.priceString;
+    }
   }
 
   int? _savingsPercent() {
     final a = _annualPackage, m = _monthlyPackage;
     if (a == null || m == null) return null;
-    final yearAtMonthly = m.storeProduct.price * 12;
-    if (yearAtMonthly <= 0) return null;
-    final pct = (1 - a.storeProduct.price / yearAtMonthly) * 100;
-    if (pct <= 0) return null;
-    return pct.round();
+    final annualPrice = a.storeProduct.price;
+    final monthlyPrice = m.storeProduct.price;
+    if (monthlyPrice <= 0) return null;
+    final pct = ((1.0 - (annualPrice / (monthlyPrice * 12.0))) * 100).round();
+    return pct > 0 ? pct : null;
   }
 
   bool get _selectedIsAnnual =>
@@ -269,199 +274,164 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final hasTrial = intro != null;
     final trialDays = intro != null ? _trialDays(intro) : null;
 
-    return Scaffold(
-      backgroundColor: c.background,
-      body: Stack(
-        children: [
-          // Layered hero glow: a wide teal wash with a tighter, warmer gold
-          // core behind the icon — the second hue reads as depth/quality
-          // rather than a second brand color, so it stays this subtle.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 320,
-            child: IgnorePointer(
+    return AmbientScaffold(
+      safeArea: false,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ---- Header: close + centered title --------------------------
+            SizedBox(
+              height: 44,
               child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          _kBrand.withValues(alpha: 0.26),
-                          _kBrand.withValues(alpha: 0.09),
-                          _kBrand.withValues(alpha: 0.0),
-                        ],
-                      ),
+                  Text(
+                    'PREMIUM SUBSCRIPTION',
+                    style: TextStyle(
+                      color: c.textTertiary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
                     ),
                   ),
                   Align(
-                    alignment: const Alignment(0, -0.7),
-                    child: Container(
-                      width: 220,
-                      height: 220,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            _kGold.withValues(alpha: 0.16),
-                            _kGold.withValues(alpha: 0.0),
-                          ],
-                        ),
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: IconButton(
+                        icon: Icon(Icons.close, color: c.textTertiary),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(context, false);
+                        },
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                // ---- Header: close + centered title --------------------------
-                SizedBox(
-                  height: 44,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Text(
-                        'PREMIUM SUBSCRIPTION',
-                        style: TextStyle(
-                          color: c.textTertiary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
+            Expanded(
+              child: _loadingOffering
+                  ? Center(
+                      child: CircularProgressIndicator(color: c.chartAccent),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_selected != null)
+                            _TopPriceBar(
+                              colors: c,
+                              selected: _selected!,
+                              isAnnual: _selectedIsAnnual,
+                              monthlyEquivalent: _selectedIsAnnual
+                                  ? _monthlyEquivalent(_selected!)
+                                  : null,
+                            ),
+                          if (_selected != null) const SizedBox(height: 28),
+                          _Hero(colors: c, userName: _userName),
+                          const SizedBox(height: 32),
+                          const _RouteMarker(1, 'CHOOSE YOUR PLAN'),
+                          const SizedBox(height: 16),
+                          if (_annualPackage != null || _monthlyPackage != null)
+                            _InlinePlanSelector(
+                              colors: c,
+                              annual: _annualPackage,
+                              monthly: _monthlyPackage,
+                              selected: _selected,
+                              savingsPercent: _savingsPercent(),
+                              monthlyEquivalent: _annualPackage != null
+                                  ? _monthlyEquivalent(_annualPackage!)
+                                  : null,
+                              introOf: _introOf,
+                              trialDaysOf: _trialDays,
+                              onPick: (pkg) {
+                                HapticFeedback.selectionClick();
+                                setState(() => _selected = pkg);
+                              },
+                            )
+                          else if (_offeringUnavailable)
+                            _OfferingUnavailableCard(
+                              colors: c,
+                              onRetry: _loadOffering,
+                            ),
+                          const SizedBox(height: 36),
+                          const _RouteMarker(2, 'WHY ENDURA'),
+                          const SizedBox(height: 16),
+                          const _FeatureTable(),
+                          const SizedBox(height: 24),
+                          const _TrainingProofRow(),
+                          const SizedBox(height: 36),
+                          const _RouteMarker(3, 'OUR COMMITMENT'),
+                          const SizedBox(height: 16),
+                          _GuaranteeCard(colors: c),
+                          const SizedBox(height: 20),
+                          _TrustRow(colors: c),
+                        ],
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: IconButton(
-                            icon: Icon(Icons.close, color: c.textTertiary),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.pop(context, false);
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: _loadingOffering
-                      ? const Center(
-                          child: CircularProgressIndicator(color: _kBrand),
-                        )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (_selected != null)
-                                _TopPriceBar(
-                                  colors: c,
-                                  selected: _selected!,
-                                  isAnnual: _selectedIsAnnual,
-                                  monthlyEquivalent: _selectedIsAnnual
-                                      ? _monthlyEquivalent(_selected!)
-                                      : null,
-                                ),
-                              if (_selected != null) const SizedBox(height: 28),
-                              _Hero(colors: c, userName: _userName),
-                              const SizedBox(height: 32),
-                              const _RouteMarker(1, 'CHOOSE YOUR PLAN'),
-                              const SizedBox(height: 16),
-                              if (_annualPackage != null ||
-                                  _monthlyPackage != null)
-                                _InlinePlanSelector(
-                                  colors: c,
-                                  annual: _annualPackage,
-                                  monthly: _monthlyPackage,
-                                  selected: _selected,
-                                  savingsPercent: _savingsPercent(),
-                                  monthlyEquivalent: _annualPackage != null
-                                      ? _monthlyEquivalent(_annualPackage!)
-                                      : null,
-                                  introOf: _introOf,
-                                  trialDaysOf: _trialDays,
-                                  onPick: (pkg) {
-                                    HapticFeedback.selectionClick();
-                                    setState(() => _selected = pkg);
-                                  },
-                                )
-                              else if (_offeringUnavailable)
-                                _OfferingUnavailableCard(
-                                  colors: c,
-                                  onRetry: _loadOffering,
-                                ),
-                              const SizedBox(height: 36),
-                              const _RouteMarker(2, 'WHY ENDURA'),
-                              const SizedBox(height: 16),
-                              const _FeatureTable(),
-                              const SizedBox(height: 24),
-                              const _TrainingProofRow(),
-                              const SizedBox(height: 36),
-                              const _RouteMarker(3, 'OUR COMMITMENT'),
-                              const SizedBox(height: 16),
-                              _GuaranteeCard(colors: c),
-                              const SizedBox(height: 20),
-                              _TrustRow(colors: c),
-                            ],
-                          ),
-                        ),
-                ),
-                // ---- Footer: price summary + CTA --------------------------------
-                Container(
-                  decoration: BoxDecoration(
-                    color: c.background,
-                    border: Border(top: BorderSide(color: c.divider)),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: _offeringUnavailable
-                        ? Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: OutlinedButton(
-                                onPressed: _loadOffering,
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: c.border),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(28),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Retry',
-                                  style: TextStyle(
-                                    color: c.textPrimary,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                    ),
+            ),
+            // ---- Footer: price summary + CTA --------------------------------
+            Container(
+              decoration: BoxDecoration(
+                color: c.background,
+                border: Border(top: BorderSide(color: c.divider)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: _offeringUnavailable
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: OutlinedButton(
+                            onPressed: _loadOffering,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: c.surface,
+                              side: BorderSide(color: c.border),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  _kCardRadius,
                                 ),
                               ),
                             ),
-                          )
-                        : (!_loadingOffering && _selected != null)
-                        ? Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _PriceSummary(
-                                  colors: c,
-                                  selected: _selected!,
-                                  isAnnual: _selectedIsAnnual,
-                                  hasTrial: hasTrial,
-                                  trialDays: trialDays,
+                            child: Text(
+                              'Retry',
+                              style: TextStyle(
+                                color: c.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : (!_loadingOffering && _selected != null)
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _PriceSummary(
+                              colors: c,
+                              selected: _selected!,
+                              isAnnual: _selectedIsAnnual,
+                              hasTrial: hasTrial,
+                              trialDays: trialDays,
+                            ),
+                            const SizedBox(height: 12),
+                            Opacity(
+                              opacity: busy ? 0.6 : 1.0,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: c.heroGradient,
+                                  borderRadius: BorderRadius.circular(
+                                    _kCtaRadius,
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
-                                SizedBox(
+                                child: SizedBox(
                                   width: double.infinity,
                                   height: 56,
                                   child: ElevatedButton(
@@ -469,23 +439,27 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                         ? null
                                         : () => _purchase(_selected!),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: _kBrand,
-                                      foregroundColor: Colors.black,
-                                      disabledBackgroundColor: _kBrand
-                                          .withValues(alpha: 0.5),
+                                      backgroundColor: Colors.transparent,
+                                      disabledBackgroundColor:
+                                          Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      foregroundColor: c.onAccent,
+                                      disabledForegroundColor: c.onAccent,
                                       elevation: 0,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(28),
+                                        borderRadius: BorderRadius.circular(
+                                          _kCtaRadius,
+                                        ),
                                       ),
                                     ),
                                     child:
                                         _purchasingId == _selected!.identifier
-                                        ? const SizedBox(
+                                        ? SizedBox(
                                             width: 22,
                                             height: 22,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              color: Colors.black45,
+                                              color: c.onAccent,
                                             ),
                                           )
                                         : Text(
@@ -503,69 +477,69 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                           ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  hasTrial
-                                      ? 'No commitment. Cancel anytime in Google Play before your trial ends.'
-                                      : 'Auto-renews. Cancel anytime in Google Play.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: c.textTertiary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                TextButton(
-                                  onPressed: busy ? null : _restore,
-                                  child: _purchasingId == 'restore'
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white38,
-                                          ),
-                                        )
-                                      : Text(
-                                          'Restore purchases',
-                                          style: TextStyle(
-                                            color: c.textTertiary,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _LegalLink(
-                                      'Terms of Use',
-                                      _kTermsUrl,
-                                      c.textFaint,
-                                    ),
-                                    Text(
-                                      '  ·  ',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              hasTrial
+                                  ? 'No commitment. Cancel anytime in Google Play before your trial ends.'
+                                  : 'Auto-renews. Cancel anytime in Google Play.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: c.textTertiary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextButton(
+                              onPressed: busy ? null : _restore,
+                              child: _purchasingId == 'restore'
+                                  ? SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: c.textTertiary,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Restore purchases',
                                       style: TextStyle(
-                                        color: c.textFaint,
-                                        fontSize: 11,
+                                        color: c.textTertiary,
+                                        fontSize: 13,
                                       ),
                                     ),
-                                    _LegalLink(
-                                      'Privacy Policy',
-                                      _kPrivacyUrl,
-                                      c.textFaint,
-                                    ),
-                                  ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _LegalLink(
+                                  'Terms of Use',
+                                  _kTermsUrl,
+                                  c.textFaint,
+                                ),
+                                Text(
+                                  '  ·  ',
+                                  style: TextStyle(
+                                    color: c.textFaint,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                _LegalLink(
+                                  'Privacy Policy',
+                                  _kPrivacyUrl,
+                                  c.textFaint,
                                 ),
                               ],
                             ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ),
-              ],
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -592,12 +566,12 @@ class _RouteMarker extends StatelessWidget {
           height: 26,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _kBrand.withValues(alpha: 0.12),
+            color: c.chartAccent.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(7),
           ),
           child: Text(
             index.toString().padLeft(2, '0'),
-            style: _numeralStyle(_kBrand, fontSize: 11),
+            style: _numeralStyle(c.chartAccent, fontSize: 11),
           ),
         ),
         const SizedBox(width: 10),
@@ -640,15 +614,8 @@ class _TopPriceBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(_kCardRadius),
         border: Border.all(color: c.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -749,7 +716,7 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: _kBrand.withValues(alpha: 0.28 + (t * 0.16)),
+                    color: c.chartAccent.withValues(alpha: 0.28 + (t * 0.16)),
                     blurRadius: 20 + (t * 10),
                     spreadRadius: 1 + (t * 2),
                   ),
@@ -764,10 +731,10 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
               'assets/icon.png',
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Container(
-                color: _kBrand,
-                child: const Icon(
+                color: c.chartAccent,
+                child: Icon(
                   Icons.directions_run_rounded,
-                  color: Colors.black,
+                  color: c.onAccent,
                   size: 30,
                 ),
               ),
@@ -904,21 +871,12 @@ class _PlanCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         decoration: BoxDecoration(
-          color: isSelected ? _kBrand.withValues(alpha: 0.08) : c.surface,
-          borderRadius: BorderRadius.circular(18),
+          color: isSelected ? c.chartAccent.withValues(alpha: 0.08) : c.surface,
+          borderRadius: BorderRadius.circular(_kCardRadius),
           border: Border.all(
-            color: isSelected ? _kBrand : c.border,
-            width: isSelected ? 2 : 1,
+            color: isSelected ? c.chartAccent : c.border,
+            width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? _kBrand.withValues(alpha: 0.18)
-                  : Colors.black.withValues(alpha: 0.16),
-              blurRadius: isSelected ? 18 : 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -927,22 +885,13 @@ class _PlanCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_kGold, Color(0xFFC9A052)],
-                  ),
+                  color: c.premiumGold,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _kGold.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.workspace_premium_rounded,
                       color: Colors.black,
                       size: 12,
@@ -968,7 +917,7 @@ class _PlanCard extends StatelessWidget {
                   isSelected
                       ? Icons.check_circle_rounded
                       : Icons.circle_outlined,
-                  color: isSelected ? _kBrand : c.textTertiary,
+                  color: isSelected ? c.chartAccent : c.textTertiary,
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -1019,16 +968,16 @@ class _PlanCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.lock_clock_rounded,
-                    color: _kBrand,
+                    color: c.chartAccent,
                     size: 14,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     trialTag!,
-                    style: const TextStyle(
-                      color: _kBrand,
+                    style: TextStyle(
+                      color: c.chartAccent,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1040,17 +989,17 @@ class _PlanCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.workspace_premium_rounded,
-                    color: _kGold,
+                    color: c.premiumGold,
                     size: 14,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       highlight!,
-                      style: const TextStyle(
-                        color: _kGold,
+                      style: TextStyle(
+                        color: c.premiumGold,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1082,7 +1031,7 @@ class _OfferingUnavailableCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(_kCardRadius),
         border: Border.all(color: c.border),
       ),
       child: Row(
@@ -1111,9 +1060,12 @@ class _OfferingUnavailableCard extends StatelessWidget {
           ),
           TextButton(
             onPressed: onRetry,
-            child: const Text(
+            child: Text(
               'Retry',
-              style: TextStyle(color: _kBrand, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: c.chartAccent,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -1147,15 +1099,8 @@ class _FeatureTable extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(_kCardRadius),
         border: Border.all(color: c.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -1173,16 +1118,16 @@ class _FeatureTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.workspace_premium_rounded,
-                  color: _kGold,
+                  color: c.premiumGold,
                   size: 14,
                 ),
                 const SizedBox(width: 4),
-                const Text(
+                Text(
                   'ENDURA PRO',
                   style: TextStyle(
-                    color: _kBrand,
+                    color: c.chartAccent,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.4,
@@ -1203,9 +1148,9 @@ class _FeatureTable extends StatelessWidget {
                       style: TextStyle(color: c.textPrimary, fontSize: 14),
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.check_circle_rounded,
-                    color: _kGold,
+                    color: c.premiumGold,
                     size: 20,
                   ),
                 ],
@@ -1264,7 +1209,7 @@ class _TrainingProofRow extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: c.surface,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(_kCardRadius),
                   border: Border.all(color: c.border),
                 ),
                 child: Column(
@@ -1274,12 +1219,12 @@ class _TrainingProofRow extends StatelessWidget {
                       height: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: _kGold.withValues(alpha: 0.12),
+                        color: c.premiumGold.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         _kTrainingPillars[i].icon,
-                        color: _kGold,
+                        color: c.premiumGold,
                         size: 18,
                       ),
                     ),
@@ -1329,15 +1274,8 @@ class _GuaranteeCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(_kCardRadius),
         border: Border.all(color: c.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -1349,15 +1287,15 @@ class _GuaranteeCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _kGold.withValues(alpha: 0.22),
-                  _kBrand.withValues(alpha: 0.14),
+                  c.premiumGold.withValues(alpha: 0.22),
+                  c.chartAccent.withValues(alpha: 0.14),
                 ],
               ),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.verified_user_rounded,
-              color: _kGold,
+              color: c.premiumGold,
               size: 22,
             ),
           ),
@@ -1410,7 +1348,7 @@ class _TrustRow extends StatelessWidget {
             (t) => Expanded(
               child: Column(
                 children: [
-                  Icon(t.icon, color: _kBrand, size: 20),
+                  Icon(t.icon, color: c.chartAccent, size: 20),
                   const SizedBox(height: 6),
                   Text(
                     t.label,
