@@ -313,7 +313,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
             Expanded(
               child: _loadingOffering
                   ? Center(
-                      child: CircularProgressIndicator(color: c.chartAccent),
+                      child: CircularProgressIndicator(
+                        color: c.heroGradientStart,
+                      ),
                     )
                   : SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
@@ -566,12 +568,12 @@ class _RouteMarker extends StatelessWidget {
           height: 26,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: c.chartAccent.withValues(alpha: 0.12),
+            color: c.textPrimary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(7),
           ),
           child: Text(
             index.toString().padLeft(2, '0'),
-            style: _numeralStyle(c.chartAccent, fontSize: 11),
+            style: _numeralStyle(c.textSecondary, fontSize: 11),
           ),
         ),
         const SizedBox(width: 10),
@@ -611,7 +613,8 @@ class _TopPriceBar extends StatelessWidget {
     final c = colors;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(_kCardRadius),
@@ -627,22 +630,37 @@ class _TopPriceBar extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const Spacer(),
-          Text(
-            selected.storeProduct.priceString,
-            style: _numeralStyle(c.textPrimary, fontSize: 19),
-          ),
-          if (isAnnual && monthlyEquivalent != null) ...[
-            const SizedBox(width: 6),
-            Text(
-              '($monthlyEquivalent/mo)',
-              style: _numeralStyle(
-                c.textTertiary,
-                fontSize: 12,
-                fontWeight: FontWeight.normal,
+          const SizedBox(width: 12),
+          // Long prices (IDR, large text scale) shrink to fit instead of
+          // overflowing; the suffix shares the price's baseline.
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    selected.storeProduct.priceString,
+                    style: _numeralStyle(c.textPrimary, fontSize: 19),
+                  ),
+                  if (isAnnual && monthlyEquivalent != null) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '($monthlyEquivalent/mo)',
+                      style: _numeralStyle(
+                        c.textTertiary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -716,7 +734,9 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: c.chartAccent.withValues(alpha: 0.28 + (t * 0.16)),
+                    color: c.heroGradientStart.withValues(
+                      alpha: 0.28 + (t * 0.16),
+                    ),
                     blurRadius: 20 + (t * 10),
                     spreadRadius: 1 + (t * 2),
                   ),
@@ -731,7 +751,7 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
               'assets/icon.png',
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Container(
-                color: c.chartAccent,
+                color: c.heroGradientStart,
                 child: Icon(
                   Icons.directions_run_rounded,
                   color: c.onAccent,
@@ -871,10 +891,12 @@ class _PlanCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         decoration: BoxDecoration(
-          color: isSelected ? c.chartAccent.withValues(alpha: 0.08) : c.surface,
+          color: isSelected
+              ? c.workoutTempo.withValues(alpha: 0.08)
+              : c.surface,
           borderRadius: BorderRadius.circular(_kCardRadius),
           border: Border.all(
-            color: isSelected ? c.chartAccent : c.border,
+            color: isSelected ? c.workoutTempo : c.border,
             width: 1,
           ),
         ),
@@ -885,22 +907,23 @@ class _PlanCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: c.premiumGold,
-                  borderRadius: BorderRadius.circular(8),
+                  color: c.workoutTempo.withValues(alpha: 0.15),
+                  border: Border.all(color: c.workoutTempo),
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.workspace_premium_rounded,
-                      color: Colors.black,
+                      color: c.workoutTempo,
                       size: 12,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       badge!,
-                      style: const TextStyle(
-                        color: Colors.black,
+                      style: TextStyle(
+                        color: c.workoutTempo,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.3,
@@ -917,7 +940,7 @@ class _PlanCard extends StatelessWidget {
                   isSelected
                       ? Icons.check_circle_rounded
                       : Icons.circle_outlined,
-                  color: isSelected ? c.chartAccent : c.textTertiary,
+                  color: isSelected ? c.workoutTempo : c.textTertiary,
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -970,14 +993,14 @@ class _PlanCard extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.lock_clock_rounded,
-                    color: c.chartAccent,
+                    color: c.workoutTempo,
                     size: 14,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     trialTag!,
                     style: TextStyle(
-                      color: c.chartAccent,
+                      color: c.workoutTempo,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -991,7 +1014,7 @@ class _PlanCard extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.workspace_premium_rounded,
-                    color: c.premiumGold,
+                    color: c.workoutTempo,
                     size: 14,
                   ),
                   const SizedBox(width: 6),
@@ -999,7 +1022,7 @@ class _PlanCard extends StatelessWidget {
                     child: Text(
                       highlight!,
                       style: TextStyle(
-                        color: c.premiumGold,
+                        color: c.workoutTempo,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1063,7 +1086,7 @@ class _OfferingUnavailableCard extends StatelessWidget {
             child: Text(
               'Retry',
               style: TextStyle(
-                color: c.chartAccent,
+                color: c.textPrimary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1120,14 +1143,14 @@ class _FeatureTable extends StatelessWidget {
                 ),
                 Icon(
                   Icons.workspace_premium_rounded,
-                  color: c.premiumGold,
+                  color: c.workoutTempo,
                   size: 14,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'ENDURA PRO',
                   style: TextStyle(
-                    color: c.chartAccent,
+                    color: c.workoutTempo,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.4,
@@ -1150,7 +1173,7 @@ class _FeatureTable extends StatelessWidget {
                   ),
                   Icon(
                     Icons.check_circle_rounded,
-                    color: c.premiumGold,
+                    color: c.workoutTempo,
                     size: 20,
                   ),
                 ],
@@ -1219,12 +1242,12 @@ class _TrainingProofRow extends StatelessWidget {
                       height: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: c.premiumGold.withValues(alpha: 0.12),
+                        color: c.workoutTempo.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         _kTrainingPillars[i].icon,
-                        color: c.premiumGold,
+                        color: c.workoutTempo,
                         size: 18,
                       ),
                     ),
@@ -1287,15 +1310,15 @@ class _GuaranteeCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  c.premiumGold.withValues(alpha: 0.22),
-                  c.chartAccent.withValues(alpha: 0.14),
+                  c.workoutTempo.withValues(alpha: 0.22),
+                  c.heroGradientStart.withValues(alpha: 0.14),
                 ],
               ),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.verified_user_rounded,
-              color: c.premiumGold,
+              color: c.workoutTempo,
               size: 22,
             ),
           ),
@@ -1348,7 +1371,7 @@ class _TrustRow extends StatelessWidget {
             (t) => Expanded(
               child: Column(
                 children: [
-                  Icon(t.icon, color: c.chartAccent, size: 20),
+                  Icon(t.icon, color: c.textSecondary, size: 20),
                   const SizedBox(height: 6),
                   Text(
                     t.label,
