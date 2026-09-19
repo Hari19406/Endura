@@ -95,9 +95,25 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
     super.dispose();
   }
 
-  void _scrollToCurrentWeek() {
+  void _scrollToCurrentWeek({bool retried = false}) {
     final ctx = _currentWeekKey.currentContext;
-    if (ctx == null) return;
+    if (ctx == null) {
+      // The list is lazy: a far-down current week isn't built yet, so it has
+      // no context to scroll to. Jump close by (rough per-card estimate) to
+      // get it built, then align it precisely on the next frame.
+      if (retried || !_scrollController.hasClients) return;
+      final index = (racePlan.currentWeekNumber(DateTime.now()) - 1).clamp(
+        0,
+        racePlan.weeks.length - 1,
+      );
+      _scrollController.jumpTo(
+        (index * 220.0).clamp(0.0, _scrollController.position.maxScrollExtent),
+      );
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToCurrentWeek(retried: true),
+      );
+      return;
+    }
     Scrollable.ensureVisible(
       ctx,
       duration: const Duration(milliseconds: 1),
@@ -141,7 +157,9 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
       final plan = await PlanStore.instance.load();
       if (!mounted) return;
       if (plan == null) {
-        debugPrint('[PlanOverviewScreen] _loadMaterialized: PlanStore has no plan.');
+        debugPrint(
+          '[PlanOverviewScreen] _loadMaterialized: PlanStore has no plan.',
+        );
         return;
       }
       // Only trust it if it was built for the same inputs we're showing.
@@ -516,7 +534,11 @@ class _WeekCard extends StatelessWidget {
   /// untappable, excluded from the week's workout/distance targets).
   final DateTime? planStart;
   final DateTime now;
-  final void Function(MaterializedWeek week, MaterializedDay day, DateTime date)?
+  final void Function(
+    MaterializedWeek week,
+    MaterializedDay day,
+    DateTime date,
+  )?
   onDayTap;
 
   /// Tapping any day dot while this week is locked — opens the
@@ -646,8 +668,10 @@ class _WeekCard extends StatelessWidget {
                 // is after the plan start, which clamps this to 0.
                 firstActiveWeekday: planStart == null
                     ? 0
-                    : PlanCalendar.daysBetween(weekMonday, planStart!)
-                          .clamp(0, 6),
+                    : PlanCalendar.daysBetween(
+                        weekMonday,
+                        planStart!,
+                      ).clamp(0, 6),
               ),
             ],
             const SizedBox(height: 16),
@@ -666,6 +690,8 @@ class _WeekCard extends StatelessWidget {
                   )
                 : _ProjectedDayStrip(
                     resolution: resolution,
+                    weekMonday: weekMonday,
+                    now: now,
                     useMiles: useMiles,
                     onLockedDayTap: isLocked
                         ? onLockedDayTap
@@ -724,7 +750,7 @@ class _WeekStatsRow extends StatelessWidget {
         : resolution.targetKm;
     final completedKm =
         mw?.days.fold<double>(0, (s, d) => s + (d.completion?.actualKm ?? 0)) ??
-            0;
+        0;
 
     final targetDisplay = UnitUtils.displayDistance(targetKm, useMiles);
     final completedDisplay = UnitUtils.displayDistance(completedKm, useMiles);
@@ -877,7 +903,18 @@ class _DayCircle extends StatelessWidget {
             color: isToday ? c.textPrimary : c.textTertiary,
           ),
         ),
-        const SizedBox(height: 8),
+        // "Today" micro-marker — always reserves its 4px so every column's
+        // circle stays aligned whether or not it is today's.
+        const SizedBox(height: 3),
+        Container(
+          width: 4,
+          height: 4,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isToday ? c.accent : Colors.transparent,
+          ),
+        ),
+        const SizedBox(height: 5),
         onTap == null
             ? circle
             : GestureDetector(
@@ -932,7 +969,11 @@ class MaterializedWeekStrip extends StatelessWidget {
   final DateTime? planStart;
   final DateTime now;
   final bool useMiles;
-  final void Function(MaterializedWeek week, MaterializedDay day, DateTime date)?
+  final void Function(
+    MaterializedWeek week,
+    MaterializedDay day,
+    DateTime date,
+  )?
   onDayTap;
 
   const MaterializedWeekStrip({
@@ -961,7 +1002,8 @@ class MaterializedWeekStrip extends StatelessWidget {
                 now: now,
                 planStart: planStart,
               );
-              final isToday = date.year == now.year &&
+              final isToday =
+                  date.year == now.year &&
                   date.month == now.month &&
                   date.day == now.day;
               return _DayCircle(
@@ -999,8 +1041,16 @@ class _ProjectedDayStrip extends StatelessWidget {
   /// stay non-interactive rather than mis-firing the paywall.
   final VoidCallback? onLockedDayTap;
 
+  /// Monday of this week + "now" — only used to ring today's dot. Lock status
+  /// says whether the workout is available; the ring says where the athlete is
+  /// on the calendar, so it is drawn for locked/projected weeks too.
+  final DateTime weekMonday;
+  final DateTime now;
+
   const _ProjectedDayStrip({
     required this.resolution,
+    required this.weekMonday,
+    required this.now,
     this.useMiles = false,
     this.onLockedDayTap,
   });
@@ -1012,8 +1062,13 @@ class _ProjectedDayStrip extends StatelessWidget {
       children: List.generate(7, (weekday) {
         final slot = resolution.slotFor(weekday);
         final isRest = slot == null || slot.isRest;
+        final date = weekMonday.add(Duration(days: weekday));
         return _DayCircle(
           weekday: weekday,
+          isToday:
+              date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day,
           status: isRest
               ? CalendarDayStatus.restDay
               : CalendarDayStatus.upcoming,
@@ -1138,4 +1193,3 @@ class _DayDetailSheet extends StatelessWidget {
     );
   }
 }
-

@@ -1880,13 +1880,41 @@ class _HomeScreenState extends State<HomeScreen>
         ? PlanCalendar.dateFor(planAnchor, shownWeek.weekNumber, 0)
         : PlanCalendar.mondayOf(now);
 
-    final runsThisWeek =
-        _consistencyData?.runsThisWeek ??
-        _runHistory.where((r) {
-          final diff = now.difference(r.date).inDays;
-          return diff < 7;
-        }).length;
-    final weeklyTarget = _trainingDayIndices.length;
+    // Denominator = training days this Monday–Sunday window actually owns:
+    // rest days and pre-plan slots (a plan started mid-week owns Mon–Thu of
+    // week 1 as slots it never had to do) don't count, so a Friday start
+    // reads "0/2", not an unreachable "0/6". Falls back to the athlete's
+    // target frequency only while no materialized week has loaded.
+    int runsThisWeek;
+    int weeklyTarget;
+    if (shownWeek != null) {
+      var scheduled = 0;
+      var completed = 0;
+      for (final d in shownWeek.days) {
+        final status = calendarDayStatus(
+          d,
+          scheduledDate: weekMonday.add(Duration(days: d.weekday)),
+          now: now,
+          planStart: _thisWeekPlanStartDate,
+        );
+        if (status == CalendarDayStatus.restDay ||
+            status == CalendarDayStatus.prePlan) {
+          continue;
+        }
+        scheduled++;
+        if (status == CalendarDayStatus.completed) completed++;
+      }
+      runsThisWeek = completed;
+      weeklyTarget = scheduled;
+    } else {
+      runsThisWeek =
+          _consistencyData?.runsThisWeek ??
+          _runHistory.where((r) {
+            final diff = now.difference(r.date).inDays;
+            return diff < 7;
+          }).length;
+      weeklyTarget = _trainingDayIndices.length;
+    }
     final ratio = weeklyTarget > 0
         ? (runsThisWeek / weeklyTarget).clamp(0.0, 1.0)
         : 0.0;
@@ -1915,24 +1943,29 @@ class _HomeScreenState extends State<HomeScreen>
                     onDayTap: _handleThisWeekDayTap,
                   ),
             const Spacer(),
-            RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$runsThisWeek',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: c.textPrimary,
+            weeklyTarget == 0
+                ? Text(
+                    'No runs scheduled this week',
+                    style: TextStyle(fontSize: 14, color: c.textTertiary),
+                  )
+                : RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$runsThisWeek',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: c.textPrimary,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' / $weeklyTarget runs',
+                          style: TextStyle(fontSize: 14, color: c.textTertiary),
+                        ),
+                      ],
                     ),
                   ),
-                  TextSpan(
-                    text: ' / $weeklyTarget runs',
-                    style: TextStyle(fontSize: 14, color: c.textTertiary),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(3),

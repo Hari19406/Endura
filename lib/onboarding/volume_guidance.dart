@@ -212,7 +212,15 @@ class VolumeGuidance {
     required int maxRuns,
   }) {
     final ceiling = _recommendedCeiling(goal, experience, maxRuns);
-    if (baselineWeeklyKm <= 0) return ceiling.clamp(kMinRunsPerWeek, 4);
+    // Half and full marathons are never built on 3 days a week when the
+    // athlete's base can carry 4.
+    final floor = (goal == 'half_marathon' || goal == 'marathon')
+        ? (maxRuns < 4 ? maxRuns : 4)
+        : kMinRunsPerWeek;
+    if (baselineWeeklyKm <= 0) {
+      final v = ceiling.clamp(kMinRunsPerWeek, 4);
+      return v < floor ? floor : v;
+    }
     final target = baselineWeeklyKm * 1.25;
 
     var best = kMinRunsPerWeek;
@@ -224,7 +232,7 @@ class VolumeGuidance {
         best = d;
       }
     }
-    return best;
+    return best < floor ? floor : best;
   }
 
   /// Hard ceiling on the RECOMMENDED badge. Never 7 (or 6 for anyone), and a

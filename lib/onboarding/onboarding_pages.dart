@@ -323,7 +323,8 @@ class OPageGoal extends StatelessWidget {
           iconBg: EC.tealBg,
           iconFg: EC.teal,
           label: 'Train for your first 5K',
-          sub: 'Lower-volume plan, one steady tempo a week — built to get you '
+          sub:
+              'Lower-volume plan, one steady tempo a week — built to get you '
               'to the finish.',
         ),
         const SizedBox(height: 10),
@@ -333,7 +334,8 @@ class OPageGoal extends StatelessWidget {
           iconBg: EC.blueBg,
           iconFg: EC.teal,
           label: 'Train for your first 10K',
-          sub: 'Gentle mileage ramp — easy aerobic runs plus one controlled '
+          sub:
+              'Gentle mileage ramp — easy aerobic runs plus one controlled '
               'tempo.',
         ),
         const SizedBox(height: 10),
@@ -352,7 +354,8 @@ class OPageGoal extends StatelessWidget {
           iconBg: EC.redBg,
           iconFg: EC.red,
           label: 'Train for your first marathon',
-          sub: 'A 16+ week buildup for first-time marathoners — easy pace, '
+          sub:
+              'A 16+ week buildup for first-time marathoners — easy pace, '
               'long-run focus.',
         ),
         const SizedBox(height: 26),
@@ -837,7 +840,8 @@ class _OPageBestTimeState extends State<OPageBestTime> {
                   ),
                   const TextSpan(text: ' in '),
                   TextSpan(
-                    text: '${_pad(widget.hours)}h ${_pad(widget.minutes)}m ${_pad(widget.seconds)}s',
+                    text:
+                        '${_pad(widget.hours)}h ${_pad(widget.minutes)}m ${_pad(widget.seconds)}s',
                     style: const TextStyle(
                       color: EC.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -1267,11 +1271,7 @@ class OPageIntensity extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _Row(
-            leading: _iconBox(
-              EC.orangeBg,
-              Icons.bolt_rounded,
-              EC.orange,
-            ),
+            leading: _iconBox(EC.orangeBg, Icons.bolt_rounded, EC.orange),
             label: 'Peak performance',
             sub: 'Push limits and hit a PR',
             selected: selected == 'performance',
@@ -2292,8 +2292,7 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
   Widget build(BuildContext context) {
     // Shrink the hero gap once the retry block is showing so the extra content
     // still fits on shorter screens.
-    final topPad =
-        MediaQuery.of(context).size.height * (_failed ? 0.08 : 0.25);
+    final topPad = MediaQuery.of(context).size.height * (_failed ? 0.08 : 0.25);
     return SingleChildScrollView(
       padding: ET.pagePad,
       child: Column(
@@ -2377,7 +2376,11 @@ class _OPageBuildPlanState extends State<OPageBuildPlan>
             const SizedBox(height: 24),
             Row(
               children: const [
-                Icon(Icons.cloud_off_rounded, size: 18, color: EC.textSecondary),
+                Icon(
+                  Icons.cloud_off_rounded,
+                  size: 18,
+                  color: EC.textSecondary,
+                ),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -3138,7 +3141,10 @@ class OPageWelcome extends StatelessWidget {
                   children: [
                     if (raceDate != null)
                       _infoChip(Icons.event_outlined, _dLabel(raceDate!)),
-                    _infoChip(Icons.calendar_month_outlined, '$planWeeks weeks'),
+                    _infoChip(
+                      Icons.calendar_month_outlined,
+                      '$planWeeks weeks',
+                    ),
                     _infoChip(
                       Icons.directions_run_rounded,
                       '$runsPerWeek runs/week',
@@ -3225,7 +3231,6 @@ class OPageWelcome extends StatelessWidget {
       ),
     );
   }
-
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -3360,7 +3365,12 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
     // on the first frame, and default the distance filter to the goal the
     // athlete already chose (if any).
     _all = RaceService.instance.popularRaces;
-    if (const {'5k', '10k', 'half_marathon', 'marathon'}.contains(widget.goal)) {
+    if (const {
+      '5k',
+      '10k',
+      'half_marathon',
+      'marathon',
+    }.contains(widget.goal)) {
       _fDistance = widget.goal;
     }
     _load();
@@ -4824,7 +4834,7 @@ class _WheelCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RUNS PER WEEK  (slider + live plan preview)
+// RUNS PER WEEK  (coach recommendation + segmented picker)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class OPageRunsPerWeek extends StatelessWidget {
@@ -4843,6 +4853,40 @@ class OPageRunsPerWeek extends StatelessWidget {
     required this.onChanged,
   });
 
+  /// Why the recommended frequency suits this distance.
+  static String rationaleFor(String goal, int days) => switch (goal) {
+    'marathon' =>
+      '$days days leaves room for a weekly long run and enough easy '
+          'mileage, with recovery days to absorb it.',
+    'half_marathon' =>
+      '$days days fits a long run and a quality session each week without '
+          'overloading your legs.',
+    '10k' =>
+      '$days days builds your aerobic base and speed while keeping rest '
+          'days to recover.',
+    _ =>
+      '$days days is enough to build fitness steadily, with rest between '
+          'runs so you improve without burning out.',
+  };
+
+  /// Coaching feedback for the frequency the athlete has currently picked.
+  static String feedbackFor({
+    required int selected,
+    required int recommended,
+    required String goal,
+  }) {
+    if (selected == recommended) return rationaleFor(goal, selected);
+    if (selected < recommended) {
+      return selected <= 3
+          ? '$selected days works, but each run gets longer to reach the same '
+                'weekly volume — recovery between sessions matters more.'
+          : '$selected days means slightly longer individual runs than the '
+                'recommended $recommended.';
+    }
+    return '$selected days spreads the load, but leaves less recovery time. '
+        'We will ramp you into it gradually.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final g = VolumeGuidance.resolve(
@@ -4851,10 +4895,9 @@ class OPageRunsPerWeek extends StatelessWidget {
       baselineWeeklyKm: baselineWeeklyKm,
       selectedRuns: runsPerWeek,
     );
-
-    // The ceiling moves with the athlete's base, so it can land on the floor.
-    final locked = g.maxRuns <= kMinRunsPerWeek;
-    final atRecommended = runsPerWeek == g.recommendedRuns;
+    final rec = g.recommendedRuns;
+    final isRecommended = runsPerWeek == rec;
+    final options = [for (var d = kMinRunsPerWeek; d <= g.maxRuns; d++) d];
 
     return ValueListenableBuilder<bool>(
       valueListenable: UnitUtils.useMilesNotifier,
@@ -4877,99 +4920,154 @@ class OPageRunsPerWeek extends StatelessWidget {
               const SizedBox(height: 32),
               const _Label('Your week'),
               const SizedBox(height: 8),
-              const _Title('How many days a\nweek can you run?'),
+              const _Title('How often do you\nwant to run?'),
               const SizedBox(height: 6),
               const _Sub(
-                'This sets your weekly volume. We build up from what you run '
-                'now, so pick what fits your life.',
+                'We recommend what balances progress and recovery for your '
+                'goal.',
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 26),
 
-              SizedBox(
-                height: 26,
-                child: Center(
-                  child: AnimatedOpacity(
-                    opacity: atRecommended ? 1 : 0,
-                    duration: const Duration(milliseconds: 160),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
+              // ── Hero: the coach's recommendation ──────────────────────────
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onChanged(rec);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: EC.teal.withOpacity(isRecommended ? 0.14 : 0.06),
+                    borderRadius: BorderRadius.circular(ET.cardRadius),
+                    border: Border.all(
+                      color: isRecommended ? EC.teal : EC.border,
+                      width: isRecommended ? 1.5 : ET.borderWidth,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: EC.teal.withOpacity(0.22),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.star_rounded, size: 13, color: EC.teal),
+                            SizedBox(width: 5),
+                            Text(
+                              'RECOMMENDED',
+                              style: TextStyle(
+                                color: EC.teal,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.9,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: EC.teal.withOpacity(0.14),
-                        borderRadius: BorderRadius.circular(20),
+                      const SizedBox(height: 14),
+                      Text(
+                        '$rec days per week',
+                        style: const TextStyle(
+                          color: EC.textPrimary,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.star_rounded, size: 13, color: EC.teal),
-                          SizedBox(width: 5),
-                          Text(
-                            'RECOMMENDED',
-                            style: TextStyle(
-                              color: EC.teal,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.9,
+                      const SizedBox(height: 8),
+                      Text(
+                        rationaleFor(goal, rec),
+                        style: const TextStyle(
+                          color: EC.textSecondary,
+                          fontSize: 13,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Manual adjustment ─────────────────────────────────────────
+              const SizedBox(height: 22),
+              const Text(
+                'OR CHOOSE WHAT FITS YOUR WEEK',
+                style: TextStyle(
+                  color: EC.muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: EC.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: EC.border, width: ET.borderWidth),
+                ),
+                child: Row(
+                  children: [
+                    for (final d in options)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            onChanged(d);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            height: 42,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: d == runsPerWeek
+                                  ? EC.teal
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$d',
+                              style: TextStyle(
+                                color: d == runsPerWeek
+                                    ? EC.white
+                                    : EC.textSecondary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Center(
-                child: Text(
-                  '$runsPerWeek days',
-                  style: const TextStyle(
-                    color: EC.textPrimary,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: EC.teal,
-                  inactiveTrackColor: EC.surface2,
-                  thumbColor: EC.teal,
-                  overlayColor: EC.teal.withOpacity(0.15),
-                  trackHeight: 4,
-                ),
-                child: Slider(
-                  value: runsPerWeek
-                      .clamp(kMinRunsPerWeek, g.maxRuns)
-                      .toDouble(),
-                  min: kMinRunsPerWeek.toDouble(),
-                  max: g.maxRuns.toDouble(),
-                  divisions: locked ? null : g.maxRuns - kMinRunsPerWeek,
-                  onChanged: locked
-                      ? null
-                      : (v) {
-                          HapticFeedback.selectionClick();
-                          onChanged(v.round());
-                        },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '$kMinRunsPerWeek',
-                      style: const TextStyle(color: EC.muted, fontSize: 12),
-                    ),
-                    Text(
-                      '${g.maxRuns}',
-                      style: const TextStyle(color: EC.muted, fontSize: 12),
-                    ),
                   ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 4, top: 8),
+                child: Text(
+                  'days per week',
+                  style: TextStyle(color: EC.muted, fontSize: 11),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _GuidanceNote(
+                icon: Icons.tips_and_updates_outlined,
+                tone: EC.textSecondary,
+                text: feedbackFor(
+                  selected: runsPerWeek,
+                  recommended: rec,
+                  goal: goal,
                 ),
               ),
 
@@ -4985,7 +5083,7 @@ class OPageRunsPerWeek extends StatelessWidget {
                 ),
               ],
 
-              const SizedBox(height: 26),
+              const SizedBox(height: 24),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),

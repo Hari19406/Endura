@@ -22,6 +22,7 @@ import 'plan_reveal_page.dart';
 import 'plan_runway.dart';
 import 'race_time_defaults.dart';
 import 'short_notice_sheet.dart';
+import 'volume_guidance.dart';
 import '../../models/training_phase.dart';
 
 class EC {
@@ -320,6 +321,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       if (storedDays != null && storedDays.isNotEmpty) {
         _selectedDays = storedDays;
         _runsPerWeek = storedDays.length;
+        _runsPerWeekTouched = true;
       }
       _longRunDayIndex =
           prefs.getInt('long_run_day_index') ?? memory.longRunDayIndex;
@@ -409,8 +411,32 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // alive across every navigation; this just avoids also flipping
   // _showTopBar/_showBottom while animateToPage's scroll activity is still
   // active, in case that timing ever matters on some future layout.
+  /// True once the athlete picked a frequency themselves (or it was restored
+  /// from a saved plan) — from then on the coach recommendation never
+  /// overwrites it.
+  bool _runsPerWeekTouched = false;
+
+  /// Landing on the frequency page pre-selects the coach's recommendation for
+  /// this goal + base, unless the athlete already chose a number.
+  void _applyRecommendedRunsIfUntouched(int index) {
+    if (_sequence[index] != OPage.runsPerWeek || _runsPerWeekTouched) return;
+    final rec = VolumeGuidance.resolve(
+      goal: _goal ?? '5k',
+      experienceBridged: _bridgeExperience(_experience),
+      baselineWeeklyKm: _baselineWeeklyKm,
+      selectedRuns: _runsPerWeek,
+    ).recommendedRuns;
+    if (rec == _runsPerWeek) return;
+    setState(() {
+      _runsPerWeek = rec;
+      _selectedDays = TrainingDaysService.defaultsFor(rec);
+      _longRunDayIndex = _defaultLongRunDay(_selectedDays);
+    });
+  }
+
   Future<void> _animateTo(int index) async {
     if (index < 0 || index >= _total || _navigating) return;
+    _applyRecommendedRunsIfUntouched(index);
     _navigating = true;
     try {
       await _slideTo(index);
@@ -1300,6 +1326,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         goal: _goal ?? '5k',
         experienceBridged: _bridgeExperience(_experience),
         onChanged: (n) => setState(() {
+          _runsPerWeekTouched = true;
           _runsPerWeek = n;
           _selectedDays = TrainingDaysService.defaultsFor(n);
           _longRunDayIndex = _defaultLongRunDay(_selectedDays);

@@ -21,7 +21,7 @@ const _goalTitle = 'What are you\ntraining for?';
 const _racePickerTitle = 'What race are\nyou running?';
 const _weeklyVolumeTitle = 'How much do you run\nin a typical week?';
 const _raceGoalTitle = "What do you want\nfrom race day?";
-const _runsPerWeekTitle = 'How many days a\nweek can you run?';
+const _runsPerWeekTitle = 'How often do you\nwant to run?';
 
 Future<void> _settle(WidgetTester tester) async {
   // Covers the 320ms page-slide animation plus the async RaceService call
