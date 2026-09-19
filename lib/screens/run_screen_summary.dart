@@ -5,6 +5,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:latlong2/latlong.dart';
 import '../utils/database_service.dart';
 import '../engines/runtime/engine_runtime.dart';
+import '../engines/runtime/work_pace_calculator.dart';
 import '../engines/pace_trend_calculator.dart';
 import '../services/coach_message_builder.dart' as message;
 import '../services/cloud_sync_service.dart';
@@ -224,6 +225,24 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     }
   }
 
+  /// The track samples of the run this summary belongs to, or empty when they
+  /// can't be found. The newest saved run is only trusted if it is this one
+  /// (same timestamp) — if the save failed it would be an older run whose
+  /// samples must not leak into this run's calibration.
+  Future<List<Map<String, dynamic>>> _savedRunTrackSamples() async {
+    try {
+      final runs = await DatabaseService.instance.getRecentRuns(limit: 1);
+      if (runs.isEmpty) return const [];
+      final gap = runs.first.date.difference(widget.runDate).abs();
+      return gap < const Duration(seconds: 5)
+          ? runs.first.trackSamples
+          : const [];
+    } catch (e) {
+      debugPrint('Error loading track samples for calibration: $e');
+      return const [];
+    }
+  }
+
   Future<void> _finaliseRun(int rpe) async {
     if (_engineProcessed) return;
     _engineProcessed = true;
@@ -262,11 +281,17 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     }
 
     // Actual vs expected pace drive EngineRuntime's vDOT calibration. Expected
-    // is the plan's work-pace midpoint; both stay null (no calibration) when
-    // the session is RPE-only or has no distance.
-    final actualPace = widget.distanceKm > 0
-        ? widget.durationSeconds / widget.distanceKm
-        : null;
+    // is the plan's work-pace midpoint, so actual must be work pace too: for an
+    // interval session the whole-run average is diluted by recovery jogs. The
+    // summary UI keeps showing the whole-run average; this is calibration only.
+    // Both stay null (no calibration) when the session is RPE-only or has no
+    // distance.
+    final actualPace = WorkPaceCalculator.actualPaceSecPerKm(
+      blocks: sched?.blocks ?? widget.activeCoachMessage?.resolvedWorkout.blocks,
+      trackSamples: await _savedRunTrackSamples(),
+      distanceKm: widget.distanceKm,
+      durationSeconds: widget.durationSeconds,
+    );
     final range = _targetPaceRange;
     final expectedPace =
         sched?.expectedPaceSecPerKm?.toDouble() ??

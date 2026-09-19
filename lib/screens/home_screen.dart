@@ -1746,64 +1746,37 @@ class _HomeScreenState extends State<HomeScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildSectionLabel('THIS WEEK'),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          button: true,
-                          label: 'Manage plan',
-                          child: TextButton(
-                            onPressed: _openManagePlan,
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              foregroundColor: context.colors.textSecondary,
-                            ),
-                            child: Text(
-                              'Manage',
+                    Semantics(
+                      button: true,
+                      label: 'Manage plan',
+                      child: TextButton(
+                        onPressed: _openManagePlan,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: context.colors.textSecondary,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Manage Plan',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: context.colors.textTertiary,
+                                color: context.colors.textSecondary,
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Semantics(
-                          button: true,
-                          label: 'View plan',
-                          child: TextButton(
-                            onPressed: _openPlanOverview,
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              foregroundColor: context.colors.textSecondary,
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 14,
+                              color: context.colors.textTertiary,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'View plan',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: context.colors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                Icon(
-                                  Icons.chevron_right,
-                                  size: 16,
-                                  color: context.colors.textSecondary,
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -1955,6 +1928,21 @@ class _HomeScreenState extends State<HomeScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // Top-right affordance: the whole card opens the full plan.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'View plan',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: c.textSecondary,
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 18, color: c.textSecondary),
+              ],
+            ),
             // Same MaterializedWeekStrip widget PlanOverviewScreen renders
             // its current week with — guarantees identical workout types,
             // colors, and statuses between Home and the full plan view
