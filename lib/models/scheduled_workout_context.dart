@@ -49,6 +49,16 @@ class ScheduledWorkoutContext {
     required this.blocks,
   });
 
+  /// Midpoint of the session's work-pace range, in seconds per km — the pace
+  /// the plan expected the athlete to run. Null when every work block is
+  /// RPE-only (no pace to compare against).
+  int? get expectedPaceSecPerKm {
+    final min = targetPaceMinSecPerKm;
+    final max = targetPaceMaxSecPerKm;
+    if (min == null || max == null) return null;
+    return ((min + max) / 2).round();
+  }
+
   int get stepCount => blocks.length;
 
   bool get hasStructuredSteps => blocks.length > 1;

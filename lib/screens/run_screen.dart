@@ -1600,6 +1600,7 @@ class _RunScreenState extends State<RunScreen>
             activeCoachMessage: _isFreeRun ? null : _activeCoachMessage,
             isFreeRun: _isFreeRun,
             scheduledWorkoutLinked: !_isFreeRun && _sched != null,
+            scheduledContext: _isFreeRun ? null : _sched,
             scheduledWeekNumber: _sched?.weekNumber,
           ),
         ),

@@ -12,7 +12,9 @@ import '../engines/config/workout_template_library.dart';
 import '../engines/config/archetype_table.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../engines/memory/engine_memory_service.dart';
+import '../engines/plan/plan_store.dart';
 import '../engines/plan/week_projection_service.dart';
+import '../models/scheduled_workout_context.dart';
 import '../engines/plan/workout_resolver.dart';
 import '../engines/core/pace_table.dart';
 import '../engines/core/vdot_calculator.dart';
@@ -47,6 +49,11 @@ class RunSummaryScreen extends StatefulWidget {
   /// Plan week the linked workout belonged to, for the confirmation chip.
   final int? scheduledWeekNumber;
 
+  /// The plan slot this run fulfilled, when started from a scheduled workout.
+  /// Used to attach RPE to the plan day and to derive the expected pace fed to
+  /// the engine's vDOT calibration.
+  final ScheduledWorkoutContext? scheduledContext;
+
   const RunSummaryScreen({
     super.key,
     required this.distanceKm,
@@ -62,6 +69,7 @@ class RunSummaryScreen extends StatefulWidget {
     this.isFreeRun = false,
     this.scheduledWorkoutLinked = false,
     this.scheduledWeekNumber,
+    this.scheduledContext,
   });
 
   @override
@@ -196,6 +204,33 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
     if (widget.isFreeRun) return;
 
+    // markDayCompleted stamped the plan day before RPE existed — attach it now.
+    final sched = widget.scheduledContext;
+    if (sched != null) {
+      try {
+        await PlanStore.instance.recordDayRpe(
+          weekNumber: sched.weekNumber,
+          weekday: sched.weekday,
+          rpe: rpe.toDouble(),
+        );
+      } catch (e) {
+        debugPrint('Error saving RPE to plan day: $e');
+      }
+    }
+
+    // Actual vs expected pace drive EngineRuntime's vDOT calibration. Expected
+    // is the plan's work-pace midpoint; both stay null (no calibration) when
+    // the session is RPE-only or has no distance.
+    final actualPace = widget.distanceKm > 0
+        ? widget.durationSeconds / widget.distanceKm
+        : null;
+    final range = _targetPaceRange;
+    final expectedPace =
+        sched?.expectedPaceSecPerKm?.toDouble() ??
+        (range == null
+            ? null
+            : (range.minSecondsPerKm + range.maxSecondsPerKm) / 2);
+
     final completedTemplateId =
         widget.activeCoachMessage?.resolvedWorkout.templateId;
     final completedIntent = widget.activeCoachMessage?.workoutIntent;
@@ -215,6 +250,8 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       rpe: rpe,
       templateId: completedTemplateId,
       completedIntent: completedIntent,
+      actualPaceSecondsPerKm: actualPace,
+      expectedPaceSecondsPerKm: expectedPace,
       weeklyProgressionDecision: memory.weeklyProgressionDecision,
     );
   }

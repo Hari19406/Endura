@@ -254,6 +254,45 @@ class PlanStore {
     return true;
   }
 
+  /// Attach the athlete's RPE to a day that [markDayCompleted] already stamped.
+  /// RPE is only collected on the summary screen, after the run is saved and
+  /// linked, so it arrives as a follow-up write. Returns true when an existing
+  /// completion was updated; false when there is no plan, no such slot, or the
+  /// day has no completion to attach to.
+  Future<bool> recordDayRpe({
+    required int weekNumber,
+    required int weekday,
+    required double rpe,
+  }) async {
+    final plan = await load();
+    if (plan == null) return false;
+
+    final wi = plan.weeks.indexWhere((w) => w.weekNumber == weekNumber);
+    if (wi < 0) return false;
+    final week = plan.weeks[wi];
+
+    final di = week.days.indexWhere((d) => d.weekday == weekday);
+    if (di < 0) return false;
+    final completion = week.days[di].completion;
+    if (completion == null) return false;
+
+    final updatedDay = week.days[di].copyWith(
+      completion: DayCompletion(
+        completedAt: completion.completedAt,
+        actualKm: completion.actualKm,
+        actualPaceSecPerKm: completion.actualPaceSecPerKm,
+        rpe: rpe,
+        runId: completion.runId,
+      ),
+    );
+    final days = List<MaterializedDay>.of(week.days)..[di] = updatedDay;
+    final weeks = List<MaterializedWeek>.of(plan.weeks)
+      ..[wi] = week.copyWith(days: days);
+
+    await saveAndSync(plan.copyWith(weeks: weeks));
+    return true;
+  }
+
   // ── Write: mark a day skipped ────────────────────────────────────────────
 
   /// Stamp a skip timestamp onto the plan day at [weekNumber] / [weekday]
