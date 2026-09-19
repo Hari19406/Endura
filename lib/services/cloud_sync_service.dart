@@ -25,25 +25,23 @@ class CloudSyncService {
 
     try {
       final plan = await _planTagFor(run);
-      final splits = _uploadSplitsFor(run);
-      await _client.from('runs').upsert({
-        'user_id': _userId,
-        'distance_km': run.distanceKm,
-        'average_pace': run.averagePace,
-        'duration_seconds': run.durationSeconds,
-        'date': run.date.toUtc().toIso8601String(),
-        'route_polyline': run.routePolyline,
-        'workout_type': run.workoutType,
-        'cs_value_at_time': run.csValueAtTime,
-        'elevation_gain': run.elevationGain,
-        // Only include rpe/elapsed when they have a value — avoids overwriting a
-        // server-side value with NULL if it's set after the first sync.
-        if (run.rpe != null) 'rpe': run.rpe,
-        if (run.elapsedSeconds != null) 'elapsed_seconds': run.elapsedSeconds,
-        if (plan.$1 != null) 'plan_name': plan.$1,
-        if (plan.$2 != null) 'plan_progress': plan.$2,
-        if (splits.isNotEmpty) 'splits': splits,
-      });
+      final payload = buildRunPayload(
+        userId: _userId,
+        run: run,
+        planName: plan.$1,
+        planProgress: plan.$2,
+        splits: _uploadSplitsFor(run),
+      );
+      try {
+        await _client.from('runs').upsert(payload);
+      } on PostgrestException catch (e) {
+        // The `title` column ships with a Supabase migration. If this build
+        // reaches a project that hasn't applied it yet, retry without the
+        // title rather than failing every run upload until it does.
+        if (!payload.containsKey('title') || !isMissingTitleColumn(e)) rethrow;
+        debugPrint('CloudSync: runs.title column missing — uploading without');
+        await _client.from('runs').upsert(Map.of(payload)..remove('title'));
+      }
 
       await DatabaseService.instance.markRunSynced(run.id!);
       return true;
@@ -53,6 +51,41 @@ class CloudSyncService {
       return false;
     }
   }
+
+  /// The `runs` row for [run]. Optional columns are only included when they
+  /// have a value, so a later sync never overwrites a server-side value with
+  /// NULL (e.g. an RPE or title set after the first upload).
+  @visibleForTesting
+  static Map<String, dynamic> buildRunPayload({
+    required String? userId,
+    required RunRecord run,
+    String? planName,
+    String? planProgress,
+    List<Map<String, dynamic>> splits = const [],
+  }) => {
+    'user_id': userId,
+    'distance_km': run.distanceKm,
+    'average_pace': run.averagePace,
+    'duration_seconds': run.durationSeconds,
+    'date': run.date.toUtc().toIso8601String(),
+    'route_polyline': run.routePolyline,
+    'workout_type': run.workoutType,
+    'cs_value_at_time': run.csValueAtTime,
+    'elevation_gain': run.elevationGain,
+    if (run.rpe != null) 'rpe': run.rpe,
+    if (run.elapsedSeconds != null) 'elapsed_seconds': run.elapsedSeconds,
+    if (run.title != null) 'title': run.title,
+    'plan_name': ?planName,
+    'plan_progress': ?planProgress,
+    if (splits.isNotEmpty) 'splits': splits,
+  };
+
+  /// True when [e] is PostgREST saying the `runs.title` column doesn't exist
+  /// (`PGRST204` schema-cache miss, or Postgres `42703` undefined column).
+  @visibleForTesting
+  static bool isMissingTitleColumn(PostgrestException e) =>
+      (e.code == 'PGRST204' || e.code == '42703') &&
+      e.message.toLowerCase().contains('title');
 
   // ── Sync all unsynced local runs ──────────────────────────────────────────
 
@@ -133,6 +166,52 @@ class CloudSyncService {
       return true;
     } catch (e, stack) {
       debugPrint('[CloudSync] updateRunRpe error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    }
+  }
+
+  /// Pushes a title edit for a run that was already synced. Same date-window
+  /// match as [updateRunRpe] (there is no persisted local↔cloud id mapping).
+  /// A run that hasn't uploaded yet needs nothing here — it uploads with the
+  /// title already on the local row.
+  Future<bool> updateRunTitle(int runId, String title) async {
+    if (!isSignedIn) return false;
+
+    try {
+      final localRun = await _getLocalRun(runId);
+      if (localRun == null) {
+        debugPrint('[CloudSync] updateRunTitle: run $runId not found locally');
+        return false;
+      }
+
+      final utcDate = localRun.date.toUtc();
+      final windowStart = utcDate
+          .subtract(const Duration(minutes: 1))
+          .toIso8601String();
+      final windowEnd = utcDate
+          .add(const Duration(minutes: 1))
+          .toIso8601String();
+
+      await _client
+          .from('runs')
+          .update({'title': title})
+          .eq('user_id', _userId!)
+          .gte('date', windowStart)
+          .lte('date', windowEnd);
+
+      return true;
+    } on PostgrestException catch (e, stack) {
+      if (isMissingTitleColumn(e)) {
+        // Migration not applied on this project yet — not worth a crash report.
+        debugPrint('[CloudSync] updateRunTitle: runs.title column missing');
+        return false;
+      }
+      debugPrint('[CloudSync] updateRunTitle error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    } catch (e, stack) {
+      debugPrint('[CloudSync] updateRunTitle error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
       return false;
     }
@@ -249,6 +328,7 @@ class CloudSyncService {
             rpe: row['rpe'] as int?,
             elevationGain: (row['elevation_gain'] as num?)?.toDouble() ?? 0,
             elapsedSeconds: row['elapsed_seconds'] as int?,
+            title: row['title'] as String?,
           );
 
           await DatabaseService.instance.insertRun(run);
@@ -304,6 +384,7 @@ class CloudSyncService {
               rpe: row['rpe'] as int?,
               elevationGain: (row['elevation_gain'] as num?)?.toDouble() ?? 0,
               elapsedSeconds: row['elapsed_seconds'] as int?,
+              title: row['title'] as String?,
             ),
           );
           restored++;

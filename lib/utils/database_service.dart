@@ -53,6 +53,11 @@ class RunRecord {
   // for free runs and for runs recorded before this field existed. ─────────
   final String? scheduledDayId;
 
+  // ── User-facing run name ("Morning Run", "Week 3 · Cruise Intervals", or
+  // whatever the athlete typed on the summary screen). Null for runs recorded
+  // before this field existed — readers fall back to a workout-type label. ───
+  final String? title;
+
   const RunRecord({
     this.id,
     required this.distanceKm,
@@ -74,6 +79,7 @@ class RunRecord {
     this.gapAveragePace,
     this.trackSamples = const [],
     this.scheduledDayId,
+    this.title,
   });
 
   Map<String, dynamic> toMap() => {
@@ -100,6 +106,7 @@ class RunRecord {
     if (gapAveragePace != null) 'gap_average_pace': gapAveragePace,
     'track_samples_json': jsonEncode(trackSamples),
     if (scheduledDayId != null) 'scheduled_day_id': scheduledDayId,
+    if (title != null) 'title': title,
   };
 
   factory RunRecord.fromMap(Map<String, dynamic> map) => RunRecord(
@@ -126,6 +133,7 @@ class RunRecord {
     gapAveragePace: map['gap_average_pace'] as String?,
     trackSamples: _decodeTrackSamples(map['track_samples_json'] as String?),
     scheduledDayId: map['scheduled_day_id'] as String?,
+    title: map['title'] as String?,
   );
 
   static List<Map<String, dynamic>> _decodeSplits(String? json) {
@@ -287,7 +295,9 @@ class DatabaseService {
       //       to the plan slot it fulfilled; see ScheduledWorkoutContext)
       // v11 → added `best_efforts` table (rolling-window PR leaderboard per
       //       benchmark distance; see BestEffortsService)
-      version: 11,
+      // v12 → added `runs.title` (user-editable run name, set on the summary
+      //       screen; NULL for older runs)
+      version: 12,
       onCreate: (db, _) async {
         // Fresh install: create the complete, up-to-date schema in one shot.
         await db.execute('''
@@ -311,7 +321,8 @@ class DatabaseService {
             peak_cadence      INTEGER,
             gap_average_pace  TEXT,
             track_samples_json TEXT  NOT NULL DEFAULT '[]',
-            scheduled_day_id  TEXT
+            scheduled_day_id  TEXT,
+            title             TEXT
           )
         ''');
         await db.execute('''
@@ -495,6 +506,16 @@ class DatabaseService {
             await db.execute(_createBestEffortsIndexSql);
           } catch (e) {
             debugPrint('[DB] idx_best_efforts already exists, skipping: $e');
+          }
+        }
+
+        if (oldVersion < 12) {
+          // v11 → v12: title — user-editable run name. Nullable: old rows read
+          // back as "no title" and fall back to a workout-type label.
+          try {
+            await db.execute('ALTER TABLE runs ADD COLUMN title TEXT');
+          } catch (e) {
+            debugPrint('[DB] title already exists, skipping: $e');
           }
         }
       },
@@ -744,6 +765,30 @@ class DatabaseService {
       return affected > 0;
     } catch (e, stack) {
       debugPrint('[DB] updateRunRpe error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    }
+  }
+
+  /// Writes the user-facing title for a run (see [RunRecord.title]).
+  ///
+  /// Returns true if a row was actually updated. Returns false and logs on any
+  /// error — never throws.
+  Future<bool> updateRunTitle(int runId, String title) async {
+    try {
+      final db = await database;
+      final affected = await db.update(
+        'runs',
+        {'title': title},
+        where: 'id = ?',
+        whereArgs: [runId],
+      );
+      if (affected == 0) {
+        debugPrint('[DB] updateRunTitle: no row found for id=$runId');
+      }
+      return affected > 0;
+    } catch (e, stack) {
+      debugPrint('[DB] updateRunTitle error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
       return false;
     }

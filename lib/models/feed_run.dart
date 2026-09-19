@@ -70,6 +70,7 @@ class FeedRun {
     this.planName,
     this.planProgress,
     this.splits = const [],
+    this.customTitle,
     this.commentCount = 0,
     this.reactionCount = 0,
     this.viewerReacted = false,
@@ -79,9 +80,20 @@ class FeedRun {
   /// usable polyline.
   List<Map<String, double>> get points => decodePolylineToPoints(routePolyline);
 
-  /// Feed cards have no freeform title — derive a readable label from the
-  /// workout type the coach engine assigned (or "Free Run" for unguided runs).
-  String get title => switch (workoutType) {
+  /// The athlete's own name for the run ([RunRecord.title], `runs.title`).
+  /// Null for runs uploaded before titles existed.
+  final String? customTitle;
+
+  /// The athlete's title when they set one; otherwise a readable label derived
+  /// from the workout type the coach engine assigned (or "Free Run" for
+  /// unguided runs).
+  String get title {
+    final custom = customTitle?.trim();
+    if (custom != null && custom.isNotEmpty) return custom;
+    return _workoutTypeTitle;
+  }
+
+  String get _workoutTypeTitle => switch (workoutType) {
     'easy' => 'Easy Run',
     'tempo' => 'Tempo Run',
     'interval' => 'Interval Workout',
@@ -132,6 +144,7 @@ class FeedRun {
           ? (runRow['plan_progress'] as String).trim()
           : null,
       splits: _decodeSplits(runRow['splits']),
+      customTitle: runRow['title'] as String?,
       commentCount: commentCount,
       reactionCount: reactionCount,
       viewerReacted: viewerReacted,

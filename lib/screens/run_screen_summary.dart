@@ -25,9 +25,11 @@ import '../models/race_plan.dart';
 import '../models/training_phase.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
+import '../utils/run_title.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
 import '../widgets/run_share_card.dart';
+import '../widgets/run_title_field.dart';
 
 class RunSummaryScreen extends StatefulWidget {
   final double distanceKm;
@@ -54,6 +56,11 @@ class RunSummaryScreen extends StatefulWidget {
   /// the engine's vDOT calibration.
   final ScheduledWorkoutContext? scheduledContext;
 
+  /// The title the run was saved with, pre-filled into the editable title
+  /// field. Falls back to a computed default (planned workout name, or time of
+  /// day for a free run) when the caller doesn't have one.
+  final String? initialTitle;
+
   const RunSummaryScreen({
     super.key,
     required this.distanceKm,
@@ -70,6 +77,7 @@ class RunSummaryScreen extends StatefulWidget {
     this.scheduledWorkoutLinked = false,
     this.scheduledWeekNumber,
     this.scheduledContext,
+    this.initialTitle,
   });
 
   @override
@@ -79,6 +87,8 @@ class RunSummaryScreen extends StatefulWidget {
 class _RunSummaryScreenState extends State<RunSummaryScreen> {
   int? _rpe;
   bool _engineProcessed = false;
+  late final String _defaultTitle;
+  late final TextEditingController _titleController;
   late Future<_SummaryData> _summaryFuture;
   bool _useMiles = UnitUtils.useMilesNotifier.value;
 
@@ -109,6 +119,19 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   @override
   void initState() {
     super.initState();
+    _defaultTitle =
+        RunTitle.normalize(widget.initialTitle) ??
+        RunTitle.resolve(
+          // runDate is when the run ended; time of day is when it began.
+          startedAt: widget.runDate.subtract(
+            Duration(seconds: widget.durationSeconds),
+          ),
+          isFreeRun: widget.isFreeRun,
+          workoutName: widget.activeCoachMessage?.workoutTitle,
+          weekNumber:
+              widget.scheduledContext?.weekNumber ?? widget.scheduledWeekNumber,
+        );
+    _titleController = TextEditingController(text: _defaultTitle);
     _summaryFuture = _buildSummaryData();
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
   }
@@ -120,6 +143,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
   @override
   void dispose() {
     UnitUtils.useMilesNotifier.removeListener(_onUnitPrefChanged);
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -183,9 +207,28 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     widget.onDiscard();
   }
 
+  /// Save the (possibly edited) title onto the run this summary belongs to —
+  /// local SQLite first, then the cloud row. A blank field falls back to the
+  /// default title rather than saving an empty name. Skips the writes when the
+  /// stored title is already right (the common, unedited case).
+  Future<void> _persistTitle() async {
+    final title = RunTitle.normalize(_titleController.text) ?? _defaultTitle;
+    try {
+      final runs = await DatabaseService.instance.getRecentRuns(limit: 1);
+      if (runs.isEmpty || runs.first.id == null) return;
+      if (runs.first.title == title) return;
+      await DatabaseService.instance.updateRunTitle(runs.first.id!, title);
+      await CloudSyncService.instance.updateRunTitle(runs.first.id!, title);
+    } catch (e) {
+      debugPrint('Error saving run title: $e');
+    }
+  }
+
   Future<void> _finaliseRun(int rpe) async {
     if (_engineProcessed) return;
     _engineProcessed = true;
+
+    await _persistTitle();
 
     // Free runs never show the RPE picker, so there's no real rating to save —
     // writing 0 here would falsely show as "RPE 0/10" in history and drag down
@@ -374,6 +417,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                               color: context.colors.textPrimary,
                                               letterSpacing: -0.5,
                                             ),
+                                          ),
+                                          RunTitleField(
+                                            controller: _titleController,
                                           ),
                                           const SizedBox(height: 3),
                                           Text(

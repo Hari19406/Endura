@@ -13,6 +13,7 @@
 import 'dart:math' as math;
 
 import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
+import '../utils/run_title.dart';
 import 'feed_run.dart';
 
 /// One finished kilometre (or the final partial km) of a run.
@@ -638,7 +639,9 @@ class ActivityDetail {
       timestamp: record.date.toLocal(),
       source: 'Endura Tracker',
       location: location ?? '',
-      title: _titleForWorkout(record.workoutType),
+      title:
+          RunTitle.normalize(record.title) ??
+          _titleForWorkout(record.workoutType),
       avatarUrl: avatarUrl,
       distanceKm: record.distanceKm,
       avgPace: record.averagePace,

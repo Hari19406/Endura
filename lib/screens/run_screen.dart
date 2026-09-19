@@ -35,6 +35,7 @@ import '../services/best_efforts_service.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../utils/run_title.dart';
 import '../utils/unit_utils.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
@@ -1375,6 +1376,15 @@ class _RunScreenState extends State<RunScreen>
     final capturedWorkoutType = (!_isFreeRun && _activeCoachMessage != null)
         ? _resolveWorkoutType(_activeCoachMessage!.workoutIntent)
         : 'free';
+    // Default name for the run: the planned workout ("Week 3 · Cruise
+    // Intervals") or time of day for a free run. The summary screen lets the
+    // athlete rename it before tapping Done.
+    final runTitle = RunTitle.resolve(
+      startedAt: runDate.subtract(Duration(seconds: _capturedMainSeconds)),
+      isFreeRun: _isFreeRun,
+      workoutName: _activeCoachMessage?.workoutTitle,
+      weekNumber: _sched?.weekNumber,
+    );
     if (_capturedMainDistanceM >= 80) {
       await AudioCueService.instance.announceRunComplete(
         distanceKm: _capturedMainDistanceM / 1000,
@@ -1495,6 +1505,7 @@ class _RunScreenState extends State<RunScreen>
           gapAveragePace: gapAveragePace,
           trackSamples: capturedTrackSamples,
           scheduledDayId: _isFreeRun ? null : _sched?.dayId,
+          title: runTitle,
         );
         final insertedId = await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then(
@@ -1601,6 +1612,7 @@ class _RunScreenState extends State<RunScreen>
             isFreeRun: _isFreeRun,
             scheduledWorkoutLinked: !_isFreeRun && _sched != null,
             scheduledContext: _isFreeRun ? null : _sched,
+            initialTitle: runTitle,
             scheduledWeekNumber: _sched?.weekNumber,
           ),
         ),
