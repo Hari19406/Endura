@@ -560,9 +560,6 @@ class RunShareCard extends StatelessWidget {
   static const double width = 360;
   static const double height = 640;
 
-  /// Strava-style route color for the Full Map Route template.
-  static const Color _mapOrange = Color(0xFFFF6B35);
-
   static const List<Shadow> _shadow = [
     Shadow(offset: Offset(0, 1), blurRadius: 4.0, color: Colors.black54),
   ];
@@ -653,7 +650,7 @@ class RunShareCard extends StatelessWidget {
                       size: Size.infinite,
                       painter: RouteTracePainter(
                         points: data.gpsPoints,
-                        color: _mapOrange,
+                        color: Colors.white,
                         strokeWidth: 4,
                         dropShadow: true,
                       ),
