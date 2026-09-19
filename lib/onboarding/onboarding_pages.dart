@@ -4349,6 +4349,27 @@ class OPageWeeklyVolume extends StatelessWidget {
   /// [firstTimerMaxBaselineKm]). Null shows every tier.
   final double? maxBaselineKm;
 
+  /// Tiers below this baseline are hidden (half marathon 15, marathon 25).
+  final double minBaselineKm;
+
+  /// Race distance this page is asked for; drives the coaching note.
+  final String? goal;
+
+  /// Lowest weekly baseline (km) a runner may start a [goal] plan from.
+  /// 5K and 10K allow 0; the longer races need an existing running base.
+  static double minBaselineFor(String? goal) => switch (goal) {
+    'half_marathon' => 15,
+    'marathon' => 25,
+    _ => 0,
+  };
+
+  /// The lowest tier offered for [goal] as (key, baselineKm).
+  static (String, double) lowestTierFor(String? goal) {
+    final min = minBaselineFor(goal);
+    final t = tiers.firstWhere((t) => t.$4 >= min);
+    return (t.$1, t.$4);
+  }
+
   /// Highest weekly-volume tier offered to a first-time runner.
   static const double firstTimerMaxBaselineKm = 25;
 
@@ -4357,11 +4378,15 @@ class OPageWeeklyVolume extends StatelessWidget {
     required this.selectedKey,
     required this.onSelect,
     this.maxBaselineKm,
+    this.minBaselineKm = 0,
+    this.goal,
   });
 
   List<(String, String, String, double)> get _visibleTiers => [
     for (final t in tiers)
-      if (maxBaselineKm == null || t.$4 <= maxBaselineKm!) t,
+      if (t.$4 >= minBaselineKm &&
+          (maxBaselineKm == null || t.$4 <= maxBaselineKm!))
+        t,
   ];
 
   // (tierKey, range label, weekly persona, baseline weekly km)
@@ -4456,6 +4481,37 @@ class OPageWeeklyVolume extends StatelessWidget {
               },
             ),
           ),
+          if (goal == 'half_marathon' || goal == 'marathon')
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: EC.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      goal == 'marathon'
+                          ? 'A running base of at least 25 km/week ensures '
+                                'you can safely build up to 42.2 km without '
+                                'injury.'
+                          : 'A running base of at least 15 km/week ensures '
+                                'you can safely build up to 21.1 km without '
+                                'injury.',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: EC.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

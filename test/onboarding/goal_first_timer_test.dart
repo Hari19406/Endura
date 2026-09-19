@@ -131,4 +131,39 @@ void main() {
     // No exception was thrown reaching here.
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('switching a 0 km first-10K pick to first-half lifts the tier '
+      'to 15 km/week and hides 0 km', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    Future<void> settle() async {
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onComplete: () {})),
+    );
+    await settle();
+
+    await tester.tap(find.text('Train for your first 10K'));
+    await settle();
+    expect(find.text('0 km/week'), findsOneWidget);
+    await tester.tap(find.text('0 km/week'));
+    await tester.pump();
+
+    // Back to the goal page and switch distance.
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await settle();
+    await tester.tap(find.text('Train for your first half'));
+    await settle();
+
+    expect(find.text('0 km/week'), findsNothing);
+    expect(find.textContaining('at least 15 km/week'), findsOneWidget);
+    // The previously chosen 0 km was lifted onto the 15 km tier, which now
+    // shows as the selected row.
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

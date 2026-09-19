@@ -529,6 +529,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _ => null,
   };
 
+  /// A half marathon or marathon needs an existing base. If the athlete had
+  /// picked a lower weekly-volume tier (e.g. 0 km for a 10K) and then changed
+  /// distance, lift the selection to the distance's lowest allowed tier.
+  void _clampBaselineToGoal() {
+    if (_weeklyVolumeTier == null) return;
+    final min = OPageWeeklyVolume.minBaselineFor(_goal);
+    if (_weeklyBaselineKm >= min) return;
+    final (key, km) = OPageWeeklyVolume.lowestTierFor(_goal);
+    _weeklyVolumeTier = key;
+    _weeklyBaselineKm = km;
+  }
+
   /// The athlete tapped a "Train for your first …" option on the goal page.
   /// Lock in the completion-focused path and advance — `_isSkipped` then walks
   /// the wizard past race-picker / experience / weekly-volume / race-goal.
@@ -556,6 +568,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _raceDate = null;
       _paceDistance = _paceDistFor(distanceKey);
       _syncPaceDefaults();
+      _clampBaselineToGoal();
     });
     Analytics.onboardingStepViewed('goal_first_timer_$distanceKey', _current);
     _next();
@@ -1183,6 +1196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _raceCity = city;
             _raceDate = date;
             _goal = distanceKey ?? _goal;
+            _clampBaselineToGoal();
             _paceDistance = _paceDistFor(_goal);
             _syncPaceDefaults();
           });
@@ -1199,6 +1213,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       OPage.weeklyVolume => OPageWeeklyVolume(
         selectedKey: _weeklyVolumeTier,
+        goal: _goal,
+        minBaselineKm: OPageWeeklyVolume.minBaselineFor(_goal),
         maxBaselineKm: _isFirstTimeRunner
             ? OPageWeeklyVolume.firstTimerMaxBaselineKm
             : null,
