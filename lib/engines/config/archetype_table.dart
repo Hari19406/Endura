@@ -110,6 +110,10 @@ enum ExperienceLevel { beginner, intermediate, advanced }
 // FLOOR KM
 // ============================================================================
 
+/// No scheduled run is ever shorter than this — anything less is a warm-up,
+/// not a workout.
+const double minSessionKm = 1.5;
+
 class _Floors {
   static double forType(ArchetypeSessionType type) => switch (type) {
     ArchetypeSessionType.recoveryEasy => 3.0,
@@ -492,7 +496,26 @@ class ArchetypeTable {
     // The 8 km absolute floor must not push a capped race (5K/10K) past its
     // operational fraction on a small week.
     final raceCap = _raceLongRunMaxFrac(raceDistance);
-    final lrFloorKm = raceCap == null ? 8.0 : math.min(8.0, raceCap * wk);
+    final baseLrFloorKm = raceCap == null ? 8.0 : math.min(8.0, raceCap * wk);
+
+    // On a very small week the per-type floors (easy 3–5 km, quality 5 km, long
+    // run 8 km) add up to more than the week itself, and the reconciler would
+    // stack the surplus on the long run. Scale every floor down together so the
+    // week still fits — but never below a meaningful 1.5 km run.
+    final floorSum =
+        easyTypes.fold(0.0, (s, t) => s + _Floors.forType(t)) +
+        _Floors.forType(ArchetypeSessionType.tempo) * qCount +
+        (hasMediumLong ? _Floors.forType(ArchetypeSessionType.mediumLong) : 0) +
+        baseLrFloorKm;
+    // Only a genuinely tiny week (under ~3 km a day) is scaled; an ordinary
+    // floor-tight week keeps its floors and overshoots slightly, as before.
+    final floorScale = floorSum > wk && wk < 3.0 * n ? wk / floorSum : 1.0;
+    double scaled(double floor) =>
+        floorScale >= 1.0
+            ? floor
+            : math.max(minSessionKm, (floor * floorScale * 2).floor() / 2);
+
+    final lrFloorKm = scaled(baseLrFloorKm);
     final lrMin = math.max(lrFloorKm, lrMinFrac * wk);
     final lrMax = math.max(lrMin, lrMaxFrac * wk);
 
@@ -505,7 +528,7 @@ class ArchetypeTable {
     final double mlMax = math.max(8.0, 0.9 * lrKm);
     final mlKm = hasMediumLong ? (0.60 * lrKm).clamp(8.0, mlMax) : 0.0;
 
-    final qMin = _Floors.forType(ArchetypeSessionType.tempo);
+    final qMin = scaled(_Floors.forType(ArchetypeSessionType.tempo));
     final qMax = math.max(qMin, 0.25 * wk);
     final qEach = (_qualityFrac(phase) * wk).clamp(qMin, qMax);
 
@@ -528,7 +551,7 @@ class ArchetypeTable {
 
     final mut = <_MutSession>[];
     for (var i = 0; i < easyTypes.length; i++) {
-      final floor = _Floors.forType(easyTypes[i]);
+      final floor = scaled(_Floors.forType(easyTypes[i]));
       final raw = weightSum > 0
           ? (easyPool * easyWeights[i] / weightSum)
           : floor;
@@ -574,7 +597,13 @@ class ArchetypeTable {
       ),
     );
 
-    _reconcile(mut, wk, allocationTolerance(wk));
+    _reconcile(
+      mut,
+      wk,
+      allocationTolerance(wk),
+      floorScale: floorScale,
+      longRunFloorKm: lrFloorKm,
+    );
 
     return ArchetypeWeek(
       mut
@@ -582,7 +611,7 @@ class ArchetypeTable {
             (m) => ArchetypeSession(
               type: m.type,
               km: m.km,
-              floorKm: _Floors.forType(m.type),
+              floorKm: math.min(_Floors.forType(m.type), m.min),
             ),
           )
           .toList(),
@@ -592,7 +621,13 @@ class ArchetypeTable {
   // ── Reconciliation ─────────────────────────────────────────────────────────
   // Drive Σ km to wk ± tol by trimming/growing sessions within their bounds,
   // in a deliberate priority order so the long run and quality are touched last.
-  static void _reconcile(List<_MutSession> mut, double wk, double tol) {
+  static void _reconcile(
+    List<_MutSession> mut,
+    double wk,
+    double tol, {
+    double floorScale = 1.0,
+    double? longRunFloorKm,
+  }) {
     double total() => mut.fold(0.0, (s, m) => s + m.km);
 
     // Trim order: easy (largest first) → mediumLong → longRun → quality.
@@ -640,7 +675,14 @@ class ArchetypeTable {
         orElse: () => ordered.first,
       );
       final hardMax = absorber.type.isLong ? 0.65 * wk : (absorber.max + wk);
-      final hardMin = _Floors.forType(absorber.type);
+      final hardMin = absorber.type.isLong && longRunFloorKm != null
+          ? longRunFloorKm
+          : (floorScale >= 1.0
+                ? _Floors.forType(absorber.type)
+                : math.max(
+                    minSessionKm,
+                    _Floors.forType(absorber.type) * floorScale,
+                  ));
       final want = _snap(diff.abs(), absorber.step); // close the whole gap
       if (trimming) {
         absorber.km = math.max(hardMin, absorber.km - want);

@@ -62,26 +62,41 @@ class RacePlanBuilder {
     final taperWeeks = _taperWeeksFor(goalRace);
     final buildWeeks = max(1, weeksOut - taperWeeks);
 
+    // A near-zero base can't seed a plan: week 1 would be ~1.5 km and the long
+    // run 0.3 × nothing. Start from a meaningful floor instead (6 km, or 8 km
+    // on a 4+ day schedule) and step up from there.
+    final floored = currentWeeklyKm < _flooredBaselineKm;
+    final startKm = floored
+        ? ((runsPerWeek ?? 0) >= 4 ? 8.0 : 6.0)
+        : currentWeeklyKm;
+
     // Peak volume: physiologically honest — current + safe weekly gain over
     // build weeks, capped by a race/experience ceiling.
-    final peakVolume = _peakVolume(
+    var peakVolume = _peakVolume(
       goalRace: goalRace,
       experienceLevel: experienceLevel,
-      currentWeeklyKm: currentWeeklyKm,
+      currentWeeklyKm: startKm,
       buildWeeks: buildWeeks,
       override: peakWeeklyKmOverride,
       runsPerWeek: runsPerWeek,
     );
+    // A 5K built up from (near) zero has no business peaking past ~24 km.
+    if (floored && _raceDistanceFrom(goalRace) == RaceDistance.fiveK) {
+      peakVolume = min(peakVolume, _flooredFiveKPeakCapKm);
+    }
 
-    final rawIncrement = (peakVolume - currentWeeklyKm) / buildWeeks;
-    final maxIncrement = currentWeeklyKm * 0.10;
+    final rawIncrement = (peakVolume - startKm) / buildWeeks;
+    final maxIncrement = startKm * 0.10;
     final safeIncrement = rawIncrement.clamp(-5.0, max(1.5, maxIncrement));
 
     final raceDist = _raceDistanceFrom(goalRace);
     var peakLongRunKm = peakLongRunKmOverride != null
         ? peakLongRunKmOverride.clamp(6.0, 46.0).toDouble()
         : _peakLongRunKm(goalRace, experienceLevel);
-    var currentLongRunKm = max(5.0, currentWeeklyKm * 0.30);
+    // The 5 km floor is right for a runner with a base; from a floored start it
+    // would be most of the week, so use a gentler 2.5 km.
+    final longRunFloorKm = floored ? _flooredLongRunKm : 5.0;
+    var currentLongRunKm = max(longRunFloorKm, startKm * 0.30);
     // 5K / 10K / marathon: clamp the long run to the envelope's absolute ceiling
     // (12 / 16 / 34 km) so a high current base or a tuned override can't push it
     // past what the archetype allows — for the marathon this is the strict
@@ -100,7 +115,7 @@ class RacePlanBuilder {
     );
 
     final weeks = <WeekTarget>[];
-    var volume = currentWeeklyKm;
+    var volume = startKm;
     var longRunKm = currentLongRunKm;
 
     for (var w = 1; w <= weeksOut; w++) {
@@ -144,11 +159,26 @@ class RacePlanBuilder {
       }
 
       // ── Normal progression weeks ──────────────────────────────────────
-      volume = (volume + safeIncrement).clamp(
-        currentWeeklyKm * 0.5,
-        peakVolume,
+      if (floored) {
+        // Week 1 is the floor itself; afterwards step by max(1.5 km, 10% of the
+        // current volume) so the ramp never stalls at a tiny base.
+        if (w > 1) {
+          final stepCap = max(1.5, volume * 0.10);
+          volume = (volume + rawIncrement.clamp(-5.0, stepCap)).clamp(
+            startKm,
+            peakVolume,
+          );
+        }
+      } else {
+        volume = (volume + safeIncrement).clamp(
+          currentWeeklyKm * 0.5,
+          peakVolume,
+        );
+      }
+      longRunKm = (longRunKm + safeLongRunIncrement).clamp(
+        longRunFloorKm,
+        max(longRunFloorKm, peakLongRunKm),
       );
-      longRunKm = (longRunKm + safeLongRunIncrement).clamp(5.0, peakLongRunKm);
 
       // Gradual start eases the *prescribed* volume for weeks 1–4 without
       // slowing the underlying ramp — `volume` / `longRunKm` keep compounding
@@ -177,6 +207,11 @@ class RacePlanBuilder {
       weeks: weeks,
     );
   }
+
+  /// Below this current weekly volume the plan seeds from a fixed floor.
+  static const double _flooredBaselineKm = 6.0;
+  static const double _flooredLongRunKm = 2.5;
+  static const double _flooredFiveKPeakCapKm = 24.0;
 
   static WeekTarget exploreTarget({
     required double fourWeekAvgKm,
