@@ -9,7 +9,45 @@ import 'package:flutter/material.dart';
 
 import '../models/athlete_profile.dart';
 import '../screens/athlete_list_screen.dart' show AthleteAvatar;
+import '../services/revenue_cat_service.dart';
 import '../theme/app_colors.dart';
+
+/// Compact "PRO" pill shown next to a Pro athlete's name.
+class _ProBadge extends StatelessWidget {
+  const _ProBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = context.colors.premiumGold;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: gold.withValues(alpha: 0.10),
+          border: Border.all(color: gold),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.workspace_premium_rounded, size: 11, color: gold),
+            const SizedBox(width: 3),
+            Text(
+              'PRO',
+              style: TextStyle(
+                color: gold,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class AthleteProfileHeader extends StatelessWidget {
   final AthleteProfile profile;
@@ -77,10 +115,18 @@ class AthleteProfileHeader extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (p.isSubscribed) ...[
-                          const SizedBox(width: 5),
-                          Icon(Icons.verified, size: 15, color: c.accent),
-                        ],
+                        // Own profile follows the live entitlement (updates the
+                        // moment a purchase/expiry lands); other athletes use
+                        // the synced profiles.is_pro flag.
+                        if (isSelf)
+                          ValueListenableBuilder<bool>(
+                            valueListenable: RevenueCatService.isProNotifier,
+                            builder: (_, isPro, _) => isPro
+                                ? const _ProBadge()
+                                : const SizedBox.shrink(),
+                          )
+                        else if (p.isSubscribed)
+                          const _ProBadge(),
                       ],
                     ),
                     if (p.location != null) ...[
@@ -222,10 +268,7 @@ class _StatCell extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontSize: 11, color: c.textTertiary),
-            ),
+            Text(label, style: TextStyle(fontSize: 11, color: c.textTertiary)),
           ],
         ),
       ),

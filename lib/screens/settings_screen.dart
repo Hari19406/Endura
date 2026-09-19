@@ -485,34 +485,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildProCard(bool isPro) {
     final c = context.colors;
     final gold = c.premiumGold;
-    return Container(
+    final card = Container(
       decoration: BoxDecoration(
         color: gold.withValues(alpha: 0.10),
         border: Border.all(color: gold.withValues(alpha: 0.5)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (isPro) {
-            launchUrl(
-              Uri.parse('https://play.google.com/store/account/subscriptions'),
-              mode: LaunchMode.externalApplication,
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PaywallScreen()),
-            );
-          }
-        },
+        borderRadius: BorderRadius.circular(10),
+        // Pro users get a status card only; managing lives in its own row.
+        onTap: isPro
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                );
+              },
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              Icon(isPro ? Icons.verified : Icons.workspace_premium,
-                  size: 24, color: gold),
+              Icon(
+                isPro ? Icons.verified : Icons.workspace_premium,
+                size: 24,
+                color: gold,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -529,18 +528,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       isPro
-                          ? 'Manage subscription'
+                          ? 'Thanks for supporting Endura'
                           : 'Unlock your full training plan',
                       style: TextStyle(fontSize: 12, color: c.textTertiary),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, size: 20, color: gold),
+              if (!isPro) Icon(Icons.chevron_right, size: 20, color: gold),
             ],
           ),
         ),
       ),
+    );
+    if (!isPro) return card;
+    return Column(
+      children: [
+        card,
+        const SizedBox(height: 12),
+        _buildCard(
+          child: _deviceRow(
+            icon: Icons.credit_card,
+            title: 'Manage Subscription',
+            subtitle: 'Opens Google Play subscriptions',
+            onTap: () {
+              HapticFeedback.lightImpact();
+              launchUrl(
+                Uri.parse(
+                  'https://play.google.com/store/account/subscriptions',
+                ),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
