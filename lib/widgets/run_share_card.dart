@@ -693,17 +693,24 @@ class RunShareCard extends StatelessWidget {
 
   Widget _buildOverlayDuoContent() {
     return Center(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildOverlayStat('Distance', _distanceTextShort),
-            const SizedBox(width: 48),
-            _buildOverlayStat('Pace', _paceText),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildOverlayStat('Distance', _distanceTextShort),
+                const SizedBox(width: 48),
+                _buildOverlayStat('Pace', _paceText),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text('ENDURA', style: _brandMarkStyle),
+        ],
       ),
     );
   }
@@ -712,22 +719,29 @@ class RunShareCard extends StatelessWidget {
 
   Widget _buildOverlayTrioContent() {
     return Center(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildOverlayStat('Distance', _distanceTextShort),
-            const SizedBox(width: 32),
-            _buildOverlayStat('Pace', _paceText),
-            const SizedBox(width: 32),
-            _buildOverlayStat(
-              'Time',
-              _formatDurationWords(data.durationSeconds),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildOverlayStat('Distance', _distanceTextShort),
+                const SizedBox(width: 32),
+                _buildOverlayStat('Pace', _paceText),
+                const SizedBox(width: 32),
+                _buildOverlayStat(
+                  'Time',
+                  _formatDurationWords(data.durationSeconds),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 14),
+          Text('ENDURA', style: _brandMarkStyle),
+        ],
       ),
     );
   }
@@ -855,6 +869,17 @@ class RunShareCard extends StatelessWidget {
             row('PACE', _paceText),
             const SizedBox(height: 8),
             row('TIME', _formatDurationWords(data.durationSeconds)),
+            const SizedBox(height: 16),
+            Text(
+              'ENDURA',
+              style: GoogleFonts.spaceMono(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2.5,
+                color: Colors.white,
+                shadows: _shadow,
+              ),
+            ),
           ],
         ),
       ),
