@@ -74,6 +74,13 @@ class AppColors extends ThemeExtension<AppColors> {
   /// color everywhere else so it never gets confused with this cue.
   final Color premiumGold;
 
+  /// Monetization gold for the paywall (selected tier, savings pill, pro
+  /// checkmarks, guarantee seal). Deliberately its own token, not
+  /// [workoutTempo], so intensity colors can change independently. Inverts
+  /// between palettes: bright amber on dark surfaces, a deeper amber on light
+  /// ones so small text still clears WCAG AA (>= 4.5:1).
+  final Color goldAccent;
+
   /// Hero/CTA gradient start and end stops, and the resulting gradient.
   final Color heroGradientStart;
   final Color heroGradientEnd;
@@ -122,6 +129,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.elevationAccent,
     required this.cadenceAccent,
     required this.premiumGold,
+    required this.goldAccent,
     required this.heroGradientStart,
     required this.heroGradientEnd,
     required this.heroGradient,
@@ -154,6 +162,7 @@ class AppColors extends ThemeExtension<AppColors> {
     elevationAccent: Color(0xFFC97B1D),
     cadenceAccent: Color(0xFF1FA97A),
     premiumGold: Color(0xFFE3C170),
+    goldAccent: Color(0xFFA35B00),
     heroGradientStart: Color(0xFF8B1E9F),
     heroGradientEnd: Color(0xFF591A9C),
     heroGradient: LinearGradient(
@@ -190,6 +199,7 @@ class AppColors extends ThemeExtension<AppColors> {
     elevationAccent: Color(0xFFE8A33D),
     cadenceAccent: Color(0xFF3ADCA0),
     premiumGold: Color(0xFFE3C170),
+    goldAccent: Color(0xFFFFB300),
     heroGradientStart: Color(0xFFE0247C),
     heroGradientEnd: Color(0xFF7B2CBF),
     heroGradient: LinearGradient(
@@ -227,6 +237,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? elevationAccent,
     Color? cadenceAccent,
     Color? premiumGold,
+    Color? goldAccent,
     Color? heroGradientStart,
     Color? heroGradientEnd,
     LinearGradient? heroGradient,
@@ -258,6 +269,7 @@ class AppColors extends ThemeExtension<AppColors> {
       elevationAccent: elevationAccent ?? this.elevationAccent,
       cadenceAccent: cadenceAccent ?? this.cadenceAccent,
       premiumGold: premiumGold ?? this.premiumGold,
+      goldAccent: goldAccent ?? this.goldAccent,
       heroGradientStart: heroGradientStart ?? this.heroGradientStart,
       heroGradientEnd: heroGradientEnd ?? this.heroGradientEnd,
       heroGradient: heroGradient ?? this.heroGradient,
@@ -294,6 +306,7 @@ class AppColors extends ThemeExtension<AppColors> {
       elevationAccent: Color.lerp(elevationAccent, other.elevationAccent, t)!,
       cadenceAccent: Color.lerp(cadenceAccent, other.cadenceAccent, t)!,
       premiumGold: Color.lerp(premiumGold, other.premiumGold, t)!,
+      goldAccent: Color.lerp(goldAccent, other.goldAccent, t)!,
       heroGradientStart: Color.lerp(
         heroGradientStart,
         other.heroGradientStart,

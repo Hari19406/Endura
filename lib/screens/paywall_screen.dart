@@ -891,12 +891,10 @@ class _PlanCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         decoration: BoxDecoration(
-          color: isSelected
-              ? c.workoutTempo.withValues(alpha: 0.08)
-              : c.surface,
+          color: isSelected ? c.goldAccent.withValues(alpha: 0.08) : c.surface,
           borderRadius: BorderRadius.circular(_kCardRadius),
           border: Border.all(
-            color: isSelected ? c.workoutTempo : c.border,
+            color: isSelected ? c.goldAccent : c.border,
             width: 1,
           ),
         ),
@@ -907,8 +905,8 @@ class _PlanCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: c.workoutTempo.withValues(alpha: 0.15),
-                  border: Border.all(color: c.workoutTempo),
+                  color: c.goldAccent.withValues(alpha: 0.15),
+                  border: Border.all(color: c.goldAccent),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
@@ -916,14 +914,14 @@ class _PlanCard extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.workspace_premium_rounded,
-                      color: c.workoutTempo,
+                      color: c.goldAccent,
                       size: 12,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       badge!,
                       style: TextStyle(
-                        color: c.workoutTempo,
+                        color: c.goldAccent,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.3,
@@ -940,7 +938,7 @@ class _PlanCard extends StatelessWidget {
                   isSelected
                       ? Icons.check_circle_rounded
                       : Icons.circle_outlined,
-                  color: isSelected ? c.workoutTempo : c.textTertiary,
+                  color: isSelected ? c.goldAccent : c.textTertiary,
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -991,16 +989,12 @@ class _PlanCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(
-                    Icons.lock_clock_rounded,
-                    color: c.workoutTempo,
-                    size: 14,
-                  ),
+                  Icon(Icons.lock_clock_rounded, color: c.goldAccent, size: 14),
                   const SizedBox(width: 6),
                   Text(
                     trialTag!,
                     style: TextStyle(
-                      color: c.workoutTempo,
+                      color: c.goldAccent,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1014,7 +1008,7 @@ class _PlanCard extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.workspace_premium_rounded,
-                    color: c.workoutTempo,
+                    color: c.goldAccent,
                     size: 14,
                   ),
                   const SizedBox(width: 6),
@@ -1022,7 +1016,7 @@ class _PlanCard extends StatelessWidget {
                     child: Text(
                       highlight!,
                       style: TextStyle(
-                        color: c.workoutTempo,
+                        color: c.goldAccent,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1143,14 +1137,14 @@ class _FeatureTable extends StatelessWidget {
                 ),
                 Icon(
                   Icons.workspace_premium_rounded,
-                  color: c.workoutTempo,
+                  color: c.goldAccent,
                   size: 14,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'ENDURA PRO',
                   style: TextStyle(
-                    color: c.workoutTempo,
+                    color: c.goldAccent,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.4,
@@ -1173,7 +1167,7 @@ class _FeatureTable extends StatelessWidget {
                   ),
                   Icon(
                     Icons.check_circle_rounded,
-                    color: c.workoutTempo,
+                    color: c.goldAccent,
                     size: 20,
                   ),
                 ],
@@ -1242,12 +1236,12 @@ class _TrainingProofRow extends StatelessWidget {
                       height: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: c.workoutTempo.withValues(alpha: 0.12),
+                        color: c.goldAccent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         _kTrainingPillars[i].icon,
-                        color: c.workoutTempo,
+                        color: c.goldAccent,
                         size: 18,
                       ),
                     ),
@@ -1310,7 +1304,7 @@ class _GuaranteeCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  c.workoutTempo.withValues(alpha: 0.22),
+                  c.goldAccent.withValues(alpha: 0.22),
                   c.heroGradientStart.withValues(alpha: 0.14),
                 ],
               ),
@@ -1318,7 +1312,7 @@ class _GuaranteeCard extends StatelessWidget {
             ),
             child: Icon(
               Icons.verified_user_rounded,
-              color: c.workoutTempo,
+              color: c.goldAccent,
               size: 22,
             ),
           ),
