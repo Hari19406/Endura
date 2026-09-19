@@ -82,6 +82,20 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   @override
   void initState() {
     super.initState();
+    if (kDebugMode) {
+      final a = widget.activity;
+      final paceN = a.telemetrySeries
+          .where((s) => s.paceSeconds != null)
+          .length;
+      final altN = a.telemetrySeries.where((s) => s.elevationM != null).length;
+      debugPrint(
+        '[ActivityDetail] ${a.distanceKm.toStringAsFixed(2)} km '
+        'splits=${a.splits.length} samples=${a.telemetrySeries.length} '
+        'paceSamples=$paceN altSamples=$altN gain=${a.elevationGainM} '
+        '-> splitsCard=${a.splits.isNotEmpty} paceChart=${a.hasPaceSeries} '
+        'elevChart=${a.hasElevationData}',
+      );
+    }
     Analytics.capture(
       'activity_detail_viewed',
       properties: {

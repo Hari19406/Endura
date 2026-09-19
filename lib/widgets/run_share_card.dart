@@ -40,13 +40,22 @@ class ShareRunData {
 /// transparent canvas at the same story size, for overlaying on the user's
 /// own photos/videos. Metrics are always metric (km, /km) regardless of the
 /// app's unit setting.
-enum ShareCardTemplate { full, overlayDuo, overlayTrio, verticalMetrics }
+enum ShareCardTemplate {
+  full,
+  overlayDuo,
+  overlayTrio,
+  verticalMetrics,
+  telemetryHud,
+  raceTicket,
+}
 
 String _labelOf(ShareCardTemplate t) => switch (t) {
   ShareCardTemplate.full => 'Full Map Route',
   ShareCardTemplate.overlayDuo => 'Overlay Duo',
   ShareCardTemplate.overlayTrio => 'Overlay Trio',
   ShareCardTemplate.verticalMetrics => 'Vertical Stack',
+  ShareCardTemplate.telemetryHud => 'Telemetry HUD',
+  ShareCardTemplate.raceTicket => 'Race Ticket',
 };
 
 /// Opens a bottom sheet with a story-format preview of the run card, a
@@ -473,10 +482,8 @@ class _LayoutPickerSheet extends StatelessWidget {
                     childAspectRatio: 0.62,
                   ),
                   itemCount: templates.length,
-                  itemBuilder: (context, i) => _buildThumbnail(
-                    context,
-                    templates[i],
-                  ),
+                  itemBuilder: (context, i) =>
+                      _buildThumbnail(context, templates[i]),
                 ),
               ),
             ],
@@ -610,6 +617,8 @@ class RunShareCard extends StatelessWidget {
       ShareCardTemplate.overlayDuo => _buildOverlayDuoContent(),
       ShareCardTemplate.overlayTrio => _buildOverlayTrioContent(),
       ShareCardTemplate.verticalMetrics => _buildVerticalMetricsContent(),
+      ShareCardTemplate.telemetryHud => _buildTelemetryHudContent(),
+      ShareCardTemplate.raceTicket => _buildRaceTicketContent(),
     };
 
     return SizedBox(
@@ -776,6 +785,112 @@ class RunShareCard extends StatelessWidget {
         const SizedBox(height: 6),
         Text(value, style: _mapMetricValueStyle.copyWith(fontSize: 44)),
       ],
+    );
+  }
+
+  // ── Telemetry HUD — monospaced flight-recorder readout ──────────────────
+  // Space Mono / Libre Barcode are scoped to these two templates only.
+
+  static const List<String> _months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+
+  String get _hudDate =>
+      '${data.date.day.toString().padLeft(2, '0')} '
+      '${_months[data.date.month - 1]} ${data.date.year}';
+
+  /// Code 39 payload: `*DDMMYYYY*` (asterisks are the start/stop characters).
+  String get _barcodeDate =>
+      '*${data.date.day.toString().padLeft(2, '0')}'
+      '${data.date.month.toString().padLeft(2, '0')}'
+      '${data.date.year}*';
+
+  Widget _buildTelemetryHudContent() {
+    final style = GoogleFonts.spaceMono(
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+      color: Colors.white,
+      shadows: _shadow,
+    );
+    Widget row(String key, String value) => Row(
+      children: [
+        SizedBox(width: 78, child: Text('$key:', style: style)),
+        Expanded(child: Text(value.toUpperCase(), style: style)),
+      ],
+    );
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: 260,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            row('DATE', _hudDate),
+            const Divider(color: Colors.white54, thickness: 1, height: 22),
+            row('DIST', _distanceTextShort),
+            const SizedBox(height: 8),
+            row('PACE', _paceText),
+            const SizedBox(height: 8),
+            row('TIME', _formatDurationWords(data.durationSeconds)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Race Ticket — barcode, compact metrics row, footer ──────────────────
+
+  Widget _buildRaceTicketContent() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.fitWidth,
+              child: Text(
+                _barcodeDate,
+                style: GoogleFonts.libreBarcode39(
+                  fontSize: 54,
+                  color: Colors.white,
+                  shadows: _shadow,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildMapMetric('DISTANCE', _distanceText),
+              _buildMapMetric('PACE', _paceText),
+              _buildMapMetric(
+                'TIME',
+                _formatDurationWords(data.durationSeconds),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'SHARED BY ENDURA',
+            style: _mapMetricLabelStyle.copyWith(fontSize: 9, letterSpacing: 2),
+          ),
+        ],
+      ),
     );
   }
 }
