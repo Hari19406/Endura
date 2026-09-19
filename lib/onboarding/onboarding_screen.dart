@@ -20,6 +20,7 @@ import 'onboarding_pages.dart';
 import 'plan_reveal_data.dart';
 import 'plan_reveal_page.dart';
 import 'plan_runway.dart';
+import 'race_time_defaults.dart';
 import 'short_notice_sheet.dart';
 import '../../models/training_phase.dart';
 
@@ -173,12 +174,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // Current race time (vDOT inputs) — OPageBestTime uses 'half' not 'half_marathon'
   String _paceDistance = '5k';
   int _paceHours = 0;
-  int _paceMinutes = 25;
+  int _paceMinutes = 30;
   int _paceSeconds = 0;
 
-  /// True once the athlete changes anything on the current-time page. Until
-  /// then the 25:00 default is a placeholder, not evidence of fitness.
+  /// True once the athlete changes the time on the current-time page. Until
+  /// then the distance's placeholder time is not evidence of fitness.
   bool _paceTouched = false;
+
+  /// While the time is untouched, keep the placeholder in step with the
+  /// distance so a 10K/half/marathon never shows a 5K-sized time.
+  void _syncPaceDefaults() {
+    if (_paceTouched) return;
+    final t = defaultRaceTimeFor(_paceDistance);
+    _paceHours = t.hours;
+    _paceMinutes = t.minutes;
+    _paceSeconds = t.seconds;
+  }
 
   // Plan start
   DateTime _startDate = DateTime.now();
@@ -270,10 +281,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _paceMinutes = paceMin;
         _paceSeconds = paceSec;
         _paceDistance = prefs.getString('pace_distance') ?? '5k';
-        _paceTouched = true;
       }
       _vdot = memory.vdotScore;
       _vdotProvisional = memory.vdotIsProvisional;
+      // A stored time only counts as evidence if it produced a real VDOT.
+      _paceTouched = paceMin != null && !memory.vdotIsProvisional;
 
       final storedDays = await TrainingDaysService.load();
       if (storedDays != null && storedDays.isNotEmpty) {
@@ -543,6 +555,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _raceCity = null;
       _raceDate = null;
       _paceDistance = _paceDistFor(distanceKey);
+      _syncPaceDefaults();
     });
     Analytics.onboardingStepViewed('goal_first_timer_$distanceKey', _current);
     _next();
@@ -831,21 +844,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── vDOT computation ─────────────────────────────────────────────────────
 
-  /// Current-time input that counts as evidence. A first-timer who never
-  /// touched the page is still on the 25:00 placeholder, so it counts as 0.
-  int get _effectiveCurrentTimeSec =>
-      _isFirstTimeRunner && !_paceTouched ? 0 : _currentTimeSec;
-
-  /// Entry-level VDOT used (as provisional) when there is no real race time.
-  static const int _entryLevelVdot = 35;
+  /// Current-time input that counts as evidence. Anyone who never touched the
+  /// page is still on the placeholder, so it counts as 0 — in every funnel.
+  int get _effectiveCurrentTimeSec => _paceTouched ? _currentTimeSec : 0;
 
   (int, bool) _computeVdot() {
-    if (widget.shortenedMode && !_vdotProvisional && _currentTimeSec == 0) {
+    if (widget.shortenedMode && !_vdotProvisional && !_paceTouched) {
       return (_vdot, false);
     }
     final totalSec = _effectiveCurrentTimeSec;
-    if (totalSec == 0 && _isFirstTimeRunner && !_paceTouched) {
-      return (_entryLevelVdot, true);
+    if (totalSec == 0 && !_paceTouched) {
+      return (fallbackVdotFor(_paceDistance), true);
     }
     if (totalSec > 0) {
       final vdot = vdotFromPr(
@@ -1175,6 +1184,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _raceDate = date;
             _goal = distanceKey ?? _goal;
             _paceDistance = _paceDistFor(_goal);
+            _syncPaceDefaults();
           });
         },
         onClose: _closeRacePicker,
@@ -1258,8 +1268,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         minutes: _paceMinutes,
         seconds: _paceSeconds,
         onDistChanged: (v) => setState(() {
-          _paceTouched = true;
           _paceDistance = v;
+          _syncPaceDefaults();
         }),
         onHoursChanged: (v) => setState(() {
           _paceTouched = true;

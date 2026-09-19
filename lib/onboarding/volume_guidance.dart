@@ -143,7 +143,13 @@ class VolumeGuidance {
       days: days,
     ).defaultKm;
     final minV = VolumeModel.minViableKm(race);
-    final peak = VolumeModel.peakKm(race, level);
+    // The same runs-scaled ceiling RacePlanBuilder ramps toward, so the band
+    // shown here matches the plan that gets built.
+    final peak = VolumeModel.peakKmForRuns(
+      race: race,
+      experience: level,
+      runsPerWeek: days,
+    );
 
     var lo = _max(minV, typical * 0.82);
     // never project below what the athlete already sustains at this frequency

@@ -96,7 +96,12 @@ class RacePlanBuilder {
     // The 5 km floor is right for a runner with a base; from a floored start it
     // would be most of the week, so use a gentler 2.5 km.
     final longRunFloorKm = floored ? _flooredLongRunKm : 5.0;
-    var currentLongRunKm = max(longRunFloorKm, startKm * 0.30);
+    // Never start the long run above 75% of where it is heading — a big base
+    // (0.3 × 45 km = 13.5 km) against a 10 km peak used to make it shrink.
+    var currentLongRunKm = min(
+      peakLongRunKm * 0.75,
+      max(longRunFloorKm, startKm * 0.30),
+    );
     // 5K / 10K / marathon: clamp the long run to the envelope's absolute ceiling
     // (12 / 16 / 34 km) so a high current base or a tuned override can't push it
     // past what the archetype allows — for the marathon this is the strict
@@ -108,6 +113,8 @@ class RacePlanBuilder {
       peakLongRunKm = min(peakLongRunKm, cap);
       currentLongRunKm = min(currentLongRunKm, cap);
     }
+    // The cap may have lowered the peak; keep the start at most 75% of it.
+    currentLongRunKm = min(currentLongRunKm, peakLongRunKm * 0.75);
     final longRunIncrement = (peakLongRunKm - currentLongRunKm) / buildWeeks;
     final safeLongRunIncrement = longRunIncrement.clamp(
       -2.0,

@@ -74,4 +74,32 @@ void main() {
       }
     });
   });
+
+  group('long-run progression', () {
+    test('a 10K plan on a 45 km base starts below its peak and only climbs', () {
+      final plan = RacePlanBuilder.build(
+        currentWeeklyKm: 45,
+        goalRace: '10k',
+        raceDate: now.add(const Duration(days: 84)),
+        experienceLevel: 'beginner',
+        durationWeeks: 12,
+        runsPerWeek: 4,
+        now: now,
+      );
+      final lr = plan.weeks
+          .where((w) => w.phase != TrainingPhase.taper)
+          .map((w) => w.longRunKm)
+          .toList();
+      final peakLr = plan.weeks.map((w) => w.longRunKm).reduce(
+        (a, b) => a > b ? a : b,
+      );
+      expect(lr.first, lessThan(peakLr));
+      // week 1 already includes one step up from the 75%-of-peak start
+      expect(lr.first, lessThanOrEqualTo(peakLr * 0.85));
+      for (var i = 1; i < lr.length; i++) {
+        expect(lr[i], greaterThanOrEqualTo(lr[i - 1]),
+            reason: 'long run shrank at index $i: $lr');
+      }
+    });
+  });
 }
