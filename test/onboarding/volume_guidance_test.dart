@@ -201,4 +201,41 @@ void main() {
       expect(_g(baseline: 0).isStretch, isFalse);
     });
   });
+
+  group('RECOMMENDED badge ceiling', () {
+    test('is never 7 days, whatever the base', () {
+      for (final goal in const ['5k', '10k', 'half_marathon', 'marathon']) {
+        for (final exp in const ['beginner', 'intermediate', 'advanced']) {
+          for (final base in const [0.0, 15.0, 25.0, 40.0, 60.0, 75.0]) {
+            final g = _g(goal: goal, experience: exp, baseline: base);
+            expect(
+              g.recommendedRuns,
+              lessThan(kMaxRunsPerWeek),
+              reason: '$goal/$exp/base=$base -> ${g.recommendedRuns}',
+            );
+          }
+        }
+      }
+    });
+
+    test('a 5K never recommends more than 4 days (5 for advanced)', () {
+      for (final base in const [0.0, 15.0, 25.0, 40.0, 60.0, 75.0]) {
+        expect(
+          _g(goal: '5k', experience: 'beginner', baseline: base)
+              .recommendedRuns,
+          lessThanOrEqualTo(4),
+        );
+        expect(
+          _g(goal: '5k', experience: 'intermediate', baseline: base)
+              .recommendedRuns,
+          lessThanOrEqualTo(4),
+        );
+        expect(
+          _g(goal: '5k', experience: 'advanced', baseline: base)
+              .recommendedRuns,
+          lessThanOrEqualTo(5),
+        );
+      }
+    });
+  });
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/engines/config/archetype_table.dart' show ExperienceLevel;
 import 'package:run_app/engines/config/volume_model.dart';
@@ -64,6 +65,26 @@ void main() {
         expect(cfg.weeklyVolumeRange.end,
             lessThanOrEqualTo(VolumeModel.safeCapKm(RaceDistance.halfMarathon)));
       }
+    });
+  });
+
+  group('first-timer tier cap', () {
+    testWidgets('hides tiers above 25 km/week', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OPageWeeklyVolume(
+              selectedKey: null,
+              maxBaselineKm: OPageWeeklyVolume.firstTimerMaxBaselineKm,
+              onSelect: (_, __) {},
+            ),
+          ),
+        ),
+      );
+      expect(find.text('20–35 km/week'), findsOneWidget);
+      expect(find.text('35–50 km/week'), findsNothing);
+      expect(find.text('50–70 km/week'), findsNothing);
+      expect(find.text('70+ km/week'), findsNothing);
     });
   });
 }

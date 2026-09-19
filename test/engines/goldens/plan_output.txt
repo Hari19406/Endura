@@ -1,15 +1,15 @@
 === P1_5K_3day_15km_beginner ===
 W1 base target=16.5km
   Mon quality1   threshold    cruise_intervals_400       5.0km @ 6:25/km
-  Thu easy       aerobicBase  easy_hilly                 4.0km @ 8:09/km
+  Thu easy       aerobicBase  easy_hilly                 6.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W2 base target=18.0km
   Mon quality1   threshold    cruise_intervals_400       5.0km @ 6:25/km
-  Thu easy       aerobicBase  easy_strides               5.0km @ 8:09/km
+  Thu easy       aerobicBase  easy_strides               7.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W3 base target=19.5km
   Mon quality1   threshold    cruise_intervals_400       5.0km @ 6:25/km
-  Thu easy       aerobicBase  easy_progressive           7.0km @ 8:09/km
+  Thu easy       aerobicBase  easy_progressive           8.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W4 build [cutback] target=19.5km
   Mon quality1   threshold    cruise_intervals_400       5.0km @ 6:25/km
@@ -20,20 +20,20 @@ W5 build target=21.0km
   Thu easy       aerobicBase  easy_steady                8.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W6 peak target=22.5km
-  Mon quality1   threshold    cruise_intervals_800       5.5km @ 6:25/km
+  Mon quality1   threshold    cruise_intervals_800       5.6km @ 6:25/km
   Thu easy       aerobicBase  easy_steady                8.0km @ 8:09/km
-  Sat longRun    endurance    long_steady                8.0km @ 8:09/km
+  Sat longRun    endurance    long_steady                9.0km @ 8:09/km
 W7 peak target=24.0km
   Mon quality1   threshold    cruise_intervals_800       6.0km @ 6:25/km
   Thu easy       aerobicBase  easy_steady                8.0km @ 8:09/km
   Sat longRun    endurance    long_steady               10.0km @ 8:09/km
 W8 taper [cutback] target=29.0km
   Mon quality1   threshold    tempo_continuous           5.0km @ 6:25/km
-  Thu easy       aerobicBase  easy_steady                4.0km @ 8:09/km
+  Thu easy       aerobicBase  easy_steady                6.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 W9 base target=15.0km
   Mon quality1   threshold    cruise_intervals_400       5.0km @ 6:25/km
-  Thu easy       aerobicBase  easy_steady                4.0km @ 8:09/km
+  Thu easy       aerobicBase  easy_steady                5.0km @ 8:09/km
   Sat longRun    endurance    long_steady                8.0km @ 8:09/km
 
 === P2_5K_4day_25km_intermediate_highRpe ===

@@ -239,6 +239,7 @@ class ArchetypeTable {
     required int days,
     required ExperienceLevel experience,
     required TrainingPhase phase,
+    RaceDistance? race,
   }) {
     if (days < 3 || days > 7) return null;
 
@@ -269,8 +270,32 @@ class ArchetypeTable {
     }
 
     // Long run absorbs whatever the weekly km minus all other sessions.
-    final longKm = _round((weeklyKm - allocatedKm).clamp(0.0, double.infinity));
+    var longKm = _round((weeklyKm - allocatedKm).clamp(0.0, double.infinity));
     final longFloor = _Floors.forType(ArchetypeSessionType.longRun);
+
+    // A race-specific long-run cap (5K: 33% of the week) spills the excess into
+    // the easy runs instead of stacking it on one day.
+    final raceCap = race == null ? null : _raceLongRunMaxFrac(race);
+    if (raceCap != null) {
+      final cappedKm = _round(raceCap * weeklyKm);
+      final excess = longKm - cappedKm;
+      final easyIdx = [
+        for (var i = 0; i < sessions.length; i++)
+          if (sessions[i].type.isEasy) i,
+      ];
+      if (excess > 0 && easyIdx.isNotEmpty) {
+        final share = excess / easyIdx.length;
+        for (final i in easyIdx) {
+          final s = sessions[i];
+          sessions[i] = ArchetypeSession(
+            type: s.type,
+            km: _round(s.km + share),
+            floorKm: s.floorKm,
+          );
+        }
+        longKm = cappedKm;
+      }
+    }
     sessions.add(
       ArchetypeSession(
         type: ArchetypeSessionType.longRun,
@@ -464,7 +489,11 @@ class ArchetypeTable {
 
     // ── Bounds ───────────────────────────────────────────────────────────────
     final (lrMinFrac, lrMaxFrac) = _lrBounds(phase, raceDistance, n);
-    final lrMin = math.max(8.0, lrMinFrac * wk);
+    // The 8 km absolute floor must not push a capped race (5K/10K) past its
+    // operational fraction on a small week.
+    final raceCap = _raceLongRunMaxFrac(raceDistance);
+    final lrFloorKm = raceCap == null ? 8.0 : math.min(8.0, raceCap * wk);
+    final lrMin = math.max(lrFloorKm, lrMinFrac * wk);
     final lrMax = math.max(lrMin, lrMaxFrac * wk);
 
     final lrTarget = longRunKmTarget ?? ((lrMinFrac + lrMaxFrac) / 2 * wk);

@@ -176,6 +176,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int _paceMinutes = 25;
   int _paceSeconds = 0;
 
+  /// True once the athlete changes anything on the current-time page. Until
+  /// then the 25:00 default is a placeholder, not evidence of fitness.
+  bool _paceTouched = false;
+
   // Plan start
   DateTime _startDate = DateTime.now();
   int? _planWeeks;
@@ -266,6 +270,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _paceMinutes = paceMin;
         _paceSeconds = paceSec;
         _paceDistance = prefs.getString('pace_distance') ?? '5k';
+        _paceTouched = true;
       }
       _vdot = memory.vdotScore;
       _vdotProvisional = memory.vdotIsProvisional;
@@ -523,6 +528,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // engine already routes beginners to threshold-only quality — no VO2 max
       // or hard intervals) and a "just finish" race goal (no target-time step).
       _experience = 'just_starting';
+      // A first-timer can't have run 40+ km weeks — drop a stale higher tier.
+      if (_weeklyBaselineKm > OPageWeeklyVolume.firstTimerMaxBaselineKm) {
+        _weeklyVolumeTier = null;
+        _weeklyBaselineKm = 0;
+      }
       _raceGoal = 'finish';
       _timeToBeatSec = null;
       _targetFinishSec = null;
@@ -626,7 +636,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       longRunDayIndex: _longRunDayIndex,
       paceDistance: _paceDistance,
       paceDistanceKm: _paceDistanceKm,
-      currentTimeSec: _currentTimeSec,
+      currentTimeSec: _effectiveCurrentTimeSec,
       startDate: _startDate,
       planWeeks: _planDurationWeeks,
       vdot: vdot,
@@ -821,11 +831,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── vDOT computation ─────────────────────────────────────────────────────
 
+  /// Current-time input that counts as evidence. A first-timer who never
+  /// touched the page is still on the 25:00 placeholder, so it counts as 0.
+  int get _effectiveCurrentTimeSec =>
+      _isFirstTimeRunner && !_paceTouched ? 0 : _currentTimeSec;
+
+  /// Entry-level VDOT used (as provisional) when there is no real race time.
+  static const int _entryLevelVdot = 35;
+
   (int, bool) _computeVdot() {
     if (widget.shortenedMode && !_vdotProvisional && _currentTimeSec == 0) {
       return (_vdot, false);
     }
-    final totalSec = _currentTimeSec;
+    final totalSec = _effectiveCurrentTimeSec;
+    if (totalSec == 0 && _isFirstTimeRunner && !_paceTouched) {
+      return (_entryLevelVdot, true);
+    }
     if (totalSec > 0) {
       final vdot = vdotFromPr(
         prTimeSeconds: totalSec,
@@ -1168,6 +1189,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       OPage.weeklyVolume => OPageWeeklyVolume(
         selectedKey: _weeklyVolumeTier,
+        maxBaselineKm: _isFirstTimeRunner
+            ? OPageWeeklyVolume.firstTimerMaxBaselineKm
+            : null,
         onSelect: (tierKey, baselineKm) => setState(() {
           _weeklyVolumeTier = tierKey;
           _weeklyBaselineKm = baselineKm;
@@ -1233,10 +1257,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         hours: _paceHours,
         minutes: _paceMinutes,
         seconds: _paceSeconds,
-        onDistChanged: (v) => setState(() => _paceDistance = v),
-        onHoursChanged: (v) => setState(() => _paceHours = v),
-        onMinsChanged: (v) => setState(() => _paceMinutes = v),
-        onSecsChanged: (v) => setState(() => _paceSeconds = v),
+        onDistChanged: (v) => setState(() {
+          _paceTouched = true;
+          _paceDistance = v;
+        }),
+        onHoursChanged: (v) => setState(() {
+          _paceTouched = true;
+          _paceHours = v;
+        }),
+        onMinsChanged: (v) => setState(() {
+          _paceTouched = true;
+          _paceMinutes = v;
+        }),
+        onSecsChanged: (v) => setState(() {
+          _paceTouched = true;
+          _paceSeconds = v;
+        }),
       ),
 
       OPage.planStart => OPagePlanStart(
@@ -1286,7 +1322,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         vdot: previewVdot.$1,
         planWeeks: _planDurationWeeks,
         experienceLevel: _bridgeExperience(_experience),
-        currentTimeSec: _currentTimeSec,
+        currentTimeSec: _effectiveCurrentTimeSec,
         paceDistanceKm: _paceDistanceKm,
         runsPerWeek: _runsPerWeek,
         baselineWeeklyKm: _baselineWeeklyKm,

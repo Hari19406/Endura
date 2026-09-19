@@ -1,3 +1,4 @@
+import 'package:run_app/engines/config/workout_template_library.dart' show RaceDistance;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/engines/config/archetype_table.dart';
 import 'package:run_app/models/training_phase.dart';
@@ -101,6 +102,25 @@ void main() {
       expect(six.sessionCount, 6);
       expect(six.qualityCount, 2);
       expect(six.hasLongRun, isTrue);
+    });
+  });
+
+  group('ArchetypeTable.build — 5K long-run cap', () {
+    test('3- and 4-day 5K weeks keep the long run at or under 33%', () {
+      for (final days in const [3, 4]) {
+        for (final km in const [18.0, 25.0, 32.0, 40.0]) {
+          final w = ArchetypeTable.build(
+            weeklyKm: km,
+            days: days,
+            experience: ExperienceLevel.beginner,
+            phase: TrainingPhase.build,
+            race: RaceDistance.fiveK,
+          )!;
+          final lr = w.sessions.firstWhere((s) => s.type.isLong);
+          expect(lr.km / km, lessThanOrEqualTo(0.34),
+              reason: 'days=$days km=$km lr=${lr.km}');
+        }
+      }
     });
   });
 }

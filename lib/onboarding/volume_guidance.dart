@@ -117,6 +117,7 @@ class VolumeGuidance {
         weeklyKm: range.defaultKm,
         days: runs,
         level: level,
+        race: race,
       ),
       isStretch:
           baselineWeeklyKm > 0 && range.defaultKm > baselineWeeklyKm * 1.8,
@@ -158,8 +159,10 @@ class VolumeGuidance {
     required double weeklyKm,
     required int days,
     required ExperienceLevel level,
+    required RaceDistance race,
   }) {
     final week = ArchetypeTable.build(
+      race: race,
       weeklyKm: weeklyKm,
       days: days,
       experience: level,
@@ -202,12 +205,13 @@ class VolumeGuidance {
     required double baselineWeeklyKm,
     required int maxRuns,
   }) {
-    if (baselineWeeklyKm <= 0) return maxRuns.clamp(kMinRunsPerWeek, 4);
+    final ceiling = _recommendedCeiling(goal, experience, maxRuns);
+    if (baselineWeeklyKm <= 0) return ceiling.clamp(kMinRunsPerWeek, 4);
     final target = baselineWeeklyKm * 1.25;
 
     var best = kMinRunsPerWeek;
     var bestGap = double.infinity;
-    for (var d = kMinRunsPerWeek; d <= maxRuns; d++) {
+    for (var d = kMinRunsPerWeek; d <= ceiling; d++) {
       final gap = (rangeFor(goal, experience, d).defaultKm - target).abs();
       if (gap < bestGap) {
         bestGap = gap;
@@ -215,6 +219,18 @@ class VolumeGuidance {
       }
     }
     return best;
+  }
+
+  /// Hard ceiling on the RECOMMENDED badge. Never 7 (or 6 for anyone), and a
+  /// 5K never recommends more than 4 days (5 for advanced) — the slider may
+  /// still allow more, the badge just won't point there.
+  static int _recommendedCeiling(String goal, String experience, int maxRuns) {
+    final distanceCap = goal == '5k' || goal.isEmpty
+        ? (experience == 'advanced' ? 5 : 4)
+        : 5;
+    final capped = distanceCap < maxRuns ? distanceCap : maxRuns;
+    final limit = capped < kMaxRunsPerWeek - 1 ? capped : kMaxRunsPerWeek - 1;
+    return limit < kMinRunsPerWeek ? kMinRunsPerWeek : limit;
   }
 
   static double _min(double a, double b) => a < b ? a : b;

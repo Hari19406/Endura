@@ -4344,11 +4344,25 @@ class _OPageRacePickerState extends State<OPageRacePicker> {
 class OPageWeeklyVolume extends StatelessWidget {
   final String? selectedKey;
   final void Function(String tierKey, double baselineWeeklyKm) onSelect;
+
+  /// Tiers above this baseline are hidden (first-time runners are capped at
+  /// [firstTimerMaxBaselineKm]). Null shows every tier.
+  final double? maxBaselineKm;
+
+  /// Highest weekly-volume tier offered to a first-time runner.
+  static const double firstTimerMaxBaselineKm = 25;
+
   const OPageWeeklyVolume({
     super.key,
     required this.selectedKey,
     required this.onSelect,
+    this.maxBaselineKm,
   });
+
+  List<(String, String, String, double)> get _visibleTiers => [
+    for (final t in tiers)
+      if (maxBaselineKm == null || t.$4 <= maxBaselineKm!) t,
+  ];
 
   // (tierKey, range label, weekly persona, baseline weekly km)
   static const tiers = <(String, String, String, double)>[
@@ -4379,10 +4393,10 @@ class OPageWeeklyVolume extends StatelessWidget {
           Expanded(
             child: ListView.separated(
               padding: EdgeInsets.zero,
-              itemCount: tiers.length,
+              itemCount: _visibleTiers.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
-                final (key, label, persona, km) = tiers[i];
+                final (key, label, persona, km) = _visibleTiers[i];
                 final sel = selectedKey == key;
                 return GestureDetector(
                   onTap: () {
