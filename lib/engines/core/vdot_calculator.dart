@@ -48,9 +48,26 @@ int vdotFromPr({
   required PrConfidence confidence,
 }) {
   if (prTimeSeconds <= 0 || prDistanceKm <= 0) return 40;
+  final raw = vdotRawFromPerformance(
+    timeSeconds: prTimeSeconds.toDouble(),
+    distanceKm: prDistanceKm,
+  );
+  if (raw == null) return 40;
+  final floor = confidence == PrConfidence.low ? 32 : 30;
+  return raw.round().clamp(floor, 85);
+}
 
-  final tMin = prTimeSeconds / 60.0;
-  final vMetersPerMin = (prDistanceKm * 1000) / tMin;
+/// Unrounded, unclamped Daniels VDOT for a performance, or null when the
+/// inputs are degenerate. Continuous, so it can be inverted (see
+/// [secondsForVdot]).
+double? vdotRawFromPerformance({
+  required double timeSeconds,
+  required double distanceKm,
+}) {
+  if (timeSeconds <= 0 || distanceKm <= 0) return null;
+
+  final tMin = timeSeconds / 60.0;
+  final vMetersPerMin = (distanceKm * 1000) / tMin;
 
   final vo2 =
       -4.60 +
@@ -61,11 +78,27 @@ int vdotFromPr({
       0.1894393 * math.exp(-0.012778 * tMin) +
       0.2989558 * math.exp(-0.1932605 * tMin);
 
-  if (pctVo2max <= 0) return 40;
+  if (pctVo2max <= 0) return null;
 
-  final raw = vo2 / pctVo2max;
-  final floor = confidence == PrConfidence.low ? 32 : 30;
-  return raw.round().clamp(floor, 85);
+  return vo2 / pctVo2max;
+}
+
+/// The finish time (seconds) at [distanceKm] that corresponds to [vdot] —
+/// the inverse of [vdotRawFromPerformance], found by bisection (VDOT falls
+/// monotonically as the time grows).
+int secondsForVdot(double vdot, double distanceKm) {
+  var lo = distanceKm * 100; // 1:40 /km — faster than any human
+  var hi = distanceKm * 1800; // 30:00 /km — slower than a walk
+  for (var i = 0; i < 60; i++) {
+    final mid = (lo + hi) / 2;
+    final v = vdotRawFromPerformance(timeSeconds: mid, distanceKm: distanceKm);
+    if (v == null || v > vdot) {
+      lo = mid; // still too fast for this VDOT → needs a longer time
+    } else {
+      hi = mid;
+    }
+  }
+  return ((lo + hi) / 2).round();
 }
 
 // ============================================================================

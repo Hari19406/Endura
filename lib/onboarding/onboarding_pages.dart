@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding_screen.dart' show EC, ET;
 import '../../engines/config/archetype_table.dart';
+import '../../engines/core/vdot_calculator.dart'
+    show secondsForVdot, vdotRawFromPerformance;
 import '../../services/race_service.dart';
 import '../../models/race_listing.dart';
 import '../../utils/unit_utils.dart';
@@ -2777,34 +2779,11 @@ class _RaceProjection {
     'marathon': 42.195,
   };
 
+  /// VDOT points a typical athlete gains over a 12-week block, by experience.
   static const _vdotGainPer12Weeks = {
     'beginner': 3.0,
     'intermediate': 2.0,
     'advanced': 1.0,
-  };
-
-  static const _vdotPaceTable = {
-    30: 440.0,
-    32: 422.0,
-    34: 405.0,
-    36: 390.0,
-    38: 375.0,
-    40: 361.0,
-    42: 348.0,
-    44: 336.0,
-    46: 325.0,
-    48: 314.0,
-    50: 304.0,
-    52: 295.0,
-    54: 286.0,
-    56: 278.0,
-    58: 270.0,
-    60: 263.0,
-    62: 256.0,
-    64: 249.0,
-    66: 243.0,
-    68: 237.0,
-    70: 232.0,
   };
 
   const _RaceProjection({
@@ -2814,60 +2793,55 @@ class _RaceProjection {
     required this.experienceLevel,
   });
 
+  /// Riegel race equivalence.
   double _riegel(double fromSec, double fromKm, double toKm) =>
       fromSec * pow(toKm / fromKm, 1.06);
 
-  double _paceSec(int vdot) {
-    final keys = _vdotPaceTable.keys.toList()..sort();
-    if (vdot <= keys.first) return _vdotPaceTable[keys.first]!;
-    if (vdot >= keys.last) return _vdotPaceTable[keys.last]!;
-    for (int i = 0; i < keys.length - 1; i++) {
-      if (vdot >= keys[i] && vdot <= keys[i + 1]) {
-        final lo = _vdotPaceTable[keys[i]]!;
-        final hi = _vdotPaceTable[keys[i + 1]]!;
-        final t = (vdot - keys[i]) / (keys[i + 1] - keys[i]);
-        return lo + (hi - lo) * t;
-      }
-    }
-    return 361.0;
-  }
+  bool get _hasTime => currentTimeSec > 0 && paceDistanceKm > 0;
 
-  int get _currentVdot {
-    final fiveKEquivSec = _riegel(
-      currentTimeSec.toDouble(),
-      paceDistanceKm,
-      5.0,
-    );
-    final paceSec = fiveKEquivSec / 5.0;
-    final keys = _vdotPaceTable.keys.toList()..sort();
-    for (int i = 0; i < keys.length - 1; i++) {
-      final lo = _vdotPaceTable[keys[i]]!;
-      final hi = _vdotPaceTable[keys[i + 1]]!;
-      if (paceSec <= lo && paceSec >= hi) {
-        final t = (lo - paceSec) / (lo - hi);
-        return (keys[i] + t * (keys[i + 1] - keys[i])).round();
-      }
-    }
-    return paceSec > _vdotPaceTable[keys.first]! ? keys.first : keys.last;
-  }
+  /// VDOT of the time the athlete gave (or the provisional placeholder).
+  double get _startVdot =>
+      (vdotRawFromPerformance(
+                timeSeconds: currentTimeSec.toDouble(),
+                distanceKm: paceDistanceKm,
+              ) ??
+              40)
+          .clamp(30.0, 85.0);
 
-  int get _projectedVdot {
+  /// Where the plan is expected to take that VDOT: the experience-scaled gain
+  /// for a 12-week block, stretched or shortened to the plan's length.
+  double get projectedVdot {
     final gainPer12 = _vdotGainPer12Weeks[experienceLevel] ?? 2.0;
-    final gain = (gainPer12 * planWeeks / 12).round();
-    return (_currentVdot + gain).clamp(30, 85);
+    return (_startVdot + gainPer12 * planWeeks / 12).clamp(30.0, 85.0);
   }
+
+  /// The time at the intake distance after the plan, from the projected VDOT.
+  double get _projectedAtIntakeSec =>
+      secondsForVdot(projectedVdot, paceDistanceKm).toDouble();
 
   int currentSec(String distKey) {
-    final km = _distances[distKey]!;
-    return _riegel(currentTimeSec.toDouble(), paceDistanceKm, km).round();
+    if (!_hasTime) return 0;
+    return _riegel(
+      currentTimeSec.toDouble(),
+      paceDistanceKm,
+      _distances[distKey]!,
+    ).round();
   }
 
+  /// Projected finish at [distKey]: the projected intake-distance time carried
+  /// to that distance with Riegel.
   int projectedSec(String distKey) {
-    final improvementRatio = _paceSec(_projectedVdot) / _paceSec(_currentVdot);
-    return (currentSec(distKey) * improvementRatio).round();
+    if (!_hasTime) return 0;
+    return _riegel(
+      _projectedAtIntakeSec,
+      paceDistanceKm,
+      _distances[distKey]!,
+    ).round();
   }
 
-  int deltaSec(String distKey) => projectedSec(distKey) - currentSec(distKey);
+  /// Negative when the plan is expected to make the athlete faster.
+  int deltaSec(String distKey) =>
+      _hasTime ? projectedSec(distKey) - currentSec(distKey) : 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2881,6 +2855,10 @@ class OPageWelcome extends StatelessWidget {
   final int planWeeks;
   final String experienceLevel;
   final int currentTimeSec;
+
+  /// True when [currentTimeSec] is only the distance's placeholder (the
+  /// athlete never entered a time) — the summary says so.
+  final bool timeIsEstimate;
   final double paceDistanceKm;
   final int runsPerWeek;
   final double baselineWeeklyKm;
@@ -2899,6 +2877,7 @@ class OPageWelcome extends StatelessWidget {
     required this.planWeeks,
     required this.experienceLevel,
     required this.currentTimeSec,
+    this.timeIsEstimate = false,
     required this.paceDistanceKm,
     required this.runsPerWeek,
     required this.baselineWeeklyKm,
@@ -3119,7 +3098,9 @@ class OPageWelcome extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        'from ${_fmt(goalCurrent)} today',
+                        timeIsEstimate
+                            ? 'from ~${_fmt(goalCurrent)} today (estimate)'
+                            : 'from ${_fmt(goalCurrent)} today',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,

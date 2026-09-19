@@ -1393,7 +1393,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         vdot: previewVdot.$1,
         planWeeks: _planDurationWeeks,
         experienceLevel: _bridgeExperience(_experience),
-        currentTimeSec: _effectiveCurrentTimeSec,
+        // The time on the page — the athlete's own, or the distance's
+        // placeholder. Not `_effectiveCurrentTimeSec`, which is 0 for a
+        // placeholder and left the summary at "--:--" and "+0s".
+        currentTimeSec: _currentTimeSec,
+        timeIsEstimate: !_paceTouched,
         paceDistanceKm: _paceDistanceKm,
         runsPerWeek: _runsPerWeek,
         baselineWeeklyKm: _baselineWeeklyKm,
