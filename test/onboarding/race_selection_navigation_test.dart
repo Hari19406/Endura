@@ -121,4 +121,90 @@ void main() {
     expect(find.text('YOUR PLAN AT A GLANCE'), findsOneWidget);
     expect(find.text(_raceGoalTitle), findsNothing);
   });
+
+  // Race-picker route of the tier gating: a 5K runner picks the 0 km tier, goes
+  // back and re-picks a longer distance through Upcoming race. The half
+  // marathon / marathon need a base, so the selection is lifted to the
+  // distance's lowest tier and the 0 km row disappears.
+  for (final (chip, minLabel, note) in const [
+    ('HM', '10–20 km/week', 'at least 15 km/week'),
+    ('FM', '20–35 km/week', 'at least 25 km/week'),
+  ]) {
+    testWidgets('race picker: switching 5K/0 km to $chip lifts the tier', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      // The picker keeps its manual-entry form (name, date) when the athlete
+      // comes back to it, so only fill in what is still missing.
+      Future<void> addRace(String distChip) async {
+        if (find.text("Don't see your race?").evaluate().isNotEmpty) {
+          await tester.tap(find.text("Don't see your race?"));
+          await tester.pump();
+        }
+        if (find.text('Pick a date').evaluate().isNotEmpty) {
+          await tester.enterText(find.byType(TextField), 'Switch Test Race');
+          await tester.pump();
+          await tester.tap(find.text('Pick a date'));
+          await _settle(tester);
+          await tester.tap(find.text('OK'));
+          await _settle(tester);
+        }
+        await tester.tap(find.text(distChip));
+        await tester.pump();
+        await tester.tap(find.text('Use this race'));
+        await _settle(tester);
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(home: OnboardingScreen(onComplete: () {})),
+      );
+      await _settle(tester);
+
+      // 5K race → experience → race goal → weekly volume, pick 0 km.
+      await tester.tap(find.text('Upcoming race'));
+      await _settle(tester);
+      await addRace('5K');
+      await tester.tap(find.text('Regular runner'));
+      await tester.pump();
+      await tester.tap(find.text('Continue'));
+      await _settle(tester);
+      await tester.tap(find.text('Just complete it'));
+      await tester.pump();
+      await tester.tap(find.text('Continue'));
+      await _settle(tester);
+      expect(find.text(_weeklyVolumeTitle), findsOneWidget);
+      expect(find.text('0 km/week'), findsOneWidget);
+      await tester.tap(find.text('0 km/week'));
+      await tester.pump();
+
+      // Back to the race picker (weekly volume → race goal → experience →
+      // race picker), and pick a longer race.
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+        await _settle(tester);
+      }
+      await addRace(chip);
+
+      // Forward again to weekly volume.
+      await tester.tap(find.text('Regular runner'));
+      await tester.pump();
+      await tester.tap(find.text('Continue'));
+      await _settle(tester);
+      await tester.tap(find.text('Just complete it'));
+      await tester.pump();
+      await tester.tap(find.text('Continue'));
+      await _settle(tester);
+
+      expect(find.text(_weeklyVolumeTitle), findsOneWidget);
+      expect(find.text('0 km/week'), findsNothing);
+      expect(find.text(minLabel), findsOneWidget);
+      expect(find.textContaining(note), findsOneWidget);
+      // The old 0 km pick was lifted onto the lowest allowed tier, so exactly
+      // one row shows as selected without the athlete touching anything.
+      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
