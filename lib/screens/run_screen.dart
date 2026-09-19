@@ -36,6 +36,7 @@ import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../utils/run_title.dart';
+import '../utils/plan_access.dart';
 import '../utils/unit_utils.dart';
 
 enum RunMode { warmup, mainSet, cooldown }
@@ -2136,8 +2137,7 @@ class _RunScreenState extends State<RunScreen>
             _buildWelcomeTip('We\'ll track your route'),
             const SizedBox(height: 8),
             _buildWelcomeTip('Pause anytime you need'),
-            if (_targetPaceRange != null &&
-                RevenueCatService.isProNotifier.value) ...[
+            if (_targetPaceRange != null && _guidedWorkoutUnlocked) ...[
               const SizedBox(height: 16),
               Container(height: 1, color: c.divider),
               const SizedBox(height: 16),
@@ -2429,10 +2429,21 @@ class _RunScreenState extends State<RunScreen>
     );
   }
 
+  /// Whether the athlete may start / see the guided workout: subscribers (and
+  /// trials) always; everyone else only for plan weeks 1–2 ([isPlanWeekLocked]).
+  /// With no known plan week (nothing to judge) it falls back to subscription
+  /// status alone, as before.
+  bool get _guidedWorkoutUnlocked {
+    final isPro = RevenueCatService.isProNotifier.value;
+    final week = _sched?.weekNumber ?? _activeCoachMessage?.weekNumber;
+    if (week == null) return isPro;
+    return !isPlanWeekLocked(weekNumber: week, isPro: isPro);
+  }
+
   Future<void> _onWorkoutChosen() async {
     setState(() => _showRunTypeChoice = false);
 
-    if (!RevenueCatService.isProNotifier.value) {
+    if (!_guidedWorkoutUnlocked) {
       if (!mounted) return;
       Navigator.push(
         context,
