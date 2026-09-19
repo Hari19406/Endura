@@ -66,4 +66,40 @@ void main() {
     expect(_wheels(tester), (2, 18, 0));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('switching pills without touching a wheel keeps the VDOT '
+      'provisional; scrolling a wheel makes it real', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onComplete: () {})),
+    );
+    await _settle(tester);
+
+    ({int vdot, bool provisional}) vdot() =>
+        (tester.state(find.byType(OnboardingScreen)) as dynamic).debugVdot
+            as ({int vdot, bool provisional});
+
+    await tester.tap(find.text('Train for your first marathon'));
+    await _settle(tester);
+    await tester.tap(find.text('20–35 km/week'));
+    await tester.pump();
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.text('Continue'));
+      await _settle(tester);
+    }
+    expect(vdot().provisional, isTrue);
+
+    for (final pill in const ['5K', '10K', 'Marathon', 'Half']) {
+      await tester.tap(find.text(pill));
+      await _settle(tester);
+      expect(vdot().provisional, isTrue, reason: 'after switching to $pill');
+      expect(vdot().vdot, inInclusiveRange(32, 35), reason: pill);
+    }
+
+    // Actually scrolling a wheel is a real edit: no longer provisional.
+    await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -88));
+    await _settle(tester);
+    expect(vdot().provisional, isFalse);
+  });
 }

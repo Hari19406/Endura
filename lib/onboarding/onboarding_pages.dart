@@ -4672,7 +4672,7 @@ class OPageRaceGoal extends StatelessWidget {
 // TARGET TIME  (shown only for pr / target_time)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class OPageTargetTime extends StatelessWidget {
+class OPageTargetTime extends StatefulWidget {
   final TargetTimeMode mode;
   final String goal;
   final int? seconds;
@@ -4686,15 +4686,67 @@ class OPageTargetTime extends StatelessWidget {
     required this.onChanged,
   });
 
-  int get _h => (seconds ?? 0) ~/ 3600;
-  int get _m => ((seconds ?? 0) % 3600) ~/ 60;
-  int get _s => (seconds ?? 0) % 60;
+  @override
+  State<OPageTargetTime> createState() => _OPageTargetTimeState();
+}
 
-  void _emit({int? h, int? m, int? s}) =>
-      onChanged((h ?? _h) * 3600 + (m ?? _m) * 60 + (s ?? _s));
+class _OPageTargetTimeState extends State<OPageTargetTime> {
+  // Long-lived wheel controllers (see _OPageBestTimeState): a controller made
+  // in build() only honours initialItem once, so when the value shown here
+  // changes from outside — e.g. the goal flips between "time to beat" and
+  // "target finish" — the wheels would stay on the old time.
+  late final FixedExtentScrollController _hCtrl;
+  late final FixedExtentScrollController _mCtrl;
+  late final FixedExtentScrollController _sCtrl;
+
+  int get _h => (widget.seconds ?? 0) ~/ 3600;
+  int get _m => ((widget.seconds ?? 0) % 3600) ~/ 60;
+  int get _s => (widget.seconds ?? 0) % 60;
+
+  @override
+  void initState() {
+    super.initState();
+    _hCtrl = FixedExtentScrollController(initialItem: _h);
+    _mCtrl = FixedExtentScrollController(initialItem: _m);
+    _sCtrl = FixedExtentScrollController(initialItem: _s);
+  }
+
+  @override
+  void didUpdateWidget(OPageTargetTime old) {
+    super.didUpdateWidget(old);
+    _syncWheel(_hCtrl, _h);
+    _syncWheel(_mCtrl, _m);
+    _syncWheel(_sCtrl, _s);
+  }
+
+  void _syncWheel(FixedExtentScrollController c, int item) {
+    if (!c.hasClients || c.selectedItem == item) return;
+    c.jumpToItem(item);
+  }
+
+  @override
+  void dispose() {
+    _hCtrl.dispose();
+    _mCtrl.dispose();
+    _sCtrl.dispose();
+    super.dispose();
+  }
+
+  /// A wheel we moved ourselves reports the item it landed on, which equals
+  /// the value the parent already holds — that is not an athlete edit.
+  void _emit({int? h, int? m, int? s}) {
+    final nh = h ?? _h, nm = m ?? _m, ns = s ?? _s;
+    if (h != null && h == _h) return;
+    if (m != null && m == _m) return;
+    if (s != null && s == _s) return;
+    widget.onChanged(nh * 3600 + nm * 60 + ns);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final mode = widget.mode;
+    final goal = widget.goal;
+    final seconds = widget.seconds;
     final title = mode == TargetTimeMode.beat
         ? 'What time do you\nwant to beat?'
         : "What's your target\nfinish time?";
@@ -4728,11 +4780,11 @@ class OPageTargetTime extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                Expanded(child: _drum('HH', 8, _h, (v) => _emit(h: v))),
+                Expanded(child: _drum('HH', 8, _hCtrl, (v) => _emit(h: v))),
                 _colon(),
-                Expanded(child: _drum('MM', 60, _m, (v) => _emit(m: v))),
+                Expanded(child: _drum('MM', 60, _mCtrl, (v) => _emit(m: v))),
                 _colon(),
-                Expanded(child: _drum('SS', 60, _s, (v) => _emit(s: v))),
+                Expanded(child: _drum('SS', 60, _sCtrl, (v) => _emit(s: v))),
               ],
             ),
           ),
@@ -4753,7 +4805,12 @@ class OPageTargetTime extends StatelessWidget {
     ),
   );
 
-  Widget _drum(String label, int count, int selected, ValueChanged<int> onSel) {
+  Widget _drum(
+    String label,
+    int count,
+    FixedExtentScrollController controller,
+    ValueChanged<int> onSel,
+  ) {
     return Column(
       children: [
         Text(
@@ -4774,9 +4831,7 @@ class OPageTargetTime extends StatelessWidget {
               border: Border.all(color: EC.border, width: ET.borderWidth),
             ),
             child: CupertinoPicker(
-              scrollController: FixedExtentScrollController(
-                initialItem: selected,
-              ),
+              scrollController: controller,
               itemExtent: 44,
               onSelectedItemChanged: onSel,
               selectionOverlay: Container(

@@ -869,6 +869,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// page is still on the placeholder, so it counts as 0 — in every funnel.
   int get _effectiveCurrentTimeSec => _paceTouched ? _currentTimeSec : 0;
 
+  /// The VDOT the reveal/plan will use right now, and whether it is only a
+  /// placeholder estimate. Exposed so tests can assert the provisional flag.
+  @visibleForTesting
+  ({int vdot, bool provisional}) get debugVdot {
+    final (v, p) = _computeVdot();
+    return (vdot: v, provisional: p);
+  }
+
   (int, bool) _computeVdot() {
     if (widget.shortenedMode && !_vdotProvisional && !_paceTouched) {
       return (_vdot, false);
