@@ -218,8 +218,13 @@ class _AppInitializerState extends State<AppInitializer> {
       // RevenueCat init — only if user is already logged in at startup
       final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
-        await RevenueCatService.init(user.id);
-        debugPrint('[Startup] RevenueCat initialized');
+        try {
+          await RevenueCatService.init(user.id);
+          debugPrint('[Startup] RevenueCat initialized');
+        } catch (e) {
+          // Never block app entry on billing; paywall retries on open.
+          debugPrint('[Startup] WARNING: RevenueCat init failed: $e');
+        }
         // Sync plan state: backfill Supabase for existing users, restore for new devices
         ProfileService.instance.syncPlanState().catchError(
           (e) => debugPrint('[Startup] syncPlanState error: $e'),
@@ -268,7 +273,11 @@ class _AppInitializerState extends State<AppInitializer> {
           event == AuthChangeEvent.initialSession) {
         final user = Supabase.instance.client.auth.currentUser;
         if (user != null) {
-          await RevenueCatService.init(user.id);
+          try {
+            await RevenueCatService.init(user.id);
+          } catch (e) {
+            debugPrint('[Auth] WARNING: RevenueCat init failed: $e');
+          }
           await Analytics.identify(
             user.id,
             properties: {'email': user.email ?? ''},

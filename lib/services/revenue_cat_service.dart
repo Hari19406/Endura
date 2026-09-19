@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
@@ -46,9 +47,17 @@ class RevenueCatService {
     if (kDebugMode) await Purchases.invalidateCustomerInfoCache();
 
     // Seed the cache immediately
-    final info = await Purchases.getCustomerInfo();
-    isProNotifier.value = info.entitlements.active.containsKey('endura_pro');
-    _syncProToProfile(isProNotifier.value);
+    // A billing/network failure here must not block app startup; the
+    // listener below will still update the cache once the SDK recovers.
+    try {
+      final info = await Purchases.getCustomerInfo();
+      isProNotifier.value = info.entitlements.active.containsKey('endura_pro');
+      _syncProToProfile(isProNotifier.value);
+    } on PlatformException catch (e) {
+      debugPrint('[RevenueCat] WARNING: getCustomerInfo failed: $e');
+    } catch (e) {
+      debugPrint('[RevenueCat] WARNING: getCustomerInfo failed: $e');
+    }
 
     // Keep cache live — fires when subscription status changes
     Purchases.addCustomerInfoUpdateListener((info) {

@@ -95,6 +95,7 @@ class _RunScreenState extends State<RunScreen>
   void _notifyTrackingActive() {
     widget.onTrackingActiveChanged?.call(_runState != RunState.ready);
   }
+
   PermissionStatus _permissionStatus = PermissionStatus.checking;
 
   int _seconds = 0;
@@ -424,15 +425,23 @@ class _RunScreenState extends State<RunScreen>
   }
 
   Color get _phaseColor {
+    final c = context.colors;
     switch (_currentPhase) {
       case RunMode.warmup:
-        return const Color(0xFF388E3C);
+        return c.success;
       case RunMode.mainSet:
-        return const Color(0xFF0A0A0A);
+        return c.accent;
       case RunMode.cooldown:
-        return const Color(0xFF1565C0);
+        return c.workoutLong;
     }
   }
+
+  /// Readable text/icon color on top of [_phaseColor] — the phase colors span
+  /// near-black (light theme main set) to near-white (dark theme main set).
+  Color get _onPhaseColor =>
+      ThemeData.estimateBrightnessForColor(_phaseColor) == Brightness.dark
+      ? Colors.white
+      : Colors.black87;
 
   String get _milestoneHint {
     switch (_currentPhase) {
@@ -1154,9 +1163,7 @@ class _RunScreenState extends State<RunScreen>
       if (!mounted || _runState != RunState.running) return;
       if (BleHeartRateService.instance.lastBpm != null) return;
       _healthPollTimer?.cancel();
-      _healthPollTimer = Timer.periodic(const Duration(seconds: 30), (
-        _,
-      ) async {
+      _healthPollTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
         if (BleHeartRateService.instance.lastBpm != null) {
           _healthPollTimer?.cancel();
           return;
@@ -1441,9 +1448,10 @@ class _RunScreenState extends State<RunScreen>
         int? avgHr;
         int? peakHr;
         if (_hrSamplesForAvg.isNotEmpty) {
-          avgHr = (_hrSamplesForAvg.reduce((a, b) => a + b) /
-                  _hrSamplesForAvg.length)
-              .round();
+          avgHr =
+              (_hrSamplesForAvg.reduce((a, b) => a + b) /
+                      _hrSamplesForAvg.length)
+                  .round();
           peakHr = _peakHrSeen;
         } else if (healthHrBackfill.isNotEmpty) {
           final bpms = healthHrBackfill.map((s) => s.bpm).toList();
@@ -1454,9 +1462,10 @@ class _RunScreenState extends State<RunScreen>
         int? avgCadence;
         int? peakCadence;
         if (_cadenceSamplesForAvg.isNotEmpty) {
-          avgCadence = (_cadenceSamplesForAvg.reduce((a, b) => a + b) /
-                  _cadenceSamplesForAvg.length)
-              .round();
+          avgCadence =
+              (_cadenceSamplesForAvg.reduce((a, b) => a + b) /
+                      _cadenceSamplesForAvg.length)
+                  .round();
           peakCadence = _peakCadenceSeen;
         }
         // else leave both null — no phone-accelerometer estimation, by
@@ -1749,6 +1758,7 @@ class _RunScreenState extends State<RunScreen>
   // ── Build methods (ALL UI UNCHANGED from original) ──────────────────────────
 
   Widget _buildCompassIcon() {
+    final c = context.colors;
     return GestureDetector(
       onTap: () {
         if (_currentLocation != null && mounted) {
@@ -1764,8 +1774,9 @@ class _RunScreenState extends State<RunScreen>
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: c.surface,
           shape: BoxShape.circle,
+          border: Border.all(color: c.border),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.12),
@@ -1783,8 +1794,8 @@ class _RunScreenState extends State<RunScreen>
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
                 color: _deviceHeading < 10 || _deviceHeading > 350
-                    ? const Color(0xFFD32F2F)
-                    : const Color(0xFF0A0A0A),
+                    ? c.danger
+                    : c.textPrimary,
                 letterSpacing: -0.3,
               ),
             ),
@@ -1801,6 +1812,8 @@ class _RunScreenState extends State<RunScreen>
         _runState == RunState.ready) {
       return Scaffold(body: _buildPermissionError());
     }
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: Stack(
         children: [
@@ -1819,7 +1832,7 @@ class _RunScreenState extends State<RunScreen>
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: mapTilerStreetsUrlTemplate,
+                      urlTemplate: mapTilerStreetsUrl(isDark: isDark),
                       userAgentPackageName: 'com.example.runtracker',
                       maxZoom: 19,
                       subdomains: const ['a', 'b', 'c'],
@@ -1838,9 +1851,9 @@ class _RunScreenState extends State<RunScreen>
                         Polyline(
                           points: _routePoints,
                           strokeWidth: 4.0,
-                          color: const Color(0xFF000000),
+                          color: c.accent,
                           borderStrokeWidth: 2.0,
-                          borderColor: Colors.white,
+                          borderColor: c.onAccent,
                         ),
                       ],
                     ),
@@ -1855,10 +1868,10 @@ class _RunScreenState extends State<RunScreen>
                               angle: _smoothedBearing * (3.14159265359 / 180.0),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF000000),
+                                  color: c.accent,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: Colors.white,
+                                    color: c.onAccent,
                                     width: 3,
                                   ),
                                   boxShadow: [
@@ -1869,9 +1882,9 @@ class _RunScreenState extends State<RunScreen>
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.navigation,
-                                  color: Colors.white,
+                                  color: c.onAccent,
                                   size: 20,
                                 ),
                               ),
@@ -2197,7 +2210,7 @@ class _RunScreenState extends State<RunScreen>
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFD32F2F)),
+                border: Border.all(color: c.danger),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -2206,18 +2219,18 @@ class _RunScreenState extends State<RunScreen>
                   Container(
                     width: 6,
                     height: 6,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD32F2F),
+                    decoration: BoxDecoration(
+                      color: c.danger,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'GPS LOST',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFD32F2F),
+                      color: c.danger,
                       letterSpacing: 1,
                     ),
                   ),
@@ -2278,7 +2291,7 @@ class _RunScreenState extends State<RunScreen>
                             isWarmupOrCooldown &&
                                 isActive &&
                                 _phaseCountdownSeconds == 0
-                            ? const Color(0xFF388E3C)
+                            ? c.success
                             : c.textPrimary,
                         letterSpacing: -0.3,
                         fontFeatures: const [FontFeature.tabularFigures()],
@@ -2354,8 +2367,7 @@ class _RunScreenState extends State<RunScreen>
             WorkoutStepHud(
               stepIndex: _stepIndex.clamp(0, _sched!.blocks.length - 1),
               blocks: _sched!.blocks,
-              rollingPaceSecPerKm:
-                  _paceSnapshot.smoothedPaceSecondsPerKm > 0
+              rollingPaceSecPerKm: _paceSnapshot.smoothedPaceSecondsPerKm > 0
                   ? _paceSnapshot.smoothedPaceSecondsPerKm.round()
                   : null,
               onNextStep: _advanceStep,
@@ -2379,26 +2391,20 @@ class _RunScreenState extends State<RunScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF388E3C).withOpacity(0.08),
+                color: c.success.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF388E3C).withOpacity(0.25),
-                ),
+                border: Border.all(color: c.success.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.check_circle_outline,
-                    size: 14,
-                    color: Color(0xFF388E3C),
-                  ),
+                  Icon(Icons.check_circle_outline, size: 14, color: c.success),
                   const SizedBox(width: 8),
                   Text(
                     _milestoneHint,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF388E3C),
+                      color: c.success,
                     ),
                   ),
                 ],
@@ -2579,10 +2585,10 @@ class _RunScreenState extends State<RunScreen>
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, 'discard'),
-              child: const Text(
+              child: Text(
                 'Discard',
                 style: TextStyle(
-                  color: Color(0xFFD32F2F),
+                  color: context.colors.danger,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -2760,8 +2766,8 @@ class _RunScreenState extends State<RunScreen>
                   ? ElevatedButton(
                       onPressed: _onFinishTapped,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD32F2F),
-                        foregroundColor: const Color(0xFFFFFFFF),
+                        backgroundColor: context.colors.danger,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -2781,7 +2787,7 @@ class _RunScreenState extends State<RunScreen>
                       onPressed: _tapNext,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _phaseColor,
-                        foregroundColor: const Color(0xFFFFFFFF),
+                        foregroundColor: _onPhaseColor,
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

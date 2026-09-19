@@ -12,3 +12,10 @@ const String mapTilerKey = String.fromEnvironment('MAPTILER_KEY');
 /// Streets raster tile template for `flutter_map`'s `TileLayer.urlTemplate`.
 const String mapTilerStreetsUrlTemplate =
     'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=$mapTilerKey';
+
+/// Theme-aware variant: the dark MapTiler style in dark mode, the standard
+/// streets style otherwise. Pass `Theme.of(context).brightness == dark`.
+String mapTilerStreetsUrl({required bool isDark}) {
+  final tileStyle = isDark ? 'streets-v2-dark' : 'streets-v2';
+  return 'https://api.maptiler.com/maps/$tileStyle/{z}/{x}/{y}.png?key=$mapTilerKey';
+}
