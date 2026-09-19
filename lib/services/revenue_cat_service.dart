@@ -31,10 +31,19 @@ class RevenueCatService {
 
   static Future<void> init(String supabaseUserId) async {
     if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
-    final config = PurchasesConfiguration(
-      Platform.isAndroid ? _androidKey : _iosKey,
-    )..appUserID = supabaseUserId;
+    final apiKey = Platform.isAndroid ? _androidKey : _iosKey;
+    if (kDebugMode) {
+      debugPrint(
+        '[RevenueCat] configure: key length=${apiKey.length}, '
+        'startsWith goog_=${apiKey.startsWith('goog_')}, '
+        'appUserID=$supabaseUserId',
+      );
+    }
+    final config = PurchasesConfiguration(apiKey)..appUserID = supabaseUserId;
     await Purchases.configure(config);
+    // Debug-only: drop any cached CustomerInfo so testing starts from a
+    // fresh network fetch rather than a stale local copy.
+    if (kDebugMode) await Purchases.invalidateCustomerInfoCache();
 
     // Seed the cache immediately
     final info = await Purchases.getCustomerInfo();
@@ -60,7 +69,19 @@ class RevenueCatService {
     try {
       final offerings = await Purchases.getOfferings().timeout(_networkTimeout);
       final current = offerings.current;
-      if (kDebugMode) _logOfferingDiagnostics(current);
+      if (kDebugMode) {
+        debugPrint(
+          '[RevenueCat] getOffering: current="${current?.identifier}", '
+          'packages=${current?.availablePackages.length}',
+        );
+        if (current == null || current.availablePackages.isEmpty) {
+          debugPrint(
+            '[RevenueCat] getOffering: offerings.all keys='
+            '${offerings.all.keys.toList()}',
+          );
+        }
+        _logOfferingDiagnostics(current);
+      }
       return (annual: current?.annual, monthly: current?.monthly);
     } on TimeoutException catch (e) {
       debugPrint(
