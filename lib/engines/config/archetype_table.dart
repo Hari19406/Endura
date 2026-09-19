@@ -225,10 +225,14 @@ class ArchetypeTable {
   /// race — a little softer than each envelope's declared target (5K 25%,
   /// 10K 28%, FM 35%) so the reconciler keeps room on a tight week, but well
   /// below the generic ~0.55 ceiling. HM is capped at 42% (loose, so a 3-day week still can't exceed it).
-  static double? _raceLongRunMaxFrac(RaceDistance race) => switch (race) {
+  static double? _raceLongRunMaxFrac(RaceDistance race, {int days = 5}) =>
+      switch (race) {
         RaceDistance.fiveK => 0.33,
         RaceDistance.tenK => 0.33,
-        RaceDistance.marathon => 0.38,
+        // Marathon: day-count aware. A 3- or 4-day week has too few other runs
+        // to soak up the volume, so the long run must be allowed more of it
+        // (else the reconciler overflows it anyway); 5+ days hold 38%.
+        RaceDistance.marathon => days <= 3 ? 0.48 : (days == 4 ? 0.44 : 0.38),
         // Half marathon: a long run is most of the point, so the cap is looser
         // than 5K/10K, but a 3-day week can't put half its volume on one day.
         RaceDistance.halfMarathon => 0.42,
@@ -282,7 +286,8 @@ class ArchetypeTable {
 
     // A race-specific long-run cap (5K: 33% of the week) spills the excess into
     // the easy runs instead of stacking it on one day.
-    final raceCap = race == null ? null : _raceLongRunMaxFrac(race);
+    final raceCap =
+        race == null ? null : _raceLongRunMaxFrac(race, days: days);
     if (raceCap != null) {
       final cappedKm = _round(raceCap * weeklyKm);
       final excess = longKm - cappedKm;
@@ -498,7 +503,7 @@ class ArchetypeTable {
     final (lrMinFrac, lrMaxFrac) = _lrBounds(phase, raceDistance, n);
     // The 8 km absolute floor must not push a capped race (5K/10K) past its
     // operational fraction on a small week.
-    final raceCap = _raceLongRunMaxFrac(raceDistance);
+    final raceCap = _raceLongRunMaxFrac(raceDistance, days: n);
     final baseLrFloorKm = raceCap == null ? 8.0 : math.min(8.0, raceCap * wk);
 
     // On a very small week the per-type floors (easy 3–5 km, quality 5 km, long
@@ -760,7 +765,7 @@ class ArchetypeTable {
     // Per-race operational long-run cap (5K/10K supporting run; marathon 35%
     // ceiling). The declared target and the absolute km ceiling are applied to
     // the skeleton long-run target in RacePlanBuilder.
-    final raceCap = _raceLongRunMaxFrac(race);
+    final raceCap = _raceLongRunMaxFrac(race, days: n);
     if (raceCap != null) {
       maxFrac = math.min(maxFrac, raceCap);
       minFrac = math.min(minFrac, maxFrac);

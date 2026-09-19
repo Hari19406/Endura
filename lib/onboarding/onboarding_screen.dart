@@ -834,7 +834,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       DateTime.now().month,
       DateTime.now().day,
     );
-    final race = _raceDate ?? today.add(const Duration(days: 84));
+    // First marathon (no race date): the runway itself is the choice — 16, 18
+    // or 20 weeks from today.
+    if (_raceDate == null && _goal == 'marathon') {
+      return [
+        for (final w in const [16, 18, 20])
+          PlanStartOption(startDate: today, weeks: w, isToday: true),
+      ];
+    }
+    final race = _raceDate ?? today.add(Duration(days: _defaultPlanWeeks * 7));
 
     int weeksBetween(DateTime from) =>
         max(4, race.difference(from).inDays ~/ 7);
@@ -880,7 +888,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return (_vdot, _vdotProvisional);
   }
 
-  int get _effectivePlanWeeks => _planWeeks ?? 12;
+  /// Default synthetic build length when there's no race date: a first
+  /// marathon needs 16 weeks, everything else 12.
+  int get _defaultPlanWeeks => _goal == 'marathon' ? 16 : 12;
+
+  int get _effectivePlanWeeks => _planWeeks ?? _defaultPlanWeeks;
 
   /// The macrocycle length handed to the generator + reveal + saved profile.
   /// Race goals derive it from the race date; fitness goals (no `_raceDate`)
@@ -1304,6 +1316,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       OPage.planStart => OPagePlanStart(
         options: _planStartOptions(),
         selectedStart: _planWeeks == null ? null : _startDate,
+        selectedWeeks: _planWeeks,
         runway: _runway,
         goal: _goal ?? '5k',
         raceName: _raceName,

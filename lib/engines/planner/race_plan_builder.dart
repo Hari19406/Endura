@@ -68,6 +68,7 @@ class RacePlanBuilder {
     // A half marathon needs a bigger floor (12 km, or 14 km on 4+ days): a
     // 6 km base can't safely reach a viable long run in one block.
     final isHalf = _raceDistanceFrom(goalRace) == RaceDistance.halfMarathon;
+    final isMarathon = _raceDistanceFrom(goalRace) == RaceDistance.marathon;
     final manyDays = (runsPerWeek ?? 0) >= 4;
     final floored =
         currentWeeklyKm < (isHalf ? _flooredHalfBaselineKm : _flooredBaselineKm);
@@ -90,7 +91,18 @@ class RacePlanBuilder {
       peakVolume = min(peakVolume, _flooredFiveKPeakCapKm);
     }
 
-    final rawIncrement = (peakVolume - startKm) / buildWeeks;
+    // Weeks that actually step the volume up (not cutbacks, not taper). A
+    // marathon's long build spends a real share of its weeks on 3:1 cutbacks,
+    // so spreading the climb over `buildWeeks` leaves the ramp short of peak.
+    var progressWeeks = 0;
+    for (var w = 1; w <= weeksOut; w++) {
+      final ph = _phaseFor(w, weeksOut, taperWeeks);
+      final isCut = ph != TrainingPhase.taper && w % 4 == 0;
+      if (ph != TrainingPhase.taper && !isCut) progressWeeks++;
+    }
+    final rampWeeks = isMarathon ? max(1, progressWeeks) : buildWeeks;
+
+    final rawIncrement = (peakVolume - startKm) / rampWeeks;
     final maxIncrement = startKm * 0.10;
     final safeIncrement = rawIncrement.clamp(-5.0, max(1.5, maxIncrement));
 
@@ -120,10 +132,12 @@ class RacePlanBuilder {
     }
     // The cap may have lowered the peak; keep the start at most 75% of it.
     currentLongRunKm = min(currentLongRunKm, peakLongRunKm * 0.75);
-    final longRunIncrement = (peakLongRunKm - currentLongRunKm) / buildWeeks;
+    final longRunIncrement = (peakLongRunKm - currentLongRunKm) / rampWeeks;
+    // A marathon long run has to climb ~2 km a week to reach 24+ km; the
+    // 10%-of-current cap that suits shorter races crawls at 0.75 km.
     final safeLongRunIncrement = longRunIncrement.clamp(
       -2.0,
-      currentLongRunKm * 0.10,
+      isMarathon ? max(2.0, currentLongRunKm * 0.10) : currentLongRunKm * 0.10,
     );
 
     final weeks = <WeekTarget>[];
@@ -186,10 +200,13 @@ class RacePlanBuilder {
           );
         }
       } else {
-        volume = (volume + safeIncrement).clamp(
-          currentWeeklyKm * 0.5,
-          peakVolume,
-        );
+        // Marathon: step by max(2.5 km, 10% of the current volume), like the
+        // half-marathon floor rule, so a 16-week build from 25 km can reach
+        // the low-to-mid 50s.
+        final step = isMarathon
+            ? rawIncrement.clamp(-5.0, max(2.5, volume * 0.10))
+            : safeIncrement;
+        volume = (volume + step).clamp(currentWeeklyKm * 0.5, peakVolume);
       }
       longRunKm = (longRunKm + safeLongRunIncrement).clamp(
         longRunFloorKm,
@@ -334,11 +351,15 @@ class RacePlanBuilder {
     }
 
     // Max safe weekly gain: ~2km for beginners, ~2.5km intermediate, ~3km advanced.
-    final maxWeeklyGain = switch (experienceLevel) {
-      'advanced' => 3.0,
-      'intermediate' => 2.5,
-      _ => 2.0,
-    };
+    final marathonBoost =
+        _raceDistanceFrom(goalRace) == RaceDistance.marathon ? 0.5 : 0.0;
+    final maxWeeklyGain =
+        marathonBoost +
+        switch (experienceLevel) {
+          'advanced' => 3.0,
+          'intermediate' => 2.5,
+          _ => 2.0,
+        };
 
     // Physiological ceiling per race × experience — single source of truth.
     // When run frequency is known, let it scale the ceiling (5K only for now).

@@ -5042,6 +5042,10 @@ class _GuidanceNote extends StatelessWidget {
 class OPagePlanStart extends StatelessWidget {
   final List<PlanStartOption> options;
   final DateTime? selectedStart;
+
+  /// When set, an option is only selected if its length matches too (needed
+  /// when several options share a start date, e.g. 16/18/20-week marathons).
+  final int? selectedWeeks;
   final ValueChanged<PlanStartOption> onSelect;
   final PlanRunway runway;
   final String goal;
@@ -5055,6 +5059,7 @@ class OPagePlanStart extends StatelessWidget {
     super.key,
     required this.options,
     required this.selectedStart,
+    this.selectedWeeks,
     required this.onSelect,
     required this.runway,
     required this.goal,
@@ -5143,7 +5148,8 @@ class OPagePlanStart extends StatelessWidget {
                 selectedStart != null &&
                 selectedStart!.year == o.startDate.year &&
                 selectedStart!.month == o.startDate.month &&
-                selectedStart!.day == o.startDate.day;
+                selectedStart!.day == o.startDate.day &&
+                (selectedWeeks == null || selectedWeeks == o.weeks);
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: GestureDetector(
