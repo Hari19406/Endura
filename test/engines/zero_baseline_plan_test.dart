@@ -102,4 +102,78 @@ void main() {
       }
     });
   });
+
+  group('half marathon', () {
+    RacePlan hm({
+      required double base,
+      required String level,
+      required int runs,
+    }) => RacePlanBuilder.build(
+      currentWeeklyKm: base,
+      goalRace: 'half_marathon',
+      raceDate: now.add(const Duration(days: 84)),
+      experienceLevel: level,
+      durationWeeks: 12,
+      runsPerWeek: runs,
+      now: now,
+    );
+
+    test('0 km baseline floors week 1 at 12–14 km', () {
+      expect(hm(base: 0, level: 'beginner', runs: 3).weeks.first.targetKm,
+          inInclusiveRange(12.0, 14.0));
+      expect(hm(base: 0, level: 'beginner', runs: 4).weeks.first.targetKm,
+          inInclusiveRange(12.0, 14.0));
+    });
+
+    test('ramps monotonically into peak, then tapers without a spike', () {
+      for (final (base, level, runs) in const [
+        (0.0, 'beginner', 3),
+        (25.0, 'beginner', 4),
+        (45.0, 'intermediate', 4),
+      ]) {
+        final weeks = hm(base: base, level: level, runs: runs).weeks;
+        final build =
+            weeks.where((w) => w.phase != TrainingPhase.taper).toList();
+        final taper =
+            weeks.where((w) => w.phase == TrainingPhase.taper).toList();
+        final maxBuild =
+            build.map((w) => w.targetKm).reduce((a, b) => a > b ? a : b);
+        final maxBuildLr =
+            build.map((w) => w.longRunKm).reduce((a, b) => a > b ? a : b);
+        for (var i = 1; i < build.length; i++) {
+          expect(build[i].targetKm, greaterThanOrEqualTo(build[i - 1].targetKm),
+              reason: '$level base=$base week ${build[i].week}');
+        }
+        expect(taper, isNotEmpty);
+        for (final t in taper) {
+          expect(t.targetKm, lessThanOrEqualTo(maxBuild),
+              reason: '$level base=$base taper week ${t.week} spiked');
+          expect(t.longRunKm, lessThanOrEqualTo(maxBuildLr),
+              reason: '$level base=$base taper long run spiked');
+        }
+      }
+    });
+
+    test('3-day HM long runs never exceed 42% of the week', () {
+      for (final phase in const [
+        TrainingPhase.base,
+        TrainingPhase.build,
+        TrainingPhase.peak,
+      ]) {
+        for (final wk in const [12.0, 16.0, 20.0, 30.0, 40.0, 50.0]) {
+          final w = ArchetypeTable.allocate(
+            effectiveKm: wk,
+            days: 3,
+            qualityCount: 1,
+            experience: ExperienceLevel.intermediate,
+            phase: phase,
+            raceDistance: RaceDistance.halfMarathon,
+          );
+          final lr = w.sessions.firstWhere((s) => s.type.isLong);
+          expect(lr.effectiveKm / wk, lessThanOrEqualTo(0.42 + 0.02),
+              reason: 'phase=$phase wk=$wk lr=${lr.km}');
+        }
+      }
+    });
+  });
 }

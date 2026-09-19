@@ -65,9 +65,14 @@ class RacePlanBuilder {
     // A near-zero base can't seed a plan: week 1 would be ~1.5 km and the long
     // run 0.3 × nothing. Start from a meaningful floor instead (6 km, or 8 km
     // on a 4+ day schedule) and step up from there.
-    final floored = currentWeeklyKm < _flooredBaselineKm;
+    // A half marathon needs a bigger floor (12 km, or 14 km on 4+ days): a
+    // 6 km base can't safely reach a viable long run in one block.
+    final isHalf = _raceDistanceFrom(goalRace) == RaceDistance.halfMarathon;
+    final manyDays = (runsPerWeek ?? 0) >= 4;
+    final floored =
+        currentWeeklyKm < (isHalf ? _flooredHalfBaselineKm : _flooredBaselineKm);
     final startKm = floored
-        ? ((runsPerWeek ?? 0) >= 4 ? 8.0 : 6.0)
+        ? (isHalf ? (manyDays ? 14.0 : 12.0) : (manyDays ? 8.0 : 6.0))
         : currentWeeklyKm;
 
     // Peak volume: physiologically honest — current + safe weekly gain over
@@ -150,15 +155,19 @@ class RacePlanBuilder {
 
       // ── Taper weeks ───────────────────────────────────────────────────
       // Pass peakVolume — WeekResolver._taperMultiplier() handles reduction.
+      // Taper from what the ramp ACTUALLY reached, not the aspirational peak —
+      // otherwise a ramp that stalls short of its ceiling (a floored or
+      // slow-growing base) is followed by a taper week bigger than any build
+      // week. WeekResolver scales these down by its taper multipliers.
       if (phase == TrainingPhase.taper) {
         weeks.add(
           _buildWeek(
             week: w,
-            targetKm: peakVolume,
+            targetKm: min(volume, peakVolume),
             phase: phase,
             goalRace: goalRace,
             experienceLevel: experienceLevel,
-            longRunKm: peakLongRunKm,
+            longRunKm: min(longRunKm, peakLongRunKm),
             isDeload: false,
           ),
         );
@@ -170,7 +179,7 @@ class RacePlanBuilder {
         // Week 1 is the floor itself; afterwards step by max(1.5 km, 10% of the
         // current volume) so the ramp never stalls at a tiny base.
         if (w > 1) {
-          final stepCap = max(1.5, volume * 0.10);
+          final stepCap = max(isHalf ? 2.5 : 1.5, volume * 0.10);
           volume = (volume + rawIncrement.clamp(-5.0, stepCap)).clamp(
             startKm,
             peakVolume,
@@ -217,6 +226,7 @@ class RacePlanBuilder {
 
   /// Below this current weekly volume the plan seeds from a fixed floor.
   static const double _flooredBaselineKm = 6.0;
+  static const double _flooredHalfBaselineKm = 12.0;
   static const double _flooredLongRunKm = 2.5;
   static const double _flooredFiveKPeakCapKm = 24.0;
 

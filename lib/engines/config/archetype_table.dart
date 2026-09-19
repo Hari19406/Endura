@@ -224,11 +224,14 @@ class ArchetypeTable {
   /// Operational upper bound on the long run as a fraction of the week, per
   /// race — a little softer than each envelope's declared target (5K 25%,
   /// 10K 28%, FM 35%) so the reconciler keeps room on a tight week, but well
-  /// below the generic ~0.55 ceiling. HM keeps the generic fractional bound.
+  /// below the generic ~0.55 ceiling. HM is capped at 42% (loose, so a 3-day week still can't exceed it).
   static double? _raceLongRunMaxFrac(RaceDistance race) => switch (race) {
         RaceDistance.fiveK => 0.33,
         RaceDistance.tenK => 0.33,
         RaceDistance.marathon => 0.38,
+        // Half marathon: a long run is most of the point, so the cap is looser
+        // than 5K/10K, but a 3-day week can't put half its volume on one day.
+        RaceDistance.halfMarathon => 0.42,
         _ => null,
       };
 
@@ -507,9 +510,9 @@ class ArchetypeTable {
         _Floors.forType(ArchetypeSessionType.tempo) * qCount +
         (hasMediumLong ? _Floors.forType(ArchetypeSessionType.mediumLong) : 0) +
         baseLrFloorKm;
-    // Only a genuinely tiny week (under ~3 km a day) is scaled; an ordinary
+    // Only a genuinely tiny week (under ~4.5 km a day) is scaled; an ordinary
     // floor-tight week keeps its floors and overshoots slightly, as before.
-    final floorScale = floorSum > wk && wk < 3.0 * n ? wk / floorSum : 1.0;
+    final floorScale = floorSum > wk && wk < 4.5 * n ? wk / floorSum : 1.0;
     double scaled(double floor) =>
         floorScale >= 1.0
             ? floor
@@ -547,7 +550,10 @@ class ArchetypeTable {
     // A single easy day carries at most ~20% of the week, and never more than
     // 20 km absolute — long enough for a genuine mid-week aerobic run at high
     // mileage, short enough that it never rivals the long run.
-    final easyMax = (0.20 * wk).clamp(8.0, 20.0);
+    // A 3-day week has only one easy day to soak up the volume the long run
+    // can't take, so it may carry more (otherwise the long run balloons past
+    // its race cap to make the week add up).
+    final easyMax = ((n == 3 ? 0.34 : 0.20) * wk).clamp(8.0, 20.0);
 
     final mut = <_MutSession>[];
     for (var i = 0; i < easyTypes.length; i++) {
