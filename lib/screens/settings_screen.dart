@@ -17,6 +17,9 @@ import '../services/ble_heart_rate_service.dart';
 import '../services/ble_cadence_service.dart';
 import '../services/health_bridge_service.dart';
 import 'device_pairing_screen.dart';
+import 'paywall_screen.dart';
+import '../services/revenue_cat_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -316,6 +319,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // SUBSCRIPTION
+                    _buildSectionHeader('SUBSCRIPTION'),
+                    const SizedBox(height: 12),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: RevenueCatService.isProNotifier,
+                      builder: (context, isPro, _) => _buildProCard(isPro),
+                    ),
+                    const SizedBox(height: 24),
+
                     // APPEARANCE
                     _buildSectionHeader('APPEARANCE'),
                     const SizedBox(height: 12),
@@ -466,6 +478,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
         fontWeight: FontWeight.w600,
         color: context.colors.textTertiary,
         letterSpacing: 1.2,
+      ),
+    );
+  }
+
+  Widget _buildProCard(bool isPro) {
+    final c = context.colors;
+    final gold = c.premiumGold;
+    return Container(
+      decoration: BoxDecoration(
+        color: gold.withValues(alpha: 0.10),
+        border: Border.all(color: gold.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (isPro) {
+            launchUrl(
+              Uri.parse('https://play.google.com/store/account/subscriptions'),
+              mode: LaunchMode.externalApplication,
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PaywallScreen()),
+            );
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Icon(isPro ? Icons.verified : Icons.workspace_premium,
+                  size: 24, color: gold),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isPro ? 'Endura Pro Active' : 'Upgrade to Endura Pro',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: c.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isPro
+                          ? 'Manage subscription'
+                          : 'Unlock your full training plan',
+                      style: TextStyle(fontSize: 12, color: c.textTertiary),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 20, color: gold),
+            ],
+          ),
+        ),
       ),
     );
   }
