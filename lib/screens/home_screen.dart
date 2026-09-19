@@ -46,6 +46,7 @@ import '../services/analytics_service.dart';
 import '../services/revenue_cat_service.dart';
 import '../services/weather_service.dart';
 import '../utils/plan_calendar.dart';
+import '../utils/plan_access.dart';
 import '../utils/unit_utils.dart';
 
 // Import the shortened onboarding for post-plan re-onboarding.
@@ -1679,23 +1680,21 @@ class _HomeScreenState extends State<HomeScreen>
                 ValueListenableBuilder<bool>(
                   valueListenable: RevenueCatService.isProNotifier,
                   builder: (context, isPro, _) {
-                    // Same lock rule as the day-dots (_onThisWeekDayTap /
-                    // PlanOverviewScreen): only a week *beyond* the current one
-                    // is paywalled, never the current week. This card always
-                    // shows today's workout, so workoutWeekNumber is always
-                    // currentWeekNumber in practice — this stays effectively
-                    // always-unlocked-by-week, same "defensive, not exercised
-                    // today" shape as the day-dot check, kept explicit so both
-                    // gates read the same and don't drift apart again.
+                    // Same lock rule as the day-dots and PlanOverviewScreen
+                    // (isPlanWeekLocked): weeks 1–2 are free, week 3+ needs
+                    // premium. Rest days are never locked — nothing to gate.
                     final currentWeekNumber = _engineMemory?.racePlan
                         ?.currentWeekNumber(DateTime.now());
                     final workoutWeekNumber =
                         _thisWeekMaterialized?.weekNumber ?? currentWeekNumber;
                     final isWorkoutLocked =
-                        !isPro &&
-                        currentWeekNumber != null &&
                         workoutWeekNumber != null &&
-                        workoutWeekNumber > currentWeekNumber;
+                        isPlanWeekLocked(
+                          weekNumber: workoutWeekNumber,
+                          isPro: isPro,
+                        ) &&
+                        (_workoutModel != null &&
+                            _workoutModel!.category != WorkoutCategory.rest);
 
                     return WorkoutCard(
                       workout:
@@ -2051,26 +2050,19 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// This strip only ever shows the current week, which — same rule as
-  /// PlanOverviewScreen's week lock — is never locked, so the lock check
-  /// here is defensive rather than one that fires in practice today: the
-  /// paywall only shows for a *future* week beyond the current one, never
-  /// for anything in the active week or during an active trial (RevenueCat's
-  /// entitlement covers the trial too, so `isProNotifier` is already true
-  /// for it).
+  /// Same week lock as PlanOverviewScreen ([isPlanWeekLocked]): weeks 1–2 are
+  /// free, week 3+ opens the unlock sheet unless the athlete is premium
+  /// (RevenueCat's entitlement covers the trial too).
   void _handleThisWeekDayTap(
     MaterializedWeek week,
     MaterializedDay day,
     DateTime dayDate,
   ) {
     HapticFeedback.lightImpact();
-    final currentWeekNumber = _engineMemory?.racePlan?.currentWeekNumber(
-      DateTime.now(),
+    final isLocked = isPlanWeekLocked(
+      weekNumber: week.weekNumber,
+      isPro: RevenueCatService.isProNotifier.value,
     );
-    final isLocked =
-        !RevenueCatService.isProNotifier.value &&
-        currentWeekNumber != null &&
-        week.weekNumber > currentWeekNumber;
 
     if (isLocked) {
       UnlockTrainingBottomSheet.show(context);

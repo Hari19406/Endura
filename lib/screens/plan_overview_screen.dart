@@ -19,6 +19,7 @@ import '../services/analytics_service.dart' show Analytics;
 import '../services/plan_restart_service.dart';
 import '../services/workout_compliance_coordinator.dart';
 import '../services/workout_compliance_matcher.dart';
+import '../utils/plan_access.dart';
 import '../utils/plan_calendar.dart';
 import '../utils/unit_utils.dart';
 import '../utils/workout_type_style.dart';
@@ -321,7 +322,10 @@ class _PlanOverviewScreenState extends State<PlanOverviewScreen> {
                 itemBuilder: (context, index) {
                   final week = racePlan.weeks[index];
                   final isCurrent = week.week == currentWeekNumber;
-                  final isLocked = !isPro && week.week > currentWeekNumber;
+                  final isLocked = isPlanWeekLocked(
+                    weekNumber: week.week,
+                    isPro: isPro,
+                  );
                   final weekMonday = _mondayOf(week.week);
                   final resolution = _resolutionForWeek(week);
                   // The whole plan is materialized upfront, so real day data
