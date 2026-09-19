@@ -165,9 +165,9 @@ class AppColors extends ThemeExtension<AppColors> {
     hrAccent: Color(0xFFD6255F),
     scrim: Color(0x99000000),
     workoutEasy: Color(0xFF00E676),
-    workoutTempo: Color(0xFF8C52FF), // Hyper Violet
+    workoutTempo: Color(0xFFFFB300), // Warm Gold / Amber
     workoutInterval: Color(0xFFFF007F), // Hot Magenta
-    workoutLong: Color(0xFF2979FF), // Cobalt Blue
+    workoutLong: Color(0xFF00B0FF), // Electric Sky Blue
     workoutRest: Color(0xFFF4F4F6),
   );
 
@@ -201,9 +201,9 @@ class AppColors extends ThemeExtension<AppColors> {
     hrAccent: Color(0xFFFF3366),
     scrim: Color(0x99000000),
     workoutEasy: Color(0xFF00E676),
-    workoutTempo: Color(0xFF8C52FF), // Hyper Violet
+    workoutTempo: Color(0xFFFFB300), // Warm Gold / Amber
     workoutInterval: Color(0xFFFF007F), // Hot Magenta
-    workoutLong: Color(0xFF2979FF), // Cobalt Blue
+    workoutLong: Color(0xFF00B0FF), // Electric Sky Blue
     workoutRest: Color(0xFFF4F4F6),
   );
 

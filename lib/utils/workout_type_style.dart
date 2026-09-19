@@ -91,13 +91,13 @@ class WorkoutTypeStyle {
   static Color exportColor(String type) {
     switch (type.toLowerCase()) {
       case 'easy':
-        return const Color(0xFF4CAF50);
+        return const Color(0xFF00E676);
       case 'tempo':
-        return const Color(0xFFF57C00);
+        return const Color(0xFFFFB300);
       case 'interval':
-        return const Color(0xFFD32F2F);
+        return const Color(0xFFFF007F);
       case 'long':
-        return const Color(0xFF1976D2);
+        return const Color(0xFF00B0FF);
       case 'recovery':
         return const Color(0xFF7B1FA2);
       case 'free':
