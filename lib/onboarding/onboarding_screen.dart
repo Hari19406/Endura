@@ -181,14 +181,40 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// then the distance's placeholder time is not evidence of fitness.
   bool _paceTouched = false;
 
-  /// While the time is untouched, keep the placeholder in step with the
-  /// distance so a 10K/half/marathon never shows a 5K-sized time.
-  void _syncPaceDefaults() {
-    if (_paceTouched) return;
-    final t = defaultRaceTimeFor(_paceDistance);
-    _paceHours = t.hours;
-    _paceMinutes = t.minutes;
-    _paceSeconds = t.seconds;
+  /// Times the athlete really entered (or that came from a real stored
+  /// result), per pace-distance key. A race time only means something at the
+  /// distance it was run, so it is never carried across a distance change.
+  final Map<String, ({int h, int m, int s})> _enteredTimes = {};
+
+  /// Points the current-time page at [distanceKey]: the athlete's own time for
+  /// that distance if they gave one, otherwise the distance's placeholder
+  /// (provisional). Without this, a time typed or restored for one distance
+  /// (say a 43:00 10K) stayed on screen after switching to Marathon.
+  void _setPaceDistance(String distanceKey) {
+    _paceDistance = distanceKey;
+    final entered = _enteredTimes[distanceKey];
+    if (entered != null) {
+      _paceHours = entered.h;
+      _paceMinutes = entered.m;
+      _paceSeconds = entered.s;
+      _paceTouched = true;
+    } else {
+      final t = defaultRaceTimeFor(distanceKey);
+      _paceHours = t.hours;
+      _paceMinutes = t.minutes;
+      _paceSeconds = t.seconds;
+      _paceTouched = false;
+    }
+  }
+
+  /// Records a wheel edit as a real time for the current distance.
+  void _paceEdited() {
+    _paceTouched = true;
+    _enteredTimes[_paceDistance] = (
+      h: _paceHours,
+      m: _paceMinutes,
+      s: _paceSeconds,
+    );
   }
 
   // Plan start
@@ -276,16 +302,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
       final paceMin = prefs.getInt('pace_minutes');
       final paceSec = prefs.getInt('pace_seconds') ?? 0;
-      if (paceMin != null) {
-        _paceHours = prefs.getInt('pace_hours') ?? 0;
-        _paceMinutes = paceMin;
-        _paceSeconds = paceSec;
-        _paceDistance = prefs.getString('pace_distance') ?? '5k';
-      }
       _vdot = memory.vdotScore;
       _vdotProvisional = memory.vdotIsProvisional;
-      // A stored time only counts as evidence if it produced a real VDOT.
-      _paceTouched = paceMin != null && !memory.vdotIsProvisional;
+      // A stored time only counts as evidence if it produced a real VDOT; a
+      // stored placeholder is not restored (the distance default replaces it).
+      if (paceMin != null && !memory.vdotIsProvisional) {
+        final dist = prefs.getString('pace_distance') ?? '5k';
+        _enteredTimes[dist] = (
+          h: prefs.getInt('pace_hours') ?? 0,
+          m: paceMin,
+          s: paceSec,
+        );
+        _setPaceDistance(dist);
+      }
 
       final storedDays = await TrainingDaysService.load();
       if (storedDays != null && storedDays.isNotEmpty) {
@@ -566,8 +595,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _raceName = null;
       _raceCity = null;
       _raceDate = null;
-      _paceDistance = _paceDistFor(distanceKey);
-      _syncPaceDefaults();
+      _setPaceDistance(_paceDistFor(distanceKey));
       _clampBaselineToGoal();
     });
     Analytics.onboardingStepViewed('goal_first_timer_$distanceKey', _current);
@@ -1217,8 +1245,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _raceDate = date;
             _goal = distanceKey ?? _goal;
             _clampBaselineToGoal();
-            _paceDistance = _paceDistFor(_goal);
-            _syncPaceDefaults();
+            _setPaceDistance(_paceDistFor(_goal));
           });
         },
         onClose: _closeRacePicker,
@@ -1303,21 +1330,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         hours: _paceHours,
         minutes: _paceMinutes,
         seconds: _paceSeconds,
-        onDistChanged: (v) => setState(() {
-          _paceDistance = v;
-          _syncPaceDefaults();
-        }),
+        onDistChanged: (v) => setState(() => _setPaceDistance(v)),
         onHoursChanged: (v) => setState(() {
-          _paceTouched = true;
           _paceHours = v;
+          _paceEdited();
         }),
         onMinsChanged: (v) => setState(() {
-          _paceTouched = true;
           _paceMinutes = v;
+          _paceEdited();
         }),
         onSecsChanged: (v) => setState(() {
-          _paceTouched = true;
           _paceSeconds = v;
+          _paceEdited();
         }),
       ),
 

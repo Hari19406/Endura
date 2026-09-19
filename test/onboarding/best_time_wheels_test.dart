@@ -102,4 +102,69 @@ void main() {
     await _settle(tester);
     expect(vdot().provisional, isFalse);
   });
+
+  testWidgets('a time entered for one distance is never carried to another; '
+      'each pill shows its own default or the athlete own time', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onComplete: () {})),
+    );
+    await _settle(tester);
+    ({int vdot, bool provisional}) vdot() =>
+        (tester.state(find.byType(OnboardingScreen)) as dynamic).debugVdot
+            as ({int vdot, bool provisional});
+    int seconds() {
+      final (h, m, s) = _wheels(tester);
+      return h * 3600 + m * 60 + s;
+    }
+
+    await tester.tap(find.text('Train for your first marathon'));
+    await _settle(tester);
+    await tester.tap(find.text('20–35 km/week'));
+    await tester.pump();
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.text('Continue'));
+      await _settle(tester);
+    }
+
+    // Initial render: Marathon = 17100 s exactly (04h 45m 00s), not 43 min.
+    expect(seconds(), 17100);
+    expect(find.textContaining('04h 45m 00s', findRichText: true),
+        findsOneWidget);
+
+    // Enter a real 10K time.
+    await tester.tap(find.text('10K'));
+    await _settle(tester);
+    expect(seconds(), 3720);
+    await tester.drag(find.byType(CupertinoPicker).at(1), const Offset(0, -88));
+    await _settle(tester);
+    final typed = seconds();
+    expect(typed, isNot(3720));
+    expect(vdot().provisional, isFalse);
+
+    // Switching to Marathon must NOT keep the 10K time.
+    await tester.tap(find.text('Marathon'));
+    await _settle(tester);
+    expect(seconds(), 17100);
+    expect(find.textContaining('04h 45m 00s', findRichText: true),
+        findsOneWidget);
+    expect(vdot().provisional, isTrue);
+
+    // Half and 5K show their exact defaults too.
+    await tester.tap(find.text('Half'));
+    await _settle(tester);
+    expect(seconds(), 8280);
+    await tester.tap(find.text('5K'));
+    await _settle(tester);
+    expect(seconds(), 1800);
+
+    // Back to 10K: the athlete's own time is still theirs.
+    await tester.tap(find.text('10K'));
+    await _settle(tester);
+    expect(seconds(), typed);
+    expect(vdot().provisional, isFalse);
+  });
 }
