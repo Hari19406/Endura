@@ -674,7 +674,7 @@ class OPageExperience extends StatelessWidget {
 // PAGE 4 — BEST TIME
 // ─────────────────────────────────────────────────────────────────────────────
 
-class OPageBestTime extends StatelessWidget {
+class OPageBestTime extends StatefulWidget {
   final String distance;
   final int hours, minutes, seconds;
   final ValueChanged<String> onDistChanged;
@@ -694,7 +694,60 @@ class OPageBestTime extends StatelessWidget {
     required this.onSecsChanged,
   });
 
-  String get _distLabel => switch (distance) {
+  @override
+  State<OPageBestTime> createState() => _OPageBestTimeState();
+}
+
+class _OPageBestTimeState extends State<OPageBestTime> {
+  // The wheels are driven by controllers that live as long as the page. A
+  // controller re-created in build() only honours `initialItem` the first time,
+  // so a later change to the values (a new distance's default time) never
+  // reached the drums — the label moved but the wheels stayed put.
+  late final FixedExtentScrollController _hoursCtrl;
+  late final FixedExtentScrollController _minsCtrl;
+  late final FixedExtentScrollController _secsCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _hoursCtrl = FixedExtentScrollController(initialItem: widget.hours);
+    _minsCtrl = FixedExtentScrollController(initialItem: widget.minutes);
+    _secsCtrl = FixedExtentScrollController(initialItem: widget.seconds);
+  }
+
+  @override
+  void didUpdateWidget(OPageBestTime old) {
+    super.didUpdateWidget(old);
+    _syncWheel(_hoursCtrl, widget.hours);
+    _syncWheel(_minsCtrl, widget.minutes);
+    _syncWheel(_secsCtrl, widget.seconds);
+  }
+
+  /// Moves a wheel to [item] when the value changed from outside (not from the
+  /// athlete scrolling it, which already leaves the wheel on [item]).
+  void _syncWheel(FixedExtentScrollController c, int item) {
+    if (!c.hasClients || c.selectedItem == item) return;
+    c.jumpToItem(item);
+  }
+
+  /// A wheel we moved ourselves (see [_syncWheel]) reports the item it landed
+  /// on, which equals the value already held by the parent. That is not an
+  /// athlete edit and must not reach the parent, or the untouched-placeholder
+  /// time would look like a real one.
+  void _onWheel(int item, int current, ValueChanged<int> onChanged) {
+    if (item == current) return;
+    onChanged(item);
+  }
+
+  @override
+  void dispose() {
+    _hoursCtrl.dispose();
+    _minsCtrl.dispose();
+    _secsCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _distLabel => switch (widget.distance) {
     '10k' => '10K',
     'half' => 'Half Marathon',
     'marathon' => 'Marathon',
@@ -729,11 +782,11 @@ class OPageBestTime extends StatelessWidget {
                   'marathon' => 'Marathon',
                   _ => '5K',
                 };
-                final sel = distance == d;
+                final sel = widget.distance == d;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
-                    onTap: () => onDistChanged(d),
+                    onTap: () => widget.onDistChanged(d),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
                       padding: const EdgeInsets.symmetric(
@@ -782,7 +835,7 @@ class OPageBestTime extends StatelessWidget {
                   ),
                   const TextSpan(text: ' in '),
                   TextSpan(
-                    text: '${_pad(hours)}h ${_pad(minutes)}m ${_pad(seconds)}s',
+                    text: '${_pad(widget.hours)}h ${_pad(widget.minutes)}m ${_pad(widget.seconds)}s',
                     style: const TextStyle(
                       color: EC.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -801,8 +854,9 @@ class OPageBestTime extends StatelessWidget {
                   child: _drum(
                     label: 'HH',
                     count: 6,
-                    selected: hours,
-                    onChanged: onHoursChanged,
+                    selected: widget.hours,
+                    controller: _hoursCtrl,
+                    onChanged: (v) => _onWheel(v, widget.hours, widget.onHoursChanged),
                   ),
                 ),
                 _colon(),
@@ -810,8 +864,9 @@ class OPageBestTime extends StatelessWidget {
                   child: _drum(
                     label: 'MM',
                     count: 60,
-                    selected: minutes,
-                    onChanged: onMinsChanged,
+                    selected: widget.minutes,
+                    controller: _minsCtrl,
+                    onChanged: (v) => _onWheel(v, widget.minutes, widget.onMinsChanged),
                   ),
                 ),
                 _colon(),
@@ -819,8 +874,9 @@ class OPageBestTime extends StatelessWidget {
                   child: _drum(
                     label: 'SS',
                     count: 60,
-                    selected: seconds,
-                    onChanged: onSecsChanged,
+                    selected: widget.seconds,
+                    controller: _secsCtrl,
+                    onChanged: (v) => _onWheel(v, widget.seconds, widget.onSecsChanged),
                   ),
                 ),
               ],
@@ -847,6 +903,7 @@ class OPageBestTime extends StatelessWidget {
     required String label,
     required int count,
     required int selected,
+    required FixedExtentScrollController controller,
     required ValueChanged<int> onChanged,
   }) {
     return Column(
@@ -869,9 +926,7 @@ class OPageBestTime extends StatelessWidget {
               border: Border.all(color: EC.border, width: ET.borderWidth),
             ),
             child: CupertinoPicker(
-              scrollController: FixedExtentScrollController(
-                initialItem: selected,
-              ),
+              scrollController: controller,
               itemExtent: 44,
               onSelectedItemChanged: onChanged,
               selectionOverlay: Container(
