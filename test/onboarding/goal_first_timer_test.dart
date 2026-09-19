@@ -9,12 +9,14 @@ import 'package:run_app/onboarding/onboarding_screen.dart';
 
 Widget _host({
   String? selected,
+  bool isFirstTimer = false,
   VoidCallback? onOpenRaceFunnel,
   void Function(String)? onSelectFirstTimer,
 }) => MaterialApp(
   home: Scaffold(
     body: OPageGoal(
       selected: selected,
+      isFirstTimer: isFirstTimer,
       onOpenRaceFunnel: onOpenRaceFunnel ?? () {},
       onSelectFirstTimer: onSelectFirstTimer ?? (_) {},
     ),
@@ -50,9 +52,52 @@ void main() {
   testWidgets('a first-time row renders selected when its distance is the goal', (
     tester,
   ) async {
-    await tester.pumpWidget(_host(selected: 'half_marathon'));
+    await tester.pumpWidget(
+      _host(selected: 'half_marathon', isFirstTimer: true),
+    );
     // The "first half" row shows a check mark once its distance is the goal.
     expect(find.byIcon(Icons.check), findsWidgets);
+  });
+
+  testWidgets('a first-timer pick leaves "Upcoming race" unselected', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_host(selected: '5k', isFirstTimer: true));
+
+    // Exactly one row (the first-5K one) is selected.
+    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Train for your first 5K'),
+          matching: find.byType(Container),
+        ).first,
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a race-funnel distance selects only "Upcoming race"', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_host(selected: '5k'));
+
+    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Upcoming race'),
+          matching: find.byType(Container),
+        ).first,
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('OnboardingScreen: picking "first 5K" skips the race picker, '

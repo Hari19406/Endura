@@ -244,6 +244,10 @@ class OPageGoal extends StatelessWidget {
   /// Non-null once a race (or its distance) has been chosen in the funnel.
   final String? selected;
 
+  /// True when the chosen goal is a "Train for your first …" option. Keeps the
+  /// "Upcoming race" row unselected, since both share the same distance key.
+  final bool isFirstTimer;
+
   /// Called when the user taps the (only live) "Upcoming race" row.
   final VoidCallback onOpenRaceFunnel;
 
@@ -256,6 +260,7 @@ class OPageGoal extends StatelessWidget {
   const OPageGoal({
     super.key,
     required this.selected,
+    this.isFirstTimer = false,
     required this.onOpenRaceFunnel,
     required this.onSelectFirstTimer,
   });
@@ -414,7 +419,7 @@ class OPageGoal extends StatelessWidget {
     leading: _iconBox(iconBg, icon, iconFg),
     label: label,
     sub: sub,
-    selected: selected == distanceKey,
+    selected: isFirstTimer && selected == distanceKey,
     onTap: () => onSelectFirstTimer(distanceKey),
   );
 
@@ -432,7 +437,7 @@ class OPageGoal extends StatelessWidget {
     ),
     label: 'Upcoming race',
     sub: 'Train toward a race day with a structured build. Pick your distance.',
-    selected: _raceDistanceKeys.contains(selected),
+    selected: !isFirstTimer && _raceDistanceKeys.contains(selected),
     onTap: onOpenRaceFunnel,
   );
 }

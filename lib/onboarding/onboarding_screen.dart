@@ -1133,6 +1133,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return switch (page) {
       OPage.goal => OPageGoal(
         selected: _goal,
+        isFirstTimer: _isFirstTimeRunner,
         onOpenRaceFunnel: () {
           // Re-entering the race funnel abandons a prior first-timer pick.
           if (_isFirstTimeRunner) setState(() => _isFirstTimeRunner = false);
