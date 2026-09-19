@@ -236,7 +236,6 @@ class ArchetypeTable {
         // Half marathon: a long run is most of the point, so the cap is looser
         // than 5K/10K, but a 3-day week can't put half its volume on one day.
         RaceDistance.halfMarathon => 0.42,
-        _ => null,
       };
 
   /// Build a week's session list.

@@ -847,115 +847,33 @@ class _OPageBestTimeState extends State<OPageBestTime> {
             ),
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _drum(
-                    label: 'HH',
-                    count: 6,
-                    selected: widget.hours,
-                    controller: _hoursCtrl,
-                    onChanged: (v) => _onWheel(v, widget.hours, widget.onHoursChanged),
-                  ),
-                ),
-                _colon(),
-                Expanded(
-                  child: _drum(
-                    label: 'MM',
-                    count: 60,
-                    selected: widget.minutes,
-                    controller: _minsCtrl,
-                    onChanged: (v) => _onWheel(v, widget.minutes, widget.onMinsChanged),
-                  ),
-                ),
-                _colon(),
-                Expanded(
-                  child: _drum(
-                    label: 'SS',
-                    count: 60,
-                    selected: widget.seconds,
-                    controller: _secsCtrl,
-                    onChanged: (v) => _onWheel(v, widget.seconds, widget.onSecsChanged),
-                  ),
-                ),
-              ],
-            ),
+          _WheelCard(
+            columns: [
+              _WheelColumn(
+                label: 'HH',
+                count: 6,
+                controller: _hoursCtrl,
+                onChanged: (v) =>
+                    _onWheel(v, widget.hours, widget.onHoursChanged),
+              ),
+              _WheelColumn(
+                label: 'MM',
+                count: 60,
+                controller: _minsCtrl,
+                onChanged: (v) =>
+                    _onWheel(v, widget.minutes, widget.onMinsChanged),
+              ),
+              _WheelColumn(
+                label: 'SS',
+                count: 60,
+                controller: _secsCtrl,
+                onChanged: (v) =>
+                    _onWheel(v, widget.seconds, widget.onSecsChanged),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _colon() => const Padding(
-    padding: EdgeInsets.only(bottom: 24),
-    child: Text(
-      ':',
-      style: TextStyle(
-        fontSize: 28,
-        fontWeight: FontWeight.w300,
-        color: EC.muted,
-      ),
-    ),
-  );
-
-  Widget _drum({
-    required String label,
-    required int count,
-    required int selected,
-    required FixedExtentScrollController controller,
-    required ValueChanged<int> onChanged,
-  }) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: EC.muted,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: EC.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: EC.border, width: ET.borderWidth),
-            ),
-            child: CupertinoPicker(
-              scrollController: controller,
-              itemExtent: 44,
-              onSelectedItemChanged: onChanged,
-              selectionOverlay: Container(
-                decoration: BoxDecoration(
-                  border: Border.symmetric(
-                    horizontal: BorderSide(
-                      color: EC.teal.withOpacity(0.5),
-                      width: 1,
-                    ),
-                  ),
-                ),
-              ),
-              children: List.generate(
-                count,
-                (i) => Center(
-                  child: Text(
-                    i.toString().padLeft(2, '0'),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: EC.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -4777,14 +4695,123 @@ class _OPageTargetTimeState extends State<OPageTargetTime> {
             ),
           ),
           const SizedBox(height: 12),
-          Expanded(
+          _WheelCard(
+            columns: [
+              _WheelColumn(
+                label: 'HH',
+                count: 8,
+                controller: _hCtrl,
+                onChanged: (v) => _emit(h: v),
+              ),
+              _WheelColumn(
+                label: 'MM',
+                count: 60,
+                controller: _mCtrl,
+                onChanged: (v) => _emit(m: v),
+              ),
+              _WheelColumn(
+                label: 'SS',
+                count: 60,
+                controller: _sCtrl,
+                onChanged: (v) => _emit(s: v),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED H:M:S WHEEL CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One column of an H:M:S wheel: a label and a [CupertinoPicker] of zero-padded
+/// numbers driven by a caller-owned [controller].
+class _WheelColumn {
+  final String label;
+  final int count;
+  final FixedExtentScrollController controller;
+  final ValueChanged<int> onChanged;
+  const _WheelColumn({
+    required this.label,
+    required this.count,
+    required this.controller,
+    required this.onChanged,
+  });
+}
+
+/// A single compact card holding the wheels side by side, split by hairline
+/// dividers, with one selection band running across all of them. ~170 px tall
+/// with a 40 px item extent, so the centred value is flanked by a faint value
+/// above and below rather than a tall stack of harsh rectangles.
+class _WheelCard extends StatelessWidget {
+  static const double height = 170;
+  static const double itemExtent = 40;
+  final List<_WheelColumn> columns;
+  const _WheelCard({required this.columns});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height + 28,
+      decoration: BoxDecoration(
+        color: EC.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: EC.border, width: ET.borderWidth),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 28,
             child: Row(
               children: [
-                Expanded(child: _drum('HH', 8, _hCtrl, (v) => _emit(h: v))),
-                _colon(),
-                Expanded(child: _drum('MM', 60, _mCtrl, (v) => _emit(m: v))),
-                _colon(),
-                Expanded(child: _drum('SS', 60, _sCtrl, (v) => _emit(s: v))),
+                for (final c in columns)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        c.label,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: EC.muted,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                // One selection band across every wheel.
+                Center(
+                  child: Container(
+                    height: itemExtent,
+                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: EC.teal.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    for (var i = 0; i < columns.length; i++) ...[
+                      if (i > 0)
+                        Container(
+                          width: ET.borderWidth,
+                          margin: const EdgeInsets.symmetric(vertical: 18),
+                          color: EC.border,
+                        ),
+                      Expanded(child: _picker(columns[i])),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
@@ -4793,76 +4820,26 @@ class _OPageTargetTimeState extends State<OPageTargetTime> {
     );
   }
 
-  Widget _colon() => const Padding(
-    padding: EdgeInsets.only(bottom: 24),
-    child: Text(
-      ':',
-      style: TextStyle(
-        fontSize: 28,
-        fontWeight: FontWeight.w300,
-        color: EC.muted,
+  Widget _picker(_WheelColumn c) => CupertinoPicker(
+    scrollController: c.controller,
+    itemExtent: itemExtent,
+    onSelectedItemChanged: c.onChanged,
+    selectionOverlay: const SizedBox.shrink(),
+    backgroundColor: Colors.transparent,
+    children: List.generate(
+      c.count,
+      (i) => Center(
+        child: Text(
+          i.toString().padLeft(2, '0'),
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w500,
+            color: EC.textPrimary,
+          ),
+        ),
       ),
     ),
   );
-
-  Widget _drum(
-    String label,
-    int count,
-    FixedExtentScrollController controller,
-    ValueChanged<int> onSel,
-  ) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: EC.muted,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: EC.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: EC.border, width: ET.borderWidth),
-            ),
-            child: CupertinoPicker(
-              scrollController: controller,
-              itemExtent: 44,
-              onSelectedItemChanged: onSel,
-              selectionOverlay: Container(
-                decoration: BoxDecoration(
-                  border: Border.symmetric(
-                    horizontal: BorderSide(
-                      color: EC.teal.withOpacity(0.5),
-                      width: 1,
-                    ),
-                  ),
-                ),
-              ),
-              children: List.generate(
-                count,
-                (i) => Center(
-                  child: Text(
-                    i.toString().padLeft(2, '0'),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: EC.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
