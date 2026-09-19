@@ -79,6 +79,12 @@ class EngineMemory {
   final ProgressionDecision? weeklyProgressionDecision;
   final DateTime? lastProgressionEvaluationDate;
   final int pendingVdotNudge;
+
+  /// When vDOT last moved UP. Drives the consolidation lockout in
+  /// [VdotAdaptationGuard]: after a rise the athlete has to hold the new
+  /// fitness for a proportional interval before paces can tighten again.
+  /// Downward moves never set or consult it.
+  final DateTime? lastVdotUpwardShiftDate;
   final int? longRunDayIndex;
 
   // ── Weekly mileage system (schema v4) ────────────────────────────────────
@@ -139,6 +145,7 @@ class EngineMemory {
     this.weeklyProgressionDecision,
     this.lastProgressionEvaluationDate,
     this.pendingVdotNudge = 0,
+    this.lastVdotUpwardShiftDate,
     this.longRunDayIndex,
     this.baselineWeeklyKm,
     this.previousWeekTargetKm,
@@ -258,6 +265,7 @@ class EngineMemory {
     'lastProgressionEvaluationDate': lastProgressionEvaluationDate
         ?.toIso8601String(),
     'pendingVdotNudge': pendingVdotNudge,
+    'lastVdotUpwardShiftDate': lastVdotUpwardShiftDate?.toIso8601String(),
     'longRunDayIndex': longRunDayIndex,
     'baselineWeeklyKm': baselineWeeklyKm,
     'previousWeekTargetKm': previousWeekTargetKm,
@@ -388,6 +396,9 @@ class EngineMemory {
           '${json['lastProgressionEvaluationDate'] ?? ''}',
         ),
         pendingVdotNudge: (json['pendingVdotNudge'] as num?)?.toInt() ?? 0,
+        lastVdotUpwardShiftDate: DateTime.tryParse(
+          '${json['lastVdotUpwardShiftDate'] ?? ''}',
+        ),
         longRunDayIndex: (json['longRunDayIndex'] as num?)?.toInt(),
         baselineWeeklyKm: (json['baselineWeeklyKm'] as num?)?.toDouble(),
         previousWeekTargetKm: (json['previousWeekTargetKm'] as num?)
@@ -441,6 +452,8 @@ class EngineMemory {
     bool clearWeeklyProgressionDecision = false,
     DateTime? lastProgressionEvaluationDate,
     int? pendingVdotNudge,
+    DateTime? lastVdotUpwardShiftDate,
+    bool clearLastVdotUpwardShiftDate = false,
     int? longRunDayIndex,
     bool clearLongRunDayIndex = false,
     double? baselineWeeklyKm,
@@ -504,6 +517,9 @@ class EngineMemory {
       lastProgressionEvaluationDate:
           lastProgressionEvaluationDate ?? this.lastProgressionEvaluationDate,
       pendingVdotNudge: pendingVdotNudge ?? this.pendingVdotNudge,
+      lastVdotUpwardShiftDate: clearLastVdotUpwardShiftDate
+          ? null
+          : (lastVdotUpwardShiftDate ?? this.lastVdotUpwardShiftDate),
       longRunDayIndex: clearLongRunDayIndex
           ? null
           : (longRunDayIndex ?? this.longRunDayIndex),

@@ -2,10 +2,11 @@
 /// Loads the persisted plan + run history + the athlete's config, hands them to
 /// the pure [PlanAdaptation.reconcile], and persists the result.
 ///
-/// STATUS: intentionally **unwired**. The Coach tab currently reads the stored
-/// MaterializedPlan verbatim — no automatic reshuffles. This coordinator and
-/// [PlanAdaptation] are kept, tested, and ready for a future milestone that
-/// turns adaptation on (e.g. behind an explicit "adjust my plan" action).
+/// STATUS: the full reconcile (missed-session shifts, volume drift) is still
+/// intentionally **unwired** — the Coach tab reads the stored MaterializedPlan
+/// verbatim, with no automatic reshuffles. Only the `paceOnly` mode is live:
+/// EngineRuntime calls it after a verified vDOT shift so upcoming paces follow
+/// the athlete's fitness without touching days, volume or workout types.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -31,7 +32,16 @@ class AdaptationCoordinator {
   /// Reconcile the persisted plan against reality as of [asOfDate] (default
   /// now). Returns the entries that were applied (empty when nothing changed).
   /// Never throws — failures are logged and swallowed.
-  Future<List<AdaptationLogEntry>> reconcileNow({DateTime? asOfDate}) async {
+  ///
+  /// With [paceOnly] the missed-session and volume rules are skipped and only
+  /// the remaining paces are re-priced for the athlete's current vDOT — what
+  /// [EngineRuntime] triggers after a verified vDOT shift, so the plan's days,
+  /// volume and workout types stay exactly as they were. The result is written
+  /// with [PlanStore.saveAndSync] (local + Supabase, awaited).
+  Future<List<AdaptationLogEntry>> reconcileNow({
+    DateTime? asOfDate,
+    bool paceOnly = false,
+  }) async {
     if (_running) return const [];
     _running = true;
     try {
@@ -39,6 +49,22 @@ class AdaptationCoordinator {
       if (plan == null || plan.weeks.isEmpty) return const [];
 
       final memory = await EngineMemoryService().load();
+
+      if (paceOnly) {
+        final result = PlanAdaptation.recalibratePaces(
+          plan: plan,
+          newVdot: memory.vdotScore,
+          asOfDate: asOfDate ?? DateTime.now(),
+        );
+        if (result.changed) {
+          await PlanStore.instance.saveAndSync(result.plan);
+          for (final e in result.applied) {
+            debugPrint('[Adaptation] ${e.reason}: ${e.summary}');
+          }
+        }
+        return result.applied;
+      }
+
       final config = await _buildConfig(memory);
       if (config == null) return const [];
 
@@ -52,7 +78,7 @@ class AdaptationCoordinator {
       );
 
       if (result.changed) {
-        await PlanStore.instance.save(result.plan);
+        await PlanStore.instance.saveAndSync(result.plan);
         for (final e in result.applied) {
           debugPrint('[Adaptation] ${e.reason}: ${e.summary}');
         }

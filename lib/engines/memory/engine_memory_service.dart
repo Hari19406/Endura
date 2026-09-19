@@ -196,7 +196,12 @@ class EngineMemoryService {
     // Snapshot vDOT at the moment a plan starts, so weekly nudges over the
     // life of this plan can be capped to a realistic total drift.
     await save(
-      current.copyWith(racePlan: plan, vdotAtPlanStart: current.vdotScore),
+      current.copyWith(
+        racePlan: plan,
+        vdotAtPlanStart: current.vdotScore,
+        // A new plan starts its own consolidation clock.
+        clearLastVdotUpwardShiftDate: true,
+      ),
     );
   }
 
@@ -240,6 +245,7 @@ class EngineMemoryService {
       clearActivePlan: true,
       clearMaterializedPlanId: true,
       clearVdotAtPlanStart: true,
+      clearLastVdotUpwardShiftDate: true,
       clearPlanCompletedAt: true,
       clearLongRunDayIndex: true,
       clearPlannedIntent: true,

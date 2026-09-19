@@ -56,6 +56,22 @@ class AdaptationResult {
   bool get changed => applied.isNotEmpty;
 }
 
+class _Partition {
+  final List<MaterializedWeek> frozen;
+  final MaterializedWeek? current;
+  final List<MaterializedWeek> future;
+  final int currentWeekNo;
+  final int todayIdx;
+
+  const _Partition({
+    required this.frozen,
+    required this.current,
+    required this.future,
+    required this.currentWeekNo,
+    required this.todayIdx,
+  });
+}
+
 class PlanAdaptation {
   const PlanAdaptation._();
 
@@ -75,36 +91,18 @@ class PlanAdaptation {
     }
 
     final week1Start = plan.week1Monday;
-    final currentWeekNo = _weekNumberFor(asOfDate, week1Start, plan.totalWeeks);
-    final todayIdx = asOfDate.weekday - 1; // 0 = Monday
 
     // Week 1 can be a partial week (the plan starts mid-week). Slots before
     // the start date are pre-plan: never the athlete's, so never "missed",
     // never counted toward "all done", never part of the planned volume.
     int firstActive(MaterializedWeek w) => plan.firstActiveWeekday(w.weekNumber);
 
-    // ── Partition ──────────────────────────────────────────────────────────
-    final frozen = <MaterializedWeek>[];
-    MaterializedWeek? current;
-    final future = <MaterializedWeek>[];
-
-    for (final w in plan.weeks) {
-      final wEnd = PlanCalendar.dateFor(week1Start, w.weekNumber + 1, 0);
-      final isPast = w.isFrozen ||
-          !wEnd.isAfter(asOfDate) ||
-          _allTrainingDaysDone(w, fromIdx: firstActive(w));
-      if (isPast) {
-        frozen.add(w); // by reference — untouched
-      } else if (w.weekNumber == currentWeekNo) {
-        current = w;
-      } else if (w.weekNumber > currentWeekNo) {
-        future.add(w);
-      } else {
-        // A not-yet-past week numbered below "current" (clock skew) — leave it.
-        frozen.add(w);
-      }
-    }
-    future.sort((a, b) => a.weekNumber.compareTo(b.weekNumber));
+    final parts = _partition(plan, asOfDate);
+    final currentWeekNo = parts.currentWeekNo;
+    final todayIdx = parts.todayIdx;
+    final frozen = parts.frozen;
+    final current = parts.current;
+    final future = parts.future;
 
     final log = <AdaptationLogEntry>[];
     var mutatedCurrent = current;
@@ -179,6 +177,95 @@ class PlanAdaptation {
         adaptationLog: [...plan.adaptationLog, ...log],
       ),
       applied: log,
+    );
+  }
+
+  /// Pace-only adaptation: re-price the remaining plan for [newVdot] and touch
+  /// nothing else. Skips the missed-session and volume rules of [reconcile] —
+  /// a change in fitness estimate must never move a workout to another day,
+  /// change its distance, or swap its type.
+  ///
+  /// Same forward-only guarantees as [reconcile]: frozen/past weeks are returned
+  /// by reference, days before tomorrow in the current week and any day with a
+  /// completion keep their original paces. Identical instance when the VDOT
+  /// differs from the plan's [MaterializedPlan.builtFromVdot] by less than 1.
+  static AdaptationResult recalibratePaces({
+    required MaterializedPlan plan,
+    required int newVdot,
+    required DateTime asOfDate,
+  }) {
+    if (plan.weeks.isEmpty || (newVdot - plan.builtFromVdot).abs() < 1) {
+      return AdaptationResult(plan: plan, applied: const []);
+    }
+
+    final parts = _partition(plan, asOfDate);
+    final factor = _paceScale(plan.builtFromVdot, newVdot);
+    final current = parts.current == null
+        ? null
+        : _recalibrateWeekPaces(
+            parts.current!,
+            factor,
+            fromIdx: parts.todayIdx + 1,
+          );
+    final future = [
+      for (final w in parts.future) _recalibrateWeekPaces(w, factor),
+    ];
+
+    final entry = AdaptationLogEntry(
+      at: asOfDate,
+      reason: 'pace_recalibrated',
+      summary: 'Training paces updated for VDOT '
+          '${plan.builtFromVdot} → $newVdot across all upcoming weeks.',
+    );
+    final weeks = <MaterializedWeek>[
+      ...parts.frozen,
+      ?current,
+      ...future,
+    ]..sort((a, b) => a.weekNumber.compareTo(b.weekNumber));
+
+    return AdaptationResult(
+      plan: plan.copyWith(
+        weeks: weeks,
+        builtFromVdot: newVdot,
+        adaptationLog: [...plan.adaptationLog, entry],
+      ),
+      applied: [entry],
+    );
+  }
+
+  /// Split the plan into past/frozen weeks, the current week, and future weeks
+  /// as of [asOfDate]. Frozen weeks are kept by reference.
+  static _Partition _partition(MaterializedPlan plan, DateTime asOfDate) {
+    final week1Start = plan.week1Monday;
+    final currentWeekNo = _weekNumberFor(asOfDate, week1Start, plan.totalWeeks);
+    final frozen = <MaterializedWeek>[];
+    MaterializedWeek? current;
+    final future = <MaterializedWeek>[];
+
+    for (final w in plan.weeks) {
+      final wEnd = PlanCalendar.dateFor(week1Start, w.weekNumber + 1, 0);
+      final isPast = w.isFrozen ||
+          !wEnd.isAfter(asOfDate) ||
+          _allTrainingDaysDone(w, fromIdx: plan.firstActiveWeekday(w.weekNumber));
+      if (isPast) {
+        frozen.add(w); // by reference — untouched
+      } else if (w.weekNumber == currentWeekNo) {
+        current = w;
+      } else if (w.weekNumber > currentWeekNo) {
+        future.add(w);
+      } else {
+        // A not-yet-past week numbered below "current" (clock skew) — leave it.
+        frozen.add(w);
+      }
+    }
+    future.sort((a, b) => a.weekNumber.compareTo(b.weekNumber));
+
+    return _Partition(
+      frozen: frozen,
+      current: current,
+      future: future,
+      currentWeekNo: currentWeekNo,
+      todayIdx: asOfDate.weekday - 1, // 0 = Monday
     );
   }
 

@@ -5,8 +5,10 @@ import '../memory/engine_memory.dart';
 import '../config/workout_template_library.dart';
 import '../../models/workout_type.dart';
 import '../../utils/database_service.dart';
+import '../plan/adaptation_coordinator.dart';
 import '../progression_decision.dart';
 import '../../services/profile_service.dart';
+import 'vdot_adaptation_guard.dart';
 
 /// Called once after every completed run to keep all coaching state current.
 ///
@@ -82,24 +84,36 @@ class EngineRuntime {
         // (volume scaling, template tier) but no longer inflates the fitness
         // score by itself — showing up isn't proof of getting faster.
         final pacePending = updated.pendingVdotNudge;
-        final appliedNudge = pacePending.clamp(-1, 1);
+        final proposedNudge = pacePending.clamp(-1, 1);
 
-        // Bound total drift within this plan to a physiologically realistic
-        // amount, scaled to how many weeks the plan actually spans, so small
-        // weekly nudges can't compound into an unrealistic pace prescription
-        // over a long plan.
-        final planWeeks = updated.racePlan?.weeks.length;
+        // Upward shifts are rationed by plan length, blocked in taper, and
+        // locked out for a consolidation interval after each rise; downward
+        // shifts (easing paces) bypass all of that. See VdotAdaptationGuard.
+        final racePlan = updated.racePlan;
         final anchor = updated.vdotAtPlanStart ?? updated.vdotScore;
+        final vdotBeforeEval = updated.vdotScore;
+        final decision = VdotAdaptationGuard.resolve(
+          proposed: proposedNudge,
+          currentVdot: vdotBeforeEval,
+          anchorVdot: anchor,
+          plan: racePlan,
+          lastUpwardShift: updated.lastVdotUpwardShiftDate,
+          today: runDate,
+        );
+
+        // Bound total downward drift within this plan to a physiologically
+        // realistic amount, scaled to how many weeks the plan spans, so small
+        // weekly nudges can't compound into an unrealistic pace prescription.
+        final planWeeks = racePlan?.weeks.length;
         final driftCap = planWeeks != null
             ? math.max(3, (planWeeks / 2).ceil())
             : null;
-
-        final vdotBeforeEval = updated.vdotScore;
-        var newVdot = vdotBeforeEval + appliedNudge;
-        if (driftCap != null) {
-          newVdot = newVdot.clamp(anchor - driftCap, anchor + driftCap);
+        var newVdot = vdotBeforeEval + decision.applied;
+        if (driftCap != null && newVdot < anchor - driftCap) {
+          newVdot = anchor - driftCap;
         }
         newVdot = newVdot.clamp(30, 85);
+        final shifted = newVdot != vdotBeforeEval;
 
         updated = updated.copyWith(
           lastProgressionEvaluationDate: runDate,
@@ -107,17 +121,31 @@ class EngineRuntime {
           weeklyProgressionDecision: resolvedDecision,
           vdotIsProvisional: false,
           pendingVdotNudge: 0,
+          lastVdotUpwardShiftDate: newVdot > vdotBeforeEval ? runDate : null,
         );
 
         debugPrint(
           '[EngineRuntime] Weekly eval: vDOT $vdotBeforeEval → $newVdot '
-          '(pacePending=$pacePending applied=$appliedNudge driftCap=$driftCap anchor=$anchor) '
+          '(pacePending=$pacePending proposed=$proposedNudge '
+          'applied=${decision.applied} guard=${decision.reason.name} '
+          'driftCap=$driftCap anchor=$anchor) '
           'progression=${resolvedDecision.name}',
         );
 
         await _memoryService.save(updated);
         // Keep profiles table vdot_score current so it reflects real fitness
         ProfileService.instance.updateField('vdot_score', newVdot).ignore();
+
+        // A verified vDOT move re-prices the remaining plan. Pace-only: the
+        // athlete's days, volume and workout types must not change because
+        // their fitness estimate did. Runs after the memory save because the
+        // coordinator reads vDOT from memory.
+        if (shifted) {
+          await AdaptationCoordinator.instance.reconcileNow(
+            asOfDate: runDate,
+            paceOnly: true,
+          );
+        }
       }
 
       debugPrint(
