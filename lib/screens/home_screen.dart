@@ -1719,7 +1719,6 @@ class _HomeScreenState extends State<HomeScreen>
                                     showPreRunCheck(
                                       context: context,
                                       coachMessage: _coachMessage!,
-                                      weather: _weather,
                                       onProceed: (scaled) => Navigator.push(
                                         context,
                                         MaterialPageRoute(
