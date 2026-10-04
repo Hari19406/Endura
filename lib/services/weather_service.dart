@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
@@ -30,6 +31,7 @@ class WeatherSnapshot {
   final double tempC;
   final double apparentTempC;
   final int humidityPercent;
+  final double dewPointC;
   final WeatherCondition condition;
   final DateTime fetchedAt;
 
@@ -37,9 +39,19 @@ class WeatherSnapshot {
     required this.tempC,
     required this.apparentTempC,
     required this.humidityPercent,
+    required this.dewPointC,
     required this.condition,
     required this.fetchedAt,
   });
+
+  /// Magnus-formula dew point — only used to read caches written before
+  /// [dewPointC] was stored.
+  static double dewPointFrom(double tempC, int humidityPercent) {
+    const a = 17.62, b = 243.12;
+    final rh = humidityPercent.clamp(1, 100) / 100;
+    final g = math.log(rh) + a * tempC / (b + tempC);
+    return b * g / (a - g);
+  }
 
   bool get isStale =>
       DateTime.now().difference(fetchedAt) > const Duration(minutes: 45);
@@ -48,15 +60,21 @@ class WeatherSnapshot {
     'tempC': tempC,
     'apparentTempC': apparentTempC,
     'humidityPercent': humidityPercent,
+    'dewPointC': dewPointC,
     'condition': condition.name,
     'fetchedAt': fetchedAt.toIso8601String(),
   };
 
   factory WeatherSnapshot.fromJson(Map<String, dynamic> json) {
+    final tempC = (json['tempC'] as num).toDouble();
+    final humidity = json['humidityPercent'] as int;
     return WeatherSnapshot(
-      tempC: (json['tempC'] as num).toDouble(),
+      tempC: tempC,
       apparentTempC: (json['apparentTempC'] as num).toDouble(),
-      humidityPercent: json['humidityPercent'] as int,
+      humidityPercent: humidity,
+      dewPointC:
+          (json['dewPointC'] as num?)?.toDouble() ??
+          dewPointFrom(tempC, humidity),
       condition: WeatherCondition.values.firstWhere(
         (c) => c.name == json['condition'],
         orElse: () => WeatherCondition.clear,
@@ -132,7 +150,7 @@ class WeatherService {
       final uri = Uri.parse(
         'https://api.open-meteo.com/v1/forecast'
         '?latitude=$lat&longitude=$lng'
-        '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code'
+        '&current=temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,weather_code'
         '&timezone=auto',
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 8));
@@ -146,6 +164,7 @@ class WeatherService {
         tempC: (current['temperature_2m'] as num).toDouble(),
         apparentTempC: (current['apparent_temperature'] as num).toDouble(),
         humidityPercent: (current['relative_humidity_2m'] as num).round(),
+        dewPointC: (current['dew_point_2m'] as num).toDouble(),
         condition: _conditionFromWmoCode(
           (current['weather_code'] as num).round(),
         ),

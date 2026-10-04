@@ -255,10 +255,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     setState(() {
       _weather = weather;
       _weatherLoading = false;
-      // Default the easing on when it's meaningful (≥15s/km); the user can
+      // Default the easing on when it's meaningful (≥2%); the user can
       // still switch it off.
-      if (weather != null &&
-          _weatherScaler.deltaSecondsPerKm(weather) >= 15) {
+      if (weather != null && _weatherScaler.slowdownPercent(weather) >= 2) {
         _weatherPacingEnabled = true;
       }
     });
@@ -492,11 +491,23 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
 
   // ── Weather card ─────────────────────────────────────────────────────
 
-  (int, String, Color) _impactTier(int delta, AppColors c) {
-    if (delta <= 0) return (1, 'No Impact', c.success);
-    if (delta < 15) return (2, 'Low Impact', c.success);
-    if (delta < 30) return (3, 'Moderate Impact', c.premiumGold);
+  // Tiers follow the temp + dew point table bands: ≤2% low, ≤4.5% moderate.
+  (int, String, Color) _impactTier(double percent, AppColors c) {
+    if (percent < 0.5) return (1, 'No Impact', c.success);
+    if (percent <= 2) return (2, 'Low Impact', c.success);
+    if (percent <= 4.5) return (3, 'Moderate Impact', c.premiumGold);
     return (4, 'Significant Impact', c.danger);
+  }
+
+  /// Seconds/km the slowdown adds to the workout's main-block target pace —
+  /// null when the workout has no pace target (RPE-only / rest).
+  int? _weatherDeltaSeconds(WeatherSnapshot weather) {
+    for (final b in widget.coachMessage.resolvedWorkout.blocks) {
+      if (b.type == BlockType.main && !b.isRpeOnly) {
+        return _weatherScaler.deltaSecondsFor(weather, b.targetPace);
+      }
+    }
+    return null;
   }
 
   Widget _buildWeatherCard() {
@@ -557,9 +568,10 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     TextTheme textTheme,
     WeatherSnapshot weather,
   ) {
-    final delta = _weatherScaler.deltaSecondsPerKm(weather);
-    final (tier, tierLabel, tierColor) = _impactTier(delta, c);
-    final markerFraction = (delta.clamp(0, 40) / 40).toDouble();
+    final percent = _weatherScaler.slowdownPercent(weather);
+    final deltaSec = _weatherDeltaSeconds(weather);
+    final (tier, tierLabel, tierColor) = _impactTier(percent, c);
+    final markerFraction = (percent.clamp(0, 10) / 10).toDouble();
     final icon = switch (weather.condition) {
       WeatherCondition.clear => Icons.wb_sunny_outlined,
       WeatherCondition.cloudy => Icons.cloud_outlined,
@@ -685,8 +697,8 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        delta > 0
-                            ? '+${delta}s/km · Tier $tier: $tierLabel'
+                        percent >= 0.5
+                            ? '+${percent.toStringAsFixed(1)}%${deltaSec != null ? ' (+${deltaSec}s/km)' : ''} · Tier $tier: $tierLabel'
                             : 'No adjustment needed · Tier $tier: $tierLabel',
                         style: textTheme.bodySmall?.copyWith(
                           color: tierColor,
@@ -698,7 +710,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
                 ),
                 Switch(
                   value: _weatherPacingEnabled,
-                  onChanged: delta > 0
+                  onChanged: percent >= 0.5
                       ? (v) => setState(() => _weatherPacingEnabled = v)
                       : null,
                   activeThumbColor: c.accent,
