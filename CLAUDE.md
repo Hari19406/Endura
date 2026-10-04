@@ -8,6 +8,12 @@ After completing any code change (feature, bug fix, refactor, cleanup), always:
 
 2. **Git commit** is handled automatically by the Stop hook — no need to do it manually unless asked.
 
+## Supabase schema changes
+
+- Create every schema change with `supabase migration new <name>` (a file in `supabase/migrations/`) and apply it only via `supabase db push` (CI does this on merge to main via `.github/workflows/supabase-migrate.yml`).
+- NEVER apply schema through the dashboard SQL editor or an MCP `apply_migration`/`execute_sql` tool — it records a different version number than the local file and breaks `db push` with `DbPushMissingLocalError`.
+- Write migrations idempotently (`if not exists`).
+
 ## Visual verification
 
 - Do NOT run browser tools, headless web previews, or take screenshots to inspect the UI.
