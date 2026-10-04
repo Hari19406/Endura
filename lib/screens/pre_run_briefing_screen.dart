@@ -301,14 +301,17 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
   );
 
   void _startWorkout() {
-    if (widget.returnOnStart) {
-      Navigator.pop(context, true);
-      return;
-    }
     final weather = _weather;
     final effectiveMessage = (_weatherPacingEnabled && weather != null)
         ? _withWorkout(widget.coachMessage, _displayedWorkout)
         : widget.coachMessage;
+
+    if (widget.returnOnStart) {
+      // Hand back the (possibly weather-eased) message so the caller starts
+      // the run with the paces the user actually saw.
+      Navigator.pop(context, effectiveMessage);
+      return;
+    }
 
     // Only forward the scheduled-day link when this briefing is genuinely
     // for today — previewing a different day and starting a run now must

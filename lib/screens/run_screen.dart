@@ -2468,7 +2468,7 @@ class _RunScreenState extends State<RunScreen>
       coachMessage: _activeCoachMessage!,
       onProceed: (scaled) async {
         if (!mounted) return;
-        final shouldStart = await Navigator.push<bool>(
+        final startMessage = await Navigator.push<message.CoachMessage>(
           context,
           MaterialPageRoute(
             builder: (_) => PreRunBriefingScreen(
@@ -2478,9 +2478,9 @@ class _RunScreenState extends State<RunScreen>
             ),
           ),
         );
-        if (shouldStart == true && mounted) {
+        if (startMessage != null && mounted) {
           setState(() {
-            _activeCoachMessage = scaled;
+            _activeCoachMessage = startMessage;
             _isFreeRun = false;
             _workoutReadyToStart = true;
           });
