@@ -499,13 +499,22 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     return (4, 'Significant Impact', c.danger);
   }
 
-  /// Seconds/km the slowdown adds to the workout's main-block target pace —
-  /// null when the workout has no pace target (RPE-only / rest).
+  /// Seconds (per km or per mile, matching the unit toggle) the slowdown adds
+  /// to the first main block's pace *as the step list displays it* — pace
+  /// rounded to 5s in km, then converted — so the card and the steps always
+  /// show the same change. Null when the workout has no pace target.
   int? _weatherDeltaSeconds(WeatherSnapshot weather) {
-    for (final b in widget.coachMessage.resolvedWorkout.blocks) {
-      if (b.type == BlockType.main && !b.isRpeOnly) {
-        return _weatherScaler.deltaSecondsFor(weather, b.targetPace);
-      }
+    final original = widget.coachMessage.resolvedWorkout;
+    final adjusted = _weatherScaler.scale(original, weather).workout;
+    for (var i = 0; i < original.blocks.length; i++) {
+      final b = original.blocks[i];
+      if (b.type != BlockType.main || b.isRpeOnly) continue;
+      int shown(int secPerKm) => UnitUtils.displayPaceSeconds(
+        ((secPerKm / 5).round() * 5).toDouble(),
+        _useMiles,
+      ).round();
+      return shown(adjusted.blocks[i].paceMinSecondsPerKm) -
+          shown(b.paceMinSecondsPerKm);
     }
     return null;
   }
@@ -698,7 +707,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
                       const SizedBox(height: 2),
                       Text(
                         percent >= 0.5
-                            ? '+${percent.toStringAsFixed(1)}%${deltaSec != null ? ' (+${deltaSec}s/km)' : ''} · Tier $tier: $tierLabel'
+                            ? '+${percent.toStringAsFixed(1)}%${deltaSec != null ? ' (+${deltaSec}s${UnitUtils.perUnitLabel(_useMiles)})' : ''} · Tier $tier: $tierLabel'
                             : 'No adjustment needed · Tier $tier: $tierLabel',
                         style: textTheme.bodySmall?.copyWith(
                           color: tierColor,
