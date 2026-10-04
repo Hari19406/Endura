@@ -255,6 +255,12 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     setState(() {
       _weather = weather;
       _weatherLoading = false;
+      // Default the easing on when it's meaningful (≥15s/km); the user can
+      // still switch it off.
+      if (weather != null &&
+          _weatherScaler.deltaSecondsPerKm(weather) >= 15) {
+        _weatherPacingEnabled = true;
+      }
     });
   }
 

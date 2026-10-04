@@ -35,7 +35,6 @@ class WeatherScaler {
   static const double _baselineC = 15.0;
   static const double _secondsPerDegree = 3.5;
   static const double _humidityThreshold = 60.0;
-  static const double _humidityMultiplier = 1.3;
   static const int _maxDeltaSecondsPerKm = 45;
   static const int _minMeaningfulDelta = 3;
 
@@ -78,10 +77,9 @@ class WeatherScaler {
     final degreesOver = weather.apparentTempC - _baselineC;
     if (degreesOver <= 0) return 0;
 
-    var delta = degreesOver * _secondsPerDegree;
-    if (weather.humidityPercent > _humidityThreshold) {
-      delta *= _humidityMultiplier;
-    }
+    // apparentTempC already folds humidity in, so no separate humidity
+    // multiplier here (it would double count).
+    final delta = degreesOver * _secondsPerDegree;
     return delta.round().clamp(0, _maxDeltaSecondsPerKm);
   }
 
