@@ -372,7 +372,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                   run.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
                     color: context.colors.textPrimary,
@@ -392,7 +392,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 _map(points),
               ],
               const SizedBox(height: 12),
-              const Divider(height: 1, color: context.colors.border),
+              Divider(height: 1, color: context.colors.border),
               const SizedBox(height: 6),
               _socialBar(),
             ],
@@ -435,7 +435,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                         run.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: context.colors.textPrimary,
@@ -445,7 +445,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                     ),
                     if (run.isSubscribed) ...[
                       const SizedBox(width: 5),
-                      const Icon(
+                      Icon(
                         Icons.verified,
                         size: 14,
                         color: context.colors.chartAccent,
@@ -453,32 +453,32 @@ class _RunFeedCardState extends State<RunFeedCard> {
                     ],
                   ],
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   '${relativeTime(run.date)}  ·  ${run.source}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: context.colors.textSecondary,
                   ),
                 ),
                 if (run.location != null && run.location!.isNotEmpty) ...[
-                  const SizedBox(height: 3),
+                  SizedBox(height: 3),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.public,
                         size: 12,
                         color: context.colors.textTertiary,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           run.location!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: context.colors.textTertiary,
                           ),
@@ -495,7 +495,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
           width: 36,
           height: 36,
           child: PopupMenuButton<String>(
-            icon: const Icon(
+            icon: Icon(
               Icons.more_horiz,
               size: 20,
               color: context.colors.textSecondary,
@@ -509,7 +509,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 _snack('Thanks — we\'ll take a look.');
               }
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'profile',
                 child: Text(
@@ -559,7 +559,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                   children: [
                     Text(
                       label.toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: context.colors.textTertiary,
@@ -571,7 +571,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                       value,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: context.colors.textPrimary,
@@ -600,7 +600,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.bolt, size: 16, color: context.colors.chartAccent),
+          Icon(Icons.bolt, size: 16, color: context.colors.chartAccent),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -610,7 +610,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                   run.planName!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: context.colors.textPrimary,
@@ -622,7 +622,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                     run.planProgress!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       color: context.colors.textSecondary,
                     ),
@@ -640,7 +640,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 color: context.colors.chartAccent.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
+              child: Text(
                 'View',
                 style: TextStyle(
                   fontSize: 12,
@@ -698,14 +698,14 @@ class _RunFeedCardState extends State<RunFeedCard> {
               : (_reactionCount > 0
                     ? '$_reactionCount reacted'
                     : 'Be the first to react'),
-          style: const TextStyle(fontSize: 12, color: context.colors.textSecondary),
+          style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
         ),
         const Spacer(),
         IconButton(
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          icon: const Icon(Icons.share, size: 18, color: context.colors.textSecondary),
+          icon: Icon(Icons.share, size: 18, color: context.colors.textSecondary),
           onPressed: _share,
         ),
         const SizedBox(width: 4),
@@ -734,7 +734,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          icon: const Icon(
+          icon: Icon(
             Icons.mode_comment_outlined,
             size: 18,
             color: context.colors.textSecondary,
@@ -747,13 +747,13 @@ class _RunFeedCardState extends State<RunFeedCard> {
             top: 2,
             child: Container(
               padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: context.colors.chartAccent,
                 shape: BoxShape.circle,
               ),
               child: Text(
                 '$_comments',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   color: context.colors.onAccent,

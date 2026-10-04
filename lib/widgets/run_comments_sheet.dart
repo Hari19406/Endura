@@ -125,11 +125,11 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
       context: context,
       builder: (dctx) => AlertDialog(
         backgroundColor: context.colors.surface,
-        title: const Text(
+        title: Text(
           'Delete comment?',
           style: TextStyle(color: context.colors.textPrimary),
         ),
-        content: const Text(
+        content: Text(
           "This can't be undone.",
           style: TextStyle(color: context.colors.textSecondary),
         ),
@@ -143,7 +143,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
               HapticFeedback.heavyImpact();
               Navigator.pop(dctx, true);
             },
-            child: const Text('Delete', style: TextStyle(color: context.colors.danger)),
+            child: Text('Delete', style: TextStyle(color: context.colors.danger)),
           ),
         ],
       ),
@@ -186,7 +186,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
       expand: false,
       builder: (context, sheetScroll) {
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: context.colors.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             border: Border(
@@ -199,7 +199,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
             children: [
               _grabber(),
               _header(),
-              const Divider(height: 1, color: context.colors.border),
+              Divider(height: 1, color: context.colors.border),
               Expanded(child: _body(sheetScroll)),
               _composer(),
             ],
@@ -225,7 +225,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
       children: [
         Text(
           _count > 0 ? 'Comments · $_count' : 'Comments',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
             color: context.colors.textPrimary,
@@ -234,7 +234,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
         ),
         const Spacer(),
         IconButton(
-          icon: const Icon(Icons.close, color: context.colors.textSecondary, size: 22),
+          icon: Icon(Icons.close, color: context.colors.textSecondary, size: 22),
           onPressed: () => Navigator.pop(context, _count),
         ),
       ],
@@ -243,7 +243,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
 
   Widget _body(ScrollController sheetScroll) {
     if (_loading) {
-      return const Center(
+      return Center(
         child: SizedBox(
           width: 24,
           height: 24,
@@ -255,7 +255,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
       return SingleChildScrollView(
         controller: sheetScroll,
         physics: const AlwaysScrollableScrollPhysics(),
-        child: const Padding(
+        child: Padding(
           padding: EdgeInsets.fromLTRB(32, 64, 32, 32),
           child: Column(
             children: [
@@ -308,7 +308,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
           8,
           8 + MediaQuery.of(context).viewInsets.bottom,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: context.colors.border)),
         ),
         child: Row(
@@ -322,11 +322,11 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _send(),
-                style: const TextStyle(color: context.colors.textPrimary, fontSize: 14),
+                style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
                 cursorColor: context.colors.chartAccent,
                 decoration: InputDecoration(
                   hintText: 'Add a comment…',
-                  hintStyle: const TextStyle(color: context.colors.textTertiary, fontSize: 14),
+                  hintStyle: TextStyle(color: context.colors.textTertiary, fontSize: 14),
                   filled: true,
                   fillColor: context.colors.surfaceAlt,
                   isDense: true,
@@ -343,7 +343,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
             ),
             IconButton(
               icon: _sending
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -351,7 +351,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
                         color: context.colors.chartAccent,
                       ),
                     )
-                  : const Icon(Icons.send_rounded, color: context.colors.chartAccent),
+                  : Icon(Icons.send_rounded, color: context.colors.chartAccent),
               onPressed: _sending ? null : _send,
             ),
           ],
@@ -397,7 +397,7 @@ class _CommentTile extends StatelessWidget {
                         comment.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: context.colors.textPrimary,
@@ -407,14 +407,14 @@ class _CommentTile extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       relativeTime(comment.createdAt),
-                      style: const TextStyle(fontSize: 11, color: context.colors.textTertiary),
+                      style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   comment.comment,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     color: context.colors.textSecondary,
                     height: 1.35,
@@ -425,7 +425,7 @@ class _CommentTile extends StatelessWidget {
           ),
           if (onDelete != null)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.delete_outline,
                 size: 17,
                 color: context.colors.textTertiary,
