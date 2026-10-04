@@ -693,10 +693,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
     final trend = _latestData?.paceTrend ?? 'neutral';
     final label = _paceTrendLabel(trend);
     final color = trend == 'improving'
-        ? const Color(0xFF388E3C)
+        ? context.colors.success
         : trend == 'declining'
-        ? const Color(0xFFD32F2F)
-        : const Color(0xFF888888);
+        ? context.colors.danger
+        : context.colors.textTertiary;
     return Text(
       label,
       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
@@ -725,16 +725,16 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
       final faster = avgSec < target.minSecondsPerKm;
       if (inRange) {
         badgeLabel = 'On target ✓';
-        badgeBg = const Color(0xFFE8F5EE);
-        badgeText = const Color(0xFF2A7D3E);
+        badgeBg = context.colors.success.withValues(alpha: 0.12);
+        badgeText = context.colors.success;
       } else if (faster) {
         badgeLabel = 'Too fast';
-        badgeBg = const Color(0xFFFFF8E1);
-        badgeText = const Color(0xFFB36200);
+        badgeBg = context.colors.workoutTempo.withValues(alpha: 0.12);
+        badgeText = context.colors.workoutTempo;
       } else {
         badgeLabel = 'Too slow';
-        badgeBg = const Color(0xFFFCE8E8);
-        badgeText = const Color(0xFFB32020);
+        badgeBg = context.colors.danger.withValues(alpha: 0.12);
+        badgeText = context.colors.danger;
       }
     }
 
@@ -750,12 +750,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5EE),
+                    color: context.colors.success.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(7),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.trending_up,
-                    color: Color(0xFF2A9D4E),
+                    color: context.colors.success,
                     size: 15,
                   ),
                 ),
@@ -796,18 +796,18 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                                     widget.averagePace,
                                     _useMiles,
                                   ),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF2A9D4E),
+                                    color: context.colors.success,
                                   ),
                                 ),
                                 TextSpan(
                                   text: ' ${UnitUtils.perUnitLabel(_useMiles)}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w400,
-                                    color: Color(0xFF2A9D4E),
+                                    color: context.colors.success,
                                   ),
                                 ),
                               ],
@@ -853,10 +853,10 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                         const SizedBox(height: 4),
                         Text(
                           '${_formatDisplayPaceSecs(target.minSecondsPerKm)} – ${_formatDisplayPaceSecs(target.maxSecondsPerKm)} ${UnitUtils.perUnitLabel(_useMiles)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF2A9D4E),
+                            color: context.colors.success,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -896,14 +896,14 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
               Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5EE),
+                  color: context.colors.success.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
               Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2A9D4E),
+                  color: context.colors.success,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -931,6 +931,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
 
   // ── RPE card ──────────────────────────────────────────────────────────────
 
+  // Effort data-viz ramp (green -> red); no matching AppColors tokens.
   static const List<_RpeLevel> _rpeLevels = [
     _RpeLevel(
       value: 1,
@@ -1195,9 +1196,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
             children: [
               Container(
                 width: 3,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF00C2A8),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: context.colors.chartAccent,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     bottomLeft: Radius.circular(16),
                   ),
@@ -1215,15 +1216,15 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE6FAF7),
+                          color: context.colors.chartAccent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
+                        child: Text(
                           'MAX',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF00A08A),
+                            color: context.colors.chartAccent,
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -1266,12 +1267,12 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8EAF6),
+                    color: context.colors.paceAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(7),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.calendar_today_outlined,
-                    color: Color(0xFF3949AB),
+                    color: context.colors.paceAccent,
                     size: 14,
                   ),
                 ),
@@ -1297,7 +1298,7 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
                     color: accentColor,
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 18),
+                  child: Icon(icon, color: context.colors.onAccent, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

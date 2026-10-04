@@ -42,7 +42,7 @@ class AchievementTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              tierBadge(achievement.tier),
+              tierBadge(context, achievement.tier),
             ],
           ),
           const SizedBox(height: 5),
@@ -65,13 +65,21 @@ class AchievementTile extends StatelessWidget {
   }
 }
 
-Widget tierBadge(int tier) {
+// Tier medal hues (bronze/silver/gold/platinum) — fixed data-viz colours with
+// no matching semantic token; (background, text) pairs.
+const _kBronze = (Color(0xFFF0997B), Color(0xFF4A1B0C));
+const _kSilver = (Color(0xFFD3D1C7), Color(0xFF444441));
+const _kGold = (Color(0xFFFAC775), Color(0xFF412402));
+const _kPlatinum = (Color(0xFFCECBF6), Color(0xFF26215C));
+
+Widget tierBadge(BuildContext context, int tier) {
+  final c = context.colors;
   final (Color bg, Color text, String label) = switch (tier) {
-    1 => (const Color(0xFFF0997B), const Color(0xFF4A1B0C), 'Bronze'),
-    2 => (const Color(0xFFD3D1C7), const Color(0xFF444441), 'Silver'),
-    3 => (const Color(0xFFFAC775), const Color(0xFF412402), 'Gold'),
-    4 => (const Color(0xFFCECBF6), const Color(0xFF26215C), 'Platinum'),
-    _ => (const Color(0xFFE8E8E8), const Color(0xFF666666), 'Bronze'),
+    1 => (_kBronze.$1, _kBronze.$2, 'Bronze'),
+    2 => (_kSilver.$1, _kSilver.$2, 'Silver'),
+    3 => (_kGold.$1, _kGold.$2, 'Gold'),
+    4 => (_kPlatinum.$1, _kPlatinum.$2, 'Platinum'),
+    _ => (c.border, c.textSecondary, 'Bronze'),
   };
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

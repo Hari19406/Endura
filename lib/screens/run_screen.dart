@@ -687,11 +687,11 @@ class _RunScreenState extends State<RunScreen>
       bool opened = await Geolocator.openAppSettings();
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: const Text(
               'Can\'t open settings. Please turn on location yourself.',
             ),
-            backgroundColor: Color(0xFFF57C00),
+            backgroundColor: context.colors.workoutTempo,
           ),
         );
       }
@@ -701,11 +701,11 @@ class _RunScreenState extends State<RunScreen>
       bool opened = await Geolocator.openLocationSettings();
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: const Text(
               'Can\'t open settings. Please turn on location yourself.',
             ),
-            backgroundColor: Color(0xFFF57C00),
+            backgroundColor: context.colors.workoutTempo,
           ),
         );
       }
@@ -2847,7 +2847,7 @@ class _RunScreenState extends State<RunScreen>
           duration: const Duration(milliseconds: 300),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: const Color(0xFFF57C00),
+            color: context.colors.workoutTempo,
             child: SafeArea(
               bottom: false,
               child: Row(
@@ -2860,25 +2860,25 @@ class _RunScreenState extends State<RunScreen>
                       child: Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
+                        decoration: BoxDecoration(
+                          color: context.colors.onAccent,
                           shape: BoxShape.circle,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'GPS signal lost — distance paused',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: context.colors.onAccent,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  const Icon(Icons.gps_off, color: Colors.white, size: 16),
+                  Icon(Icons.gps_off, color: context.colors.onAccent, size: 16),
                 ],
               ),
             ),

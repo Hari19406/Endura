@@ -64,11 +64,11 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
                 height: 36,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? _rpeColor(value)
-                      : _rpeColor(value).withOpacity(0.12),
+                      ? _rpeColor(context, value)
+                      : _rpeColor(context, value).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6),
                   border: isSelected
-                      ? Border.all(color: _rpeColor(value), width: 1.5)
+                      ? Border.all(color: _rpeColor(context, value), width: 1.5)
                       : null,
                 ),
                 child: Center(
@@ -78,8 +78,8 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: isSelected
-                          ? Colors.white
-                          : _rpeColor(value).withOpacity(0.7),
+                          ? context.colors.onAccent
+                          : _rpeColor(context, value).withOpacity(0.7),
                     ),
                   ),
                 ),
@@ -111,10 +111,11 @@ class _RpeInputWidgetState extends State<RpeInputWidget> {
     );
   }
 
-  Color _rpeColor(int rpe) {
-    if (rpe <= 3) return const Color(0xFF388E3C); // green
-    if (rpe <= 6) return const Color(0xFFF57C00); // orange
-    return const Color(0xFFD32F2F); // red
+  Color _rpeColor(BuildContext context, int rpe) {
+    final c = context.colors;
+    if (rpe <= 3) return c.success;
+    if (rpe <= 6) return c.workoutTempo;
+    return c.danger;
   }
 }
 
@@ -132,18 +133,20 @@ class _RpeLabel extends StatelessWidget {
     return 'Maximum';
   }
 
-  Color get _color {
-    if (rpe <= 3) return const Color(0xFF388E3C);
-    if (rpe <= 6) return const Color(0xFFF57C00);
-    return const Color(0xFFD32F2F);
+  Color _color(BuildContext context) {
+    final c = context.colors;
+    if (rpe <= 3) return c.success;
+    if (rpe <= 6) return c.workoutTempo;
+    return c.danger;
   }
 
   @override
   Widget build(BuildContext context) {
+    final color = _color(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -151,7 +154,7 @@ class _RpeLabel extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: _color,
+          color: color,
         ),
       ),
     );

@@ -639,14 +639,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     painter: _RoutePreviewPainter(
                       points: a.routePoints,
                       lineColor: c.chartAccent,
+                      backgroundColor: c.background,
+                      routeColor: c.textPrimary,
+                      startColor: c.success,
                     ),
                   )
                 : Container(
-                    color: const Color(0xFF0A0A0A),
-                    child: const Center(
+                    color: c.background,
+                    child: Center(
                       child: Icon(
                         Icons.map_outlined,
-                        color: Colors.white12,
+                        color: c.textPrimary.withValues(alpha: 0.12),
                         size: 56,
                       ),
                     ),
@@ -1421,6 +1424,7 @@ class _HrZonesCard extends StatefulWidget {
 class _HrZonesCardState extends State<_HrZonesCard> {
   bool _expanded = true;
 
+  // HR zone hues (Z1-Z5): fixed data-viz ramp, no matching semantic tokens.
   static const _zoneColorsLight = [
     Color(0xFF9E9E9E), // Z1 gray
     Color(0xFF4A90E2), // Z2 blue
@@ -1709,11 +1713,11 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                       width: markerW,
                       height: 26,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: c.textPrimary,
                         borderRadius: BorderRadius.circular(2),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.35),
+                            color: c.scrim.withValues(alpha: 0.35),
                             blurRadius: 4,
                           ),
                         ],
@@ -1732,7 +1736,7 @@ class _HrZonesCardState extends State<_HrZonesCard> {
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: c.textPrimary,
                 shape: BoxShape.circle,
                 border: Border.all(color: c.border),
               ),
@@ -1842,14 +1846,23 @@ class _HrZonesCardState extends State<_HrZonesCard> {
 class _RoutePreviewPainter extends CustomPainter {
   final List<Map<String, double>> points;
   final Color lineColor;
+  final Color backgroundColor;
+  final Color routeColor;
+  final Color startColor;
 
-  const _RoutePreviewPainter({required this.points, required this.lineColor});
+  const _RoutePreviewPainter({
+    required this.points,
+    required this.lineColor,
+    required this.backgroundColor,
+    required this.routeColor,
+    required this.startColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFF0A0A0A),
+      Paint()..color = backgroundColor,
     );
     if (points.length < 2) return;
 
@@ -1898,7 +1911,7 @@ class _RoutePreviewPainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = Colors.white.withOpacity(0.92)
+        ..color = routeColor.withValues(alpha: 0.92)
         ..strokeWidth = 2.5
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
@@ -1908,12 +1921,16 @@ class _RoutePreviewPainter extends CustomPainter {
     canvas.drawCircle(
       toOffset(points.first),
       5,
-      Paint()..color = const Color(0xFF4CAF50),
+      Paint()..color = startColor,
     );
     canvas.drawCircle(toOffset(points.last), 5, Paint()..color = lineColor);
   }
 
   @override
   bool shouldRepaint(_RoutePreviewPainter oldDelegate) =>
-      oldDelegate.points != points || oldDelegate.lineColor != lineColor;
+      oldDelegate.points != points ||
+      oldDelegate.lineColor != lineColor ||
+      oldDelegate.backgroundColor != backgroundColor ||
+      oldDelegate.routeColor != routeColor ||
+      oldDelegate.startColor != startColor;
 }

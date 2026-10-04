@@ -22,17 +22,10 @@ import '../utils/unit_utils.dart';
 
 enum BlockState { pending, done }
 
-/// Muted emerald used for the "Completed" status chip — deliberately not
-/// [AppColors.success] (too bright/neon against the dark card) and not a
-/// theme token, since this is a one-off refinement of a single badge rather
-/// than a new semantic color the rest of the app should pick up.
-const _kCompletedChipBg = Color(0xFF1B4D3E);
-const _kCompletedChipBorder = Color(0xFF2E7D32);
-const _kCompletedChipText = Color(0xFFA5D6A7);
-
 /// Exact blue of the primary Start Workout/Start Run CTA — Warmup and
 /// Cooldown step cards match it precisely so those two "bookend" steps read
 /// as one visual family with the action that starts the whole session.
+// Kept: brand blue of the Start CTA; no matching semantic token.
 const _kStartBlue = Color(0xFF007AFF);
 
 // ── Chasing-dash cloud loader ────────────────────────────────────────────────
@@ -730,9 +723,9 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
       return _StatusChip(
         icon: Icons.check_circle_rounded,
         label: 'Completed$loggedText',
-        color: _kCompletedChipText,
-        background: _kCompletedChipBg,
-        border: _kCompletedChipBorder,
+        color: c.success,
+        background: c.success.withValues(alpha: 0.12),
+        border: c.success.withValues(alpha: 0.4),
       );
     }
     return _StatusChip(

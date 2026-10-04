@@ -53,6 +53,7 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
   Future<void> _pickAvatar() async {
     if (_avatarBusy) return;
     try {
+      final c = context.colors;
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
         maxWidth: 1024,
@@ -67,12 +68,12 @@ class _EditAthleteProfileScreenState extends State<EditAthleteProfileScreen> {
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: 'Crop Profile Photo',
-            toolbarColor: const Color(0xFF00E5CC), // Endura blue
-            toolbarWidgetColor: Colors.white,
-            cropFrameColor: const Color(0xFF00E5CC),
-            cropGridColor: Colors.white24,
-            activeControlsWidgetColor: const Color(0xFF00E5CC),
-            backgroundColor: Colors.black,
+            toolbarColor: c.chartAccent, // Endura blue
+            toolbarWidgetColor: c.onAccent,
+            cropFrameColor: c.chartAccent,
+            cropGridColor: c.textPrimary.withValues(alpha: 0.24),
+            activeControlsWidgetColor: c.chartAccent,
+            backgroundColor: c.background,
             initAspectRatio: CropAspectRatioPreset.square,
             lockAspectRatio: true,
             cropStyle: CropStyle.circle,

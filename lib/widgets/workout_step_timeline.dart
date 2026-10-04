@@ -411,19 +411,19 @@ class _StepRow extends StatelessWidget {
     final c = context.colors;
     switch (block.type) {
       case BlockType.warmup:
-        return const Color(0xFF388E3C);
+        return c.workoutEasy;
       case BlockType.cooldown:
-        return const Color(0xFF1565C0);
+        return c.workoutLong;
       case BlockType.recovery:
         return c.textTertiary;
       case BlockType.main:
         return switch (intent) {
-          WorkoutIntent.threshold => const Color(0xFFBF360C),
-          WorkoutIntent.vo2max => const Color(0xFF0D47A1),
-          WorkoutIntent.speed => const Color(0xFF6A1B9A),
-          WorkoutIntent.raceSpecific => const Color(0xFFAD1457),
-          WorkoutIntent.endurance => const Color(0xFF1B5E20),
-          WorkoutIntent.aerobicBase => const Color(0xFF00695C),
+          WorkoutIntent.threshold => c.workoutTempo,
+          WorkoutIntent.vo2max => c.workoutInterval,
+          WorkoutIntent.speed => c.paceAccent,
+          WorkoutIntent.raceSpecific => c.heroGradientStart,
+          WorkoutIntent.endurance => c.success,
+          WorkoutIntent.aerobicBase => c.chartAccent,
         };
     }
   }

@@ -10,17 +10,8 @@ import '../models/activity_comment.dart';
 import '../models/athlete_profile.dart';
 import '../screens/athlete_list_screen.dart' show AthleteAvatar;
 import '../services/social_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/date_format_utils.dart';
-
-class _P {
-  static const surface = Color(0xFF12161A);
-  static const border = Color(0xFF23262B);
-  static const field = Color(0xFF1A1F25);
-  static const accent = Color(0xFF00B2FF);
-  static const textHigh = Color(0xFFF3F5F7);
-  static const textMid = Color(0xFF9BA3AD);
-  static const textLow = Color(0xFF6A7178);
-}
 
 /// Opens the comments sheet for [runId]. Resolves to the final comment count
 /// once the sheet is dismissed (>= [initialCount]).
@@ -133,14 +124,14 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
-        backgroundColor: _P.surface,
+        backgroundColor: context.colors.surface,
         title: const Text(
           'Delete comment?',
-          style: TextStyle(color: _P.textHigh),
+          style: TextStyle(color: context.colors.textPrimary),
         ),
         content: const Text(
           "This can't be undone.",
-          style: TextStyle(color: _P.textMid),
+          style: TextStyle(color: context.colors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -152,7 +143,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
               HapticFeedback.heavyImpact();
               Navigator.pop(dctx, true);
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: context.colors.danger)),
           ),
         ],
       ),
@@ -196,19 +187,19 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
       builder: (context, sheetScroll) {
         return Container(
           decoration: const BoxDecoration(
-            color: _P.surface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             border: Border(
-              top: BorderSide(color: _P.border),
-              left: BorderSide(color: _P.border),
-              right: BorderSide(color: _P.border),
+              top: BorderSide(color: context.colors.border),
+              left: BorderSide(color: context.colors.border),
+              right: BorderSide(color: context.colors.border),
             ),
           ),
           child: Column(
             children: [
               _grabber(),
               _header(),
-              const Divider(height: 1, color: _P.border),
+              const Divider(height: 1, color: context.colors.border),
               Expanded(child: _body(sheetScroll)),
               _composer(),
             ],
@@ -223,7 +214,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
     width: 40,
     height: 4,
     decoration: BoxDecoration(
-      color: _P.border,
+      color: context.colors.border,
       borderRadius: BorderRadius.circular(2),
     ),
   );
@@ -237,13 +228,13 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
-            color: _P.textHigh,
+            color: context.colors.textPrimary,
             letterSpacing: -0.3,
           ),
         ),
         const Spacer(),
         IconButton(
-          icon: const Icon(Icons.close, color: _P.textMid, size: 22),
+          icon: const Icon(Icons.close, color: context.colors.textSecondary, size: 22),
           onPressed: () => Navigator.pop(context, _count),
         ),
       ],
@@ -256,7 +247,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
         child: SizedBox(
           width: 24,
           height: 24,
-          child: CircularProgressIndicator(strokeWidth: 2, color: _P.accent),
+          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.chartAccent),
         ),
       );
     }
@@ -271,7 +262,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
               Icon(
                 Icons.mode_comment_outlined,
                 size: 34,
-                color: _P.textLow,
+                color: context.colors.textTertiary,
               ),
               SizedBox(height: 14),
               Text(
@@ -279,7 +270,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: _P.textMid,
+                  color: context.colors.textSecondary,
                   height: 1.4,
                 ),
               ),
@@ -318,7 +309,7 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
           8 + MediaQuery.of(context).viewInsets.bottom,
         ),
         decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: _P.border)),
+          border: Border(top: BorderSide(color: context.colors.border)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -331,13 +322,13 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _send(),
-                style: const TextStyle(color: _P.textHigh, fontSize: 14),
-                cursorColor: _P.accent,
+                style: const TextStyle(color: context.colors.textPrimary, fontSize: 14),
+                cursorColor: context.colors.chartAccent,
                 decoration: InputDecoration(
                   hintText: 'Add a comment…',
-                  hintStyle: const TextStyle(color: _P.textLow, fontSize: 14),
+                  hintStyle: const TextStyle(color: context.colors.textTertiary, fontSize: 14),
                   filled: true,
-                  fillColor: _P.field,
+                  fillColor: context.colors.surfaceAlt,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -357,10 +348,10 @@ class _RunCommentsSheetState extends State<_RunCommentsSheet> {
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: _P.accent,
+                        color: context.colors.chartAccent,
                       ),
                     )
-                  : const Icon(Icons.send_rounded, color: _P.accent),
+                  : const Icon(Icons.send_rounded, color: context.colors.chartAccent),
               onPressed: _sending ? null : _send,
             ),
           ],
@@ -409,14 +400,14 @@ class _CommentTile extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: _P.textHigh,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       relativeTime(comment.createdAt),
-                      style: const TextStyle(fontSize: 11, color: _P.textLow),
+                      style: const TextStyle(fontSize: 11, color: context.colors.textTertiary),
                     ),
                   ],
                 ),
@@ -425,7 +416,7 @@ class _CommentTile extends StatelessWidget {
                   comment.comment,
                   style: const TextStyle(
                     fontSize: 13.5,
-                    color: _P.textMid,
+                    color: context.colors.textSecondary,
                     height: 1.35,
                   ),
                 ),
@@ -437,7 +428,7 @@ class _CommentTile extends StatelessWidget {
               icon: const Icon(
                 Icons.delete_outline,
                 size: 17,
-                color: _P.textLow,
+                color: context.colors.textTertiary,
               ),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,

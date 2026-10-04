@@ -291,6 +291,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                             painter: _RoutePainter(
                               points: gpsPoints,
                               lineColor: wColor,
+                              startColor: context.colors.success,
                             ),
                           )
                         : Container(
@@ -1089,8 +1090,13 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 class _RoutePainter extends CustomPainter {
   final List<Map<String, double>> points;
   final Color lineColor;
+  final Color startColor;
 
-  const _RoutePainter({required this.points, required this.lineColor});
+  const _RoutePainter({
+    required this.points,
+    required this.lineColor,
+    required this.startColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1167,7 +1173,7 @@ class _RoutePainter extends CustomPainter {
 
     // Start dot — green
     final startOffset = toOffset(points.first);
-    canvas.drawCircle(startOffset, 5, Paint()..color = const Color(0xFF4CAF50));
+    canvas.drawCircle(startOffset, 5, Paint()..color = startColor);
 
     // End dot — colored by workout type
     final endOffset = toOffset(points.last);

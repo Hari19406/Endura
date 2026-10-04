@@ -229,20 +229,9 @@ class _FeedScreenState extends State<FeedScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTIVITY CARD
 //
-// Deliberately a single (dark) look — the feed is a premium dark surface
-// regardless of the app theme, so colours here are fixed rather than tokens.
+// Colours come from AppColors tokens (context.colors).
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _FeedPalette {
-  static const surface = Color(0xFF12161A);
-  static const border = Color(0xFF23262B);
-  static const pill = Color(0xFF1A1F25);
-  static const mapBase = Color(0xFF0E1114);
-  static const route = Color(0xFF00B2FF);
-  static const textHigh = Color(0xFFF3F5F7);
-  static const textMid = Color(0xFF9BA3AD);
-  static const textLow = Color(0xFF6A7178);
-}
 
 class RunFeedCard extends StatefulWidget {
   final FeedRun run;
@@ -365,9 +354,9 @@ class _RunFeedCardState extends State<RunFeedCard> {
       behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
-          color: _FeedPalette.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _FeedPalette.border),
+          border: Border.all(color: context.colors.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
@@ -386,7 +375,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                   style: const TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
-                    color: _FeedPalette.textHigh,
+                    color: context.colors.textPrimary,
                     letterSpacing: -0.4,
                     height: 1.15,
                   ),
@@ -403,7 +392,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 _map(points),
               ],
               const SizedBox(height: 12),
-              const Divider(height: 1, color: _FeedPalette.border),
+              const Divider(height: 1, color: context.colors.border),
               const SizedBox(height: 6),
               _socialBar(),
             ],
@@ -449,7 +438,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: _FeedPalette.textHigh,
+                          color: context.colors.textPrimary,
                           letterSpacing: -0.2,
                         ),
                       ),
@@ -459,7 +448,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                       const Icon(
                         Icons.verified,
                         size: 14,
-                        color: _FeedPalette.route,
+                        color: context.colors.chartAccent,
                       ),
                     ],
                   ],
@@ -471,7 +460,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: _FeedPalette.textMid,
+                    color: context.colors.textSecondary,
                   ),
                 ),
                 if (run.location != null && run.location!.isNotEmpty) ...[
@@ -481,7 +470,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                       const Icon(
                         Icons.public,
                         size: 12,
-                        color: _FeedPalette.textLow,
+                        color: context.colors.textTertiary,
                       ),
                       const SizedBox(width: 4),
                       Flexible(
@@ -491,7 +480,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 12,
-                            color: _FeedPalette.textLow,
+                            color: context.colors.textTertiary,
                           ),
                         ),
                       ),
@@ -509,10 +498,10 @@ class _RunFeedCardState extends State<RunFeedCard> {
             icon: const Icon(
               Icons.more_horiz,
               size: 20,
-              color: _FeedPalette.textMid,
+              color: context.colors.textSecondary,
             ),
             padding: EdgeInsets.zero,
-            color: _FeedPalette.pill,
+            color: context.colors.surfaceAlt,
             onSelected: (v) {
               if (v == 'profile') {
                 widget.onTapAthlete();
@@ -525,14 +514,14 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 value: 'profile',
                 child: Text(
                   'View profile',
-                  style: TextStyle(color: _FeedPalette.textHigh),
+                  style: TextStyle(color: context.colors.textPrimary),
                 ),
               ),
               PopupMenuItem(
                 value: 'report',
                 child: Text(
                   'Report activity',
-                  style: TextStyle(color: _FeedPalette.textHigh),
+                  style: TextStyle(color: context.colors.textPrimary),
                 ),
               ),
             ],
@@ -573,7 +562,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: _FeedPalette.textLow,
+                        color: context.colors.textTertiary,
                         letterSpacing: 0.7,
                       ),
                     ),
@@ -585,7 +574,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
-                        color: _FeedPalette.textHigh,
+                        color: context.colors.textPrimary,
                         letterSpacing: -0.3,
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),
@@ -605,13 +594,13 @@ class _RunFeedCardState extends State<RunFeedCard> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
-        color: _FeedPalette.pill,
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _FeedPalette.border),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.bolt, size: 16, color: _FeedPalette.route),
+          const Icon(Icons.bolt, size: 16, color: context.colors.chartAccent),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -624,7 +613,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: _FeedPalette.textHigh,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 if (run.planProgress != null) ...[
@@ -635,7 +624,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 11,
-                      color: _FeedPalette.textMid,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                 ],
@@ -648,7 +637,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: _FeedPalette.route.withValues(alpha: 0.14),
+                color: context.colors.chartAccent.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
@@ -656,7 +645,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: _FeedPalette.route,
+                  color: context.colors.chartAccent,
                 ),
               ),
             ),
@@ -674,12 +663,12 @@ class _RunFeedCardState extends State<RunFeedCard> {
       child: Container(
         height: 224,
         width: double.infinity,
-        color: _FeedPalette.mapBase,
+        color: context.colors.background,
         child: CustomPaint(
           size: Size.infinite,
           painter: RouteTracePainter(
             points: points,
-            color: _FeedPalette.route,
+            color: context.colors.chartAccent,
             strokeWidth: 3.5,
             padding: 18,
           ),
@@ -698,7 +687,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
               ? Icons.local_fire_department
               : Icons.local_fire_department_outlined,
           size: 18,
-          color: _kudosed ? _FeedPalette.route : _FeedPalette.textLow,
+          color: _kudosed ? context.colors.chartAccent : context.colors.textTertiary,
         ),
         const SizedBox(width: 6),
         Text(
@@ -709,14 +698,14 @@ class _RunFeedCardState extends State<RunFeedCard> {
               : (_reactionCount > 0
                     ? '$_reactionCount reacted'
                     : 'Be the first to react'),
-          style: const TextStyle(fontSize: 12, color: _FeedPalette.textMid),
+          style: const TextStyle(fontSize: 12, color: context.colors.textSecondary),
         ),
         const Spacer(),
         IconButton(
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          icon: const Icon(Icons.share, size: 18, color: _FeedPalette.textMid),
+          icon: const Icon(Icons.share, size: 18, color: context.colors.textSecondary),
           onPressed: _share,
         ),
         const SizedBox(width: 4),
@@ -729,7 +718,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
           icon: Icon(
             _kudosed ? Icons.favorite : Icons.favorite_border,
             size: 19,
-            color: _kudosed ? _FeedPalette.route : _FeedPalette.textMid,
+            color: _kudosed ? context.colors.chartAccent : context.colors.textSecondary,
           ),
           onPressed: _toggleReaction,
         ),
@@ -748,7 +737,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
           icon: const Icon(
             Icons.mode_comment_outlined,
             size: 18,
-            color: _FeedPalette.textMid,
+            color: context.colors.textSecondary,
           ),
           onPressed: _openComments,
         ),
@@ -759,7 +748,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
             child: Container(
               padding: const EdgeInsets.all(3),
               decoration: const BoxDecoration(
-                color: _FeedPalette.route,
+                color: context.colors.chartAccent,
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -767,7 +756,7 @@ class _RunFeedCardState extends State<RunFeedCard> {
                 style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF0B0B0C),
+                  color: context.colors.onAccent,
                 ),
               ),
             ),

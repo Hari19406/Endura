@@ -100,20 +100,17 @@ class TargetPaceIndicator extends StatelessWidget {
 
   // ── Visual config per status ─────────────────────────────────────────────
 
-  static const _onPaceColor = Color(0xFF2E7D32); // green
-  static const _tooSlowColor = Color(0xFFD32F2F); // red
-  static const _tooFastColor = Color(0xFFF57C00); // amber
-
-  Color _statusColor(PaceStatus s) {
+  Color _statusColor(BuildContext context, PaceStatus s) {
+    final c = context.colors;
     switch (s) {
       case PaceStatus.onPace:
-        return _onPaceColor;
+        return c.success;
       case PaceStatus.tooSlow:
-        return _tooSlowColor;
+        return c.danger;
       case PaceStatus.tooFast:
-        return _tooFastColor;
+        return c.workoutTempo;
       case PaceStatus.noData:
-        return const Color(0xFF999999);
+        return c.textTertiary;
     }
   }
 
@@ -155,7 +152,7 @@ class TargetPaceIndicator extends StatelessWidget {
       targetRange: targetRange!,
     );
 
-    final color = _statusColor(status);
+    final color = _statusColor(context, status);
     final label = _statusLabel(status);
     final icon = _statusIcon(status);
     final range = PaceComparator.formatRange(targetRange!, useMiles: useMiles);

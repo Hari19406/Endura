@@ -132,6 +132,7 @@ class _BestEffortsDetailScreenState extends State<BestEffortsDetailScreen>
         ),
       );
     }
+    // Medal palette (gold/silver/bronze) — no matching AppColors tokens.
     final (Color bg, Color text) = switch (rank) {
       1 => (const Color(0xFFFAC775), const Color(0xFF412402)), // Gold
       2 => (const Color(0xFFD3D1C7), const Color(0xFF444441)), // Silver

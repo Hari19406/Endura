@@ -69,20 +69,20 @@ class PlanCompleteCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF004D40).withOpacity(0.12),
+                color: c.success.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('🎉', style: TextStyle(fontSize: 13)),
-                  SizedBox(width: 6),
+                  const Text('🎉', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 6),
                   Text(
                     'PLAN COMPLETE',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF00796B),
+                      color: c.success,
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -212,12 +212,12 @@ class PlanCompleteCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: highlight
-              ? const Color(0xFF004D40).withOpacity(0.08)
+              ? c.success.withValues(alpha: 0.12)
               : c.divider,
           borderRadius: BorderRadius.circular(10),
           border: highlight
               ? Border.all(
-                  color: const Color(0xFF00796B).withOpacity(0.25),
+                  color: c.success.withValues(alpha: 0.25),
                   width: 1,
                 )
               : null,
@@ -228,7 +228,7 @@ class PlanCompleteCard extends StatelessWidget {
             Icon(
               icon,
               size: 13,
-              color: highlight ? const Color(0xFF00796B) : c.textTertiary,
+              color: highlight ? c.success : c.textTertiary,
             ),
             const SizedBox(height: 4),
             Text(
@@ -236,7 +236,7 @@ class PlanCompleteCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: highlight ? const Color(0xFF00796B) : c.textPrimary,
+                color: highlight ? c.success : c.textPrimary,
               ),
             ),
             Text(

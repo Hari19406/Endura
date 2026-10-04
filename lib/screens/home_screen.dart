@@ -365,10 +365,10 @@ class WorkoutCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.chat_bubble_outline_rounded,
                             size: 11,
-                            color: Color(0xFF00A08A),
+                            color: c.chartAccent,
                           ),
                           const SizedBox(width: 5),
                           Text(

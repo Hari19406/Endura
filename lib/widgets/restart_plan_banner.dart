@@ -40,7 +40,7 @@ class RestartPlanBanner extends StatelessWidget {
             border: Border.all(color: c.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
+                color: c.scrim.withValues(alpha: 0.22),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
