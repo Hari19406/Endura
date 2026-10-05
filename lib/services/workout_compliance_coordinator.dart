@@ -12,6 +12,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import '../config/feature_flags.dart';
 import '../engines/plan/materialized_plan.dart';
 import '../engines/plan/plan_store.dart';
 import '../utils/database_service.dart' show loadSavedRuns;
@@ -29,6 +30,10 @@ class WorkoutComplianceCoordinator {
   /// Returns the matches made (empty when nothing changed). Never throws —
   /// failures are logged and swallowed so the dashboard still paints.
   Future<List<ComplianceMatch>> sync({int windowDays = 1}) async {
+    // Plan-started runs are stamped directly by PlanStore.markDayCompleted and
+    // manual links by the briefing's "Link Activity"; the fuzzy scan below is
+    // what let free runs complete workouts, so it's off unless flagged on.
+    if (!enableAutoRunMatching) return const [];
     if (_running) return const [];
     _running = true;
     try {
