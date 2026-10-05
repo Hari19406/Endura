@@ -12,7 +12,7 @@
 ///     candidates — rest days are never marked complete.
 ///   • An activity matches a scheduled day when its calendar date is within
 ///     ±[windowDays] of the day's scheduled date (default ±1: a same-day run, or
-///     one that slipped a day), AND it clears the completion threshold —
+///     one that slipped a day) *within the same Mon–Sun week*, AND it clears the completion threshold —
 ///     ≥ [minCompletionRatio] of the target distance, or the same fraction of
 ///     the workout's estimated duration.
 ///   • Each activity is claimed by at most one day; the closest date wins, then
@@ -166,6 +166,13 @@ class WorkoutComplianceMatcher {
         if (claimed.contains(a.id)) continue;
         final offset = PlanCalendar.daysBetween(c.scheduledDate, aDate);
         if (offset.abs() > win) continue;
+        // A run belongs to the Mon–Sun week it happened in: the ± slip never
+        // crosses a week boundary, otherwise a Sunday run would tick off the
+        // *next* Monday and a fresh week would open at "1 / N".
+        if (PlanCalendar.mondayOf(aDate) !=
+            PlanCalendar.mondayOf(c.scheduledDate)) {
+          continue;
+        }
 
         final distRatio = target > 0 ? a.distanceKm / target : 1.0;
         final durRatio = (plannedSecs > 0 && a.durationSeconds > 0)

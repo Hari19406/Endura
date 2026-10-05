@@ -159,6 +159,19 @@ void main() {
     expect(tight.changed, isFalse);
   });
 
+  test('a run never counts toward a day in a different Mon–Sun week', () {
+    // Sunday of week 1 (a rest day) — one day before week 2's Monday quality
+    // session. Inside ±1 day, but it belongs to last week, so it must not
+    // tick off week 2's Monday and show "1 / N" on a fresh week.
+    final sunday = _act('run-sun', _d(6), 8.0);
+    final res = WorkoutComplianceMatcher.match(
+      plan: _plan(),
+      recentActivities: [sunday],
+    );
+    expect(res.changed, isFalse);
+    expect(res.plan.weekByNumber(2)!.days[0].completion, isNull);
+  });
+
   test('below the completion threshold on distance → no match', () {
     final res = WorkoutComplianceMatcher.match(
       plan: _plan(),
