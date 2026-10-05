@@ -172,6 +172,42 @@ void main() {
     expect(res.plan.weekByNumber(2)!.days[0].completion, isNull);
   });
 
+  test('clearAutoMatchedCompletions drops only synthetic-id completions', () {
+    // Auto-match (id has '#') on Mon, real linked run (numeric id) on Wed.
+    final auto = WorkoutComplianceMatcher.match(
+      plan: _plan(),
+      recentActivities: [_act('2026-01-05T08:00:00.000#8.00', _d(0), 8.0)],
+    ).plan;
+    final withReal = auto.copyWith(weeks: [
+      auto.weeks[0].copyWith(days: [
+        for (final d in auto.weeks[0].days)
+          d.weekday == 2
+              ? d.copyWith(
+                  completion: DayCompletion(
+                    completedAt: _d(2),
+                    actualKm: 6,
+                    runId: '42',
+                  ),
+                )
+              : d,
+      ]),
+      auto.weeks[1],
+    ]);
+
+    final cleaned =
+        WorkoutComplianceMatcher.clearAutoMatchedCompletions(withReal);
+    final days = cleaned.weekByNumber(1)!.days;
+    expect(days[0].completion, isNull);
+    expect(days[2].completion!.runId, '42');
+
+    // Nothing to clear → same instance.
+    expect(
+      identical(WorkoutComplianceMatcher.clearAutoMatchedCompletions(cleaned),
+          cleaned),
+      isTrue,
+    );
+  });
+
   test('below the completion threshold on distance → no match', () {
     final res = WorkoutComplianceMatcher.match(
       plan: _plan(),

@@ -33,7 +33,10 @@ class WorkoutComplianceCoordinator {
     // Plan-started runs are stamped directly by PlanStore.markDayCompleted and
     // manual links by the briefing's "Link Activity"; the fuzzy scan below is
     // what let free runs complete workouts, so it's off unless flagged on.
-    if (!enableAutoRunMatching) return const [];
+    if (!enableAutoRunMatching) {
+      await _clearStaleAutoMatches();
+      return const [];
+    }
     if (_running) return const [];
     _running = true;
     try {
@@ -64,6 +67,22 @@ class WorkoutComplianceCoordinator {
       return const [];
     } finally {
       _running = false;
+    }
+  }
+
+  /// Drop completions the (now disabled) fuzzy scan stamped earlier, so a
+  /// free run that once ticked off a workout stops counting. Idempotent and
+  /// cheap — a no-op once none remain.
+  Future<void> _clearStaleAutoMatches() async {
+    try {
+      final plan = await PlanStore.instance.load();
+      if (plan == null) return;
+      final cleaned = WorkoutComplianceMatcher.clearAutoMatchedCompletions(plan);
+      if (identical(cleaned, plan)) return;
+      await PlanStore.instance.save(cleaned);
+      debugPrint('[Compliance] cleared stale auto-matched completions');
+    } catch (e, s) {
+      debugPrint('[WorkoutComplianceCoordinator] cleanup failed: $e\n$s');
     }
   }
 

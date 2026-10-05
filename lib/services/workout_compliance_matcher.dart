@@ -237,6 +237,41 @@ class WorkoutComplianceMatcher {
     );
   }
 
+  /// Auto-matched completions carry the coordinator's synthetic activity id
+  /// (`<iso date>#<km>`); plan-started and manually linked runs carry the
+  /// numeric DB id (or none). Returns [plan] with every auto-matched
+  /// completion cleared — the same instance when there is none.
+  static MaterializedPlan clearAutoMatchedCompletions(MaterializedPlan plan) {
+    bool isAuto(MaterializedDay d) =>
+        (d.completion?.runId ?? '').contains('#');
+
+    if (!plan.weeks.any((w) => w.days.any(isAuto))) return plan;
+
+    return plan.copyWith(
+      weeks: [
+        for (final w in plan.weeks)
+          if (!w.days.any(isAuto))
+            w
+          else
+            w.copyWith(days: [
+              for (final d in w.days)
+                if (isAuto(d))
+                  MaterializedDay(
+                    weekday: d.weekday,
+                    slot: d.slot,
+                    intent: d.intent,
+                    templateId: d.templateId,
+                    progressionStep: d.progressionStep,
+                    workout: d.workout,
+                    skippedAt: d.skippedAt,
+                  )
+                else
+                  d,
+            ]),
+      ],
+    );
+  }
+
   /// "Completed: 8.2 km @ 5:12 /km" — the string the WorkoutCard shows in place
   /// of the Start-Run CTA. Pace is omitted when it wasn't captured.
   static String completedStatsLabel(
