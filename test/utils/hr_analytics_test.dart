@@ -1,4 +1,4 @@
-import 'package:endura/utils/hr_analytics.dart';
+import 'package:run_app/utils/hr_analytics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 HrPoint p(double? t, int? bpm) => HrPoint(timeSeconds: t, bpm: bpm);
@@ -9,11 +9,7 @@ HrZoneStat zoneOf(List<HrZoneStat> zones, int z) =>
 void main() {
   group('HrAnalytics.summary', () {
     test('averages and peaks valid readings', () {
-      final s = HrAnalytics.summary([
-        p(0, 140),
-        p(15, 150),
-        p(30, 160),
-      ])!;
+      final s = HrAnalytics.summary([p(0, 140), p(15, 150), p(30, 160)])!;
       expect(s.avg, 150);
       expect(s.peak, 160);
       expect(s.count, 3);
@@ -149,7 +145,11 @@ void main() {
     });
 
     test('null HR readings credit no time but end the previous interval', () {
-      final zones = HrAnalytics.zones([p(0, 150), p(10, null), p(20, 150)], 200);
+      final zones = HrAnalytics.zones([
+        p(0, 150),
+        p(10, null),
+        p(20, 150),
+      ], 200);
       expect(zoneOf(zones, 3).durationSeconds, 20);
     });
 

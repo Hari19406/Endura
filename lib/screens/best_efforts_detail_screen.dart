@@ -26,6 +26,7 @@ class BestEffortsDetailScreen extends StatefulWidget {
   final Future<List<BestEffortRecord>> Function(DistanceCategory category)
   loadEntries;
   final Future<RunRecord?> Function(int runId) loadRun;
+  final Future<MaxHrResolution> Function() loadMaxHr;
 
   BestEffortsDetailScreen({
     super.key,
@@ -35,9 +36,11 @@ class BestEffortsDetailScreen extends StatefulWidget {
     Future<List<BestEffortRecord>> Function(DistanceCategory category)?
     loadEntries,
     Future<RunRecord?> Function(int runId)? loadRun,
+    Future<MaxHrResolution> Function()? loadMaxHr,
   }) : loadEntries =
            loadEntries ?? DatabaseService.instance.getBestEffortsForCategory,
-       loadRun = loadRun ?? DatabaseService.instance.getRunById;
+       loadRun = loadRun ?? DatabaseService.instance.getRunById,
+       loadMaxHr = loadMaxHr ?? AthletePhysiology.instance.resolveMaxHr;
 
   @override
   State<BestEffortsDetailScreen> createState() =>
@@ -93,7 +96,7 @@ class _BestEffortsDetailScreenState extends State<BestEffortsDetailScreen>
     if (id == null) return;
     final run = await widget.loadRun(id);
     if (run == null || !mounted) return;
-    final maxHr = await AthletePhysiology.instance.resolveMaxHr();
+    final maxHr = await widget.loadMaxHr();
     if (!mounted) return;
     Navigator.push(
       context,

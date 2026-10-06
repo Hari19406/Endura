@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/screens/best_efforts_detail_screen.dart';
+import 'package:run_app/services/athlete_physiology.dart';
 import 'package:run_app/services/best_efforts_service.dart';
 import 'package:run_app/theme/app_colors.dart';
 import 'package:run_app/utils/database_service.dart';
@@ -88,6 +89,7 @@ void main() {
                 ]
               : const [],
           loadRun: (id) async => id == 42 ? fixtureRun : null,
+          loadMaxHr: () async => MaxHrResolution.fallback,
         ),
       ),
     );
