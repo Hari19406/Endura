@@ -27,9 +27,12 @@ import '../engines/plan/plan_store.dart';
 import '../engines/pace_engine.dart';
 import '../engines/config/workout_template_library.dart';
 import '../services/analytics_service.dart';
+import '../services/ble_connection_state.dart';
 import '../services/ble_heart_rate_service.dart';
 import '../services/ble_cadence_service.dart';
 import '../services/health_bridge_service.dart';
+import '../services/hr_session.dart';
+import '../utils/hr_analytics.dart';
 import '../utils/gap_calculator.dart';
 import '../services/best_efforts_service.dart';
 import '../theme/app_colors.dart';
@@ -176,13 +179,14 @@ class _RunScreenState extends State<RunScreen>
 
   // ── Live vitals: real BLE/Health Connect/HealthKit data only, never
   // estimated. Null fields simply mean "no source connected". ────────────
-  int? _latestHr;
-  int? _peakHrSeen;
-  final List<int> _hrSamplesForAvg = [];
+  // HR validation, freshness and avg/peak live in HrSession (see
+  // services/hr_session.dart); it only counts readings while [_isCountingHr].
+  final HrSession _hrSession = HrSession();
   int? _latestCadence;
   int? _peakCadenceSeen;
   final List<int> _cadenceSamplesForAvg = [];
   StreamSubscription<int>? _hrSub;
+  StreamSubscription<BleConnectionState>? _hrConnSub;
   StreamSubscription<int>? _cadenceSub;
   Timer? _healthPollTimer;
 
@@ -897,9 +901,7 @@ class _RunScreenState extends State<RunScreen>
         _trackSamples.clear();
         _lastTrackSampleT = 0;
         _lastTrackSampleD = 0;
-        _latestHr = null;
-        _peakHrSeen = null;
-        _hrSamplesForAvg.clear();
+        _hrSession.reset();
         _latestCadence = null;
         _peakCadenceSeen = null;
         _cadenceSamplesForAvg.clear();
@@ -1076,7 +1078,7 @@ class _RunScreenState extends State<RunScreen>
                           'pace': _paceSnapshot.smoothedPaceSecondsPerKm > 0
                               ? _paceSnapshot.smoothedPaceSecondsPerKm
                               : null,
-                          'hr': _latestHr,
+                          'hr': _hrSession.currentOrNull(DateTime.now()),
                           'cad': _latestCadence,
                         });
                         _lastTrackSampleT = sampleT;
@@ -1147,16 +1149,31 @@ class _RunScreenState extends State<RunScreen>
   /// run — BLE first, falling back to a coarse Health Connect/HealthKit poll
   /// for HR only if no BLE monitor connects within a few seconds. Never
   /// estimates a value: fields stay null when nothing is connected.
+  /// HR counts toward avg/peak only while running in the main set — the same
+  /// window as distance, pace and the track samples (not warmup, cooldown or
+  /// a pause).
+  bool get _isCountingHr =>
+      _runState == RunState.running && _currentPhase == RunMode.mainSet;
+
   void _startVitalsTracking() {
     _hrSub?.cancel();
     _hrSub = BleHeartRateService.instance.bpmStream.listen((bpm) {
-      _latestHr = bpm;
-      _peakHrSeen = _peakHrSeen == null
-          ? bpm
-          : (bpm > _peakHrSeen! ? bpm : _peakHrSeen);
-      _hrSamplesForAvg.add(bpm);
+      _hrSession.onReading(
+        bpm,
+        DateTime.now(),
+        source: HrSourceKind.ble,
+        counting: _isCountingHr,
+      );
       _healthPollTimer?.cancel();
       _healthPollTimer = null;
+    });
+
+    // A dropped strap must not keep feeding its last bpm into samples.
+    _hrConnSub?.cancel();
+    _hrConnSub = BleHeartRateService.instance.connectionStream.listen((state) {
+      if (state == BleConnectionState.disconnected) {
+        _hrSession.invalidateCurrent(HrSourceKind.ble);
+      }
     });
 
     _cadenceSub?.cancel();
@@ -1188,11 +1205,12 @@ class _RunScreenState extends State<RunScreen>
           DateTime.now(),
         );
         if (bpm != null) {
-          _latestHr = bpm;
-          _peakHrSeen = _peakHrSeen == null
-              ? bpm
-              : (bpm > _peakHrSeen! ? bpm : _peakHrSeen);
-          _hrSamplesForAvg.add(bpm);
+          _hrSession.onReading(
+            bpm,
+            DateTime.now(),
+            source: HrSourceKind.healthPoll,
+            counting: _isCountingHr,
+          );
         }
       });
     });
@@ -1353,6 +1371,7 @@ class _RunScreenState extends State<RunScreen>
     _elapsedTimer?.cancel();
     _elapsedTimer = null;
     _hrSub?.cancel();
+    _hrConnSub?.cancel();
     _hrSub = null;
     _cadenceSub?.cancel();
     _cadenceSub = null;
@@ -1469,18 +1488,17 @@ class _RunScreenState extends State<RunScreen>
               .fetchHeartRateSeries(mainSetStart, runDate);
         }
 
-        int? avgHr;
-        int? peakHr;
-        if (_hrSamplesForAvg.isNotEmpty) {
-          avgHr =
-              (_hrSamplesForAvg.reduce((a, b) => a + b) /
-                      _hrSamplesForAvg.length)
-                  .round();
-          peakHr = _peakHrSeen;
-        } else if (healthHrBackfill.isNotEmpty) {
-          final bpms = healthHrBackfill.map((s) => s.bpm).toList();
-          avgHr = (bpms.reduce((a, b) => a + b) / bpms.length).round();
-          peakHr = bpms.reduce((a, b) => a > b ? a : b);
+        // Live readings (main set only, 30–230 bpm) win; the Health
+        // Connect/HealthKit backfill is only used when none were counted, and
+        // goes through the same validity filter.
+        int? avgHr = _hrSession.avg;
+        int? peakHr = _hrSession.peak;
+        if (avgHr == null && healthHrBackfill.isNotEmpty) {
+          final backfill = HrAnalytics.summary([
+            for (final s in healthHrBackfill) HrPoint(bpm: s.bpm),
+          ]);
+          avgHr = backfill?.avg;
+          peakHr = backfill?.peak;
         }
 
         int? avgCadence;
@@ -1763,6 +1781,7 @@ class _RunScreenState extends State<RunScreen>
     _elapsedTimer?.cancel();
     _notifSyncTimer?.cancel();
     _hrSub?.cancel();
+    _hrConnSub?.cancel();
     _cadenceSub?.cancel();
     _healthPollTimer?.cancel();
     _positionStream?.cancel();
@@ -2528,6 +2547,7 @@ class _RunScreenState extends State<RunScreen>
     _elapsedTimer?.cancel();
     _elapsedTimer = null;
     _hrSub?.cancel();
+    _hrConnSub?.cancel();
     _hrSub = null;
     _cadenceSub?.cancel();
     _cadenceSub = null;
@@ -2574,9 +2594,7 @@ class _RunScreenState extends State<RunScreen>
       _trackSamples.clear();
       _lastTrackSampleT = 0;
       _lastTrackSampleD = 0;
-      _latestHr = null;
-      _peakHrSeen = null;
-      _hrSamplesForAvg.clear();
+      _hrSession.reset();
       _latestCadence = null;
       _peakCadenceSeen = null;
       _cadenceSamplesForAvg.clear();

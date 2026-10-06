@@ -272,20 +272,15 @@ class ActivityDetail {
   /// recorded at all (indoor / no GPS altitude).
   bool get hasElevationData => _channelCount((s) => s.elevationM != null) >= 2;
 
-  /// Mean HR over the trace — display fallback when [avgHr] wasn't supplied.
-  int? get seriesAvgHr {
-    final v = telemetrySeries
-        .map((s) => s.hrBpm)
-        .whereType<int>()
-        .toList(growable: false);
-    if (v.isEmpty) return null;
-    return (v.reduce((a, b) => a + b) / v.length).round();
-  }
+  HrSummary? get _seriesHrSummary => HrAnalytics.summary([
+    for (final s in telemetrySeries) HrPoint(bpm: s.hrBpm),
+  ]);
 
-  int? get seriesPeakHr {
-    final v = telemetrySeries.map((s) => s.hrBpm).whereType<int>();
-    return v.isEmpty ? null : v.reduce(math.max);
-  }
+  /// Mean HR over the trace (valid 30–230 bpm readings only) — display
+  /// fallback when [avgHr] wasn't supplied.
+  int? get seriesAvgHr => _seriesHrSummary?.avg;
+
+  int? get seriesPeakHr => _seriesHrSummary?.peak;
 
   int? get effectiveAvgHr => avgHr ?? seriesAvgHr;
   int? get effectivePeakHr => peakHr ?? seriesPeakHr;
@@ -628,15 +623,11 @@ class ActivityDetail {
       }
     }
 
-    final hrSamples = samples
-        .map((s) => s.hrBpm)
-        .whereType<int>()
-        .toList(growable: false);
     final avgHr =
         record.avgHeartRate ??
-        (hrSamples.isEmpty
-            ? null
-            : (hrSamples.reduce((a, b) => a + b) / hrSamples.length).round());
+        HrAnalytics.summary([
+          for (final s in samples) HrPoint(bpm: s.hrBpm),
+        ])?.avg;
     final hrZones = [
       for (final z in HrAnalytics.zones([
         for (final s in samples)

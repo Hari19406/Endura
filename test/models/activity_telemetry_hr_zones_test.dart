@@ -86,4 +86,29 @@ void main() {
     expect(a.maxHr, isNull);
     expect(a.hasHrData, isFalse);
   });
+
+  test('display fallback avg/peak ignore invalid readings like the zones', () {
+    final a = ActivityDetail.fromRunRecord(
+      _run([_s(0, 0, 150), _s(15, 50, 250), _s(30, 100, 170), _s(45, 150, 20)]),
+      runnerName: 'x',
+    );
+    expect(a.effectivePeakHr, 170);
+    expect(a.effectiveAvgHr, 160);
+  });
+
+  test('a stored avg/peak column still takes precedence over samples', () {
+    final r = RunRecord(
+      date: DateTime(2026, 9, 20, 7),
+      distanceKm: 1.0,
+      averagePace: '5:00',
+      durationSeconds: 300,
+      routePolyline: '',
+      avgHeartRate: 155,
+      peakHeartRate: 181,
+      trackSamples: [_s(0, 0, 150), _s(15, 50, 170)],
+    );
+    final a = ActivityDetail.fromRunRecord(r, runnerName: 'x');
+    expect(a.effectiveAvgHr, 155);
+    expect(a.effectivePeakHr, 181);
+  });
 }
