@@ -14,6 +14,7 @@ import 'dart:math' as math;
 
 import '../services/athlete_physiology.dart';
 import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
+import '../utils/gap_calculator.dart';
 import '../utils/hr_analytics.dart';
 import '../utils/pace_analytics.dart';
 import '../utils/run_title.dart';
@@ -41,12 +42,18 @@ class KmSplit {
   /// and label stay comparable with the full splits.
   final double distanceKm;
 
+  /// Grade-adjusted pace for this split, in the same unit and normalisation
+  /// as [paceSeconds] (a per-unit pace). Null when the run had no usable
+  /// altitude/segment coverage for the split — never fabricated.
+  final int? gapPaceSeconds;
+
   const KmSplit({
     required this.km,
     required this.paceSeconds,
     this.elevationChangeM,
     this.avgHr,
     this.distanceKm = 1.0,
+    this.gapPaceSeconds,
     bool? partial,
   }) : isPartial = partial ?? distanceKm < 0.995;
 
@@ -59,12 +66,18 @@ class KmSplit {
     elevationChangeM: elevationChangeM,
     avgHr: avgHr,
     distanceKm: distanceKm,
+    gapPaceSeconds: gapPaceSeconds,
     partial: isPartial,
   );
 
   /// "m:ss" per-km label.
   String get paceLabel =>
       '${paceSeconds ~/ 60}:${(paceSeconds % 60).toString().padLeft(2, '0')}';
+
+  /// "m:ss" GAP label, or null when there is no GAP for this split.
+  String? get gapPaceLabel => gapPaceSeconds == null
+      ? null
+      : '${gapPaceSeconds! ~/ 60}:${(gapPaceSeconds! % 60).toString().padLeft(2, '0')}';
 }
 
 /// A single point on the high-resolution telemetry trace, keyed by cumulative
@@ -206,6 +219,10 @@ class ActivityDetail {
   /// track to adjust against — the GAP block is omitted in that case.
   final String? avgGapPace;
 
+  /// The GAP analysis behind [avgGapPace] and the per-split GAP (null when
+  /// there is no usable telemetry, and for Feed runs).
+  final GapAnalysis? gap;
+
   /// Decoded `{lat, lng}` points for the route preview. May be empty.
   final List<Map<String, double>> routePoints;
 
@@ -239,6 +256,7 @@ class ActivityDetail {
     this.avgHr,
     this.peakHr,
     this.avgGapPace,
+    this.gap,
     this.routePoints = const [],
   });
 
@@ -258,10 +276,15 @@ class ActivityDetail {
 
   /// GAP minus raw pace, in seconds/km. Negative → GAP is faster than raw.
   int? get gapDeltaSeconds {
+    // Compare like with like: GAP and the raw pace over the SAME valid
+    // segments, so a flat run reads exactly 0 (the official average pace
+    // also covers stretches the GAP analysis had to skip).
+    final analysis = gap;
+    if (analysis != null) return analysis.deltaSecPerKm.round();
     final raw = avgPaceSeconds;
-    final gap = avgGapSeconds;
-    if (raw == null || gap == null) return null;
-    return gap - raw;
+    final gapSeconds = avgGapSeconds;
+    if (raw == null || gapSeconds == null) return null;
+    return gapSeconds - raw;
   }
 
   int _channelCount(bool Function(TelemetrySample) has) =>
@@ -356,6 +379,8 @@ class ActivityDetail {
               .whereType<double>()
               .toList();
           final hrs = inBucket.map((s) => s.hrBpm).whereType<int>().toList();
+          final milePace = (avgPaceSecPerKm * mileKm).round();
+          final gapRatio = gap?.ratioBetween(lo, hi);
           rebucketed.add(
             KmSplit(
               km: u,
@@ -363,7 +388,10 @@ class ActivityDetail {
               // per-unit pace — a trailing partial bucket is normalised too
               // (its real length is carried in distanceKm) so its bar/label
               // stay comparable with the full miles.
-              paceSeconds: (avgPaceSecPerKm * mileKm).round(),
+              paceSeconds: milePace,
+              gapPaceSeconds: gapRatio == null
+                  ? null
+                  : (milePace * gapRatio).round(),
               distanceKm: hi - lo,
               partial: (hi - lo) < mileKm - 0.005,
               elevationChangeM: alts.length >= 2
@@ -389,6 +417,9 @@ class ActivityDetail {
           elevationChangeM: s.elevationChangeM,
           avgHr: s.avgHr,
           distanceKm: s.distanceKm,
+          gapPaceSeconds: s.gapPaceSeconds == null
+              ? null
+              : (s.gapPaceSeconds! * mileKm).round(),
           partial: s.isPartial,
         ),
     ];
@@ -565,6 +596,29 @@ class ActivityDetail {
       );
     }
 
+    // GAP is always recomputed from the telemetry (never read back from the
+    // stored `gap_average_pace`, which older builds wrote with an inverted
+    // formula). The finish line closes the gap after the last sample.
+    final gap = GapCalculator.analyze(
+      [
+        for (final s in samples)
+          GapSample(
+            distanceM: s.distanceKm * 1000,
+            timeSeconds: s.timeSeconds,
+            altitudeM: s.elevationM,
+            paceSecPerKm: s.paceSeconds?.toDouble(),
+          ),
+      ],
+      finalDistanceM: record.distanceKm * 1000,
+      finalSeconds: record.durationSeconds.toDouble(),
+    );
+
+    int? splitGap(int paceSeconds, double loKm, double hiKm) {
+      if (gap == null || paceSeconds <= 0) return null;
+      final ratio = gap.ratioBetween(loKm, hiKm);
+      return ratio == null ? null : (paceSeconds * ratio).round();
+    }
+
     final splits = <KmSplit>[];
     for (final m in record.splits) {
       final km = (m['km'] as num?)?.toInt();
@@ -592,6 +646,7 @@ class ActivityDetail {
           avgHr: hrs.isEmpty
               ? null
               : (hrs.reduce((a, b) => a + b) / hrs.length).round(),
+          gapPaceSeconds: splitGap(sec, km - 1.0, km.toDouble()),
         ),
       );
     }
@@ -620,10 +675,16 @@ class ActivityDetail {
             .map((s) => (s['hr'] as num?)?.toDouble())
             .whereType<double>()
             .toList(growable: false);
+        final partialPace = (remainingSec / remainingKm).round();
         splits.add(
           KmSplit(
             km: coveredKm + 1,
-            paceSeconds: (remainingSec / remainingKm).round(),
+            paceSeconds: partialPace,
+            gapPaceSeconds: splitGap(
+              partialPace,
+              coveredKm.toDouble(),
+              record.distanceKm,
+            ),
             elevationChangeM: alts.length >= 2 ? alts.last - alts.first : null,
             avgHr: hrs.isEmpty
                 ? null
@@ -697,9 +758,15 @@ class ActivityDetail {
       peakCadence: record.peakCadence,
       avgHr: avgHr,
       peakHr: record.peakHeartRate,
-      avgGapPace: record.gapAveragePace,
+      avgGapPace: gap == null ? null : _paceLabel(gap.avgGapSecPerKm),
+      gap: gap,
       routePoints: decodePolylineToPoints(record.routePolyline),
     );
+  }
+
+  static String _paceLabel(double secPerKm) {
+    final s = secPerKm.round();
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
   static String _titleForWorkout(String type) => switch (type) {

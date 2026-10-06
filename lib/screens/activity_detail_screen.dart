@@ -901,6 +901,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final slowest = validPaces.isEmpty ? 0 : validPaces.reduce(math.max);
     final showElev = a.anySplitHasElevation;
     final showHr = a.anySplitHasHr;
+    final showGap = splits.any((s) => s.gapPaceSeconds != null);
     return _card(
       c,
       title: _useMiles ? 'MILE SPLITS' : 'KILOMETRE SPLITS',
@@ -913,6 +914,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               const SizedBox(width: 10),
               _splitHeaderCell(c, 'PACE', width: 44),
               const Expanded(child: SizedBox()),
+              if (showGap) ...[
+                _splitHeaderCell(c, 'GAP', width: 40, alignEnd: true),
+                const SizedBox(width: 10),
+              ],
               if (showElev) ...[
                 _splitHeaderCell(c, 'ELEV', width: 46, alignEnd: true),
                 const SizedBox(width: 10),
@@ -972,6 +977,22 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       ),
                     ),
                   ),
+                  if (showGap) ...[
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        s.gapPaceLabel ?? '—',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: c.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ],
                   if (showElev) ...[
                     const SizedBox(width: 10),
                     SizedBox(
@@ -2069,11 +2090,7 @@ class _RoutePreviewPainter extends CustomPainter {
         ..style = PaintingStyle.stroke,
     );
 
-    canvas.drawCircle(
-      toOffset(points.first),
-      5,
-      Paint()..color = startColor,
-    );
+    canvas.drawCircle(toOffset(points.first), 5, Paint()..color = startColor);
     canvas.drawCircle(toOffset(points.last), 5, Paint()..color = lineColor);
   }
 
