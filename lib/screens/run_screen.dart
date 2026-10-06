@@ -101,6 +101,26 @@ class _RunScreenState extends State<RunScreen>
   PermissionStatus _permissionStatus = PermissionStatus.checking;
 
   int _seconds = 0;
+
+  /// Wall-clock instant up to which [_seconds] has been accounted for while
+  /// running; null when not running. [_seconds] is derived from this rather
+  /// than by counting timer ticks, because ticks are suspended while the
+  /// screen is off / app is backgrounded but GPS keeps adding distance —
+  /// which stamped km splits and track samples with a lagging clock.
+  DateTime? _clockMark;
+
+  /// Folds whole seconds elapsed on the wall clock since [_clockMark] into
+  /// [_seconds], keeping the sub-second remainder. Call before reading
+  /// [_seconds] anywhere that can run while ticks are suspended.
+  void _syncClock() {
+    final mark = _clockMark;
+    if (mark == null) return;
+    final whole = DateTime.now().difference(mark).inSeconds;
+    if (whole > 0 && whole < 86400) {
+      _seconds += whole;
+      _clockMark = mark.add(Duration(seconds: whole));
+    }
+  }
   double _distance = 0.0;
   double _pendingDistance = 0.0;
   Timer? _timer;
@@ -520,22 +540,7 @@ class _RunScreenState extends State<RunScreen>
     debugPrint('App returning to foreground');
     if (!mounted) return;
     if (_runStartTime != null && _runState == RunState.running) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final backgroundElapsed = prefs.getInt('background_elapsed_seconds');
-        if (backgroundElapsed != null && backgroundElapsed > 0) {
-          setState(() => _seconds = backgroundElapsed);
-        } else {
-          final actualElapsed = DateTime.now()
-              .difference(_runStartTime!)
-              .inSeconds;
-          if (actualElapsed > _seconds && actualElapsed < 86400) {
-            setState(() => _seconds = actualElapsed);
-          }
-        }
-      } catch (e) {
-        debugPrint('Error syncing background time: $e');
-      }
+      setState(_syncClock);
       _resumeTimersAfterBackground();
     }
     _backgroundTime = null;
@@ -551,7 +556,7 @@ class _RunScreenState extends State<RunScreen>
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _runState == RunState.running) {
         setState(() {
-          _seconds++;
+          _syncClock();
           _paceSnapshot = _paceEngine.tick(_seconds);
         });
         _checkPhaseMilestone();
@@ -912,10 +917,11 @@ class _RunScreenState extends State<RunScreen>
     _startGPSMonitoring();
     _startVitalsTracking();
 
+    _clockMark = DateTime.now();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _runState == RunState.running) {
         setState(() {
-          _seconds++;
+          _syncClock();
           _paceSnapshot = _paceEngine.tick(_seconds);
         });
         _checkPhaseMilestone();
@@ -940,6 +946,7 @@ class _RunScreenState extends State<RunScreen>
           ).listen(
             (Position position) {
               if (_runState != RunState.running) return;
+              _syncClock();
               _lastGPSUpdate = DateTime.now();
               if (_isGPSSignalLost && mounted)
                 setState(() => _isGPSSignalLost = false);
@@ -1194,6 +1201,8 @@ class _RunScreenState extends State<RunScreen>
   void _pauseTracking() {
     if (_runState != RunState.running) return;
     HapticFeedback.lightImpact();
+    _syncClock();
+    _clockMark = null;
     _timer?.cancel();
     _timer = null;
     _gpsMonitorTimer?.cancel();
@@ -1223,10 +1232,11 @@ class _RunScreenState extends State<RunScreen>
     _syncForegroundNotificationState();
     Analytics.workoutResumed();
     _startGPSMonitoring();
+    _clockMark = DateTime.now();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _runState == RunState.running) {
         setState(() {
-          _seconds++;
+          _syncClock();
           _paceSnapshot = _paceEngine.tick(_seconds);
         });
         _checkPhaseMilestone();
