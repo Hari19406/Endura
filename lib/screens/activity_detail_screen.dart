@@ -11,6 +11,7 @@ import '../services/cloud_sync_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/pace_analytics.dart';
+import '../utils/run_effort_analytics.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/ambient_scaffold.dart';
 import '../widgets/run_comments_sheet.dart';
@@ -119,6 +120,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   ActivityDetail get a => widget.activity;
+
+  /// Aligned, validated pace / HR / elevation — built once, shared by the
+  /// combined card and the individual charts.
+  late final RunEffortSeries _effort = a.effort;
 
   /// MET-based estimate (assumes 70 kg — we don't collect weight). Mirrors
   /// `RunDetailScreen._estimateCalories` so history parity is kept when the
@@ -392,6 +397,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     _gapBlock(c),
                     const SizedBox(height: 16),
                   ],
+                  if (_effort.supportsCombinedChart) ...[
+                    _EffortCard(effort: _effort, useMiles: _useMiles),
+                    const SizedBox(height: 16),
+                  ],
                   if (a.hasPaceSeries) ...[
                     _paceCard(c),
                     const SizedBox(height: 16),
@@ -405,7 +414,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     const SizedBox(height: 16),
                   ],
                   if (a.hasHrData) ...[
-                    _HrZonesCard(activity: a, useMiles: _useMiles),
+                    _HrZonesCard(
+                      activity: a,
+                      useMiles: _useMiles,
+                      effort: _effort,
+                    ),
                     const SizedBox(height: 16),
                   ],
                   if (a.hasCadenceSeries) _cadenceCard(c),
@@ -1066,22 +1079,31 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   // ── 5a. Pace chart (inverted Y) ──────────────────────────────────────────
 
+  /// Plot-ready runs for [channel]: only valid points, split at GPS/time
+  /// gaps so no line is drawn across a dropout.
+  List<List<FlSpot>> _effortRuns(
+    EffortChannel channel,
+    double Function(EffortPoint p) y,
+  ) => [
+    for (final run in _effort.runsFor(channel))
+      [
+        for (final p in run)
+          FlSpot(UnitUtils.displayDistance(p.distanceKm, _useMiles), y(p)),
+      ],
+  ];
+
   Widget _paceCard(AppColors c) {
-    final spots = [
-      for (final s in a.telemetrySeries)
-        if (s.paceSeconds != null)
-          FlSpot(
-            UnitUtils.displayDistance(s.distanceKm, _useMiles),
-            -UnitUtils.displayPaceSeconds(s.paceSeconds!.toDouble(), _useMiles),
-          ),
-    ];
+    final runs = _effortRuns(
+      EffortChannel.pace,
+      (p) => -UnitUtils.displayPaceSeconds(p.paceSecPerKm!, _useMiles),
+    );
     return _card(
       c,
       title: 'PACE',
       child: SizedBox(
         height: 150,
         child: _ScrubLineChart(
-          spots: spots,
+          runs: runs,
           color: c.chartAccent,
           xUnitLabel: UnitUtils.unitLabel(_useMiles),
           formatY: (y) => _paceFromSeconds((-y).round()),
@@ -1234,20 +1256,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   // ── 5b. Elevation profile ────────────────────────────────────────────────
 
   Widget _elevationCard(AppColors c) {
-    final elevs = a.telemetrySeries
-        .map((s) => s.elevationM)
-        .whereType<double>()
-        .toList();
-    final lo = elevs.reduce(math.min);
-    final hi = elevs.reduce(math.max);
-    final spots = [
-      for (final s in a.telemetrySeries)
-        if (s.elevationM != null)
-          FlSpot(
-            UnitUtils.displayDistance(s.distanceKm, _useMiles),
-            s.elevationM!,
-          ),
-    ];
+    final range = _effort.rangeOf(EffortChannel.elevation);
+    final lo = range?.$1 ?? 0.0;
+    final hi = range?.$2 ?? 0.0;
+    final runs = _effortRuns(EffortChannel.elevation, (p) => p.elevationM!);
     return _card(
       c,
       title: 'ELEVATION PROFILE',
@@ -1258,7 +1270,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       child: SizedBox(
         height: 130,
         child: _ScrubLineChart(
-          spots: spots,
+          runs: runs,
           color: c.cadenceAccent, // green
           xUnitLabel: UnitUtils.unitLabel(_useMiles),
           formatY: (y) => '${y.round()}',
@@ -1288,6 +1300,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             s.cadenceSpm!.toDouble(),
           ),
     ];
+    final runs = [spots];
     final avgCad =
         a.avgCadence ??
         (cadences.isEmpty
@@ -1309,7 +1322,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       child: SizedBox(
         height: 130,
         child: _ScrubLineChart(
-          spots: spots,
+          runs: runs,
           color: c.elevationAccent, // orange
           xUnitLabel: UnitUtils.unitLabel(_useMiles),
           formatY: (y) => '${y.round()}',
@@ -1436,7 +1449,9 @@ LineTouchData _scrubTouchData(
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _ScrubLineChart extends StatelessWidget {
-  final List<FlSpot> spots;
+  /// One list per contiguous stretch; separate lists are NOT joined, so a
+  /// GPS/time gap shows as a break in the line.
+  final List<List<FlSpot>> runs;
   final Color color;
   final String xUnitLabel;
   final String yUnitLabel;
@@ -1445,7 +1460,7 @@ class _ScrubLineChart extends StatelessWidget {
   final List<Color>? fillGradient;
 
   const _ScrubLineChart({
-    required this.spots,
+    required this.runs,
     required this.color,
     required this.xUnitLabel,
     required this.yUnitLabel,
@@ -1457,6 +1472,7 @@ class _ScrubLineChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final spots = [for (final r in runs) ...r];
     if (spots.length < 2) {
       return Center(
         child: Text(
@@ -1548,25 +1564,26 @@ class _ScrubLineChart extends StatelessWidget {
           xUnitLabel: xUnitLabel,
         ),
         lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            curveSmoothness: 0.18,
-            preventCurveOverShooting: true,
-            color: color,
-            barWidth: 2.5,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: fill,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors:
-                    fillGradient ??
-                    [color.withOpacity(0.22), color.withOpacity(0.0)],
+          for (final run in runs)
+            LineChartBarData(
+              spots: run,
+              isCurved: true,
+              curveSmoothness: 0.18,
+              preventCurveOverShooting: true,
+              color: color,
+              barWidth: 2.5,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: fill,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors:
+                      fillGradient ??
+                      [color.withOpacity(0.22), color.withOpacity(0.0)],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1580,7 +1597,12 @@ class _ScrubLineChart extends StatelessWidget {
 class _HrZonesCard extends StatefulWidget {
   final ActivityDetail activity;
   final bool useMiles;
-  const _HrZonesCard({required this.activity, required this.useMiles});
+  final RunEffortSeries effort;
+  const _HrZonesCard({
+    required this.activity,
+    required this.useMiles,
+    required this.effort,
+  });
 
   @override
   State<_HrZonesCard> createState() => _HrZonesCardState();
@@ -1605,15 +1627,22 @@ class _HrZonesCardState extends State<_HrZonesCard> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final a = widget.activity;
-    final spots = [
-      for (final s in a.telemetrySeries)
-        if (s.hrBpm != null)
-          FlSpot(
-            UnitUtils.displayDistance(s.distanceKm, widget.useMiles),
-            s.hrBpm!.toDouble(),
-          ),
+    // Valid HR only (30–230 bpm), split at gaps so a dropout isn't bridged.
+    final runs = [
+      for (final run in widget.effort.runsFor(EffortChannel.hr))
+        [
+          for (final p in run)
+            FlSpot(
+              UnitUtils.displayDistance(p.distanceKm, widget.useMiles),
+              p.hrBpm!.toDouble(),
+            ),
+        ],
     ];
-    final hrs = a.telemetrySeries.map((s) => s.hrBpm).whereType<int>().toList();
+    final spots = [for (final r in runs) ...r];
+    final hrs = [
+      for (final p in widget.effort.points)
+        if (p.hrBpm != null) p.hrBpm!,
+    ];
     final minHr = hrs.isEmpty ? 100 : hrs.reduce(math.min);
     final maxHr = hrs.isEmpty ? 180 : hrs.reduce(math.max);
     final xMax = spots.isEmpty ? 1.0 : spots.last.x;
@@ -1751,26 +1780,27 @@ class _HrZonesCardState extends State<_HrZonesCard> {
                         xUnitLabel: UnitUtils.unitLabel(widget.useMiles),
                       ),
                       lineBarsData: [
-                        LineChartBarData(
-                          spots: spots,
-                          isCurved: true,
-                          curveSmoothness: 0.18,
-                          preventCurveOverShooting: true,
-                          color: c.danger,
-                          barWidth: 2.5,
-                          dotData: const FlDotData(show: false),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                c.danger.withOpacity(0.16),
-                                c.danger.withOpacity(0.0),
-                              ],
+                        for (final run in runs)
+                          LineChartBarData(
+                            spots: run,
+                            isCurved: true,
+                            curveSmoothness: 0.18,
+                            preventCurveOverShooting: true,
+                            color: c.danger,
+                            barWidth: 2.5,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  c.danger.withOpacity(0.16),
+                                  c.danger.withOpacity(0.0),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -2007,6 +2037,477 @@ class _HrZonesCardState extends State<_HrZonesCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Combined pace · HR · elevation card
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Pace, heart rate and elevation on ONE distance axis with a shared cursor.
+/// Each channel is scaled to its own range (so the axis carries no numbers);
+/// the readout above the chart gives the real values at the cursor. On a
+/// narrow screen at most two channels are shown at once.
+class _EffortCard extends StatefulWidget {
+  final RunEffortSeries effort;
+  final bool useMiles;
+  const _EffortCard({required this.effort, required this.useMiles});
+
+  @override
+  State<_EffortCard> createState() => _EffortCardState();
+}
+
+class _EffortCardState extends State<_EffortCard> {
+  /// Channels currently drawn, in the order they were switched on.
+  List<EffortChannel> _visible = const [];
+  bool _initialised = false;
+
+  /// Cursor position in display-unit distance (km or mi), or null.
+  double? _cursorX;
+
+  static const _maxVisibleNarrow = 2;
+  static const _maxVisibleWide = 3;
+  static const _narrowWidth = 380.0;
+
+  int _maxVisible(BuildContext context) =>
+      MediaQuery.sizeOf(context).width < _narrowWidth
+      ? _maxVisibleNarrow
+      : _maxVisibleWide;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialised) {
+      _visible = widget.effort.availableChannels
+          .take(_maxVisible(context))
+          .toList();
+      _initialised = true;
+    }
+  }
+
+  void _toggle(EffortChannel channel) {
+    HapticFeedback.selectionClick();
+    final max = _maxVisible(context);
+    setState(() {
+      final next = [..._visible];
+      if (next.contains(channel)) {
+        if (next.length > 1) next.remove(channel); // keep at least one
+      } else {
+        next.add(channel);
+        while (next.length > max) {
+          next.removeAt(0); // drop the one switched on longest ago
+        }
+      }
+      _visible = next;
+    });
+  }
+
+  Color _color(AppColors c, EffortChannel ch) => switch (ch) {
+    EffortChannel.pace => c.chartAccent,
+    EffortChannel.hr => c.hrAccent,
+    EffortChannel.elevation => c.cadenceAccent, // green, as the elevation card
+  };
+
+  String _name(EffortChannel ch) => switch (ch) {
+    EffortChannel.pace => 'Pace',
+    EffortChannel.hr => 'HR',
+    EffortChannel.elevation => 'Elev',
+  };
+
+  double _x(EffortPoint p) =>
+      UnitUtils.displayDistance(p.distanceKm, widget.useMiles);
+
+  String _paceText(double secPerKm) {
+    final s = UnitUtils.displayPaceSeconds(secPerKm, widget.useMiles).round();
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  /// Range label for a chip, e.g. "4:58–5:40 /km" (fastest first).
+  String _rangeText(EffortChannel ch) {
+    final r = widget.effort.rangeOf(ch);
+    if (r == null) return '';
+    return switch (ch) {
+      EffortChannel.pace =>
+        '${_paceText(r.$1)}\u2013${_paceText(r.$2)} '
+            '${UnitUtils.perUnitLabel(widget.useMiles)}',
+      EffortChannel.hr => '${r.$1.round()}\u2013${r.$2.round()} bpm',
+      EffortChannel.elevation => '${r.$1.round()}\u2013${r.$2.round()} m',
+    };
+  }
+
+  /// 0..1 height for [v] on [ch], with a minimum span so a flat channel
+  /// doesn't turn noise into a mountain. Pace is inverted: faster = higher.
+  double _norm(EffortChannel ch, double v) {
+    final r = widget.effort.rangeOf(ch)!;
+    final minSpan = switch (ch) {
+      EffortChannel.pace => 30.0,
+      EffortChannel.hr => 10.0,
+      EffortChannel.elevation => 10.0,
+    };
+    var lo = r.$1;
+    var hi = r.$2;
+    if (hi - lo < minSpan) {
+      final mid = (lo + hi) / 2;
+      lo = mid - minSpan / 2;
+      hi = mid + minSpan / 2;
+    }
+    var t = (v - lo) / (hi - lo);
+    if (ch == EffortChannel.pace) t = 1 - t;
+    return 0.08 + t * 0.84;
+  }
+
+  EffortPoint? _pointAt(double displayX) {
+    EffortPoint? best;
+    var bestDist = double.infinity;
+    for (final p in widget.effort.points) {
+      final d = (_x(p) - displayX).abs();
+      if (d < bestDist) {
+        best = p;
+        bestDist = d;
+      }
+    }
+    return best;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final channels = widget.effort.availableChannels;
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PACE \u00b7 HR \u00b7 ELEVATION',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: c.textTertiary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [for (final ch in channels) _chip(c, ch)],
+          ),
+          const SizedBox(height: 12),
+          _readout(c),
+          const SizedBox(height: 8),
+          SizedBox(height: 170, child: _chart(c)),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(AppColors c, EffortChannel ch) {
+    final on = _visible.contains(ch);
+    final color = _color(c, ch);
+    return GestureDetector(
+      key: Key('effort-chip-${ch.name}'),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _toggle(ch),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: on ? color.withValues(alpha: 0.10) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: on ? color : c.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: on ? color : c.textFaint,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _name(ch),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: on ? c.textPrimary : c.textTertiary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _rangeText(ch),
+              style: TextStyle(
+                fontSize: 10.5,
+                color: c.textTertiary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _readout(AppColors c) {
+    final cursor = _cursorX;
+    final p = cursor == null ? null : _pointAt(cursor);
+    if (p == null) {
+      return SizedBox(
+        key: const Key('effort-readout'),
+        height: 38,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Touch and drag across the chart to compare',
+            style: TextStyle(fontSize: 11.5, color: c.textTertiary),
+          ),
+        ),
+      );
+    }
+
+    // FittedBox: five cells share a 280 px card on a small phone, so long
+    // labels/values scale down rather than overflow.
+    Widget cell(String label, String value, {Color? color}) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+                color: c.textTertiary,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: color ?? c.textPrimary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final eff = widget.effort;
+    final unit = UnitUtils.unitLabel(widget.useMiles);
+    final g = p.gradient;
+    return SizedBox(
+      key: const Key('effort-readout'),
+      height: 38,
+      child: Row(
+        children: [
+          cell(unit.toUpperCase(), _x(p).toStringAsFixed(2)),
+          if (eff.hasPace)
+            cell(
+              'PACE ${UnitUtils.perUnitLabel(widget.useMiles).toUpperCase()}',
+              p.paceSecPerKm == null ? '\u2014' : _paceText(p.paceSecPerKm!),
+              color: _color(c, EffortChannel.pace),
+            ),
+          if (eff.hasHr)
+            cell(
+              'HR BPM',
+              p.hrBpm == null ? '\u2014' : '${p.hrBpm}',
+              color: _color(c, EffortChannel.hr),
+            ),
+          if (eff.hasElevation) ...[
+            cell(
+              'ELEV M',
+              p.elevationM == null ? '\u2014' : '${p.elevationM!.round()}',
+              color: _color(c, EffortChannel.elevation),
+            ),
+            cell(
+              'GRADE',
+              g == null
+                  ? '\u2014'
+                  : '${g >= 0 ? '+' : ''}${(g * 100).toStringAsFixed(1)}%',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _chart(AppColors c) {
+    final eff = widget.effort;
+    final xMax = eff.points.isEmpty ? 1.0 : _x(eff.points.last);
+    final safeXMax = xMax <= 0 ? 1.0 : xMax;
+
+    // Elevation first so it sits behind the lines.
+    final order = [
+      for (final ch in [
+        EffortChannel.elevation,
+        EffortChannel.pace,
+        EffortChannel.hr,
+      ])
+        if (_visible.contains(ch)) ch,
+    ];
+
+    final bars = <LineChartBarData>[];
+    for (final ch in order) {
+      final color = _color(c, ch);
+      for (final run in eff.runsFor(ch)) {
+        bars.add(
+          LineChartBarData(
+            spots: [
+              for (final p in run) FlSpot(_x(p), _norm(ch, p.valueOf(ch)!)),
+            ],
+            isCurved: true,
+            curveSmoothness: 0.18,
+            preventCurveOverShooting: true,
+            color: color,
+            barWidth: ch == EffortChannel.elevation ? 1.5 : 2.3,
+            dotData: FlDotData(show: run.length == 1),
+            belowBarData: BarAreaData(
+              show: ch == EffortChannel.elevation,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  color.withValues(alpha: 0.30),
+                  color.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // Shared cursor: a vertical line plus a dot on every drawn channel.
+    final cursor = _cursorX;
+    final cp = cursor == null ? null : _pointAt(cursor);
+    final cursorX = cp == null ? null : _x(cp);
+    if (cp != null) {
+      for (final ch in order) {
+        final v = cp.valueOf(ch);
+        if (v == null) continue;
+        bars.add(
+          LineChartBarData(
+            spots: [FlSpot(cursorX!, _norm(ch, v))],
+            color: Colors.transparent,
+            barWidth: 0,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                radius: 4.5,
+                color: _color(c, ch),
+                strokeWidth: 2.5,
+                strokeColor: c.surface,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        void setCursor(double dx) {
+          if (w <= 0) return;
+          setState(() => _cursorX = (dx / w).clamp(0.0, 1.0) * safeXMax);
+        }
+
+        return GestureDetector(
+          key: const Key('effort-chart'),
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (d) => setCursor(d.localPosition.dx),
+          onHorizontalDragStart: (d) => setCursor(d.localPosition.dx),
+          onHorizontalDragUpdate: (d) => setCursor(d.localPosition.dx),
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: safeXMax,
+              minY: 0,
+              maxY: 1,
+              clipData: const FlClipData.all(),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 0.25,
+                getDrawingHorizontalLine: (_) =>
+                    FlLine(color: c.divider, strokeWidth: 1),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 20,
+                    interval: (safeXMax / 4).clamp(0.5, double.infinity),
+                    getTitlesWidget: (value, meta) {
+                      if (value < 0 || value > safeXMax + 0.01) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '${value.toStringAsFixed(1)} '
+                          '${UnitUtils.unitLabel(widget.useMiles)}',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            color: c.textTertiary,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(bottom: BorderSide(color: c.border, width: 1)),
+              ),
+              lineTouchData: const LineTouchData(enabled: false),
+              extraLinesData: cursorX == null
+                  ? null
+                  : ExtraLinesData(
+                      verticalLines: [
+                        VerticalLine(
+                          x: cursorX,
+                          color: c.textTertiary.withValues(alpha: 0.9),
+                          strokeWidth: 1.5,
+                        ),
+                      ],
+                    ),
+              lineBarsData: bars,
+            ),
+          ),
+        );
+      },
     );
   }
 }

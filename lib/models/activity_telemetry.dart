@@ -17,6 +17,7 @@ import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
 import '../utils/gap_calculator.dart';
 import '../utils/hr_analytics.dart';
 import '../utils/pace_analytics.dart';
+import '../utils/run_effort_analytics.dart';
 import '../utils/run_title.dart';
 import 'feed_run.dart';
 
@@ -223,6 +224,12 @@ class ActivityDetail {
   /// there is no usable telemetry, and for Feed runs).
   final GapAnalysis? gap;
 
+  /// Pace, HR and elevation aligned on one axis, validated and cleaned with
+  /// the same rules as the HR / pace-zone / GAP analytics. Built by the
+  /// factories; for an [ActivityDetail] constructed directly (tests, fixtures)
+  /// [effort] derives it from [telemetrySeries] on demand.
+  final RunEffortSeries? effortSeries;
+
   /// Decoded `{lat, lng}` points for the route preview. May be empty.
   final List<Map<String, double>> routePoints;
 
@@ -257,6 +264,7 @@ class ActivityDetail {
     this.peakHr,
     this.avgGapPace,
     this.gap,
+    this.effortSeries,
     this.routePoints = const [],
   });
 
@@ -290,20 +298,50 @@ class ActivityDetail {
   int _channelCount(bool Function(TelemetrySample) has) =>
       telemetrySeries.where(has).length;
 
-  /// ≥ 2 samples carry an instantaneous pace → the Pace chart can render.
-  bool get hasPaceSeries => _channelCount((s) => s.paceSeconds != null) >= 2;
+  /// The aligned, validated pace / HR / elevation series.
+  RunEffortSeries get effort =>
+      effortSeries ?? buildEffortSeries(telemetrySeries, gap: gap);
+
+  /// Builds the aligned effort series from telemetry samples.
+  static RunEffortSeries buildEffortSeries(
+    List<TelemetrySample> samples, {
+    GapAnalysis? gap,
+    bool cleanElevation = true,
+  }) => RunEffortSeries.build(
+    [
+      for (final s in samples)
+        EffortInput(
+          timeSeconds: s.timeSeconds,
+          distanceKm: s.distanceKm,
+          paceSecPerKm: s.paceSeconds?.toDouble(),
+          hrBpm: s.hrBpm,
+          elevationM: s.elevationM,
+        ),
+    ],
+    gap: gap,
+    cleanElevation: cleanElevation,
+  );
+
+  /// ≥ 2 samples carry a VALID instantaneous pace (120–1800 s/km) → the Pace
+  /// chart can render.
+  bool get hasPaceSeries => effort.hasPace;
 
   /// ≥ 2 samples carry a cadence reading → the Cadence chart can render.
   bool get hasCadenceSeries => _channelCount((s) => s.cadenceSpm != null) >= 2;
 
-  /// Zones + ≥ 2 HR samples → the Heart Rate & Zones card can render.
-  bool get hasHrData =>
-      hrZones.isNotEmpty && _channelCount((s) => s.hrBpm != null) >= 2;
+  /// Zones + ≥ 2 VALID HR samples (30–230 bpm) → the Heart Rate & Zones card
+  /// can render.
+  bool get hasHrData => hrZones.isNotEmpty && effort.hasHr;
 
   /// ≥ 2 altitude samples → the Elevation Profile can render, even when the
   /// net gain is 0 m (a flat baseline). Hidden only when no altitude was
   /// recorded at all (indoor / no GPS altitude).
-  bool get hasElevationData => _channelCount((s) => s.elevationM != null) >= 2;
+  bool get hasElevationData => effort.hasElevation;
+
+  /// The combined pace · HR · elevation chart: needs a clock and at least two
+  /// channels. Feed runs (synthesised from per-km splits, no clock) never
+  /// qualify.
+  bool get hasEffortChart => effort.supportsCombinedChart;
 
   HrSummary? get _seriesHrSummary => HrAnalytics.summary([
     for (final s in telemetrySeries) HrPoint(bpm: s.hrBpm),
@@ -488,6 +526,7 @@ class ActivityDetail {
   }) {
     final elapsed = run.elapsedSeconds;
     final splits = _splitsFromRaw(run.splits);
+    final feedSeries = _telemetryFromSplits(splits);
     return ActivityDetail(
       runId: run.runId,
       runIdIsCloud: true, // FeedRun.runId is the Supabase runs.id
@@ -510,7 +549,8 @@ class ActivityDetail {
       elevationGainM: run.elevationGain > 0 ? run.elevationGain : null,
       calories: null,
       splits: splits,
-      telemetrySeries: _telemetryFromSplits(splits),
+      telemetrySeries: feedSeries,
+      effortSeries: buildEffortSeries(feedSeries, cleanElevation: false),
       hrZones: const [],
       routePoints: run.points,
     );
@@ -760,6 +800,7 @@ class ActivityDetail {
       peakHr: record.peakHeartRate,
       avgGapPace: gap == null ? null : _paceLabel(gap.avgGapSecPerKm),
       gap: gap,
+      effortSeries: buildEffortSeries(samples, gap: gap),
       routePoints: decodePolylineToPoints(record.routePolyline),
     );
   }
@@ -794,6 +835,7 @@ class ActivityDetail {
     final samples = <TelemetrySample>[];
     const step = 0.15;
     double elev = 42;
+    double clock = 0; // seconds, advanced by each step's pace
     for (double d = 0; d <= totalKm + 0.0001; d += step) {
       final t = d / totalKm; // 0..1 progress
 
@@ -837,8 +879,10 @@ class ActivityDetail {
           hrBpm: hr,
           elevationM: double.parse(elev.toStringAsFixed(1)),
           cadenceSpm: cad,
+          timeSeconds: clock,
         ),
       );
+      clock += pace * step;
     }
 
     // ── Km splits: average the trace over each 1 km bucket ──────────────────
