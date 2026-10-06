@@ -16,10 +16,17 @@ import '../main.dart';
 import '../services/ble_heart_rate_service.dart';
 import '../services/ble_cadence_service.dart';
 import '../services/health_bridge_service.dart';
+import '../services/athlete_physiology.dart';
 import 'device_pairing_screen.dart';
 import 'paywall_screen.dart';
 import '../services/revenue_cat_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+/// Result of the max-HR dialog: [bpm] null means "use automatic".
+class _MaxHrEdit {
+  final int? bpm;
+  const _MaxHrEdit(this.bpm);
+}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -37,6 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _hrDeviceId;
   String? _cadenceDeviceId;
   bool _healthConnected = false;
+  MaxHrResolution _maxHr = MaxHrResolution.fallback;
 
   @override
   void initState() {
@@ -49,12 +57,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final hrId = await BleHeartRateService.instance.lastDeviceId();
     final cadenceId = await BleCadenceService.instance.lastDeviceId();
     final healthGranted = await HealthBridgeService.instance.hasPermissions();
+    final maxHr = await AthletePhysiology.instance.resolveMaxHr();
     if (!mounted) return;
     setState(() {
+      _maxHr = maxHr;
       _hrDeviceId = hrId;
       _cadenceDeviceId = cadenceId;
       _healthConnected = healthGranted;
     });
+  }
+
+  Future<void> _editMaxHr() async {
+    HapticFeedback.lightImpact();
+    final physiology = AthletePhysiology.instance;
+    final current = await physiology.loadUserMaxHr();
+    if (!mounted) return;
+    final controller = TextEditingController(text: current?.toString() ?? '');
+    final result = await showDialog<_MaxHrEdit>(
+      context: context,
+      builder: (dctx) {
+        final c = dctx.colors;
+        String? error;
+        return StatefulBuilder(
+          builder: (dctx, setDialogState) => AlertDialog(
+            backgroundColor: c.surface,
+            title: const Text('Max heart rate'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Used for heart-rate zones. Leave it unset to estimate it '
+                  'from your age or your highest recorded heart rate.',
+                  style: TextStyle(fontSize: 13, color: c.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    suffixText: 'bpm',
+                    errorText: error,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dctx),
+                child: const Text('Cancel'),
+              ),
+              if (current != null)
+                TextButton(
+                  onPressed: () => Navigator.pop(dctx, const _MaxHrEdit(null)),
+                  child: const Text('Use automatic'),
+                ),
+              TextButton(
+                onPressed: () {
+                  final v = int.tryParse(controller.text.trim());
+                  if (!AthletePhysiology.isPlausibleMaxHr(v)) {
+                    setDialogState(
+                      () => error =
+                          'Enter ${AthletePhysiology.minMaxHr}–'
+                          '${AthletePhysiology.maxMaxHr} bpm',
+                    );
+                    return;
+                  }
+                  Navigator.pop(dctx, _MaxHrEdit(v));
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    controller.dispose();
+    if (result == null) return;
+    await physiology.setUserMaxHr(result.bpm);
+    final resolved = await physiology.resolveMaxHr();
+    if (!mounted) return;
+    setState(() => _maxHr = resolved);
   }
 
   Future<void> _loadSettings() async {
@@ -426,6 +510,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               if (!mounted) return;
                               setState(() => _healthConnected = granted);
                             },
+                          ),
+                          Divider(height: 24, color: context.colors.divider),
+                          _deviceRow(
+                            icon: Icons.favorite_border,
+                            title: 'Max heart rate',
+                            subtitle: '${_maxHr.bpm} bpm · ${_maxHr.sourceLabel}',
+                            onTap: _editMaxHr,
                           ),
                         ],
                       ),

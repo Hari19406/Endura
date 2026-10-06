@@ -972,27 +972,6 @@ class _RunScreenState extends State<RunScreen>
                     _elevationGainM += altDelta;
                 }
                 _lastAltitudeForGain = position.altitude;
-
-                // ── Track-sample capture: every ~15s of phase time or ~150m
-                // of phase distance, whichever first — bounds sample count
-                // for pace-trend/elevation/HR/cadence charts. ─────────────
-                final sampleT = _phaseElapsedSeconds;
-                final sampleD = _phaseDistanceM;
-                if (sampleT - _lastTrackSampleT >= 15 ||
-                    sampleD - _lastTrackSampleD >= 150) {
-                  _trackSamples.add({
-                    't': sampleT,
-                    'd': sampleD,
-                    'alt': position.altitude,
-                    'pace': _paceSnapshot.smoothedPaceSecondsPerKm > 0
-                        ? _paceSnapshot.smoothedPaceSecondsPerKm
-                        : null,
-                    'hr': _latestHr,
-                    'cad': _latestCadence,
-                  });
-                  _lastTrackSampleT = sampleT;
-                  _lastTrackSampleD = sampleD;
-                }
               }
 
               if (_lastPosition != null) {
@@ -1073,6 +1052,30 @@ class _RunScreenState extends State<RunScreen>
                       );
                     }
                     if (_currentPhase == RunMode.mainSet) {
+                      // ── Track-sample capture: every ~15s of phase time or
+                      // ~150m of phase distance, whichever first — bounds
+                      // sample count for pace-trend/elevation/HR/cadence
+                      // charts and feeds Best Efforts. Taken AFTER `_distance`
+                      // is updated so `d` and `t` describe the same instant
+                      // (capturing before made every `d` lag one GPS step). ──
+                      final sampleT = _phaseElapsedSeconds;
+                      final sampleD = _phaseDistanceM;
+                      if (sampleT - _lastTrackSampleT >= 15 ||
+                          sampleD - _lastTrackSampleD >= 150) {
+                        _trackSamples.add({
+                          't': sampleT,
+                          'd': sampleD,
+                          'alt': position.altitude,
+                          'pace': _paceSnapshot.smoothedPaceSecondsPerKm > 0
+                              ? _paceSnapshot.smoothedPaceSecondsPerKm
+                              : null,
+                          'hr': _latestHr,
+                          'cad': _latestCadence,
+                        });
+                        _lastTrackSampleT = sampleT;
+                        _lastTrackSampleD = sampleD;
+                      }
+
                       final phaseKm = (_phaseDistanceM / 1000).floor();
                       if (phaseKm > _lastSplitKm) {
                         _lastSplitKm = phaseKm;
@@ -1520,6 +1523,8 @@ class _RunScreenState extends State<RunScreen>
           try {
             final points = BestEffortsService.pointsFromTrackSamples(
               capturedTrackSamples,
+              finalDistanceMeters: _capturedMainDistanceM,
+              finalSeconds: _capturedMainSeconds.toDouble(),
             );
             final results = BestEffortsService.extract(points);
             await DatabaseService.instance.insertBestEffortsForRun(

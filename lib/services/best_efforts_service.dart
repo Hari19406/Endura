@@ -78,17 +78,38 @@ class BestEffortsService {
   /// 'd': cumulativeMeters, ...}`) into [TelemetryPoint]s, prepending an
   /// implicit (0, 0) start point since samples begin partway into the
   /// main-set phase.
+  ///
+  /// Samples are only recorded every ~15s/150m, so the last one can sit up to
+  /// 150m short of the finish. Pass [finalDistanceMeters]/[finalSeconds] (the
+  /// run's true main-set totals) to append the finish line as a closing point,
+  /// otherwise a run that barely clears a benchmark distance loses it or gets
+  /// a slower window. Samples that go backwards in distance or time (GPS
+  /// glitches) are dropped so the scan's monotonic assumption holds.
   static List<TelemetryPoint> pointsFromTrackSamples(
-    List<Map<String, dynamic>> samples,
-  ) {
+    List<Map<String, dynamic>> samples, {
+    double? finalDistanceMeters,
+    double? finalSeconds,
+  }) {
     final points = <TelemetryPoint>[
       const TelemetryPoint(distanceMeters: 0, elapsedSeconds: 0),
     ];
+
+    void add(double d, double t) {
+      final last = points.last;
+      if (d < last.distanceMeters || t < last.elapsedSeconds) return;
+      points.add(TelemetryPoint(distanceMeters: d, elapsedSeconds: t));
+    }
+
     for (final s in samples) {
       final d = (s['d'] as num?)?.toDouble();
       final t = (s['t'] as num?)?.toDouble();
       if (d == null || t == null) continue;
-      points.add(TelemetryPoint(distanceMeters: d, elapsedSeconds: t));
+      add(d, t);
+    }
+    if (finalDistanceMeters != null &&
+        finalSeconds != null &&
+        finalDistanceMeters > points.last.distanceMeters) {
+      add(finalDistanceMeters, finalSeconds);
     }
     return points;
   }

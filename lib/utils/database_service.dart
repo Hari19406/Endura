@@ -677,6 +677,23 @@ class DatabaseService {
     }
   }
 
+  /// Highest stored `peak_heart_rate` across all runs, or null when no run
+  /// recorded one. Feeds the observed-max fallback in AthletePhysiology.
+  Future<int?> getMaxPeakHeartRate() async {
+    try {
+      final db = await database;
+      final rows = await db.rawQuery(
+        'SELECT MAX(peak_heart_rate) AS m FROM runs',
+      );
+      if (rows.isEmpty) return null;
+      return (rows.first['m'] as num?)?.toInt();
+    } catch (e, stack) {
+      debugPrint('[DB] getMaxPeakHeartRate error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return null;
+    }
+  }
+
   Future<List<RunRecord>> getRunsSince(DateTime since) async {
     final db = await database;
     final rows = await db.query(

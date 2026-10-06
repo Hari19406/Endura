@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/activity_telemetry.dart';
+import '../services/athlete_physiology.dart';
 import '../services/best_efforts_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/database_service.dart';
@@ -92,6 +93,8 @@ class _BestEffortsDetailScreenState extends State<BestEffortsDetailScreen>
     if (id == null) return;
     final run = await widget.loadRun(id);
     if (run == null || !mounted) return;
+    final maxHr = await AthletePhysiology.instance.resolveMaxHr();
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -100,6 +103,7 @@ class _BestEffortsDetailScreenState extends State<BestEffortsDetailScreen>
             run,
             runnerName: widget.runnerName,
             avatarUrl: widget.avatarUrl,
+            maxHr: maxHr,
           ),
           onDelete: () => DatabaseService.instance.deleteRun(id),
         ),

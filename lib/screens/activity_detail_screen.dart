@@ -1612,6 +1612,13 @@ class _HrZonesCardState extends State<_HrZonesCard> {
           ),
           const SizedBox(height: 16),
           _segmentedZoneBar(c, a, a.effectiveAvgHr ?? (minHr + maxHr) ~/ 2),
+          if (a.maxHr != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              a.maxHr!.caption,
+              style: TextStyle(fontSize: 10.5, color: c.textTertiary),
+            ),
+          ],
           const SizedBox(height: 12),
           InkWell(
             onTap: () {

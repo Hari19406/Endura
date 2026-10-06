@@ -12,7 +12,9 @@
 
 import 'dart:math' as math;
 
+import '../services/athlete_physiology.dart';
 import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
+import '../utils/hr_analytics.dart';
 import '../utils/run_title.dart';
 import 'feed_run.dart';
 
@@ -74,12 +76,17 @@ class TelemetrySample {
   final double? elevationM;
   final int? cadenceSpm; // steps per minute (both feet)
 
+  /// Seconds since the start of the recorded phase (the sample's `'t'`).
+  /// Null for synthesised samples (e.g. Feed runs) that carry no clock.
+  final double? timeSeconds;
+
   const TelemetrySample({
     required this.distanceKm,
     this.paceSeconds,
     this.hrBpm,
     this.elevationM,
     this.cadenceSpm,
+    this.timeSeconds,
   });
 }
 
@@ -176,6 +183,10 @@ class ActivityDetail {
   final List<TelemetrySample> telemetrySeries;
   final List<HrZone> hrZones;
 
+  /// The max HR the [hrZones] were computed against, and where it came from.
+  /// Null when the zones carry no such provenance (Feed runs, fixtures).
+  final MaxHrResolution? maxHr;
+
   // ── Aggregates (null when the run carries no such data) ──────────────────
   final int? calories;
   final int? avgCadence;
@@ -212,6 +223,7 @@ class ActivityDetail {
     required this.splits,
     required this.telemetrySeries,
     required this.hrZones,
+    this.maxHr,
     this.avgCadence,
     this.peakCadence,
     this.avgHr,
@@ -527,6 +539,7 @@ class ActivityDetail {
     String? avatarUrl,
     String? location,
     int? estimatedCalories,
+    MaxHrResolution maxHr = MaxHrResolution.fallback,
   }) {
     final ts = record.trackSamples;
 
@@ -541,6 +554,7 @@ class ActivityDetail {
           hrBpm: (m['hr'] as num?)?.round(),
           elevationM: (m['alt'] as num?)?.toDouble(),
           cadenceSpm: (m['cad'] as num?)?.round(),
+          timeSeconds: (m['t'] as num?)?.toDouble(),
         ),
       );
     }
@@ -623,9 +637,20 @@ class ActivityDetail {
         (hrSamples.isEmpty
             ? null
             : (hrSamples.reduce((a, b) => a + b) / hrSamples.length).round());
-    final hrZones = hrSamples.isNotEmpty
-        ? _zonesFromSamples(hrSamples, record.durationSeconds)
-        : const <HrZone>[];
+    final hrZones = [
+      for (final z in HrAnalytics.zones([
+        for (final s in samples)
+          HrPoint(timeSeconds: s.timeSeconds, bpm: s.hrBpm),
+      ], maxHr.bpm))
+        HrZone(
+          zone: z.zone,
+          label: z.label,
+          durationSeconds: z.durationSeconds,
+          percentage: z.percentage,
+          bpmLow: z.bpmLow,
+          bpmHigh: z.bpmHigh,
+        ),
+    ];
 
     final elapsed = record.elapsedSeconds;
 
@@ -654,6 +679,7 @@ class ActivityDetail {
       splits: splits,
       telemetrySeries: samples,
       hrZones: hrZones,
+      maxHr: hrZones.isEmpty ? null : maxHr,
       avgCadence: record.avgCadence,
       peakCadence: record.peakCadence,
       avgHr: avgHr,
@@ -673,44 +699,6 @@ class ActivityDetail {
     'free' || 'free_run' || 'freeRun' => 'Free Run',
     _ => 'Run',
   };
-
-  /// Derives a Z1–Z5 breakdown from raw HR samples using %-of-max bands
-  /// (max HR estimated from the observed peak, floored at 190).
-  static List<HrZone> _zonesFromSamples(List<int> hr, int movingSeconds) {
-    final maxHr = math.max(hr.reduce(math.max) + 4, 190);
-    const defs = <({int z, String label, double lo, double hi})>[
-      (z: 1, label: 'Recovery', lo: 0.50, hi: 0.60),
-      (z: 2, label: 'Easy', lo: 0.60, hi: 0.70),
-      (z: 3, label: 'Aerobic', lo: 0.70, hi: 0.80),
-      (z: 4, label: 'Threshold', lo: 0.80, hi: 0.90),
-      (z: 5, label: 'VO₂ Max', lo: 0.90, hi: 1.0),
-    ];
-    final counts = <int, int>{for (var z = 1; z <= 5; z++) z: 0};
-    for (final v in hr) {
-      final frac = v / maxHr;
-      var z = 1;
-      for (final d in defs) {
-        if (frac >= d.lo) z = d.z;
-      }
-      counts[z] = counts[z]! + 1;
-    }
-    final total = hr.length;
-    return [
-      for (final d in defs)
-        HrZone(
-          zone: d.z,
-          label: d.label,
-          durationSeconds: total == 0
-              ? 0
-              : (counts[d.z]! / total * movingSeconds).round(),
-          percentage: total == 0
-              ? 0
-              : double.parse((counts[d.z]! / total).toStringAsFixed(3)),
-          bpmLow: (d.lo * maxHr).round(),
-          bpmHigh: (d.hi * maxHr).round(),
-        ),
-    ];
-  }
 
   // ───────────────────────────────────────────────────────────────────────────
   //  Mock fixture

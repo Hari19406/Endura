@@ -26,6 +26,7 @@ import '../widgets/shoe_edit_sheet.dart';
 import '../widgets/shoe_locker_view.dart';
 import 'milestones_screen.dart';
 import 'history_tab.dart';
+import '../services/athlete_physiology.dart';
 import 'athlete_list_screen.dart';
 import 'athlete_discovery_screen.dart';
 import 'edit_athlete_profile_screen.dart';
@@ -212,6 +213,8 @@ class _YouScreenState extends State<YouScreen>
 
   void _openRunDetail(RunRecord record) async {
     final id = record.id;
+    final maxHr = await AthletePhysiology.instance.resolveMaxHr();
+    if (!mounted) return;
     final deleted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ActivityDetailScreen(
@@ -219,6 +222,7 @@ class _YouScreenState extends State<YouScreen>
             record,
             runnerName: _profile?.displayName ?? 'You',
             avatarUrl: _profile?.avatarUrl,
+            maxHr: maxHr,
           ),
           onDelete: id == null
               ? null
