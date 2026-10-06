@@ -90,6 +90,7 @@ void main() {
               : const [],
           loadRun: (id) async => id == 42 ? fixtureRun : null,
           loadMaxHr: () async => MaxHrResolution.fallback,
+          loadPaceZones: () async => null,
         ),
       ),
     );

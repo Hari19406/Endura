@@ -10,6 +10,7 @@ import '../services/analytics_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/pace_analytics.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/ambient_scaffold.dart';
 import '../widgets/run_comments_sheet.dart';
@@ -393,6 +394,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   ],
                   if (a.hasPaceSeries) ...[
                     _paceCard(c),
+                    const SizedBox(height: 16),
+                  ],
+                  if (a.paceZones.isNotEmpty) ...[
+                    _paceZonesCard(c),
                     const SizedBox(height: 16),
                   ],
                   if (a.hasElevationData) ...[
@@ -1062,6 +1067,145 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           yUnitLabel: UnitUtils.perUnitLabel(_useMiles),
           fill: true,
         ),
+      ),
+    );
+  }
+
+  // ── 5a-2. Pace zones ─────────────────────────────────────────────────────
+
+  Color _paceZoneColor(AppColors c, int zone) => switch (zone) {
+    1 => c.workoutEasy,
+    2 => c.workoutLong,
+    3 => c.workoutTempo,
+    4 => c.workoutInterval,
+    _ => c.danger,
+  };
+
+  String _paceEdge(int secPerKm) => _paceFromSeconds(
+    UnitUtils.displayPaceSeconds(secPerKm.toDouble(), _useMiles).round(),
+  );
+
+  /// "7:04–7:47" for a closed zone, "7:47+" (slower than) or "<5:44" (faster
+  /// than) for the open-ended ends, in the display unit.
+  String _paceRange(PaceZoneStat z) {
+    final slow = z.slowEdgeSecPerKm;
+    final fast = z.fastEdgeSecPerKm;
+    if (slow == null && fast != null) return '${_paceEdge(fast)}+';
+    if (fast == null && slow != null) return '<${_paceEdge(slow)}';
+    if (slow != null && fast != null) {
+      return '${_paceEdge(fast)}–${_paceEdge(slow)}';
+    }
+    return '';
+  }
+
+  Widget _paceZonesCard(AppColors c) {
+    final zones = a.paceZones;
+    return _card(
+      c,
+      title: 'PACE ZONES',
+      trailing: a.paceZonesVdot == null
+          ? null
+          : Text(
+              'from vDOT ${a.paceZonesVdot} · ${UnitUtils.perUnitLabel(_useMiles)}',
+              style: TextStyle(fontSize: 10.5, color: c.textTertiary),
+            ),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  for (final z in zones)
+                    if (z.percentage > 0)
+                      Expanded(
+                        flex: (z.percentage * 1000).round().clamp(1, 1000),
+                        child: ColoredBox(color: _paceZoneColor(c, z.zone)),
+                      ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final z in zones) _paceZoneRow(c, z),
+        ],
+      ),
+    );
+  }
+
+  Widget _paceZoneRow(AppColors c, PaceZoneStat z) {
+    final m = z.durationSeconds ~/ 60;
+    final s = z.durationSeconds % 60;
+    final duration = m > 0 ? '${m}m ${s.toString().padLeft(2, '0')}s' : '${s}s';
+    final color = _paceZoneColor(c, z.zone);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 26,
+            child: Text(
+              'Z${z.zone}',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: c.textPrimary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              z.label,
+              style: TextStyle(fontSize: 12.5, color: c.textSecondary),
+            ),
+          ),
+          Text(
+            _paceRange(z),
+            style: TextStyle(
+              fontSize: 11,
+              color: c.textTertiary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 52,
+            child: Text(
+              duration,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: c.textPrimary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 34,
+            child: Text(
+              '${(z.percentage * 100).round()}%',
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

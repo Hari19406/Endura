@@ -15,6 +15,7 @@ import 'dart:math' as math;
 import '../services/athlete_physiology.dart';
 import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
 import '../utils/hr_analytics.dart';
+import '../utils/pace_analytics.dart';
 import '../utils/run_title.dart';
 import 'feed_run.dart';
 
@@ -187,6 +188,13 @@ class ActivityDetail {
   /// Null when the zones carry no such provenance (Feed runs, fixtures).
   final MaxHrResolution? maxHr;
 
+  /// Time in each of the five pace zones (easiest → hardest), empty when the
+  /// run has no usable pace samples or no zone config was supplied.
+  final List<PaceZoneStat> paceZones;
+
+  /// The vDOT the [paceZones] boundaries came from, for the card caption.
+  final int? paceZonesVdot;
+
   // ── Aggregates (null when the run carries no such data) ──────────────────
   final int? calories;
   final int? avgCadence;
@@ -224,6 +232,8 @@ class ActivityDetail {
     required this.telemetrySeries,
     required this.hrZones,
     this.maxHr,
+    this.paceZones = const [],
+    this.paceZonesVdot,
     this.avgCadence,
     this.peakCadence,
     this.avgHr,
@@ -535,6 +545,7 @@ class ActivityDetail {
     String? location,
     int? estimatedCalories,
     MaxHrResolution maxHr = MaxHrResolution.fallback,
+    PaceZoneConfig? paceZoneConfig,
   }) {
     final ts = record.trackSamples;
 
@@ -671,6 +682,17 @@ class ActivityDetail {
       telemetrySeries: samples,
       hrZones: hrZones,
       maxHr: hrZones.isEmpty ? null : maxHr,
+      paceZones: paceZoneConfig == null
+          ? const []
+          : PaceAnalytics.zones([
+              for (final s in samples)
+                PacePoint(
+                  timeSeconds: s.timeSeconds,
+                  distanceKm: s.distanceKm,
+                  paceSecPerKm: s.paceSeconds?.toDouble(),
+                ),
+            ], paceZoneConfig),
+      paceZonesVdot: paceZoneConfig?.vdot,
       avgCadence: record.avgCadence,
       peakCadence: record.peakCadence,
       avgHr: avgHr,

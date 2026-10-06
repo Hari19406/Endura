@@ -18,6 +18,7 @@ import '../models/scheduled_workout_context.dart';
 import 'activity_detail_screen.dart';
 import 'calendar_day_status.dart';
 import 'run_screen.dart';
+import '../services/athlete_pace_zones.dart';
 import '../services/athlete_physiology.dart';
 import '../utils/unit_utils.dart';
 
@@ -417,6 +418,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     final record = await DatabaseService.instance.getRunById(runId);
     if (!mounted || record == null) return;
     final maxHr = await AthletePhysiology.instance.resolveMaxHr();
+    final paceZones = await AthletePaceZones.instance.resolve();
     if (!mounted) return;
 
     Navigator.push(
@@ -427,6 +429,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
             record,
             runnerName: 'You',
             maxHr: maxHr,
+            paceZoneConfig: paceZones,
           ),
         ),
       ),

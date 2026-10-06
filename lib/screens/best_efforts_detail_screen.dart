@@ -7,7 +7,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/activity_telemetry.dart';
+import '../services/athlete_pace_zones.dart';
 import '../services/athlete_physiology.dart';
+import '../utils/pace_analytics.dart';
 import '../services/best_efforts_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/database_service.dart';
@@ -27,6 +29,7 @@ class BestEffortsDetailScreen extends StatefulWidget {
   loadEntries;
   final Future<RunRecord?> Function(int runId) loadRun;
   final Future<MaxHrResolution> Function() loadMaxHr;
+  final Future<PaceZoneConfig?> Function() loadPaceZones;
 
   BestEffortsDetailScreen({
     super.key,
@@ -37,10 +40,12 @@ class BestEffortsDetailScreen extends StatefulWidget {
     loadEntries,
     Future<RunRecord?> Function(int runId)? loadRun,
     Future<MaxHrResolution> Function()? loadMaxHr,
+    Future<PaceZoneConfig?> Function()? loadPaceZones,
   }) : loadEntries =
            loadEntries ?? DatabaseService.instance.getBestEffortsForCategory,
        loadRun = loadRun ?? DatabaseService.instance.getRunById,
-       loadMaxHr = loadMaxHr ?? AthletePhysiology.instance.resolveMaxHr;
+       loadMaxHr = loadMaxHr ?? AthletePhysiology.instance.resolveMaxHr,
+       loadPaceZones = loadPaceZones ?? AthletePaceZones.instance.resolve;
 
   @override
   State<BestEffortsDetailScreen> createState() =>
@@ -97,6 +102,7 @@ class _BestEffortsDetailScreenState extends State<BestEffortsDetailScreen>
     final run = await widget.loadRun(id);
     if (run == null || !mounted) return;
     final maxHr = await widget.loadMaxHr();
+    final paceZones = await widget.loadPaceZones();
     if (!mounted) return;
     Navigator.push(
       context,
@@ -107,6 +113,7 @@ class _BestEffortsDetailScreenState extends State<BestEffortsDetailScreen>
             runnerName: widget.runnerName,
             avatarUrl: widget.avatarUrl,
             maxHr: maxHr,
+            paceZoneConfig: paceZones,
           ),
           onDelete: () => DatabaseService.instance.deleteRun(id),
         ),
