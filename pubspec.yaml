@@ -84,10 +84,11 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon.png"
+  image_path: "assets/icon2.png"
+  remove_alpha_ios: true
 
-  adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon2.png"
 # The following section is specific to Flutter packages.
 flutter:
 

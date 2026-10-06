@@ -748,7 +748,7 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
             child: Image.asset(
-              'assets/icon.png',
+              'assets/icon2.png',
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Container(
                 color: c.heroGradientStart,
