@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../engines/pr_engine.dart';
@@ -24,6 +23,8 @@ import '../widgets/athlete_profile_header.dart';
 import '../widgets/best_efforts_preview_card.dart';
 import '../widgets/shoe_edit_sheet.dart';
 import '../widgets/shoe_locker_view.dart';
+import '../widgets/trends_card.dart';
+import '../utils/trend_analytics.dart';
 import 'milestones_screen.dart';
 import 'history_tab.dart';
 import '../services/athlete_pace_zones.dart';
@@ -51,6 +52,7 @@ class _YouScreenState extends State<YouScreen>
   List<String> _newAchievements = [];
   List<dynamic> _runHistory = [];
   List<dynamic> _runRecords = [];
+  List<TrendRun> _trendRuns = [];
 
   bool _isLoading = true;
   String _errorMessage = '';
@@ -111,6 +113,7 @@ class _YouScreenState extends State<YouScreen>
     try {
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
+      final trendRuns = await DatabaseService.instance.getTrendRuns();
       final bestEfforts = await DatabaseService.instance.getAllCategoryPRs();
 
       // ── Athlete identity header ──────────────────────────────────────────
@@ -194,6 +197,7 @@ class _YouScreenState extends State<YouScreen>
           _achievements = achievements;
           _newAchievements = newlyUnlocked;
           _runRecords = records;
+          _trendRuns = trendRuns;
           _runHistory = runs;
           _profile = profile;
           _counts = counts;
@@ -448,6 +452,14 @@ class _YouScreenState extends State<YouScreen>
           _buildWeeklySummaryCard(),
           const SizedBox(height: 16),
 
+          // ② TRENDS
+          TrendsCard(
+            runs: _trendRuns,
+            loadBestEfforts: DatabaseService.instance.getBestEffortSeries,
+            useMiles: _useMiles,
+          ),
+          const SizedBox(height: 16),
+
           // ③ PERSONAL RECORDS
           if (_prResults != null && _runHistory.isNotEmpty) ...[
             _buildPersonalRecordsCard(),
@@ -520,9 +532,11 @@ class _YouScreenState extends State<YouScreen>
 
     List<dynamic> weekRuns = _getRunsInWeek(_selectedWeekStart);
     double totalDistance = weekRuns.fold(0.0, (sum, run) => sum + run.distance);
+    // Real moving time, not pace × distance (which drifts with rounding and
+    // drops any run whose pace string is malformed).
     int totalSeconds = weekRuns.fold(
       0,
-      (sum, run) => sum + _paceToSeconds(run.averagePace, run.distance),
+      (sum, run) => sum + (run.durationSeconds as int),
     );
     String totalTime = _formatDuration(totalSeconds);
     int totalRuns = weekRuns.length;
@@ -733,20 +747,6 @@ class _YouScreenState extends State<YouScreen>
               ],
             ),
           ),
-          const SizedBox(height: 20),
-
-          Text(
-            'PAST 8 WEEKS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: c.textTertiary,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          _buildWeeklyTrendChart(_getWeeklyTotals(8)),
         ],
       ),
     );
@@ -973,124 +973,6 @@ class _YouScreenState extends State<YouScreen>
     return _runHistory
         .where((run) => _isSameWeek(weekStart, run.date))
         .toList();
-  }
-
-  /// Total distance per week for the [weeks] weeks ending at
-  /// `_selectedWeekStart`, oldest first.
-  List<double> _getWeeklyTotals(int weeks) {
-    return List.generate(weeks, (i) {
-      final weekStart = _selectedWeekStart.subtract(
-        Duration(days: 7 * (weeks - 1 - i)),
-      );
-      return _getRunsInWeek(
-        weekStart,
-      ).fold(0.0, (sum, run) => sum + run.distance);
-    });
-  }
-
-  Widget _buildWeeklyTrendChart(List<double> weeklyTotalsKm) {
-    final c = context.colors;
-    final weeklyTotals = weeklyTotalsKm
-        .map((km) => UnitUtils.displayDistance(km, _useMiles))
-        .toList();
-    final maxDistance = weeklyTotals.fold(0.0, (m, v) => v > m ? v : m);
-    final maxY = maxDistance <= 0 ? 10.0 : maxDistance * 1.2;
-    final weeks = weeklyTotals.length;
-
-    DateTime weekStartFor(int index) =>
-        _selectedWeekStart.subtract(Duration(days: 7 * (weeks - 1 - index)));
-
-    final spots = List.generate(
-      weeks,
-      (i) => FlSpot(i.toDouble(), weeklyTotals[i]),
-    );
-
-    return SizedBox(
-      height: 140,
-      child: LineChart(
-        LineChartData(
-          minY: 0,
-          maxY: maxY,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: maxY,
-            getDrawingHorizontalLine: (value) =>
-                FlLine(color: c.divider, strokeWidth: 1),
-          ),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                interval: maxY,
-                getTitlesWidget: (value, meta) => Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    '${value.toStringAsFixed(0)} ${UnitUtils.unitLabel(_useMiles)}',
-                    style: TextStyle(fontSize: 10, color: c.textTertiary),
-                  ),
-                ),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 18,
-                interval: 1,
-                getTitlesWidget: (value, meta) {
-                  final index = value.round();
-                  if (index < 0 || index >= weeks) {
-                    return const SizedBox.shrink();
-                  }
-                  final month = weekStartFor(index).month;
-                  final prevMonth = index == 0
-                      ? null
-                      : weekStartFor(index - 1).month;
-                  if (month == prevMonth) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      _getMonthName(month),
-                      style: TextStyle(fontSize: 10, color: c.textTertiary),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          lineTouchData: const LineTouchData(enabled: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: false,
-              color: c.chartAccent,
-              barWidth: 2,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    c.chartAccent.withOpacity(0.25),
-                    c.chartAccent.withOpacity(0.0),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        duration: Duration.zero,
-      ),
-    );
   }
 
   String _formatDuration(int totalSeconds) {

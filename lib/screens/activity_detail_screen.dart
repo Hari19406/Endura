@@ -11,11 +11,15 @@ import '../services/best_efforts_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/database_service.dart';
+import '../utils/matched_run_comparison.dart';
 import '../utils/pace_analytics.dart';
+import '../utils/route_matcher.dart';
 import '../utils/run_effort_analytics.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/ambient_scaffold.dart';
 import '../widgets/best_effort_rank_badge.dart';
+import '../widgets/matched_run_card.dart';
 import '../widgets/run_comments_sheet.dart';
 import '../widgets/run_share_card.dart';
 
@@ -84,9 +88,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   /// this unit; the underlying [ActivityDetail] data always stays km-based.
   bool _useMiles = UnitUtils.useMilesNotifier.value;
 
+  /// Today's run vs earlier runs on the same route; null until (and unless) a
+  /// match is found. Computed on demand for local runs only.
+  MatchedRunsResult? _matched;
+
   @override
   void initState() {
     super.initState();
+    _loadMatchedRuns();
     if (kDebugMode) {
       final a = widget.activity;
       final paceN = a.telemetrySeries
@@ -109,6 +118,63 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       },
     );
     UnitUtils.useMilesNotifier.addListener(_onUnitPrefChanged);
+  }
+
+  Future<void> _loadMatchedRuns() async {
+    final id = a.runId;
+    // Feed runs (cloud ids) and runs without a usable route are never matched.
+    if (id == null || a.runIdIsCloud || a.routePoints.length < 2) return;
+    try {
+      final rows = await DatabaseService.instance.getRouteCandidates(id);
+      final found = RouteMatcher.findMatches(
+        current: a.routePoints,
+        currentDistanceKm: a.distanceKm,
+        candidates: [
+          for (final r in rows)
+            if (r.id != null)
+              RouteCandidate(
+                id: r.id!,
+                distanceKm: r.distanceKm,
+                polyline: r.routePolyline,
+              ),
+        ],
+      );
+      if (found.isEmpty) return;
+      final matchedIds = {for (final m in found) m.id};
+      final today = MatchedRunSummary.fromActivity(a);
+      final matches = [
+        for (final r in rows)
+          if (matchedIds.contains(r.id)) MatchedRunSummary.fromRunRecord(r),
+      ];
+      var result = MatchedRunsResult.build(today, matches);
+      if (result == null) return;
+
+      // GAP needs track samples, which candidate rows never carry: recompute
+      // it for just the (at most two) runs actually shown.
+      final shownIds = {
+        result.previous?.other.id,
+        result.best?.other.id,
+      }.whereType<int>();
+      final withGap = <int, MatchedRunSummary>{};
+      for (final sid in shownIds) {
+        final full = await DatabaseService.instance.getRunById(sid);
+        if (full == null) continue;
+        final gap = ActivityDetail.fromRunRecord(
+          full,
+          runnerName: '',
+        ).avgGapSeconds;
+        withGap[sid] = MatchedRunSummary.fromRunRecord(
+          full,
+          gapSecPerKm: gap,
+        );
+      }
+      result = MatchedRunsResult.build(today, [
+        for (final m in matches) withGap[m.id] ?? m,
+      ]);
+      if (mounted && result != null) setState(() => _matched = result);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ActivityDetail] matched runs failed: $e');
+    }
   }
 
   void _onUnitPrefChanged() {
@@ -391,6 +457,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   const SizedBox(height: 16),
                   _routeCard(c),
                   const SizedBox(height: 16),
+                  if (_matched != null) ...[
+                    MatchedRunCard(
+                      avgPace: a.avgPace,
+                      result: _matched,
+                      useMiles: _useMiles,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (a.splits.isNotEmpty) ...[
                     _splitsCard(c),
                     const SizedBox(height: 16),

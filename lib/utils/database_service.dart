@@ -696,6 +696,41 @@ class DatabaseService {
     }
   }
 
+  /// Runs that could share a route with another, newest first, for Matched
+  /// Runs. Only runs with a recorded polyline qualify (manual / treadmill runs
+  /// are skipped) and [excludeId] — the run being viewed — is left out. Reads
+  /// just the columns matching and comparison need: never `track_samples_json`,
+  /// so the returned records have empty `trackSamples`.
+  Future<List<RunRecord>> getRouteCandidates(int? excludeId) async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        columns: [
+          'id',
+          'date',
+          'distance_km',
+          'average_pace',
+          'duration_seconds',
+          'route_polyline',
+          'splits_json',
+          'avg_heart_rate',
+          'elevation_gain',
+        ],
+        where: excludeId == null
+            ? "route_polyline <> ''"
+            : "route_polyline <> '' AND id <> ?",
+        whereArgs: excludeId == null ? null : [excludeId],
+        orderBy: 'date DESC',
+      );
+      return rows.map(RunRecord.fromMap).toList();
+    } catch (e, stack) {
+      debugPrint('[DB] getRouteCandidates error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
   /// Every run reduced to the five columns Trends needs, oldest first. Unlike
   /// [getAllRuns] this never reads the route polyline, splits or track
   /// samples, which dominate a run row's size. `avg_heart_rate` stays null
