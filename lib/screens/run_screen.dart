@@ -33,6 +33,7 @@ import '../services/ble_cadence_service.dart';
 import '../services/health_bridge_service.dart';
 import '../services/hr_session.dart';
 import '../utils/hr_analytics.dart';
+import '../utils/elevation_gain.dart';
 import '../utils/gap_calculator.dart';
 import '../services/best_efforts_service.dart';
 import '../models/run_weather.dart';
@@ -163,9 +164,7 @@ class _RunScreenState extends State<RunScreen>
   bool _voiceCoachingEnabled = false;
   int _lastAnnouncedKm = 0;
 
-  // ── Elevation + splits (main-set phase only, matches saved distance/duration) ──
-  double _elevationGainM = 0.0;
-  double? _lastAltitudeForGain;
+  // ── Splits (main-set phase only, matches saved distance/duration) ──
   final List<Map<String, dynamic>> _splits = [];
   int _lastSplitKm = 0;
 
@@ -903,8 +902,6 @@ class _RunScreenState extends State<RunScreen>
         _capturedMainSeconds = 0;
         _capturedMainPace = '--:--';
         _capturedMainRoute = [];
-        _elevationGainM = 0.0;
-        _lastAltitudeForGain = null;
         _splits.clear();
         _lastSplitKm = 0;
         _elapsedSeconds = 0;
@@ -982,16 +979,6 @@ class _RunScreenState extends State<RunScreen>
               final smoothedLat = _kalmanLat.filter(position.latitude);
               final smoothedLng = _kalmanLng.filter(position.longitude);
               final LatLng newPoint = LatLng(smoothedLat, smoothedLng);
-
-              if (_currentPhase == RunMode.mainSet) {
-                if (_lastAltitudeForGain != null) {
-                  final altDelta = position.altitude - _lastAltitudeForGain!;
-                  // Ignore sub-noise deltas and improbable spikes from GPS jitter.
-                  if (altDelta > 0.5 && altDelta < 15)
-                    _elevationGainM += altDelta;
-                }
-                _lastAltitudeForGain = position.altitude;
-              }
 
               if (_lastPosition != null) {
                 final double distanceInMeters = Geolocator.distanceBetween(
@@ -1550,7 +1537,9 @@ class _RunScreenState extends State<RunScreen>
           date: runDate,
           routePolyline: polyline,
           workoutType: capturedWorkoutType,
-          elevationGain: _elevationGainM,
+          // Ascent comes from the cleaned track samples at save time (null =
+          // no usable altitude, stored as 0 = unknown), never from raw fixes.
+          elevationGain: ElevationGain.fromTrackSamples(capturedTrackSamples) ?? 0,
           splits: capturedSplits,
           elapsedSeconds: _elapsedSeconds > 0 ? _elapsedSeconds : null,
           avgHeartRate: avgHr,
@@ -1721,8 +1710,6 @@ class _RunScreenState extends State<RunScreen>
         _phaseMilestoneReached = false;
         _stepIndex = 0;
         _stepStartDistanceM = 0.0;
-        _elevationGainM = 0.0;
-        _lastAltitudeForGain = null;
         _splits.clear();
         _lastSplitKm = 0;
         _trackSamples.clear();
@@ -2610,8 +2597,6 @@ class _RunScreenState extends State<RunScreen>
       _capturedMainSeconds = 0;
       _capturedMainPace = '--:--';
       _capturedMainRoute = [];
-      _elevationGainM = 0.0;
-      _lastAltitudeForGain = null;
       _splits.clear();
       _lastSplitKm = 0;
       _elapsedSeconds = 0;

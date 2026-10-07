@@ -247,6 +247,39 @@ class CloudSyncService {
     }
   }
 
+  /// Re-pushes a corrected `elevation_gain` for a run that was already synced
+  /// (existing column, no schema change). Same date-window match as
+  /// [updateRunTitle]; a run not yet uploaded uploads with the corrected local
+  /// value. Returns false when signed out or on failure.
+  Future<bool> updateRunElevationGain(int runId, double gain) async {
+    if (!isSignedIn) return false;
+
+    try {
+      final localRun = await _getLocalRun(runId);
+      if (localRun == null) return false;
+
+      final utcDate = localRun.date.toUtc();
+      final windowStart = utcDate
+          .subtract(const Duration(minutes: 1))
+          .toIso8601String();
+      final windowEnd = utcDate
+          .add(const Duration(minutes: 1))
+          .toIso8601String();
+
+      await _client
+          .from('runs')
+          .update({'elevation_gain': gain})
+          .eq('user_id', _userId!)
+          .gte('date', windowStart)
+          .lte('date', windowEnd);
+      return true;
+    } catch (e, stack) {
+      debugPrint('[CloudSync] updateRunElevationGain error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    }
+  }
+
   /// Pushes a race mark / unmark (a `workout_type` change) for a run that was
   /// already synced. Same date-window match as [updateRunTitle]; a run that
   /// hasn't uploaded yet uploads with the new type already on the local row.

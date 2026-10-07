@@ -977,6 +977,24 @@ class DatabaseService {
     }
   }
 
+  /// Rewrites only `elevation_gain` for [runId] (the elevation backfill).
+  Future<bool> updateRunElevationGain(int runId, double gain) async {
+    try {
+      final db = await database;
+      final affected = await db.update(
+        'runs',
+        {'elevation_gain': gain},
+        where: 'id = ?',
+        whereArgs: [runId],
+      );
+      return affected > 0;
+    } catch (e, stack) {
+      debugPrint('[DB] updateRunElevationGain error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    }
+  }
+
   /// Marks or unmarks a run as a race. A race is an ordinary run whose
   /// `workout_type` is `'race'`; no other column changes. Unmarking restores
   /// `'free'` (the run's previous type is not kept). Only a run that is

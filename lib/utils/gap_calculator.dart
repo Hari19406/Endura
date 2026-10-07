@@ -371,6 +371,22 @@ class ElevationProfile {
     return kept;
   }
 
+  /// Total ascent in metres across [samples]: the sum of the positive steps of
+  /// the cleaned, smoothed profile on its [GapCalculator.gridStepM] grid.
+  /// Null when fewer than two usable altitude readings remain.
+  static double? totalAscent(List<GapSample> samples) =>
+      build(samples)?.ascent;
+
+  /// Sum of the positive steps between consecutive grid points.
+  double get ascent {
+    var total = 0.0;
+    for (var k = 1; k < _smoothed.length; k++) {
+      final step = _smoothed[k] - _smoothed[k - 1];
+      if (step > 0) total += step;
+    }
+    return total;
+  }
+
   /// Smoothed altitude at [distanceM] (held at the ends outside the range).
   double elevationAt(double distanceM) {
     final d = distanceM.clamp(_startM, _endM);

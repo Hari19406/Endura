@@ -14,6 +14,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'services/analytics_service.dart';
 import 'services/revenue_cat_service.dart';
 import 'services/best_efforts_rebuild_service.dart';
+import 'services/elevation_gain_backfill_service.dart';
 import 'services/profile_service.dart';
 import 'services/hydration_service.dart';
 import 'services/theme_service.dart';
@@ -219,6 +220,20 @@ class _AppInitializerState extends State<AppInitializer> {
       // Best Efforts: one-time (version-flagged) rebuild from the runs already
       // stored on this device. Fire-and-forget — it waits a few seconds, works
       // in small batches, and never blocks or fails app start.
+      // Elevation: one-time (version-flagged) correction of stored elevation
+      // gain from each run's track samples. Same fire-and-forget contract.
+      ElevationGainBackfillService.instance
+          .backfillIfNeeded()
+          .then((result) {
+            // Lifetime elevation on the public profile follows the runs.
+            if (result != null && result.runsUpdated > 0) {
+              ProfileService.instance.refreshRunAggregates();
+            }
+          })
+          .catchError((Object e) {
+            debugPrint('[Startup] elevation backfill error: $e');
+          });
+
       BestEffortsRebuildService.instance
           .rebuildIfNeeded()
           .then((result) {
