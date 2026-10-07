@@ -7,6 +7,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../models/activity_telemetry.dart';
 import '../services/analytics_service.dart';
+import '../services/best_efforts_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_colors.dart';
@@ -14,6 +15,7 @@ import '../utils/pace_analytics.dart';
 import '../utils/run_effort_analytics.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/ambient_scaffold.dart';
+import '../widgets/best_effort_rank_badge.dart';
 import '../widgets/run_comments_sheet.dart';
 import '../widgets/run_share_card.dart';
 
@@ -393,6 +395,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     _splitsCard(c),
                     const SizedBox(height: 16),
                   ],
+                  if (a.bestEfforts.isNotEmpty) ...[
+                    _bestEffortsCard(c),
+                    const SizedBox(height: 16),
+                  ],
                   if (a.avgGapPace != null) ...[
                     _gapBlock(c),
                     const SizedBox(height: 16),
@@ -747,6 +753,93 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Best Efforts achieved in this run ────────────────────────────────────
+
+  /// Each distance this run covered, with its rank among all of the athlete's
+  /// efforts at that distance and the current all-time best for comparison.
+  /// Straight from the stored Best Efforts — nothing is recomputed here.
+  Widget _bestEffortsCard(AppColors c) {
+    return _card(
+      c,
+      title: 'BEST EFFORTS',
+      child: Column(
+        children: [for (final e in a.bestEfforts) _bestEffortRow(c, e)],
+      ),
+    );
+  }
+
+  Widget _bestEffortRow(AppColors c, RunBestEffort e) {
+    final time = BestEffortsService.formatElapsed(e.elapsedSeconds);
+    final comparison = e.isPr
+        ? 'All-time best'
+        : 'Best ${BestEffortsService.formatElapsed(e.bestSeconds)}'
+              ' \u00b7 +${BestEffortsService.formatElapsed(e.secondsOffBest)}';
+    return Padding(
+      key: Key('best-effort-row-${e.category.name}'),
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          BestEffortRankBadge(rank: e.rank),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e.category.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  comparison,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: c.textTertiary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                time,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: c.textPrimary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 3),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: e.isPr ? c.chartAccent : c.border),
+                ),
+                child: Text(
+                  e.rankLabel,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: e.isPr ? c.chartAccent : c.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

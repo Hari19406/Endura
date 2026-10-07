@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../engines/pr_engine.dart';
 import '../models/athlete_profile.dart';
 import '../models/shoe.dart';
+import '../services/best_efforts_service.dart';
 import '../services/profile_service.dart';
 import '../services/shoe_service.dart';
 import '../services/social_service.dart';
@@ -84,7 +85,8 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
     int activityCount = 0;
     if (isSelf) {
       final runs = await DatabaseService.instance.getAllRuns();
-      stats = _AthleteStats.fromRuns(runs);
+      final bestEfforts = await DatabaseService.instance.getAllCategoryPRs();
+      stats = _AthleteStats.fromRuns(runs, bestEfforts);
       activityCount = runs.length;
     }
 
@@ -244,7 +246,7 @@ class _AthleteProfileScreenState extends State<AthleteProfileScreen>
       valueListenable: UnitUtils.useMilesNotifier,
       builder: (context, useMiles, _) {
         final unit = UnitUtils.unitLabel(useMiles);
-        final pr = PREngine(s.prRuns).calculate();
+        final pr = PREngine(s.prRuns, bestEfforts: s.bestEfforts).calculate();
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -487,6 +489,10 @@ class _AthleteStats {
   final double totalElevationM;
   final List<Run> prRuns;
 
+  /// The athlete's #1 Best Effort per distance — the source of the 5K / 10K /
+  /// half / marathon records (see PREngine).
+  final Map<DistanceCategory, BestEffortRecord> bestEfforts;
+
   _AthleteStats({
     required this.weekKm,
     required this.weekSeconds,
@@ -496,9 +502,13 @@ class _AthleteStats {
     required this.totalActivities,
     required this.totalElevationM,
     required this.prRuns,
+    required this.bestEfforts,
   });
 
-  factory _AthleteStats.fromRuns(List<RunRecord> runs) {
+  factory _AthleteStats.fromRuns(
+    List<RunRecord> runs,
+    Map<DistanceCategory, BestEffortRecord> bestEfforts,
+  ) {
     final now = DateTime.now();
     final monday = DateTime(
       now.year,
@@ -537,6 +547,7 @@ class _AthleteStats {
       totalActivities: runs.length,
       totalElevationM: elev,
       prRuns: prRuns,
+      bestEfforts: bestEfforts,
     );
   }
 }

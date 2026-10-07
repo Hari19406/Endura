@@ -154,7 +154,7 @@ class _YouScreenState extends State<YouScreen>
           )
           .toList();
 
-      PREngine prEngine = PREngine(prRuns);
+      PREngine prEngine = PREngine(prRuns, bestEfforts: bestEfforts);
       PRResults prResults = prEngine.calculate();
       achieve.AchievementEngine achieveEngine = achieve.AchievementEngine(
         achieveRunData,
@@ -216,6 +216,9 @@ class _YouScreenState extends State<YouScreen>
     final id = record.id;
     final maxHr = await AthletePhysiology.instance.resolveMaxHr();
     final paceZones = await AthletePaceZones.instance.resolve();
+    final runEfforts = id == null
+        ? const <RunBestEffort>[]
+        : await DatabaseService.instance.getRunBestEfforts(id.toString());
     if (!mounted) return;
     final deleted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -226,10 +229,16 @@ class _YouScreenState extends State<YouScreen>
             avatarUrl: _profile?.avatarUrl,
             maxHr: maxHr,
             paceZoneConfig: paceZones,
+            bestEfforts: runEfforts,
           ),
           onDelete: id == null
               ? null
-              : () => DatabaseService.instance.deleteRun(id),
+              : () async {
+                  await DatabaseService.instance.deleteRun(id);
+                  // The next-fastest effort may now be a PR — refresh the
+                  // public aggregates so they keep matching.
+                  ProfileService.instance.refreshRunAggregates();
+                },
         ),
       ),
     );

@@ -20,6 +20,7 @@ import 'calendar_day_status.dart';
 import 'run_screen.dart';
 import '../services/athlete_pace_zones.dart';
 import '../services/athlete_physiology.dart';
+import '../services/best_efforts_service.dart';
 import '../utils/unit_utils.dart';
 
 enum BlockState { pending, done }
@@ -419,6 +420,11 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
     if (!mounted || record == null) return;
     final maxHr = await AthletePhysiology.instance.resolveMaxHr();
     final paceZones = await AthletePaceZones.instance.resolve();
+    final runEfforts = record.id == null
+        ? const <RunBestEffort>[]
+        : await DatabaseService.instance.getRunBestEfforts(
+            record.id.toString(),
+          );
     if (!mounted) return;
 
     Navigator.push(
@@ -430,6 +436,7 @@ class _PreRunBriefingScreenState extends State<PreRunBriefingScreen>
             runnerName: 'You',
             maxHr: maxHr,
             paceZoneConfig: paceZones,
+            bestEfforts: runEfforts,
           ),
         ),
       ),

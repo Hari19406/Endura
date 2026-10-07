@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:latlong2/latlong.dart';
+import '../services/profile_service.dart';
 import '../utils/database_service.dart';
 import '../engines/runtime/engine_runtime.dart';
 import '../engines/runtime/work_pace_calculator.dart';
@@ -199,6 +200,9 @@ class _RunSummaryScreenState extends State<RunSummaryScreen> {
         final runs = await DatabaseService.instance.getRecentRuns(limit: 1);
         if (runs.isNotEmpty && runs.first.id != null) {
           await DatabaseService.instance.deleteRun(runs.first.id!);
+          // This run was already counted in the public aggregates when it was
+          // saved; refresh so a PR it set doesn't linger.
+          ProfileService.instance.refreshRunAggregates();
         }
       } catch (e) {
         debugPrint('Error discarding run: $e');

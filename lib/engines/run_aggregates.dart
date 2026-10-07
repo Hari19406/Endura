@@ -1,11 +1,13 @@
 // lib/engines/run_aggregates.dart
 //
 // Rolls the full local run history into the handful of numbers denormalized
-// onto `profiles` (see migration 20260906000003). PR seconds use the same
-// "fastest eligible run projected onto the target distance" rule as PREngine,
-// so the public figure matches what the owner sees on their own Stats tab.
+// onto `profiles` (see migration 20260906000003). The 5K / 10K / half PR
+// seconds are the athlete's #1 Best Effort at that distance — the same value
+// PREngine and the Best Efforts screens show — so the public figure always
+// matches what the owner sees. Totals still come from the runs themselves.
 
-import '../utils/database_service.dart' show RunRecord;
+import '../services/best_efforts_service.dart';
+import '../utils/database_service.dart' show BestEffortRecord, RunRecord;
 
 class RunAggregates {
   final int totalDistanceMeters;
@@ -43,7 +45,10 @@ class RunAggregates {
     'best_half_marathon_seconds': bestHalfMarathonSeconds,
   };
 
-  factory RunAggregates.fromRuns(List<RunRecord> runs) {
+  factory RunAggregates.fromRuns(
+    List<RunRecord> runs, {
+    Map<DistanceCategory, BestEffortRecord> bestEfforts = const {},
+  }) {
     if (runs.isEmpty) return empty;
 
     double distanceKm = 0, elevationM = 0;
@@ -54,24 +59,15 @@ class RunAggregates {
       elevationM += r.elevationGain;
     }
 
-    int? projected(double minKm, double targetKm) {
-      double? bestPace; // sec per km
-      for (final r in runs) {
-        if (r.distanceKm < minKm || r.durationSeconds <= 0) continue;
-        final pace = r.durationSeconds / r.distanceKm;
-        if (bestPace == null || pace < bestPace) bestPace = pace;
-      }
-      return bestPace == null ? null : (bestPace * targetKm).round();
-    }
-
     return RunAggregates(
       totalDistanceMeters: (distanceKm * 1000).round(),
       totalRuns: runs.length,
       totalMovingSeconds: movingSeconds,
       totalElevationMeters: elevationM.round(),
-      best5kSeconds: projected(4.5, 5.0),
-      best10kSeconds: projected(9.0, 10.0),
-      bestHalfMarathonSeconds: projected(19.0, 21.0975),
+      best5kSeconds: bestEfforts[DistanceCategory.k5]?.elapsedSeconds,
+      best10kSeconds: bestEfforts[DistanceCategory.k10]?.elapsedSeconds,
+      bestHalfMarathonSeconds:
+          bestEfforts[DistanceCategory.half]?.elapsedSeconds,
     );
   }
 }

@@ -949,6 +949,69 @@ class DatabaseService {
     }
   }
 
+  /// The best efforts achieved in one run, each with its rank among ALL
+  /// retained efforts at that distance and the current all-time best, in
+  /// distance order. Read straight from `best_efforts` (no recalculation), and
+  /// ranked with the same ordering as [getBestEffortsForCategory] —
+  /// `elapsed_seconds, recorded_at, id` — so the rank always equals the
+  /// effort's position on the leaderboard. Empty when the run has none.
+  Future<List<RunBestEffort>> getRunBestEfforts(String runId) async {
+    try {
+      final db = await database;
+      final mine = await db.query(
+        'best_efforts',
+        where: 'run_id = ?',
+        whereArgs: [runId],
+      );
+      final out = <RunBestEffort>[];
+      for (final row in mine) {
+        final record = BestEffortRecord.fromMap(row);
+        final category = record.category.name;
+
+        final ahead = Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COUNT(*) FROM best_efforts WHERE distance_category = ? AND ('
+            'elapsed_seconds < ? OR (elapsed_seconds = ? AND ('
+            'recorded_at < ? OR (recorded_at = ? AND id < ?))))',
+            [
+              category,
+              record.elapsedSeconds,
+              record.elapsedSeconds,
+              row['recorded_at'],
+              row['recorded_at'],
+              record.id,
+            ],
+          ),
+        );
+        final total = Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COUNT(*) FROM best_efforts WHERE distance_category = ?',
+            [category],
+          ),
+        );
+        final best = await getBestEffortsForCategory(record.category, limit: 1);
+
+        out.add(
+          RunBestEffort(
+            category: record.category,
+            elapsedSeconds: record.elapsedSeconds,
+            rank: (ahead ?? 0) + 1,
+            totalEfforts: total ?? 1,
+            bestSeconds: best.isEmpty
+                ? record.elapsedSeconds
+                : best.first.elapsedSeconds,
+          ),
+        );
+      }
+      out.sort((a, b) => a.category.index.compareTo(b.category.index));
+      return out;
+    } catch (e, stack) {
+      debugPrint('[DB] getRunBestEfforts error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
   /// The #1 (fastest) effort for every category that has at least one
   /// recorded effort. Categories never reached by any run are omitted.
   Future<Map<DistanceCategory, BestEffortRecord>> getAllCategoryPRs() async {

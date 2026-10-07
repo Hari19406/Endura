@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../engines/run_aggregates.dart';
 import '../models/athlete_profile.dart';
-import '../utils/database_service.dart' show RunRecord;
+import '../utils/database_service.dart' show DatabaseService, RunRecord;
 import 'revenue_cat_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -384,7 +384,12 @@ class ProfileService {
   Future<bool> pushRunAggregates(List<RunRecord> runs) async {
     if (_userId == null) return false;
     try {
-      final agg = RunAggregates.fromRuns(runs);
+      // The public PR columns are the athlete's #1 Best Efforts, read here so
+      // every caller publishes the same numbers the app shows locally.
+      final agg = RunAggregates.fromRuns(
+        runs,
+        bestEfforts: await DatabaseService.instance.getAllCategoryPRs(),
+      );
       await _client
           .from('profiles')
           .update({
@@ -399,6 +404,19 @@ class ProfileService {
     } catch (e) {
       debugPrint('[ProfileService] pushRunAggregates error: $e');
       return false;
+    }
+  }
+
+  /// Re-publishes the aggregates from what is on the device now. Call after
+  /// something that can change the PRs outside a run save: deleting a run (the
+  /// next-fastest effort becomes the PR) or the Best Efforts rebuild. Best
+  /// effort — never throws.
+  Future<void> refreshRunAggregates() async {
+    try {
+      if (_userId == null) return;
+      await pushRunAggregates(await DatabaseService.instance.getAllRuns());
+    } catch (e) {
+      debugPrint('[ProfileService] refreshRunAggregates error: $e');
     }
   }
 

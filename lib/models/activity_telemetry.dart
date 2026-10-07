@@ -13,6 +13,7 @@
 import 'dart:math' as math;
 
 import '../services/athlete_physiology.dart';
+import '../services/best_efforts_service.dart';
 import '../utils/database_service.dart' show RunRecord, decodePolylineToPoints;
 import '../utils/gap_calculator.dart';
 import '../utils/hr_analytics.dart';
@@ -230,6 +231,12 @@ class ActivityDetail {
   /// [effort] derives it from [telemetrySeries] on demand.
   final RunEffortSeries? effortSeries;
 
+  /// The Best Efforts achieved in this run, each with its rank among all of the
+  /// athlete's efforts at that distance and the current all-time best. Read
+  /// from the stored `best_efforts` rows (see `getRunBestEfforts`), never
+  /// recalculated here. Empty when the run has none and for Feed runs.
+  final List<RunBestEffort> bestEfforts;
+
   /// Decoded `{lat, lng}` points for the route preview. May be empty.
   final List<Map<String, double>> routePoints;
 
@@ -265,6 +272,7 @@ class ActivityDetail {
     this.avgGapPace,
     this.gap,
     this.effortSeries,
+    this.bestEfforts = const [],
     this.routePoints = const [],
   });
 
@@ -617,6 +625,7 @@ class ActivityDetail {
     int? estimatedCalories,
     MaxHrResolution maxHr = MaxHrResolution.fallback,
     PaceZoneConfig? paceZoneConfig,
+    List<RunBestEffort> bestEfforts = const [],
   }) {
     final ts = record.trackSamples;
 
@@ -801,6 +810,7 @@ class ActivityDetail {
       avgGapPace: gap == null ? null : _paceLabel(gap.avgGapSecPerKm),
       gap: gap,
       effortSeries: buildEffortSeries(samples, gap: gap),
+      bestEfforts: bestEfforts,
       routePoints: decodePolylineToPoints(record.routePolyline),
     );
   }

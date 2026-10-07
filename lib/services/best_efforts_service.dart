@@ -93,6 +93,41 @@ class BestEffortResult {
   });
 }
 
+/// One effort from a single run, in the context of ALL of the athlete's
+/// retained efforts at that distance: where it ranks and what the current
+/// all-time best is. Built by the database from the stored `best_efforts`
+/// rows (never recalculated), so it always agrees with the leaderboard.
+class RunBestEffort {
+  final DistanceCategory category;
+  final int elapsedSeconds;
+
+  /// 1 = the all-time best. Ties are broken exactly as the leaderboard orders
+  /// them: earlier effort first, then id.
+  final int rank;
+
+  /// How many efforts exist at this distance (this one included).
+  final int totalEfforts;
+
+  /// The current all-time best time at this distance.
+  final int bestSeconds;
+
+  const RunBestEffort({
+    required this.category,
+    required this.elapsedSeconds,
+    required this.rank,
+    required this.totalEfforts,
+    required this.bestSeconds,
+  });
+
+  bool get isPr => rank == 1;
+
+  /// How much slower than the all-time best (0 for the PR itself).
+  int get secondsOffBest => elapsedSeconds - bestSeconds;
+
+  /// "PR", "2nd", "3rd", "4th" …
+  String get rankLabel => BestEffortsService.rankLabel(rank);
+}
+
 /// Data-quality rules for [BestEffortsService.analyzeRun]. Deliberately
 /// conservative: the goal is that an obvious GPS or clock glitch can't become
 /// a personal best, not to second-guess a fast but legitimate runner.
@@ -309,6 +344,19 @@ class BestEffortsService {
     final dt = b.elapsedSeconds - a.elapsedSeconds;
     if (dt <= 0) return dd > rules.maxStallDistanceM;
     return dd / dt > rules.maxSegmentSpeedMps;
+  }
+
+  /// "PR" for rank 1, otherwise the ordinal: 2nd, 3rd, 4th … 11th, 12th, 21st.
+  static String rankLabel(int rank) {
+    if (rank <= 1) return 'PR';
+    final mod100 = rank % 100;
+    if (mod100 >= 11 && mod100 <= 13) return '${rank}th';
+    return switch (rank % 10) {
+      1 => '${rank}st',
+      2 => '${rank}nd',
+      3 => '${rank}rd',
+      _ => '${rank}th',
+    };
   }
 
   /// Formats a duration as `m:ss`, or `h:mm:ss` once it reaches an hour —

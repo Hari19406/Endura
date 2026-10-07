@@ -219,12 +219,15 @@ class _AppInitializerState extends State<AppInitializer> {
       // Best Efforts: one-time (version-flagged) rebuild from the runs already
       // stored on this device. Fire-and-forget — it waits a few seconds, works
       // in small batches, and never blocks or fails app start.
-      BestEffortsRebuildService.instance.rebuildIfNeeded().catchError((
-        Object e,
-      ) {
-        debugPrint('[Startup] best-efforts rebuild error: $e');
-        return null;
-      });
+      BestEffortsRebuildService.instance
+          .rebuildIfNeeded()
+          .then((result) {
+            // The rebuild can change PRs; keep the public aggregates matching.
+            if (result != null) ProfileService.instance.refreshRunAggregates();
+          })
+          .catchError((Object e) {
+            debugPrint('[Startup] best-efforts rebuild error: $e');
+          });
 
       // RevenueCat init — only if user is already logged in at startup
       final user = Supabase.instance.client.auth.currentUser;

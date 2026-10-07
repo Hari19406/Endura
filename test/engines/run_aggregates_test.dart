@@ -3,7 +3,9 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:run_app/engines/run_aggregates.dart';
-import 'package:run_app/utils/database_service.dart' show RunRecord;
+import 'package:run_app/services/best_efforts_service.dart';
+import 'package:run_app/utils/database_service.dart'
+    show BestEffortRecord, RunRecord;
 
 RunRecord run({
   required double km,
@@ -38,23 +40,75 @@ void main() {
     expect(a.totalElevationMeters, 100); // 30 + 70.4 → round
   });
 
-  test('5K PR projects the fastest eligible run onto 5.0 km', () {
-    // 4.6 km in 1200s → 260.87 s/km → ×5 ≈ 1304s. A slower 5 km run must lose.
-    final a = RunAggregates.fromRuns([
-      run(km: 4.6, seconds: 1200),
-      run(km: 5.0, seconds: 1500),
-    ]);
-    expect(a.best5kSeconds, closeTo(1304, 1));
+  BestEffortRecord effort(DistanceCategory c, int seconds) => BestEffortRecord(
+    id: '1_${c.name}',
+    runId: '1',
+    category: c,
+    elapsedSeconds: seconds,
+    recordedAt: DateTime(2026, 9, 1),
+  );
+
+  test('the 5K / 10K / half PRs are the athlete\'s #1 Best Efforts', () {
+    final a = RunAggregates.fromRuns(
+      [run(km: 21.5, seconds: 6200)],
+      bestEfforts: {
+        DistanceCategory.k5: effort(DistanceCategory.k5, 1304),
+        DistanceCategory.k10: effort(DistanceCategory.k10, 2750),
+        DistanceCategory.half: effort(DistanceCategory.half, 5900),
+      },
+    );
+    expect(a.best5kSeconds, 1304);
+    expect(a.best10kSeconds, 2750);
+    expect(a.bestHalfMarathonSeconds, 5900);
   });
 
-  test('distance gates: a 3 km run never sets the 5K PR', () {
-    final a = RunAggregates.fromRuns([run(km: 3, seconds: 600)]);
-    expect(a.best5kSeconds, isNull);
+  test(
+    'no whole-run projection: fast long runs without Best Efforts set no PR',
+    () {
+      // The old rule projected the fastest eligible run's average pace onto the
+      // distance. That is gone: with no Best Effort there is no PR.
+      final a = RunAggregates.fromRuns([
+        run(km: 4.6, seconds: 1200),
+        run(km: 12, seconds: 3000),
+        run(km: 21.5, seconds: 6500),
+      ]);
+      expect(a.best5kSeconds, isNull);
+      expect(a.best10kSeconds, isNull);
+      expect(a.bestHalfMarathonSeconds, isNull);
+    },
+  );
+
+  test('a Best Effort for one distance does not create PRs for others', () {
+    final a = RunAggregates.fromRuns(
+      [run(km: 6, seconds: 1800)],
+      bestEfforts: {DistanceCategory.k5: effort(DistanceCategory.k5, 1500)},
+    );
+    expect(a.best5kSeconds, 1500);
     expect(a.best10kSeconds, isNull);
+    expect(a.bestHalfMarathonSeconds, isNull);
+  });
+
+  test('totals are unaffected by Best Efforts', () {
+    final runs = [
+      run(km: 5, seconds: 1500, elevation: 30),
+      run(km: 10, seconds: 3000, elevation: 70.4),
+    ];
+    final without = RunAggregates.fromRuns(runs);
+    final withBe = RunAggregates.fromRuns(
+      runs,
+      bestEfforts: {DistanceCategory.k5: effort(DistanceCategory.k5, 1400)},
+    );
+    expect(withBe.totalRuns, without.totalRuns);
+    expect(withBe.totalDistanceMeters, without.totalDistanceMeters);
+    expect(withBe.totalMovingSeconds, without.totalMovingSeconds);
+    expect(withBe.totalElevationMeters, without.totalElevationMeters);
   });
 
   test('toMap uses the profile column names', () {
-    final m = RunAggregates.fromRuns([run(km: 21.1, seconds: 6000)]).toMap();
+    final m = RunAggregates.fromRuns(
+      [run(km: 21.1, seconds: 6000)],
+      bestEfforts: {DistanceCategory.half: effort(DistanceCategory.half, 5900)},
+    ).toMap();
     expect(
       m.keys,
       containsAll(<String>[

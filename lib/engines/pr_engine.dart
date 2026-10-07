@@ -1,3 +1,6 @@
+import '../services/best_efforts_service.dart';
+import '../utils/database_service.dart' show BestEffortRecord;
+
 class Run {
   final double distanceKm;
   final int durationSeconds;
@@ -58,7 +61,15 @@ class PRResults {
 
 class PREngine {
   final List<Run> runs;
-  PREngine(this.runs);
+
+  /// The athlete's #1 Best Effort per standard distance (see
+  /// `DatabaseService.getAllCategoryPRs`). This is the ONE source for the 5K /
+  /// 10K / half / marathon records, so they always agree with the Best Efforts
+  /// screens. Whole-run metrics (longest run, best average pace) still come
+  /// from [runs].
+  final Map<DistanceCategory, BestEffortRecord> bestEfforts;
+
+  PREngine(this.runs, {this.bestEfforts = const {}});
 
   String _formatTime(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
@@ -77,22 +88,18 @@ class PREngine {
     return '$mins:${secs.toString().padLeft(2, '0')}';
   }
 
-  // Among runs of at least [minKm], find the fastest-paced one and project
-  // its pace onto [targetKm] to get the PR time.
-  PREntry? _bestForDistance(double minKm, double targetKm, String label) {
-    final eligible = runs
-        .where((r) => r.distanceKm >= minKm && r.paceSecPerKm > 0)
-        .toList();
-    if (eligible.isEmpty) return null;
-    final best = eligible.reduce(
-      (a, b) => a.paceSecPerKm < b.paceSecPerKm ? a : b,
-    );
-    final timeSeconds = (best.paceSecPerKm * targetKm).round();
+  // The record for a standard distance is the athlete's #1 Best Effort — an
+  // actual rolling-window time, never a projection of a whole run's average
+  // pace. Null when there is no Best Effort for that distance.
+  PREntry? _bestForDistance(DistanceCategory category, String label) {
+    final record = bestEfforts[category];
+    if (record == null) return null;
+    final paceSecPerKm = record.elapsedSeconds / (category.meters / 1000);
     return PREntry(
       label: label,
-      value: _formatTime(timeSeconds),
-      unit: '${_formatPace(best.paceSecPerKm)} /km',
-      setOn: best.date,
+      value: _formatTime(record.elapsedSeconds),
+      unit: '${_formatPace(paceSecPerKm)} /km',
+      setOn: record.recordedAt,
     );
   }
 
@@ -121,10 +128,13 @@ class PREngine {
     );
 
     return PRResults(
-      best5K: _bestForDistance(4.5, 5.0, 'Best 5K'),
-      best10K: _bestForDistance(9.0, 10.0, 'Best 10K'),
-      bestHalf: _bestForDistance(19.0, 21.0975, 'Best half'),
-      bestMarathon: _bestForDistance(40.0, 42.195, 'Best marathon'),
+      best5K: _bestForDistance(DistanceCategory.k5, 'Best 5K'),
+      best10K: _bestForDistance(DistanceCategory.k10, 'Best 10K'),
+      bestHalf: _bestForDistance(DistanceCategory.half, 'Best half'),
+      bestMarathon: _bestForDistance(
+        DistanceCategory.marathon,
+        'Best marathon',
+      ),
       bestAvgPace: PREntry(
         label: 'Best avg pace',
         value: fastestRun == null
