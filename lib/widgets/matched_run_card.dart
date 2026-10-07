@@ -92,7 +92,7 @@ class MatchedRunCard extends StatelessWidget {
             r.previous == null
                 ? 'VS BEST ON THIS ROUTE'
                 : r.previousIsBest
-                ? 'VS PREVIOUS RUN � YOUR BEST'
+                ? 'VS PREVIOUS RUN \u00b7 YOUR BEST'
                 : 'VS PREVIOUS RUN',
             primary,
           ),
@@ -166,7 +166,7 @@ class MatchedRunCard extends StatelessWidget {
           '${UnitUtils.displayDistance(cmp.other.distanceKm, useMiles).toStringAsFixed(2)} ${UnitUtils.unitLabel(useMiles)}',
           null,
           trailingText:
-              '${cmp.distanceDiffKm! > 0 ? '+' : '−'}'
+              '${cmp.distanceDiffKm! > 0 ? '+' : '\u00e2\u02c6\u2019'}'
               '${UnitUtils.displayDistance(cmp.distanceDiffKm!.abs(), useMiles).toStringAsFixed(2)} ${UnitUtils.unitLabel(useMiles)}',
         ),
       if (cmp.hrDelta != null)
@@ -257,7 +257,7 @@ class MatchedRunCard extends StatelessWidget {
   }
 
   static String _signed(int v, String Function(int) fmt) =>
-      v == 0 ? '0' : '${v < 0 ? '−' : '+'}${fmt(v)}';
+      v == 0 ? '0' : '${v < 0 ? '\u00e2\u02c6\u2019' : '+'}${fmt(v)}';
 
   Widget _row(
     AppColors c,
