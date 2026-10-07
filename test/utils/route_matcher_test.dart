@@ -190,7 +190,13 @@ void main() {
 
   test('an out-and-back still matches itself', () {
     final oab = _outAndBack();
-    expect(_match(oab, [_cand(1, _noisy(oab, 8))]).map((m) => m.id), [1]);
+    // Jitter inflates the traced length, so pass the clean distance (the
+    // app stores the run's own measured distance, not the polyline length).
+    final d = _len(oab) / 1000;
+    expect(
+      _match(oab, [_cand(1, _noisy(oab, 8), distanceKm: d)]).map((m) => m.id),
+      [1],
+    );
   });
 
   test('only the matching candidates are returned, in input order', () {

@@ -1,5 +1,3 @@
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -166,7 +164,7 @@ class MatchedRunCard extends StatelessWidget {
           '${UnitUtils.displayDistance(cmp.other.distanceKm, useMiles).toStringAsFixed(2)} ${UnitUtils.unitLabel(useMiles)}',
           null,
           trailingText:
-              '${cmp.distanceDiffKm! > 0 ? '+' : '\u00e2\u02c6\u2019'}'
+              '${cmp.distanceDiffKm! > 0 ? '+' : '\u2212'}'
               '${UnitUtils.displayDistance(cmp.distanceDiffKm!.abs(), useMiles).toStringAsFixed(2)} ${UnitUtils.unitLabel(useMiles)}',
         ),
       if (cmp.hrDelta != null)
@@ -257,7 +255,7 @@ class MatchedRunCard extends StatelessWidget {
   }
 
   static String _signed(int v, String Function(int) fmt) =>
-      v == 0 ? '0' : '${v < 0 ? '\u00e2\u02c6\u2019' : '+'}${fmt(v)}';
+      v == 0 ? '0' : '${v < 0 ? '\u2212' : '+'}${fmt(v)}';
 
   Widget _row(
     AppColors c,
