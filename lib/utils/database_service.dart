@@ -8,6 +8,7 @@ import 'stats.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import '../services/best_efforts_service.dart';
+import 'trend_analytics.dart' show BestEffortPoint, TrendRun;
 
 class RunRecord {
   final int? id;
@@ -690,6 +691,74 @@ class DatabaseService {
       return rows.map(RunRecord.fromMap).toList();
     } catch (e, stack) {
       debugPrint('getRecentRuns error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// Every run reduced to the five columns Trends needs, oldest first. Unlike
+  /// [getAllRuns] this never reads the route polyline, splits or track
+  /// samples, which dominate a run row's size. `avg_heart_rate` stays null
+  /// for runs without an HR source — it is never defaulted.
+  Future<List<TrendRun>> getTrendRuns() async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        columns: [
+          'date',
+          'distance_km',
+          'duration_seconds',
+          'elevation_gain',
+          'avg_heart_rate',
+        ],
+        orderBy: 'date ASC',
+      );
+      return [
+        for (final r in rows)
+          TrendRun(
+            date: DateTime.parse(r['date'] as String),
+            distanceKm: (r['distance_km'] as num?)?.toDouble() ?? 0,
+            movingTimeSeconds: (r['duration_seconds'] as num?)?.toInt() ?? 0,
+            elevationGain: (r['elevation_gain'] as num?)?.toDouble() ?? 0,
+            avgHr: (r['avg_heart_rate'] as num?)?.toInt(),
+          ),
+      ];
+    } catch (e, stack) {
+      debugPrint('[DB] getTrendRuns error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// Every stored effort for [category] as (date, time) points, oldest first,
+  /// read straight from `best_efforts` — nothing is recalculated. Only runs
+  /// that actually have an effort at that distance have a row. `isPr` is left
+  /// false; Trends flags progressive PRs with
+  /// `TrendAnalytics.withProgressivePrs`.
+  Future<List<BestEffortPoint>> getBestEffortSeries(
+    DistanceCategory category,
+  ) async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'best_efforts',
+        columns: ['id', 'run_id', 'elapsed_seconds', 'recorded_at'],
+        where: 'distance_category = ?',
+        whereArgs: [category.name],
+        orderBy: 'recorded_at ASC, id ASC',
+      );
+      return [
+        for (final r in rows)
+          BestEffortPoint(
+            id: r['id'] as String,
+            runId: r['run_id'] as String,
+            date: DateTime.parse(r['recorded_at'] as String),
+            seconds: (r['elapsed_seconds'] as num).toInt(),
+          ),
+      ];
+    } catch (e, stack) {
+      debugPrint('[DB] getBestEffortSeries error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
       return [];
     }
