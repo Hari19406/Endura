@@ -124,6 +124,7 @@ class _RunScreenState extends State<RunScreen>
       _clockMark = mark.add(Duration(seconds: whole));
     }
   }
+
   double _distance = 0.0;
   double _pendingDistance = 0.0;
   Timer? _timer;
@@ -1544,17 +1545,17 @@ class _RunScreenState extends State<RunScreen>
           (r) => debugPrint('Sync: $r'),
         );
 
-        // Best Efforts — rolling-window PR extraction. Computed once here,
-        // off the main-set track samples; best-effort and never blocks the
-        // summary screen if a run has too-sparse telemetry to compute from.
+        // Best Efforts — rolling-window PR extraction. Computed once here via
+        // the canonical BestEffortsService.analyzeRun (the same function the
+        // historical rebuild uses), off the main-set track samples plus the
+        // run's true totals; best-effort and never blocks the summary screen.
         if (insertedId > 0) {
           try {
-            final points = BestEffortsService.pointsFromTrackSamples(
+            final results = BestEffortsService.analyzeRun(
               capturedTrackSamples,
               finalDistanceMeters: _capturedMainDistanceM,
               finalSeconds: _capturedMainSeconds.toDouble(),
             );
-            final results = BestEffortsService.extract(points);
             await DatabaseService.instance.insertBestEffortsForRun(
               insertedId.toString(),
               results,

@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'services/analytics_service.dart';
 import 'services/revenue_cat_service.dart';
+import 'services/best_efforts_rebuild_service.dart';
 import 'services/profile_service.dart';
 import 'services/hydration_service.dart';
 import 'services/theme_service.dart';
@@ -214,6 +215,16 @@ class _AppInitializerState extends State<AppInitializer> {
     try {
       final service = await FirstRunService.create();
       await DatabaseService.instance.migrateFromSharedPreferences();
+
+      // Best Efforts: one-time (version-flagged) rebuild from the runs already
+      // stored on this device. Fire-and-forget — it waits a few seconds, works
+      // in small batches, and never blocks or fails app start.
+      BestEffortsRebuildService.instance.rebuildIfNeeded().catchError((
+        Object e,
+      ) {
+        debugPrint('[Startup] best-efforts rebuild error: $e');
+        return null;
+      });
 
       // RevenueCat init — only if user is already logged in at startup
       final user = Supabase.instance.client.auth.currentUser;

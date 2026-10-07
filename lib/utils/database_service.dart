@@ -267,6 +267,15 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
   static Database? _db;
 
+  /// Test seam: point the service at an already-open (e.g. in-memory ffi)
+  /// database. Pass null to reset.
+  @visibleForTesting
+  static void useDatabaseForTesting(Database? db) => _db = db;
+
+  /// Test seam: create the real, current schema on [db].
+  @visibleForTesting
+  static Future<void> createSchemaForTesting(Database db) => _createSchema(db);
+
   Future<Database> get database async {
     _db ??= await _init();
     return _db!;
@@ -293,71 +302,12 @@ class DatabaseService {
       // ────────────────────────────────────────────────────────────────────
       // v10 → added `runs.scheduled_day_id` (direct link from a completed run
       //       to the plan slot it fulfilled; see ScheduledWorkoutContext)
-      // v11 → added `best_efforts` table (rolling-window PR leaderboard per
-      //       benchmark distance; see BestEffortsService)
+      // v11 → added `best_efforts` table (rolling-window efforts per
+      //       benchmark distance, ranked at query time; see BestEffortsService)
       // v12 → added `runs.title` (user-editable run name, set on the summary
       //       screen; NULL for older runs)
       version: 12,
-      onCreate: (db, _) async {
-        // Fresh install: create the complete, up-to-date schema in one shot.
-        await db.execute('''
-          CREATE TABLE runs (
-            id                INTEGER PRIMARY KEY AUTOINCREMENT,
-            distance_km       REAL    NOT NULL,
-            average_pace      TEXT    NOT NULL,
-            duration_seconds  INTEGER NOT NULL,
-            date              TEXT    NOT NULL,
-            route_polyline    TEXT    NOT NULL DEFAULT '',
-            workout_type      TEXT    NOT NULL DEFAULT 'easy',
-            synced_to_cloud   INTEGER NOT NULL DEFAULT 0,
-            cs_value_at_time  REAL,
-            rpe               INTEGER,
-            elevation_gain    REAL    NOT NULL DEFAULT 0,
-            splits_json       TEXT    NOT NULL DEFAULT '[]',
-            elapsed_seconds   INTEGER,
-            avg_heart_rate    INTEGER,
-            peak_heart_rate   INTEGER,
-            avg_cadence       INTEGER,
-            peak_cadence      INTEGER,
-            gap_average_pace  TEXT,
-            track_samples_json TEXT  NOT NULL DEFAULT '[]',
-            scheduled_day_id  TEXT,
-            title             TEXT
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE training_snapshots (
-            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-            date               TEXT NOT NULL,
-            acute_load         REAL NOT NULL,
-            chronic_load       REAL NOT NULL,
-            acwr               REAL NOT NULL,
-            critical_speed     REAL NOT NULL DEFAULT 0.0,
-            last_quality_date  TEXT,
-            last_long_run_date TEXT
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE skip_counts (
-            workout_type  TEXT    PRIMARY KEY,
-            count         INTEGER NOT NULL DEFAULT 0
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE achievements (
-            type        TEXT    PRIMARY KEY,
-            unlocked_at TEXT    NOT NULL,
-            tier        INTEGER NOT NULL
-          )
-        ''');
-        await db.execute(_createShoesTableSql);
-        await db.execute(_createBestEffortsTableSql);
-        await db.execute('CREATE INDEX idx_runs_date ON runs(date DESC)');
-        await db.execute(
-          'CREATE INDEX idx_snap_date ON training_snapshots(date DESC)',
-        );
-        await db.execute(_createBestEffortsIndexSql);
-      },
+      onCreate: (db, _) => _createSchema(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         // Each migration block is additive and guarded by the old version so
         // it runs exactly once per device regardless of which version the user
@@ -522,6 +472,69 @@ class DatabaseService {
     );
   }
 
+  /// Creates the complete, current schema on a fresh install. Also the seam
+  /// database tests use to build an in-memory database with the real tables.
+  static Future<void> _createSchema(Database db) async {
+    // Fresh install: create the complete, up-to-date schema in one shot.
+    await db.execute('''
+      CREATE TABLE runs (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        distance_km       REAL    NOT NULL,
+        average_pace      TEXT    NOT NULL,
+        duration_seconds  INTEGER NOT NULL,
+        date              TEXT    NOT NULL,
+        route_polyline    TEXT    NOT NULL DEFAULT '',
+        workout_type      TEXT    NOT NULL DEFAULT 'easy',
+        synced_to_cloud   INTEGER NOT NULL DEFAULT 0,
+        cs_value_at_time  REAL,
+        rpe               INTEGER,
+        elevation_gain    REAL    NOT NULL DEFAULT 0,
+        splits_json       TEXT    NOT NULL DEFAULT '[]',
+        elapsed_seconds   INTEGER,
+        avg_heart_rate    INTEGER,
+        peak_heart_rate   INTEGER,
+        avg_cadence       INTEGER,
+        peak_cadence      INTEGER,
+        gap_average_pace  TEXT,
+        track_samples_json TEXT  NOT NULL DEFAULT '[]',
+        scheduled_day_id  TEXT,
+        title             TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE training_snapshots (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        date               TEXT NOT NULL,
+        acute_load         REAL NOT NULL,
+        chronic_load       REAL NOT NULL,
+        acwr               REAL NOT NULL,
+        critical_speed     REAL NOT NULL DEFAULT 0.0,
+        last_quality_date  TEXT,
+        last_long_run_date TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE skip_counts (
+        workout_type  TEXT    PRIMARY KEY,
+        count         INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE achievements (
+        type        TEXT    PRIMARY KEY,
+        unlocked_at TEXT    NOT NULL,
+        tier        INTEGER NOT NULL
+      )
+    ''');
+    await db.execute(_createShoesTableSql);
+    await db.execute(_createBestEffortsTableSql);
+    await db.execute('CREATE INDEX idx_runs_date ON runs(date DESC)');
+    await db.execute(
+      'CREATE INDEX idx_snap_date ON training_snapshots(date DESC)',
+    );
+    await db.execute(_createBestEffortsIndexSql);
+  }
+
   static const String _createShoesTableSql = '''
     CREATE TABLE shoes (
       id                  TEXT    PRIMARY KEY,
@@ -555,7 +568,9 @@ class DatabaseService {
 
   // ── CRUD: shoes (local mirror of the Supabase `shoes` table) ──────────────
 
-  Future<List<Map<String, dynamic>>> getShoeRows({bool includeDeleted = false}) async {
+  Future<List<Map<String, dynamic>>> getShoeRows({
+    bool includeDeleted = false,
+  }) async {
     try {
       final db = await database;
       return db.query(
@@ -572,11 +587,7 @@ class DatabaseService {
 
   Future<void> upsertShoeRow(Map<String, dynamic> row) async {
     final db = await database;
-    await db.insert(
-      'shoes',
-      row,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('shoes', row, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> deleteShoeRow(String id) async {
@@ -604,8 +615,11 @@ class DatabaseService {
     await db.transaction((txn) async {
       await txn.delete('shoes');
       for (final r in rows) {
-        await txn.insert('shoes', r,
-            conflictAlgorithm: ConflictAlgorithm.replace);
+        await txn.insert(
+          'shoes',
+          r,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     });
   }
@@ -632,7 +646,11 @@ class DatabaseService {
     await db.delete('runs', where: 'id = ?', whereArgs: [id]);
     // No enforced FK cascade (foreign_keys pragma isn't enabled), so clean
     // up this run's best-effort rows explicitly.
-    await db.delete('best_efforts', where: 'run_id = ?', whereArgs: [id.toString()]);
+    await db.delete(
+      'best_efforts',
+      where: 'run_id = ?',
+      whereArgs: [id.toString()],
+    );
   }
 
   Future<RunRecord?> getRunById(int id) async {
@@ -819,38 +837,44 @@ class DatabaseService {
 
   // ── CRUD: best_efforts ──────────────────────────────────────────────────────
 
-  /// Computes and stores best-effort segments for a just-completed run.
-  /// Idempotent: rows are keyed by `'<runId>_<category>'`, so recomputing for
-  /// the same run overwrites rather than duplicates. Never blocks or throws —
-  /// callers should treat this as best-effort, same as shoe/aggregate updates.
+  /// Stores the best-effort segments for one run, REPLACING whatever that run
+  /// had before: the run's old rows are deleted and the new ones inserted in
+  /// one transaction, so a recompute that now rejects an effort (e.g. it fails
+  /// the plausibility rules) removes the stale row instead of leaving it.
+  /// Idempotent — rows are keyed `'<runId>_<category>'`. An empty [results]
+  /// clears the run's rows. Every row is kept: the leaderboard is ranked at
+  /// query time, never trimmed, so deleting a run can promote the next-fastest.
+  /// Never blocks or throws — callers should treat this as best-effort, same as
+  /// shoe/aggregate updates.
   Future<void> insertBestEffortsForRun(
     String runId,
     List<BestEffortResult> results, {
     DateTime? recordedAt,
   }) async {
-    if (results.isEmpty) return;
     final when = recordedAt ?? DateTime.now();
     try {
       final db = await database;
-      final touchedCategories = <String>{};
-      for (final r in results) {
-        final record = BestEffortRecord(
-          id: '${runId}_${r.category.name}',
-          runId: runId,
-          category: r.category,
-          elapsedSeconds: r.elapsedSeconds,
-          recordedAt: when,
-        );
-        await db.insert(
+      await db.transaction((txn) async {
+        await txn.delete(
           'best_efforts',
-          record.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
+          where: 'run_id = ?',
+          whereArgs: [runId],
         );
-        touchedCategories.add(r.category.name);
-      }
-      for (final categoryName in touchedCategories) {
-        await _trimBestEffortsCategory(db, categoryName);
-      }
+        for (final r in results) {
+          final record = BestEffortRecord(
+            id: '${runId}_${r.category.name}',
+            runId: runId,
+            category: r.category,
+            elapsedSeconds: r.elapsedSeconds,
+            recordedAt: when,
+          );
+          await txn.insert(
+            'best_efforts',
+            record.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      });
     } catch (e, stack) {
       debugPrint('[DB] insertBestEffortsForRun error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
@@ -865,33 +889,48 @@ class DatabaseService {
         record.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      await _trimBestEffortsCategory(db, record.category.name);
     } catch (e, stack) {
       debugPrint('[DB] insertBestEffort error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
     }
   }
 
-  /// Keeps at most the top 10 fastest rows for [categoryName], deleting the
-  /// slowest overflow rows.
-  Future<void> _trimBestEffortsCategory(Database db, String categoryName) async {
-    final rows = await db.query(
-      'best_efforts',
-      columns: ['id'],
-      where: 'distance_category = ?',
-      whereArgs: [categoryName],
-      orderBy: 'elapsed_seconds ASC',
-    );
-    if (rows.length <= 10) return;
-    for (final row in rows.skip(10)) {
-      await db.delete('best_efforts', where: 'id = ?', whereArgs: [row['id']]);
+  /// Removes best-effort rows whose run no longer exists (a run deleted by an
+  /// older build, or by a path that didn't clean up). Returns rows removed.
+  Future<int> deleteOrphanBestEfforts() async {
+    try {
+      final db = await database;
+      return await db.rawDelete(
+        'DELETE FROM best_efforts '
+        'WHERE run_id NOT IN (SELECT CAST(id AS TEXT) FROM runs)',
+      );
+    } catch (e, stack) {
+      debugPrint('[DB] deleteOrphanBestEfforts error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return 0;
     }
   }
 
-  /// Top [limit] fastest efforts for [category], fastest first.
+  /// Ids of every stored run, oldest first. Lets the best-efforts rebuild load
+  /// runs one at a time instead of holding every run's track samples at once.
+  Future<List<int>> getAllRunIds() async {
+    try {
+      final db = await database;
+      final rows = await db.query('runs', columns: ['id'], orderBy: 'id ASC');
+      return [for (final r in rows) r['id'] as int];
+    } catch (e, stack) {
+      debugPrint('[DB] getAllRunIds error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// The [limit] fastest efforts for [category], fastest first (null = all).
+  /// Ranked here at query time; ties go to the earlier effort, then id, so the
+  /// order is stable.
   Future<List<BestEffortRecord>> getBestEffortsForCategory(
     DistanceCategory category, {
-    int limit = 10,
+    int? limit = 10,
   }) async {
     try {
       final db = await database;
@@ -899,7 +938,7 @@ class DatabaseService {
         'best_efforts',
         where: 'distance_category = ?',
         whereArgs: [category.name],
-        orderBy: 'elapsed_seconds ASC',
+        orderBy: 'elapsed_seconds ASC, recorded_at ASC, id ASC',
         limit: limit,
       );
       return rows.map(BestEffortRecord.fromMap).toList();

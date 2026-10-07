@@ -4,6 +4,13 @@
 // distance + elapsed time), finds the fastest continuous segment for every
 // tracked benchmark distance the run actually covered. No DB/Flutter deps —
 // testable with plain fixtures, same spirit as engines/pr_engine.dart.
+//
+// CANONICAL ENTRY POINT: [BestEffortsService.analyzeRun]. It is the one place
+// that turns a run's samples into Best Efforts — points, closing point, data
+// validation and plausibility — and it is what BOTH the save-time path
+// (run_screen) and the historical rebuild call. The lower-level
+// [fastestSegmentSeconds] / [extract] stay available as the unvalidated
+// building blocks; nothing else should reimplement the calculation.
 
 /// Benchmark distances tracked for Best Efforts, in meters. `.name` is the
 /// stable key persisted to `best_efforts.distance_category` — never rename
@@ -40,6 +47,21 @@ enum DistanceCategory {
     DistanceCategory.marathon => 'Marathon',
   };
 
+  /// A time no human has beaten, in seconds: set slightly BELOW the current
+  /// world record for the distance so a legitimate elite run is never
+  /// rejected, while a GPS or clock glitch (a 5K "in 9 minutes") always is.
+  /// Not a performance standard — only a plausibility ceiling.
+  double get ceilingSeconds => switch (this) {
+    DistanceCategory.m400 => 42, // WR ~43.0
+    DistanceCategory.k1 => 130, // WR ~2:11
+    DistanceCategory.mi1 => 222, // WR ~3:43
+    DistanceCategory.k3 => 435, // WR ~7:17
+    DistanceCategory.k5 => 750, // WR ~12:35
+    DistanceCategory.k10 => 1560, // WR ~26:11
+    DistanceCategory.half => 3360, // WR ~56:42
+    DistanceCategory.marathon => 7200, // WR ~2:00:35
+  };
+
   static DistanceCategory? fromKey(String key) {
     for (final c in DistanceCategory.values) {
       if (c.name == key) return c;
@@ -71,8 +93,62 @@ class BestEffortResult {
   });
 }
 
+/// Data-quality rules for [BestEffortsService.analyzeRun]. Deliberately
+/// conservative: the goal is that an obvious GPS or clock glitch can't become
+/// a personal best, not to second-guess a fast but legitimate runner.
+class BestEffortsRules {
+  /// A stretch between two samples faster than this is not running (10 m/s is
+  /// 1:40/km, beyond what any recreational runner holds even for 15 s).
+  final double maxSegmentSpeedMps;
+
+  /// Distance may advance this far while the clock does not (whole-second
+  /// quantisation, a finish line landing in the same second as the last
+  /// sample). More than this with Δt ≤ 0 is a stalled clock.
+  final double maxStallDistanceM;
+
+  /// A window whose start edge has to be interpolated across samples further
+  /// apart than this is too sparse to trust (normal spacing is ~15 s).
+  final double maxEdgeGapSeconds;
+
+  /// Reject any effort faster than [DistanceCategory.ceilingSeconds].
+  final bool applyCeilings;
+
+  const BestEffortsRules({
+    this.maxSegmentSpeedMps = 10.0,
+    this.maxStallDistanceM = 5.0,
+    this.maxEdgeGapSeconds = 60.0,
+    this.applyCeilings = true,
+  });
+
+  static const standard = BestEffortsRules();
+}
+
 class BestEffortsService {
   BestEffortsService._();
+
+  /// THE canonical Best Efforts calculation for one run: decodes the track
+  /// samples, closes the run with its true totals, and returns the validated
+  /// fastest window for every [DistanceCategory] the run covers.
+  ///
+  /// [finalDistanceMeters]/[finalSeconds] are the run's stored totals
+  /// (`distanceKm × 1000`, `durationSeconds`): the last sample can sit up to
+  /// ~150 m / 15 s short of the finish, so they are appended as a closing
+  /// point. Windows that cross a stalled clock, an impossible-speed stretch or
+  /// sparse samples — and times beyond the plausibility ceiling — are
+  /// discarded, never rounded into a PB.
+  static List<BestEffortResult> analyzeRun(
+    List<Map<String, dynamic>> trackSamples, {
+    double? finalDistanceMeters,
+    double? finalSeconds,
+    BestEffortsRules rules = BestEffortsRules.standard,
+  }) {
+    final points = pointsFromTrackSamples(
+      trackSamples,
+      finalDistanceMeters: finalDistanceMeters,
+      finalSeconds: finalSeconds,
+    );
+    return extract(points, rules: rules);
+  }
 
   /// Converts a run's decoded `track_samples_json` (each `{'t': seconds,
   /// 'd': cumulativeMeters, ...}`) into [TelemetryPoint]s, prepending an
@@ -95,6 +171,7 @@ class BestEffortsService {
     ];
 
     void add(double d, double t) {
+      if (!d.isFinite || !t.isFinite) return;
       final last = points.last;
       if (d < last.distanceMeters || t < last.elapsedSeconds) return;
       points.add(TelemetryPoint(distanceMeters: d, elapsedSeconds: t));
@@ -116,11 +193,22 @@ class BestEffortsService {
 
   /// Extracts the fastest continuous segment for every [DistanceCategory]
   /// that [points] actually reaches. Categories never reached (run too
-  /// short) are omitted from the result.
-  static List<BestEffortResult> extract(List<TelemetryPoint> points) {
+  /// short) are omitted from the result. With [rules] null this is the plain,
+  /// unvalidated scan; [analyzeRun] always passes rules.
+  static List<BestEffortResult> extract(
+    List<TelemetryPoint> points, {
+    BestEffortsRules? rules,
+  }) {
     final results = <BestEffortResult>[];
     for (final category in DistanceCategory.values) {
-      final seconds = fastestSegmentSeconds(points, category.meters);
+      final seconds = fastestSegmentSeconds(
+        points,
+        category.meters,
+        rules: rules,
+        ceilingSeconds: (rules?.applyCeilings ?? false)
+            ? category.ceilingSeconds
+            : null,
+      );
       if (seconds != null) {
         results.add(
           BestEffortResult(category: category, elapsedSeconds: seconds),
@@ -137,12 +225,32 @@ class BestEffortsService {
   ///
   /// Both the window's trailing edge and its interpolation pointer only ever
   /// move forward, so this is O(n) per target distance.
+  ///
+  /// With [rules], a window is skipped (not the whole run) when it contains an
+  /// invalid stretch (impossible speed, or distance with no time) or when its
+  /// interpolated start edge spans sparse samples; with [ceilingSeconds] a
+  /// window faster than the plausibility ceiling is skipped. Remaining valid
+  /// windows still compete, so one glitch doesn't forfeit a legitimate effort
+  /// elsewhere in the run.
   static int? fastestSegmentSeconds(
     List<TelemetryPoint> points,
-    double targetMeters,
-  ) {
+    double targetMeters, {
+    BestEffortsRules? rules,
+    double? ceilingSeconds,
+  }) {
     if (points.length < 2 || targetMeters <= 0) return null;
     if (points.last.distanceMeters < targetMeters) return null;
+
+    // invalidBefore[i] = number of invalid stretches among segments 0..i-1.
+    List<int>? invalidBefore;
+    if (rules != null) {
+      invalidBefore = List<int>.filled(points.length, 0);
+      for (var i = 1; i < points.length; i++) {
+        invalidBefore[i] =
+            invalidBefore[i - 1] +
+            (_segmentInvalid(points[i - 1], points[i], rules) ? 1 : 0);
+      }
+    }
 
     int j = 0;
     double? bestSeconds;
@@ -161,11 +269,22 @@ class BestEffortsService {
       final d1 = points[j + 1].distanceMeters;
       final t0 = points[j].elapsedSeconds;
       final t1 = points[j + 1].elapsedSeconds;
+
+      if (rules != null) {
+        // Any invalid stretch the window passes through (segments j..right-1).
+        if (invalidBefore![right] - invalidBefore[j] > 0) continue;
+        // Start edge interpolated across sparse samples. Skipped when the edge
+        // sits exactly on a sample — nothing is interpolated then.
+        final startsOnSample = (targetBoundary - d0).abs() < 1e-9;
+        if (!startsOnSample && t1 - t0 > rules.maxEdgeGapSeconds) continue;
+      }
+
       final startTime = d1 == d0
           ? t0
           : t0 + (targetBoundary - d0) / (d1 - d0) * (t1 - t0);
 
       final segmentSeconds = points[right].elapsedSeconds - startTime;
+      if (ceilingSeconds != null && segmentSeconds < ceilingSeconds) continue;
       if (segmentSeconds > 0 &&
           (bestSeconds == null || segmentSeconds < bestSeconds)) {
         bestSeconds = segmentSeconds;
@@ -173,6 +292,23 @@ class BestEffortsService {
     }
 
     return bestSeconds?.round();
+  }
+
+  /// A stretch between consecutive samples that cannot be real running:
+  /// distance advancing with no (or negative) time, beyond the quantisation
+  /// allowance, or faster than the maximum plausible speed. A stretch with no
+  /// forward movement can only make an effort slower, never a false PB, so it
+  /// is never invalid.
+  static bool _segmentInvalid(
+    TelemetryPoint a,
+    TelemetryPoint b,
+    BestEffortsRules rules,
+  ) {
+    final dd = b.distanceMeters - a.distanceMeters;
+    if (dd <= 0) return false;
+    final dt = b.elapsedSeconds - a.elapsedSeconds;
+    if (dt <= 0) return dd > rules.maxStallDistanceM;
+    return dd / dt > rules.maxSegmentSpeedMps;
   }
 
   /// Formats a duration as `m:ss`, or `h:mm:ss` once it reaches an hour —
