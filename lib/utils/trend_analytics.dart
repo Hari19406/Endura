@@ -315,10 +315,11 @@ class TrendAnalytics {
 
   // ── Aggregation ───────────────────────────────────────────────────────────
 
-  static bool hasHr(TrendRun r) {
-    final hr = r.avgHr;
-    return hr != null && hr >= _minHr && hr <= _maxHr;
-  }
+  static bool hasHr(TrendRun r) => isValidHr(r.avgHr);
+
+  /// A plausible average HR (30-230 bpm); null or out of range counts as
+  /// "no HR", never as zero.
+  static bool isValidHr(int? hr) => hr != null && hr >= _minHr && hr <= _maxHr;
 
   static TrendSummary summarize(Iterable<TrendRun> runs) {
     var count = 0;

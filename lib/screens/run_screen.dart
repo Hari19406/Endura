@@ -35,6 +35,8 @@ import '../services/hr_session.dart';
 import '../utils/hr_analytics.dart';
 import '../utils/gap_calculator.dart';
 import '../services/best_efforts_service.dart';
+import '../models/run_weather.dart';
+import '../services/weather_service.dart';
 import '../theme/app_colors.dart';
 import '../config/map_config.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -202,6 +204,10 @@ class _RunScreenState extends State<RunScreen>
   // ignore: unused_field
   bool _wasRunningBeforeBackground = false;
   DateTime? _runStartTime;
+
+  /// Weather lookup kicked off when the run begins (cache-first, so normally no
+  /// extra request after the pre-run briefing). Awaited - briefly - at save.
+  Future<WeatherSnapshot?>? _startWeatherFetch;
 
   String _distanceUnit = 'km';
 
@@ -841,6 +847,9 @@ class _RunScreenState extends State<RunScreen>
 
   Future<void> _executeStartTracking() async {
     _runStartTime = DateTime.now();
+    _startWeatherFetch = WeatherService.getCurrentWeather().catchError(
+      (_) => null,
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(
@@ -1521,6 +1530,19 @@ class _RunScreenState extends State<RunScreen>
             ? _formatPaceFromSeconds(gapAvgSecPerKm)
             : null;
 
+        // Weather around the run (never blocks or fails the save): the lookup
+        // started with the run, accepted only if observed near the run's
+        // window. Indoor / route-less runs get none.
+        final runWeather = await RunWeatherCapture.resolve(
+          startFetch: _startWeatherFetch,
+          fallbackFetch: WeatherService.getCurrentWeather,
+          startedAt:
+              _runStartTime ??
+              runDate.subtract(Duration(seconds: _capturedMainSeconds)),
+          endedAt: runDate,
+          hasRoute: polyline.isNotEmpty,
+        );
+
         final newRun = RunRecord(
           distanceKm: _capturedMainDistanceM / 1000,
           averagePace: _capturedMainPace,
@@ -1539,6 +1561,7 @@ class _RunScreenState extends State<RunScreen>
           trackSamples: capturedTrackSamples,
           scheduledDayId: _isFreeRun ? null : _sched?.dayId,
           title: runTitle,
+          weather: runWeather,
         );
         final insertedId = await DatabaseService.instance.insertRun(newRun);
         CloudSyncService.instance.syncPendingRuns().then(

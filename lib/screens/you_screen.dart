@@ -24,6 +24,8 @@ import '../widgets/best_efforts_preview_card.dart';
 import '../widgets/shoe_edit_sheet.dart';
 import '../widgets/shoe_locker_view.dart';
 import '../widgets/trends_card.dart';
+import '../widgets/weather_performance_card.dart';
+import '../utils/weather_analytics.dart';
 import '../utils/trend_analytics.dart';
 import 'milestones_screen.dart';
 import 'history_tab.dart';
@@ -53,6 +55,7 @@ class _YouScreenState extends State<YouScreen>
   List<dynamic> _runHistory = [];
   List<dynamic> _runRecords = [];
   List<TrendRun> _trendRuns = [];
+  List<WeatherRun> _weatherRuns = [];
 
   bool _isLoading = true;
   String _errorMessage = '';
@@ -114,6 +117,7 @@ class _YouScreenState extends State<YouScreen>
       List<dynamic> runs = await loadSavedRuns();
       final records = await DatabaseService.instance.getAllRuns();
       final trendRuns = await DatabaseService.instance.getTrendRuns();
+      final weatherRuns = await DatabaseService.instance.getWeatherRuns();
       final bestEfforts = await DatabaseService.instance.getAllCategoryPRs();
 
       // ── Athlete identity header ──────────────────────────────────────────
@@ -198,6 +202,7 @@ class _YouScreenState extends State<YouScreen>
           _newAchievements = newlyUnlocked;
           _runRecords = records;
           _trendRuns = trendRuns;
+          _weatherRuns = weatherRuns;
           _runHistory = runs;
           _profile = profile;
           _counts = counts;
@@ -458,6 +463,10 @@ class _YouScreenState extends State<YouScreen>
             loadBestEfforts: DatabaseService.instance.getBestEffortSeries,
             useMiles: _useMiles,
           ),
+          const SizedBox(height: 16),
+
+          // ②b WEATHER PERFORMANCE
+          WeatherPerformanceCard(runs: _weatherRuns, useMiles: _useMiles),
           const SizedBox(height: 16),
 
           // ③ PERSONAL RECORDS

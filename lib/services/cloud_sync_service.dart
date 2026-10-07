@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../engines/memory/engine_memory_service.dart';
 import '../models/activity_telemetry.dart' show ActivityDetail;
+import '../models/run_weather.dart';
 import '../utils/database_service.dart';
 
 class CloudSyncService {
@@ -32,15 +33,21 @@ class CloudSyncService {
         planProgress: plan.$2,
         splits: _uploadSplitsFor(run),
       );
-      try {
-        await _client.from('runs').upsert(payload);
-      } on PostgrestException catch (e) {
-        // The `title` column ships with a Supabase migration. If this build
-        // reaches a project that hasn't applied it yet, retry without the
-        // title rather than failing every run upload until it does.
-        if (!payload.containsKey('title') || !isMissingTitleColumn(e)) rethrow;
-        debugPrint('CloudSync: runs.title column missing — uploading without');
-        await _client.from('runs').upsert(Map.of(payload)..remove('title'));
+      // The optional `title` and `weather` columns ship with Supabase
+      // migrations. If this build reaches a project that hasn't applied one
+      // yet, retry without that column rather than failing every run upload
+      // until it does.
+      var body = payload;
+      for (var attempt = 0; ; attempt++) {
+        try {
+          await _client.from('runs').upsert(body);
+          break;
+        } on PostgrestException catch (e) {
+          final reduced = withoutMissingOptionalColumn(body, e);
+          if (reduced == null || attempt >= 2) rethrow;
+          debugPrint('CloudSync: optional runs column missing - retrying');
+          body = reduced;
+        }
       }
 
       await DatabaseService.instance.markRunSynced(run.id!);
@@ -75,6 +82,7 @@ class CloudSyncService {
     if (run.rpe != null) 'rpe': run.rpe,
     if (run.elapsedSeconds != null) 'elapsed_seconds': run.elapsedSeconds,
     if (run.title != null) 'title': run.title,
+    if (run.weather != null) 'weather': run.weather!.toJson(),
     'plan_name': ?planName,
     'plan_progress': ?planProgress,
     if (splits.isNotEmpty) 'splits': splits,
@@ -86,6 +94,28 @@ class CloudSyncService {
   static bool isMissingTitleColumn(PostgrestException e) =>
       (e.code == 'PGRST204' || e.code == '42703') &&
       e.message.toLowerCase().contains('title');
+
+  /// True when [e] is PostgREST saying the `runs.weather` column doesn't exist.
+  @visibleForTesting
+  static bool isMissingWeatherColumn(PostgrestException e) =>
+      (e.code == 'PGRST204' || e.code == '42703') &&
+      e.message.toLowerCase().contains('weather');
+
+  /// [payload] minus the optional column [e] says is missing, or null when [e]
+  /// isn't a missing-optional-column error for something in [payload].
+  @visibleForTesting
+  static Map<String, dynamic>? withoutMissingOptionalColumn(
+    Map<String, dynamic> payload,
+    PostgrestException e,
+  ) {
+    if (payload.containsKey('title') && isMissingTitleColumn(e)) {
+      return Map.of(payload)..remove('title');
+    }
+    if (payload.containsKey('weather') && isMissingWeatherColumn(e)) {
+      return Map.of(payload)..remove('weather');
+    }
+    return null;
+  }
 
   // ── Sync all unsynced local runs ──────────────────────────────────────────
 
@@ -329,6 +359,7 @@ class CloudSyncService {
             elevationGain: (row['elevation_gain'] as num?)?.toDouble() ?? 0,
             elapsedSeconds: row['elapsed_seconds'] as int?,
             title: row['title'] as String?,
+            weather: RunWeather.tryParse(row['weather']),
           );
 
           await DatabaseService.instance.insertRun(run);
@@ -385,6 +416,7 @@ class CloudSyncService {
               elevationGain: (row['elevation_gain'] as num?)?.toDouble() ?? 0,
               elapsedSeconds: row['elapsed_seconds'] as int?,
               title: row['title'] as String?,
+              weather: RunWeather.tryParse(row['weather']),
             ),
           );
           restored++;

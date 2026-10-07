@@ -8,7 +8,9 @@ import 'stats.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import '../services/best_efforts_service.dart';
+import '../models/run_weather.dart';
 import 'trend_analytics.dart' show BestEffortPoint, TrendRun;
+import 'weather_analytics.dart' show WeatherRun;
 
 class RunRecord {
   final int? id;
@@ -59,6 +61,12 @@ class RunRecord {
   // before this field existed — readers fall back to a workout-type label. ───
   final String? title;
 
+  // ── Weather the run was done in (temperature, humidity, condition ...),
+  // stored as one JSON payload (`weather_json`). Null for runs recorded before
+  // this field existed, indoor/manual runs, and runs where the weather lookup
+  // failed - never defaulted. ───────────────────────────────────────────────
+  final RunWeather? weather;
+
   const RunRecord({
     this.id,
     required this.distanceKm,
@@ -81,6 +89,7 @@ class RunRecord {
     this.trackSamples = const [],
     this.scheduledDayId,
     this.title,
+    this.weather,
   });
 
   Map<String, dynamic> toMap() => {
@@ -108,6 +117,7 @@ class RunRecord {
     'track_samples_json': jsonEncode(trackSamples),
     if (scheduledDayId != null) 'scheduled_day_id': scheduledDayId,
     if (title != null) 'title': title,
+    if (weather != null) 'weather_json': jsonEncode(weather!.toJson()),
   };
 
   factory RunRecord.fromMap(Map<String, dynamic> map) => RunRecord(
@@ -135,6 +145,7 @@ class RunRecord {
     trackSamples: _decodeTrackSamples(map['track_samples_json'] as String?),
     scheduledDayId: map['scheduled_day_id'] as String?,
     title: map['title'] as String?,
+    weather: RunWeather.tryParse(map['weather_json']),
   );
 
   static List<Map<String, dynamic>> _decodeSplits(String? json) {
@@ -307,7 +318,9 @@ class DatabaseService {
       //       benchmark distance, ranked at query time; see BestEffortsService)
       // v12 → added `runs.title` (user-editable run name, set on the summary
       //       screen; NULL for older runs)
-      version: 12,
+      // v13 → added `runs.weather_json` (nullable per-run weather payload;
+      //       NULL for older runs and runs without a weather lookup)
+      version: 13,
       onCreate: (db, _) => _createSchema(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         // Each migration block is additive and guarded by the old version so
@@ -469,6 +482,16 @@ class DatabaseService {
             debugPrint('[DB] title already exists, skipping: $e');
           }
         }
+
+        if (oldVersion < 13) {
+          // v12 → v13: weather_json — nullable; existing runs stay valid and
+          // simply have no weather.
+          try {
+            await db.execute('ALTER TABLE runs ADD COLUMN weather_json TEXT');
+          } catch (e) {
+            debugPrint('[DB] weather_json already exists, skipping: $e');
+          }
+        }
       },
     );
   }
@@ -499,7 +522,8 @@ class DatabaseService {
         gap_average_pace  TEXT,
         track_samples_json TEXT  NOT NULL DEFAULT '[]',
         scheduled_day_id  TEXT,
-        title             TEXT
+        title             TEXT,
+        weather_json      TEXT
       )
     ''');
     await db.execute('''
@@ -761,6 +785,48 @@ class DatabaseService {
       ];
     } catch (e, stack) {
       debugPrint('[DB] getTrendRuns error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// Outdoor runs that carry stored weather, reduced to what Weather
+  /// Analytics needs. Runs without weather (older runs, failed lookups) and
+  /// runs without a GPS route (treadmill / manual) are excluded in SQL, so
+  /// they can never be counted as weather samples. The route itself is not
+  /// read - only tested for emptiness.
+  Future<List<WeatherRun>> getWeatherRuns() async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        columns: [
+          'distance_km',
+          'duration_seconds',
+          'avg_heart_rate',
+          'weather_json',
+        ],
+        where: "weather_json IS NOT NULL AND route_polyline != ''",
+        orderBy: 'date ASC',
+      );
+      final out = <WeatherRun>[];
+      for (final r in rows) {
+        final weather = RunWeather.tryParse(r['weather_json']);
+        if (weather == null) continue;
+        out.add(
+          WeatherRun(
+            tempC: weather.tempC,
+            humidityPercent: weather.humidityPercent,
+            condition: weather.condition,
+            distanceKm: (r['distance_km'] as num?)?.toDouble() ?? 0,
+            movingTimeSeconds: (r['duration_seconds'] as num?)?.toInt() ?? 0,
+            avgHr: (r['avg_heart_rate'] as num?)?.toInt(),
+          ),
+        );
+      }
+      return out;
+    } catch (e, stack) {
+      debugPrint('[DB] getWeatherRuns error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
       return [];
     }
