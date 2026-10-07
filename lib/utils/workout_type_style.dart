@@ -55,6 +55,8 @@ class WorkoutTypeStyle {
         return 'Recovery';
       case 'free':
         return 'Free Run';
+      case 'race':
+        return 'Race';
       default:
         return type;
     }
@@ -76,6 +78,7 @@ class WorkoutTypeStyle {
       case 'long':
         return c.workoutLong;
       case 'free':
+      case 'race':
         return c.chartAccent;
       case 'recovery':
         return c.textTertiary;

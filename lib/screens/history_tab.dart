@@ -44,6 +44,7 @@ const List<_TypeFilter> _filters = [
   _TypeFilter('interval', 'Intervals'),
   _TypeFilter('long', 'Long'),
   _TypeFilter('free', 'Free Run'),
+  _TypeFilter('race', 'Race'),
 ];
 
 class _MonthSection {

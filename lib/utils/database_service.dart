@@ -9,6 +9,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import '../services/best_efforts_service.dart';
 import '../models/run_weather.dart';
+import 'observed_performance.dart' show ObservedEffort, ObservedPerformance;
+import 'race_history.dart' show RaceRun;
 import 'trend_analytics.dart' show BestEffortPoint, TrendRun;
 import 'weather_analytics.dart' show WeatherRun;
 
@@ -972,6 +974,102 @@ class DatabaseService {
       debugPrint('[DB] updateRunRpe error: $e');
       FirebaseCrashlytics.instance.recordError(e, stack);
       return false;
+    }
+  }
+
+  /// Marks or unmarks a run as a race. A race is an ordinary run whose
+  /// `workout_type` is `'race'`; no other column changes. Unmarking restores
+  /// `'free'` (the run's previous type is not kept). Only a run that is
+  /// currently (un)marked changes, so other types are never overwritten by an
+  /// unmark. Returns the run's resulting workout type, or null when the run
+  /// doesn't exist or the write failed.
+  Future<String?> setRunRace(int runId, bool isRace) async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        columns: ['workout_type'],
+        where: 'id = ?',
+        whereArgs: [runId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      final current = rows.first['workout_type'] as String? ?? 'easy';
+      final next = isRace ? 'race' : (current == 'race' ? 'free' : current);
+      if (next != current) {
+        await db.update(
+          'runs',
+          {'workout_type': next},
+          where: 'id = ?',
+          whereArgs: [runId],
+        );
+      }
+      return next;
+    } catch (e, stack) {
+      debugPrint('[DB] setRunRace error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return null;
+    }
+  }
+
+  /// Every stored Best Effort at 3K or longer recorded since [since], as
+  /// [ObservedEffort]s, for observed-performance predictions. Read straight
+  /// from `best_efforts` — nothing is recalculated.
+  Future<List<ObservedEffort>> getObservedEfforts({
+    required DateTime since,
+  }) async {
+    try {
+      final db = await database;
+      final cats = ObservedPerformance.sourceCategories;
+      final rows = await db.query(
+        'best_efforts',
+        columns: ['distance_category', 'elapsed_seconds', 'recorded_at'],
+        where:
+            'distance_category IN (${List.filled(cats.length, '?').join(',')})'
+            ' AND recorded_at >= ?',
+        whereArgs: [for (final c in cats) c.name, since.toIso8601String()],
+      );
+      return [
+        for (final r in rows)
+          if (DistanceCategory.fromKey(r['distance_category'] as String)
+              case final cat?)
+            ObservedEffort(
+              category: cat,
+              seconds: (r['elapsed_seconds'] as num).toInt(),
+              date: DateTime.parse(r['recorded_at'] as String),
+            ),
+      ];
+    } catch (e, stack) {
+      debugPrint('[DB] getObservedEfforts error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
+    }
+  }
+
+  /// Every run marked as a race, oldest first, reduced to the four columns race
+  /// history needs (no polyline, splits or samples).
+  Future<List<RaceRun>> getRaceRuns() async {
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'runs',
+        columns: ['id', 'date', 'distance_km', 'duration_seconds'],
+        where: "workout_type = 'race'",
+        orderBy: 'date ASC',
+      );
+      return [
+        for (final r in rows)
+          RaceRun(
+            id: r['id'] as int,
+            date: DateTime.parse(r['date'] as String),
+            distanceKm: (r['distance_km'] as num).toDouble(),
+            durationSeconds: (r['duration_seconds'] as num).toInt(),
+          ),
+      ];
+    } catch (e, stack) {
+      debugPrint('[DB] getRaceRuns error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return [];
     }
   }
 

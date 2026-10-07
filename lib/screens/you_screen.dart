@@ -21,6 +21,7 @@ import '../widgets/achievement_tile.dart';
 import '../widgets/ambient_scaffold.dart';
 import '../widgets/athlete_profile_header.dart';
 import '../widgets/best_efforts_preview_card.dart';
+import '../widgets/observed_performance_card.dart';
 import '../widgets/shoe_edit_sheet.dart';
 import '../widgets/shoe_locker_view.dart';
 import '../widgets/trends_card.dart';
@@ -478,6 +479,22 @@ class _YouScreenState extends State<YouScreen>
           // ③b BEST EFFORTS
           if (_bestEfforts.isNotEmpty) ...[
             _buildBestEffortsCard(),
+            const SizedBox(height: 16),
+          ],
+
+          // ③c CURRENT PERFORMANCE (observed predictions + race history)
+          if (_runHistory.isNotEmpty) ...[
+            ObservedPerformanceCard(
+              key: ValueKey(
+                _bestEfforts.values.map((e) => e.elapsedSeconds).join(','),
+              ),
+              loadEfforts: (since) =>
+                  DatabaseService.instance.getObservedEfforts(since: since),
+              bests: {
+                for (final e in _bestEfforts.entries)
+                  e.key: e.value.elapsedSeconds,
+              },
+            ),
             const SizedBox(height: 16),
           ],
 

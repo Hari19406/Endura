@@ -15,6 +15,7 @@ import '../utils/database_service.dart';
 import '../utils/matched_run_comparison.dart';
 import '../utils/pace_analytics.dart';
 import '../utils/route_matcher.dart';
+import '../utils/split_strategy.dart';
 import '../utils/run_effort_analytics.dart';
 import '../utils/unit_utils.dart';
 import '../widgets/ambient_scaffold.dart';
@@ -22,6 +23,7 @@ import '../widgets/best_effort_rank_badge.dart';
 import '../widgets/matched_run_card.dart';
 import '../widgets/run_comments_sheet.dart';
 import '../widgets/run_share_card.dart';
+import '../widgets/split_strategy_card.dart';
 
 /// Modern running-telemetry detail view: header + summary grid, route preview,
 /// kilometre splits, a grade-adjusted-pace block, and up to four scrubbable
@@ -91,6 +93,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   /// Today's run vs earlier runs on the same route; null until (and unless) a
   /// match is found. Computed on demand for local runs only.
   MatchedRunsResult? _matched;
+
+  /// Whether this (local) run is marked as a race. A race is an ordinary run
+  /// whose `workout_type` is 'race'.
+  late bool _isRace = widget.activity.workoutType == 'race';
 
   @override
   void initState() {
@@ -175,6 +181,30 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     } catch (e) {
       if (kDebugMode) debugPrint('[ActivityDetail] matched runs failed: $e');
     }
+  }
+
+  /// Local runs only — a Feed run isn't the viewer's to classify.
+  bool get _canMarkRace => a.runId != null && !a.runIdIsCloud;
+
+  Future<void> _toggleRace() async {
+    final id = a.runId;
+    if (id == null) return;
+    final want = !_isRace;
+    final type = await DatabaseService.instance.setRunRace(id, want);
+    if (type == null || !mounted) return;
+    setState(() => _isRace = type == 'race');
+    // Fire-and-forget: a run that hasn't uploaded yet carries the new type
+    // when it does.
+    CloudSyncService.instance
+        .updateRunWorkoutType(id, type)
+        .catchError((_) => false);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(_isRace ? 'Marked as a race' : 'Removed race mark'),
+        ),
+      );
   }
 
   void _onUnitPrefChanged() {
@@ -438,6 +468,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   tooltip: 'Delete workout',
                   onPressed: _confirmDelete,
                 ),
+              if (_canMarkRace)
+                IconButton(
+                  key: const Key('mark-race-button'),
+                  icon: Icon(
+                    _isRace ? Icons.flag : Icons.flag_outlined,
+                    color: _isRace ? c.chartAccent : c.textPrimary,
+                    size: 20,
+                  ),
+                  tooltip: _isRace ? 'Unmark race' : 'Mark as race',
+                  onPressed: _toggleRace,
+                ),
               IconButton(
                 icon: Icon(Icons.ios_share, color: c.textPrimary, size: 20),
                 tooltip: 'Share',
@@ -467,6 +508,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   ],
                   if (a.splits.isNotEmpty) ...[
                     _splitsCard(c),
+                    const SizedBox(height: 16),
+                  ],
+                  if (SplitStrategies.analyze(a.splits)
+                      case final strategy?) ...[
+                    SplitStrategyCard(analysis: strategy, useMiles: _useMiles),
                     const SizedBox(height: 16),
                   ],
                   if (a.bestEfforts.isNotEmpty) ...[

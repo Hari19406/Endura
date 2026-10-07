@@ -247,6 +247,38 @@ class CloudSyncService {
     }
   }
 
+  /// Pushes a race mark / unmark (a `workout_type` change) for a run that was
+  /// already synced. Same date-window match as [updateRunTitle]; a run that
+  /// hasn't uploaded yet uploads with the new type already on the local row.
+  Future<bool> updateRunWorkoutType(int runId, String workoutType) async {
+    if (!isSignedIn) return false;
+
+    try {
+      final localRun = await _getLocalRun(runId);
+      if (localRun == null) return false;
+
+      final utcDate = localRun.date.toUtc();
+      final windowStart = utcDate
+          .subtract(const Duration(minutes: 1))
+          .toIso8601String();
+      final windowEnd = utcDate
+          .add(const Duration(minutes: 1))
+          .toIso8601String();
+
+      await _client
+          .from('runs')
+          .update({'workout_type': workoutType})
+          .eq('user_id', _userId!)
+          .gte('date', windowStart)
+          .lte('date', windowEnd);
+      return true;
+    } catch (e, stack) {
+      debugPrint('[CloudSync] updateRunWorkoutType error: $e');
+      FirebaseCrashlytics.instance.recordError(e, stack);
+      return false;
+    }
+  }
+
   /// Best-effort resolve of the Supabase `runs.id` for a locally-recorded run,
   /// matched by a ±1-minute date window + a close distance (mirrors
   /// [updateRunRpe]'s approach) — there is no persisted local↔cloud id mapping.
